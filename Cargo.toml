@@ -1,33 +1,69 @@
-[package]
-name = "bizkit"
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.100"
-description = "Self-hosted business hub for small software companies: analytics, forms, webhooks and document signing"
 authors = ["Hayden"]
 license = "MIT"
 repository = "https://github.com/hay-kot/bizkit"
 readme = "README.md"
-keywords = ["cli"]
-categories = ["command-line-utilities"]
+keywords = ["cli", "self-hosted", "business"]
+categories = ["command-line-utilities", "web-programming::http-server"]
 # Releases ship as binaries through GoReleaser, not through crates.io.
 publish = false
 
-[dependencies]
-anyhow = "1"
+# Versions name a release at least 7 days old when they were added. Cargo has
+# no release-age gate, so the exact pins (`=`) hold back releases that are
+# newer than that. Security fixes skip the wait, as in renovate.json: sqlx
+# 0.9.1 (for libsqlite3-sys 0.39, RUSTSEC-2026-0459), lettre 0.11.24
+# (RUSTSEC-2026-0560 to -0565) and url 2.5.9 (RUSTSEC-2026-0592).
+[workspace.dependencies]
+bizkit-core = { path = "crates/bizkit-core" }
+bizkit-testkit = { path = "crates/bizkit-testkit" }
+bizkit-web = { path = "crates/bizkit-web" }
+
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = { version = "0.8.9", features = ["macros"] }
+axum-test = "21.1.0"
+base64 = "0.23.1"
+bytes = "1.12.1"
 clap = { version = "4", features = ["derive", "env", "string", "wrap_help"] }
 clap_complete = "4"
 etcetera = "0.11"
-serde = { version = "1", features = ["derive"] }
+futures = "0.3.34"
+globset = "0.4.21"
+http = "1.5.0"
+insta = { version = "1.49.0", features = ["filters", "json", "redactions"] }
+jsonschema = { version = "=0.61.2", default-features = false }
+lettre = { version = "=0.11.24", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
+mime_guess = "2.0.5"
+proptest = "1.12.0"
+rand = "0.10.4"
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+rmcp = { version = "=3.10.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
+rust-embed = "8.14.0"
+serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = "2"
-tracing = "0.1"
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+sha2 = "0.11.1"
+sqlx = { version = "=0.9.1", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "macros", "migrate", "json", "uuid"] }
+tempfile = "3.27.0"
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["formatting", "parsing"] }
+tokio = { version = "1.54.1", features = ["fs", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-util = "0.7.20"
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.7.1", features = ["limit", "request-id", "timeout", "trace", "util"] }
+tracing = "0.1.44"
 tracing-subscriber = "0.3"
-
-[dev-dependencies]
-assert_cmd = "2"
-insta = "1"
-predicates = "3"
-tempfile = "3"
+url = { version = "=2.5.9", features = ["serde"] }
+utoipa = { version = "6.0.0", features = ["uuid", "openapi_extensions", "preserve_order"] }
+uuid = { version = "=1.29.2", features = ["v7", "serde"] }
 
 [profile.release]
 codegen-units = 1
@@ -37,7 +73,7 @@ strip = true
 # The lint set is strict on purpose: it keeps generated and hand-written code
 # to the same bar. Silence a lint at the use site with
 # `#[expect(clippy::name, reason = "...")]`, never with a blanket allow here.
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "forbid"
 let_underscore_drop = "warn"
 missing_debug_implementations = "warn"
@@ -46,7 +82,7 @@ unreachable_pub = "warn"
 unused_lifetimes = "warn"
 unused_qualifications = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 cargo = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }

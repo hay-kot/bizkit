@@ -1,0 +1,53 @@
+{
+  "name": "bizkit-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "gen": "openapi-ts",
+    "lint": "eslint . && prettier --check src",
+    "stylelint": "stylelint \"src/**/*.{css,vue}\"",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write src"
+  },
+  "dependencies": {
+    "@pinia/colada": "^1.4.9",
+    "@vueuse/core": "^15.0.0",
+    "lucide-vue-next": "^1.0.0",
+    "pinia": "^4.1.0",
+    "vue": "^3.5.46",
+    "vue-router": "^5.5.1"
+  },
+  "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
+    "@eslint/js": "^10.0.1",
+    "@hey-api/openapi-ts": "0.99.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "@vue/test-utils": "^2.6.0",
+    "@vue/tsconfig": "^0.9.1",
+    "daisyui": "^5.8.2",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-better-tailwindcss": "^4.11.0",
+    "eslint-plugin-vue": "^10.12.1",
+    "globals": "^17.14.0",
+    "happy-dom": "^21.0.4",
+    "postcss-html": "^2.0.1",
+    "prettier": "^3.10.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "stylelint": "^18.1.0",
+    "stylelint-config-recommended-vue": "^2.0.0",
+    "stylelint-config-standard": "^41.1.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1",
+    "vue-eslint-parser": "^10.4.2",
+    "vue-tsc": "^3.3.14"
+  }
+}

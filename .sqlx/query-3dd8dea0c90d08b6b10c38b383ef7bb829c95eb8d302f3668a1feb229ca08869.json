@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE magic_links SET consumed_at = ?\n         WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?\n         RETURNING email",
+  "describe": {
+    "columns": [
+      {
+        "name": "email",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "magic_links",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3dd8dea0c90d08b6b10c38b383ef7bb829c95eb8d302f3668a1feb229ca08869"
+}

@@ -12,24 +12,24 @@ questions:
 
 rewrites:
   - from: templates/src/commands/command.rs
-    to: "src/commands/{{ .Scaffold.command_name | toSnakeCase }}.rs"
+    to: "crates/bizkit/src/commands/{{ .Scaffold.command_name | toSnakeCase }}.rs"
 
 inject:
   - name: "declare module"
-    path: src/commands.rs
+    path: crates/bizkit/src/commands.rs
     at: "// +scaffold:command:module"
     mode: before
     template: |
       pub(crate) mod {{ .Scaffold.command_name | toSnakeCase }};
   - name: "add subcommand"
-    path: src/cli.rs
+    path: crates/bizkit/src/cli.rs
     at: "// +scaffold:command:variant"
     mode: before
     template: |
       /// Run the {{ .Scaffold.command_name }} command
       {{ .Scaffold.command_name | toPascalCase }}(commands::{{ .Scaffold.command_name | toSnakeCase }}::Args),
   - name: "dispatch subcommand"
-    path: src/main.rs
+    path: crates/bizkit/src/main.rs
     at: "// +scaffold:command:dispatch"
     mode: before
     template: |

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.user_id AS \"user_id: UserId\", u.email, s.last_seen_at AS \"last_seen_at: UnixMillis\"\n           FROM sessions s JOIN users u ON u.id = s.user_id\n           WHERE s.token_hash = ? AND s.expires_at > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id: UserId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "last_seen_at: UnixMillis",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "last_seen_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6d5e0b23967f664b85204fdbc85a688e4dc1b8967b46f91e8a7612452f73bdb6"
+}

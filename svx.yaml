@@ -1,0 +1,34 @@
+# Dev stack for `svx up`; `svx guide` explains the format. Each checkout gets
+# its own ports, data dir and Mailpit, so stacks never share a database.
+project: bizkit
+
+settings:
+  window_name: "bk.{{ .service.name }}"
+
+services:
+  mailpit:
+    run: exec mailpit --listen 127.0.0.1:$PORT --smtp 127.0.0.1:$PORT_SMTP --database $SVX_STACK_DIR/mailpit.db
+    port: 8025
+    ports: { smtp: 1025 }
+    ready: { http: /api/v1/info }
+    links: { Mailpit: / }
+
+  api:
+    # The base URL is the UI's, so magic links open Vite and the browser's
+    # Origin passes the CSRF check.
+    run: >-
+      exec cargo run -p bizkit --features test-hooks -- --config dev/bizkit.yaml serve
+      --listen 127.0.0.1:$PORT --base-url $SVX_URL_UI
+      --data-dir $SVX_STACK_DIR/data --smtp-url smtp://127.0.0.1:$SVX_PORT_MAILPIT_SMTP
+    port: 8484
+    depends: [mailpit]
+    ready: { http: /healthz, timeout: 5m } # the first cargo build is slow
+    links: { OpenAPI: /api/openapi.json }
+
+  ui:
+    run: exec pnpm -C web dev --host 127.0.0.1 --port $PORT --strictPort
+    port: 5173
+    depends: [api]
+    env:
+      BIZKIT_API_URL: '{{ url "api" }}' # vite.config.ts proxies /api, /mcp and /m here
+    links: { App: / }

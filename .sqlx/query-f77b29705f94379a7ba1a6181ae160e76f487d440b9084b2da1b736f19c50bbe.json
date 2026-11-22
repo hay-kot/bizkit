@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: ProjectId\", workspace_id AS \"workspace_id: WorkspaceId\", slug, name,\n                  created_at AS \"created_at: UnixMillis\"\n           FROM projects WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ProjectId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "slug",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f77b29705f94379a7ba1a6181ae160e76f487d440b9084b2da1b736f19c50bbe"
+}

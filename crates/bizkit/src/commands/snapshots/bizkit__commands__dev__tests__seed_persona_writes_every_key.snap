@@ -1,0 +1,48 @@
+---
+source: crates/bizkit/src/commands/dev.rs
+expression: manifest
+---
+{
+  "accounts": {
+    "admin": {
+      "email": "admin+ns1@e2e.test",
+      "id": "[id]",
+      "session_token": "[token]"
+    },
+    "member": {
+      "email": "member+ns1@e2e.test",
+      "id": "[id]",
+      "session_token": "[token]"
+    }
+  },
+  "api_keys": {
+    "full": {
+      "id": "[id]",
+      "token": "[token]"
+    }
+  },
+  "invitations": {
+    "invitee": {
+      "email": "invitee+ns1@e2e.test",
+      "id": "[id]"
+    }
+  },
+  "namespace": "ns1",
+  "persona": "team",
+  "projects": {
+    "app": {
+      "id": "[id]",
+      "slug": "app"
+    },
+    "site": {
+      "id": "[id]",
+      "slug": "site"
+    }
+  },
+  "workspaces": {
+    "main": {
+      "id": "[id]",
+      "slug": "team-ns1"
+    }
+  }
+}

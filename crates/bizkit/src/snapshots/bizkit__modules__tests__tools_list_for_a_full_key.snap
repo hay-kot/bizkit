@@ -1,0 +1,427 @@
+---
+source: crates/bizkit/src/modules.rs
+expression: tools
+---
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create an API key; the token is shown once",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A new key.",
+        "properties": {
+          "expires_in_days": {
+            "description": "Days until the key expires; never when absent.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "A label.",
+            "type": "string"
+          },
+          "scopes": {
+            "description": "Scopes such as `projects:read`. You can only grant scopes you hold.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "scopes"
+        ],
+        "type": "object"
+      },
+      "name": "api_keys_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the API keys of a workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Just the workspace from the path.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "api_keys_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Revoke an API key",
+      "inputSchema": {
+        "$defs": {
+          "ApiKeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A key of a workspace.",
+        "properties": {
+          "api_key_id": {
+            "$ref": "#/$defs/ApiKeyId",
+            "description": "The key."
+          }
+        },
+        "required": [
+          "api_key_id"
+        ],
+        "type": "object"
+      },
+      "name": "api_keys_revoke"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Invite an email to a workspace; mails them a link",
+      "inputSchema": {
+        "$defs": {
+          "Role": {
+            "description": "A member's role in a workspace.",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Who to invite.",
+        "properties": {
+          "email": {
+            "description": "The email to invite.",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/Role",
+            "description": "The role they get on accepting."
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ],
+        "type": "object"
+      },
+      "name": "invitations_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List pending invitations of a workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Just the workspace from the path.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "invitations_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Revoke a pending invitation",
+      "inputSchema": {
+        "$defs": {
+          "InvitationId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An invitation of a workspace.",
+        "properties": {
+          "invitation_id": {
+            "$ref": "#/$defs/InvitationId",
+            "description": "The invitation."
+          }
+        },
+        "required": [
+          "invitation_id"
+        ],
+        "type": "object"
+      },
+      "name": "invitations_revoke"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the members of a workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Just the workspace from the path.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "members_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Remove a member from a workspace",
+      "inputSchema": {
+        "$defs": {
+          "UserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A member of a workspace.",
+        "properties": {
+          "user_id": {
+            "$ref": "#/$defs/UserId",
+            "description": "The member."
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "type": "object"
+      },
+      "name": "members_remove"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a member's role",
+      "inputSchema": {
+        "$defs": {
+          "Role": {
+            "description": "A member's role in a workspace.",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "type": "string"
+          },
+          "UserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A member's new role.",
+        "properties": {
+          "role": {
+            "$ref": "#/$defs/Role",
+            "description": "The new role."
+          },
+          "user_id": {
+            "$ref": "#/$defs/UserId",
+            "description": "The member."
+          }
+        },
+        "required": [
+          "user_id",
+          "role"
+        ],
+        "type": "object"
+      },
+      "name": "members_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create a project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A new project.",
+        "properties": {
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "slug": {
+            "description": "2-48 of `a-z`, `0-9` and `-`, unique in the workspace.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "projects_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project of a workspace.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "projects_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project of a workspace.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "projects_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the projects of a workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Which projects to list.",
+        "properties": {
+          "limit": {
+            "description": "At most this many, 1-500. Default 100.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "projects_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Rename a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project's new name.",
+        "properties": {
+          "name": {
+            "description": "The new display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "projects_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Just the workspace from the path.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "workspaces_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Rename a workspace; the slug never changes",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A workspace's new name.",
+        "properties": {
+          "name": {
+            "description": "The new display name.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "workspaces_update"
+    }
+  ]
+}

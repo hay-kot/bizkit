@@ -1,0 +1,12 @@
+# Dev config for `svx up` (and `mise run web:dev`). Anyone at bizkit.test can
+# sign up; the first user creates a workspace in the UI. Mail goes to the
+# stack's Mailpit through --smtp-url.
+log_level: debug
+server:
+  mail:
+    from: "bizkit dev <noreply@bizkit.test>"
+  auth:
+    policies:
+      - name: dev
+        matches: ["*@bizkit.test"]
+        sign_up: true

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MAX(created_at) AS \"at: UnixMillis\" FROM magic_links WHERE email = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "at: UnixMillis",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "1877d82b073d6489bc7c56e0a73508ae19b36c154a7c8019307608008c704b60"
+}

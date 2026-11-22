@@ -3,19 +3,26 @@
 [tools]
 cargo-deny = "0.22.0"
 cargo-insta = "1.49.0"
+"cargo:sqlx-cli" = { version = "0.9.0", default-features = "false", features = "sqlite,completions", locked = "true" }
+"github:axllent/mailpit" = "1.33.0"
 "github:Boshen/cargo-shear" = "1.14.1"
 "github:rust-cross/cargo-zigbuild" = "0.24.1"
 "github:taiki-e/cargo-llvm-cov" = "0.9.1"
 goreleaser = "2.20.2"
+node = "26.13.1"
+pnpm = "12.20.0"
 typos = "1.52.2"
 zig = "0.17.1"
 
 [env]
 LOG_LEVEL = "debug"
+# sqlx query macros read the committed `.sqlx/` data, so builds never need a
+# live database. `mise run db:prepare` refreshes it after a query changes.
+SQLX_OFFLINE = "true"
 
 [tasks.run]
 description = "Run the main application"
-run = "cargo run --"
+run = "cargo run -p bizkit --"
 
 [tasks.build]
 description = "Build a release binary for this machine with goreleaser"
@@ -23,11 +30,15 @@ run = "goreleaser build --snapshot --clean --single-target"
 
 [tasks.test]
 description = "Run all tests"
-run = "cargo test --locked"
+run = "cargo test --locked --workspace --all-features"
+
+[tasks."test:e2e"]
+description = "Run the Playwright end-to-end tests against a fresh server and Mailpit"
+run = "scripts/test-e2e.sh"
 
 [tasks.coverage]
 description = "Run tests with coverage and write lcov.info"
-run = "cargo llvm-cov --locked --lcov --output-path lcov.info"
+run = "cargo llvm-cov --locked --workspace --all-features --lcov --output-path lcov.info"
 
 [tasks.fmt]
 description = "Format code"
@@ -38,12 +49,15 @@ description = "Check formatting"
 run = "cargo fmt --all --check"
 
 [tasks.lint]
-description = "Run clippy with warnings as errors"
-run = "cargo clippy --locked --all-targets -- -D warnings"
+description = "Run clippy with warnings as errors, with and without test hooks"
+run = [
+    "cargo clippy --locked --workspace --all-targets --all-features -- -D warnings",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings",
+]
 
 [tasks.docs]
 description = "Build docs with warnings as errors"
-run = "cargo doc --locked --no-deps --document-private-items"
+run = "cargo doc --locked --workspace --all-features --no-deps --document-private-items"
 env = { RUSTDOCFLAGS = "-D warnings" }
 
 [tasks.deny]
@@ -58,8 +72,55 @@ run = "cargo shear"
 description = "Check spelling"
 run = "typos"
 
+[tasks."db:prepare"]
+description = "Refresh the committed sqlx query data in .sqlx/"
+run = "scripts/sqlx-db.sh prepare"
+
+[tasks."db:check"]
+description = "Check that .sqlx/ matches the queries in the code"
+run = "scripts/sqlx-db.sh check"
+
+[tasks."web:install"]
+description = "Install node modules for web and e2e"
+run = "pnpm install --frozen-lockfile"
+
+[tasks.gen]
+description = "Write openapi.json and regenerate the web API client"
+depends = ["web:install"]
+run = [
+    "CONFIG_FILE=/dev/null cargo run --locked -q -p bizkit -- openapi > openapi.json",
+    "pnpm -C web gen",
+]
+
+[tasks."gen:check"]
+description = "Check that openapi.json and the generated web client are current"
+run = [
+    { task = "gen" },
+    "test -z \"$(git status --porcelain openapi.json web/src/api/gen)\" || { git status --porcelain openapi.json web/src/api/gen; echo 'generated files are stale: run mise run gen' >&2; exit 1; }",
+]
+
+[tasks."web:check"]
+description = "Lint, typecheck and test the web app"
+depends = ["web:install"]
+run = [
+    "pnpm -C web lint",
+    "pnpm -C web stylelint",
+    "pnpm -C web typecheck",
+    "pnpm -C web test",
+]
+
+[tasks."web:build"]
+description = "Build the web app into web/dist"
+depends = ["web:install"]
+run = "pnpm -C web build"
+
+[tasks."web:dev"]
+description = "Run Vite on 5173 against a server on 8484 (start it with --base-url http://localhost:5173)"
+depends = ["web:install"]
+run = "pnpm -C web dev --port 5173 --strictPort"
+
 [tasks.check]
-description = "Run all checks for PRs (fmt, lint, test, docs, deny, tidy, typos)"
+description = "Run all checks for PRs (fmt, lint, test, docs, deny, tidy, typos, db, gen, web)"
 run = [
     { task = "fmt:check" },
     { task = "lint" },
@@ -68,4 +129,7 @@ run = [
     { task = "deny" },
     { task = "tidy" },
     { task = "typos" },
+    { task = "db:check" },
+    { task = "gen:check" },
+    { task = "web:check" },
 ]

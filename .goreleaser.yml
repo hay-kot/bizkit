@@ -4,6 +4,8 @@ project_name: bizkit
 
 before:
   hooks:
+    # bizkit-web embeds web/dist, so it must exist before the build.
+    - mise run web:build
     - rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu
 
 builds:
@@ -16,6 +18,8 @@ builds:
     flags:
       - --release
       - --locked
+      # The root manifest is a virtual workspace, so name the binary crate.
+      - --package=bizkit
     targets:
       - x86_64-unknown-linux-musl
       - aarch64-unknown-linux-musl

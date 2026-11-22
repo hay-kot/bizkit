@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE workspaces SET name = ? WHERE id = ?\n           RETURNING id AS \"id: WorkspaceId\", slug, name, created_at AS \"created_at: UnixMillis\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "slug",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0cf5436353bd56f956ca518f4ffad78dcecb753e387ae1ef5ed4337643a081c1"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS (\n             SELECT 1 FROM invitations\n             WHERE email = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?\n           ) AS \"open!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "open!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f53b55dd6c0221237474a720d9972567e1e45ecdc04dc11e944efe3e648346ca"
+}

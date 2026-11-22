@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: ApiKeyId\", workspace_id AS \"workspace_id: WorkspaceId\", name, prefix, scopes,\n                  created_by AS \"created_by: UserId\", created_at AS \"created_at: UnixMillis\",\n                  expires_at AS \"expires_at: UnixMillis\", last_used_at AS \"last_used_at: UnixMillis\",\n                  revoked_at AS \"revoked_at: UnixMillis\"\n           FROM api_keys WHERE workspace_id = ? ORDER BY created_at DESC, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ApiKeyId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "prefix",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "prefix"
+          }
+        }
+      },
+      {
+        "name": "scopes",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "scopes"
+          }
+        }
+      },
+      {
+        "name": "created_by: UserId",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "created_by"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "expires_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "name": "last_used_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "last_used_at"
+          }
+        }
+      },
+      {
+        "name": "revoked_at: UnixMillis",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "revoked_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bfd420a4d28bcb30b5d53a7fbdfc9cd9f122dd85c7fd6a8d3d3d58c353eb2b12"
+}
