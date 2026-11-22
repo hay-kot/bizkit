@@ -16,6 +16,7 @@ pub mod error;
 pub mod ids;
 pub mod jobs;
 mod module;
+pub mod net;
 pub mod ops;
 mod tenancy;
 #[cfg(feature = "test-hooks")]

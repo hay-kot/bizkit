@@ -30,7 +30,7 @@ pub struct Deps {
     pub clock: Arc<dyn Clock>,
     /// Outgoing mail.
     pub mailer: Arc<dyn Mailer>,
-    /// Outbound HTTP.
+    /// Outbound HTTP to public addresses only; see [`HttpClient`].
     pub http: Arc<dyn HttpClient>,
     /// Blob storage.
     pub blobs: Arc<dyn BlobStore>,
@@ -84,10 +84,12 @@ pub trait Mailer: Send + Sync + fmt::Debug {
     async fn send(&self, mail: &Mail) -> anyhow::Result<()>;
 }
 
-/// Sends outbound HTTP requests.
+/// Sends outbound HTTP requests to user-supplied URLs. The production
+/// client ([`ReqwestHttp`]) reaches public addresses only, follows no
+/// redirects, times out after 10 s and reads at most 1 MiB.
 #[async_trait]
 pub trait HttpClient: Send + Sync + fmt::Debug {
-    /// Sends `req` and reads the whole response body.
+    /// Sends `req` and reads the whole response body, up to the client's cap.
     async fn send(&self, req: http::Request<Bytes>) -> anyhow::Result<http::Response<Bytes>>;
 }
 
