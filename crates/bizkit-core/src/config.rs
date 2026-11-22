@@ -141,7 +141,7 @@ fn check_base_url(base_url: &Url, errors: &mut Vec<String>) {
         "https" => {}
         "http" if is_loopback(base_url) => {}
         "http" => {
-            errors.push(format!("base_url {base_url} must use https unless the host is loopback"))
+            errors.push(format!("base_url {base_url} must use https unless the host is loopback"));
         }
         other => errors.push(format!("base_url scheme {other} must be http or https")),
     }

@@ -232,7 +232,7 @@ async fn apply_policy_joins(
         if let Some(workspace) = workspaces::find_by_slug(&mut **tx, &join.workspace).await? {
             members::insert(&mut **tx, workspace.id, user_id, join.role, platform.now()).await?;
         } else {
-            tracing::warn!(policy = %policy.name, workspace = %join.workspace, "policy join names no workspace; skipped")
+            tracing::warn!(policy = %policy.name, workspace = %join.workspace, "policy join names no workspace; skipped");
         }
     }
     Ok(())

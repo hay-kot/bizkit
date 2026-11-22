@@ -12,3 +12,24 @@ jobs:
   backend-tests:
     name: "Rust Build/Test"
     uses: ./.github/workflows/partial-tests.yml
+
+  e2e:
+    name: "E2E"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install tools
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Install node modules
+        run: mise run web:install
+
+      - name: Install Chromium
+        run: pnpm -C e2e exec playwright install --with-deps chromium
+
+      - name: Run Playwright
+        run: mise run test:e2e

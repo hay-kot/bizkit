@@ -1,0 +1,5 @@
+{
+  "name": "bizkit-workspace",
+  "private": true,
+  "packageManager": "pnpm@12.20.0"
+}

@@ -4,7 +4,15 @@ Guidance for coding agents working in this repository.
 
 ## Before you finish
 
-Run `mise run check`. It is what CI runs, and it must pass: formatting, clippy with warnings as errors, tests, docs, cargo-deny, cargo-shear and typos.
+Run `mise run check`. It is what CI runs, and it must pass: formatting, clippy with warnings as errors (with and without the `test-hooks` feature), tests, docs, cargo-deny, cargo-shear, typos, the sqlx query data (`db:check`), the generated API client (`gen:check`) and the web checks (`web:check`). CI also runs `mise run test:e2e`.
+
+## Layout
+
+- `crates/bizkit`: the binary. `main.rs` owns process concerns; `modules.rs` lists the compiled-in feature modules and holds the tests that sweep every operation.
+- `crates/bizkit-core`: the platform: config, database, operations, auth, tenancy, jobs and the `Module` trait.
+- `crates/bizkit-web`: embeds `web/dist` and serves it as the fallback route.
+- `crates/bizkit-testkit`: fakes, `TestApp`, the spec-checking `SpecClient` and `McpClient`. Integration tests live in its `tests/`.
+- `web/`: the Vue SPA. `e2e/`: Playwright (see `e2e/AGENTS.md`).
 
 ## Lints
 
@@ -24,8 +32,44 @@ Never use `#[allow(...)]` (the `allow_attributes` lint rejects it), and never ad
 - No `unwrap`, `expect` or `panic!` outside tests.
 - Add a command with `scaffold new command`, not by hand, so all registration points stay in sync.
 
+## Operations
+
+An API operation is one `Operation` impl: ID, method, path under `/api/v1`, access, input, output and summary. The registry turns it into a JSON route, an OpenAPI entry and, for `Access::Workspace` operations, an MCP tool named after the ID (`projects.create` → `projects_create`).
+
+- The input is one struct merged from path params, query params and the JSON body. Path params are the fields named like the `{...}` segments. Derive `Deserialize` and `ToSchema`, use `#[serde(deny_unknown_fields)]`, and implement `Validate`.
+- List outputs are objects with `items`, never bare arrays, so they can grow pagination fields.
+- Return `ApiError` variants. Document statuses beyond the access defaults (such as 409) in `ERRORS`; the spec-checking client fails tests on undocumented statuses.
+- Writes go through `cx.write()`, a `BEGIN IMMEDIATE` transaction. Never call `write()` while you hold one.
+- Mail and other side effects go through jobs (`platform.bus().enqueue(&mut tx, ...)`) in the same transaction.
+
+## Modules
+
+A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<name>` crate and is added to `crates/bizkit/src/modules.rs`.
+
+- `register` declares scope areas (named after the module), operations (paths under `/workspaces/{workspace_id}/<name>` or `/<name>`), raw routes (nested at `/m/<name>`), jobs (kinds starting with `<name>.`) and subscribers. It must not do I/O or branch on config.
+- Module tables carry `workspace_id`, and every query filters on it.
+- Migrations live in the module crate's `migrations/` and return from `Module::migrations` as `sqlx::migrate!()`. Versions must be unique across all crates; a test checks it.
+
+## Database and generated code
+
+- Queries use the `sqlx::query!` macros. Builds read the committed `.sqlx/` (`SQLX_OFFLINE=true` in `mise.toml`). After changing a query or a migration, run `mise run db:prepare` and commit `.sqlx/`.
+- After changing an operation or a schema type, run `mise run gen`. It rewrites `openapi.json` and `web/src/api/gen`; commit both.
+
+## Frontend
+
+- Vue 3, Tailwind v4 and DaisyUI 5. Use Tailwind and DaisyUI classes only: ESLint rejects unknown classes, arbitrary values (`w-[13px]`), raw palette colors (`bg-blue-500`) and inline styles. Use DaisyUI semantic colors (`primary`, `base-200`, `error`).
+- Colors are defined only in `web/src/styles/theme.css`; stylelint rejects hex, named and functional colors elsewhere.
+- Only `web/src/queries/**` and `web/src/api/client.ts` import the generated client in `web/src/api/gen`. Pages use the composables in `src/queries`.
+- Disabling an ESLint rule needs a reason: `// eslint-disable-next-line rule -- why`.
+
+## Dev stack
+
+`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`) and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Sign in as any `@bizkit.test` email and open the link from the stack's Mailpit.
+
 ## Tests
 
 - Unit tests go in a `#[cfg(test)] mod tests` block in the same file. Integration tests that run the binary go in `tests/`.
-- Every new command gets a unit test that captures its output and a CLI test in `tests/cli.rs`.
+- Every new command gets a unit test that captures its output and a CLI test in `crates/bizkit/tests/cli.rs`.
+- API behavior tests use `bizkit_testkit::TestApp`: it builds a real app on a temp database with fake clock, mailer, HTTP and blobs, and its clients check every response against the OpenAPI document. The worker doesn't run on its own; call `drain_jobs()`.
+- Seed data with `app.seed(Persona::Team, "ns")` instead of building it through the API when the setup isn't what the test is about.
 - Use `insta::assert_snapshot!` for multi-line or structured output, and `cargo insta review` to accept intended changes.

@@ -48,7 +48,7 @@ mod auth {
     async fn sign_up_false_sends_no_mail_for_unknown_emails() {
         let app = TestApp::builder()
             .config(|c| {
-                c.auth.policies = vec![policy("closed", "*@example.com", false, Vec::new())]
+                c.auth.policies = vec![policy("closed", "*@example.com", false, Vec::new())];
             })
             .build()
             .await;

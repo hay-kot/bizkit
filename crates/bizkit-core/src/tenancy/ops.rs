@@ -105,6 +105,17 @@ pub struct Meta {
     pub version: String,
     /// The compiled-in feature modules.
     pub modules: Vec<String>,
+    /// Every scope area API keys can be granted, sorted by name.
+    pub scope_areas: Vec<ScopeArea>,
+}
+
+/// An area API key scopes name, such as `projects`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ScopeArea {
+    /// The area name; scopes are `<name>:read`, `:write` or `:admin`.
+    pub name: String,
+    /// What the area covers.
+    pub description: String,
 }
 
 /// The signed-in user.
@@ -472,9 +483,19 @@ impl Operation for PlatformMeta {
         cx: OpCtx,
         _input: NoInput,
     ) -> impl Future<Output = Result<Meta, ApiError>> + Send {
+        let scope_areas = cx
+            .platform()
+            .scope_areas()
+            .iter()
+            .map(|(name, description)| ScopeArea {
+                name: name.to_owned(),
+                description: description.to_owned(),
+            })
+            .collect();
         std::future::ready(Ok(Meta {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             modules: cx.platform().modules().iter().map(|&m| m.to_owned()).collect(),
+            scope_areas,
         }))
     }
 }

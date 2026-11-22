@@ -326,5 +326,12 @@ mod tenancy {
         meta.expect(StatusCode::OK);
         assert_eq!(meta["version"], env!("CARGO_PKG_VERSION"), "version");
         assert_eq!(meta["modules"], Value::Array(Vec::new()), "no modules");
+        let areas: Vec<&str> = meta["scope_areas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(areas, ["projects", "workspace"], "core's scope areas");
     }
 }
