@@ -90,6 +90,643 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Create a form in a project",
+      "inputSchema": {
+        "$defs": {
+          "BotCheck": {
+            "description": "How a form tells people from bots.",
+            "enum": [
+              "honeypot",
+              "challenge"
+            ],
+            "type": "string"
+          },
+          "FieldDef": {
+            "additionalProperties": false,
+            "description": "A field a form accepts.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/FieldKind",
+                "description": "How values are checked."
+              },
+              "label": {
+                "description": "A label for the UI and mail; the name when absent.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max_length": {
+                "description": "The longest value, 1-10000 characters. Default 10000.",
+                "format": "int32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "multiple": {
+                "description": "A `choice` field may take several values.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The input's `name`: 1-64 of `a-z`, `A-Z`, `0-9`, `_` and `-`, not\nstarting with `_`, unique in the form.",
+                "type": "string"
+              },
+              "options": {
+                "description": "The allowed values of a `choice` field, 1-50 of them.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "required": {
+                "description": "At least one non-blank value is needed.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ],
+            "type": "object"
+          },
+          "FieldKind": {
+            "description": "What a field holds, which decides how it is checked.",
+            "enum": [
+              "text",
+              "email",
+              "url",
+              "number",
+              "choice"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new form.",
+        "properties": {
+          "bot_check": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/BotCheck",
+                "description": "The bot check. Default `honeypot`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fields": {
+            "description": "The accepted fields. Default none, which keeps every field.",
+            "items": {
+              "$ref": "#/$defs/FieldDef"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "min_fill_ms": {
+            "description": "With `challenge`: the least ms between loading the challenge and submitting, 0-600000. Default 2000.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "notify_emails": {
+            "description": "Who gets mail for each new submission, at most 10.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "redirect_url": {
+            "description": "Where browsers go after a plain form post, http or https.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "forms_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a form and its submissions",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A form of a workspace.",
+        "properties": {
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a form",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A form of a workspace.",
+        "properties": {
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the forms of a workspace",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which forms to list.",
+        "properties": {
+          "project_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProjectId",
+                "description": "Only this project's forms."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "forms_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a submission",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A submission of a form.",
+        "properties": {
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          },
+          "submission_id": {
+            "$ref": "#/$defs/SubmissionId",
+            "description": "The submission."
+          }
+        },
+        "required": [
+          "form_id",
+          "submission_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_submissions_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Export a form's submissions as CSV, newest first, at most 10000",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionStatus": {
+            "description": "Where a submission sits.",
+            "enum": [
+              "inbox",
+              "spam"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which submissions to export.",
+        "properties": {
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SubmissionStatus",
+                "description": "Inbox or spam. Default inbox."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_submissions_export"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a submission",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A submission of a form.",
+        "properties": {
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          },
+          "submission_id": {
+            "$ref": "#/$defs/SubmissionId",
+            "description": "The submission."
+          }
+        },
+        "required": [
+          "form_id",
+          "submission_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_submissions_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a form's submissions, newest first",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionStatus": {
+            "description": "Where a submission sits.",
+            "enum": [
+              "inbox",
+              "spam"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which submissions to list.",
+        "properties": {
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SubmissionId",
+                "description": "Only submissions older than this one, for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SubmissionStatus",
+                "description": "Inbox or spam. Default inbox."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_submissions_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Move a submission to the inbox or to spam",
+      "inputSchema": {
+        "$defs": {
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SubmissionStatus": {
+            "description": "Where a submission sits.",
+            "enum": [
+              "inbox",
+              "spam"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A submission's new status.",
+        "properties": {
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          },
+          "status": {
+            "$ref": "#/$defs/SubmissionStatus",
+            "description": "Inbox or spam."
+          },
+          "submission_id": {
+            "$ref": "#/$defs/SubmissionId",
+            "description": "The submission."
+          }
+        },
+        "required": [
+          "form_id",
+          "submission_id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "name": "forms_submissions_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a form's settings",
+      "inputSchema": {
+        "$defs": {
+          "BotCheck": {
+            "description": "How a form tells people from bots.",
+            "enum": [
+              "honeypot",
+              "challenge"
+            ],
+            "type": "string"
+          },
+          "FieldDef": {
+            "additionalProperties": false,
+            "description": "A field a form accepts.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/FieldKind",
+                "description": "How values are checked."
+              },
+              "label": {
+                "description": "A label for the UI and mail; the name when absent.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max_length": {
+                "description": "The longest value, 1-10000 characters. Default 10000.",
+                "format": "int32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "multiple": {
+                "description": "A `choice` field may take several values.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The input's `name`: 1-64 of `a-z`, `A-Z`, `0-9`, `_` and `-`, not\nstarting with `_`, unique in the form.",
+                "type": "string"
+              },
+              "options": {
+                "description": "The allowed values of a `choice` field, 1-50 of them.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "required": {
+                "description": "At least one non-blank value is needed.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ],
+            "type": "object"
+          },
+          "FieldKind": {
+            "description": "What a field holds, which decides how it is checked.",
+            "enum": [
+              "text",
+              "email",
+              "url",
+              "number",
+              "choice"
+            ],
+            "type": "string"
+          },
+          "FormId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a form. Absent fields stay as they are.",
+        "properties": {
+          "bot_check": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/BotCheck",
+                "description": "The bot check."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "description": "Disabled forms refuse submissions.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "fields": {
+            "description": "The accepted fields; empty keeps every field.",
+            "items": {
+              "$ref": "#/$defs/FieldDef"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "form_id": {
+            "$ref": "#/$defs/FormId",
+            "description": "The form."
+          },
+          "min_fill_ms": {
+            "description": "With `challenge`: the least ms between loading the challenge and submitting, 0-600000.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notify_emails": {
+            "description": "Who gets mail for each new submission, at most 10.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "redirect_url": {
+            "description": "Where browsers go after a plain form post; `null` removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Invite an email to a workspace; mails them a link",
       "inputSchema": {
         "$defs": {
@@ -279,7 +916,7 @@ expression: tools
         "destructiveHint": true,
         "readOnlyHint": false
       },
-      "description": "Delete a project",
+      "description": "Delete a project and everything modules keep in it",
       "inputSchema": {
         "$defs": {
           "ProjectId": {

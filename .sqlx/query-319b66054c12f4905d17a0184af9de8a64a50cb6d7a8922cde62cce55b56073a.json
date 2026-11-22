@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO form_used_challenges (challenge, workspace_id, form_id, expires_at)\n         VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "319b66054c12f4905d17a0184af9de8a64a50cb6d7a8922cde62cce55b56073a"
+}

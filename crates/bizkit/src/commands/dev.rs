@@ -36,6 +36,8 @@ enum DevCommand {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Seed the demo workspace and each module's sample data. Safe to run again
+    SeedDemo,
     /// Print a sign-in link for an email without sending mail
     Login {
         /// The email to sign in as
@@ -65,6 +67,14 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
                     .with_context(|| format!("writing {}", path.display()))?,
                 None => writeln!(out, "{json}")?,
             }
+        }
+        DevCommand::SeedDemo => {
+            bizkit_core::dev::demo::seed(&db, &modules, SystemClock.now()).await?;
+            writeln!(
+                out,
+                "seeded the demo workspace; sign in as {}",
+                bizkit_core::dev::demo::DEMO_EMAIL
+            )?;
         }
         DevCommand::Login { email } => {
             let base_url = match &config.base_url {
@@ -110,5 +120,46 @@ mod tests {
             ".api_keys.*.token" => "[token]",
             ".invitations.*.id" => "[id]",
         });
+    }
+
+    #[cfg(feature = "forms")]
+    async fn counts(data_dir: &std::path::Path) -> Vec<i64> {
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let mut counts = Vec::new();
+        for sql in [
+            "SELECT COUNT(*) FROM users",
+            "SELECT COUNT(*) FROM workspaces",
+            "SELECT COUNT(*) FROM memberships",
+            "SELECT COUNT(*) FROM projects",
+            "SELECT COUNT(*) FROM forms",
+            "SELECT COUNT(*) FROM form_submissions",
+        ] {
+            counts.push(sqlx::query_scalar::<_, i64>(sql).fetch_one(db.read()).await.unwrap());
+        }
+        db.close().await;
+        counts
+    }
+
+    #[cfg(feature = "forms")]
+    #[tokio::test]
+    async fn seed_demo_is_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let args = Args { command: DevCommand::SeedDemo, data_dir: Some(data_dir.clone()) };
+        let mut out = Vec::new();
+        dev(&args, &Context::default(), &mut out).await.unwrap();
+        let first = counts(&data_dir).await;
+        assert_eq!(
+            first,
+            [1, 1, 1, 2, 2, 5],
+            "users, workspaces, memberships, projects, forms, submissions"
+        );
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        assert_eq!(counts(&data_dir).await, first, "a second run changes nothing");
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "seeded the demo workspace; sign in as demo@bizkit.test\n",
+            "output"
+        );
     }
 }

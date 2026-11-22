@@ -36,6 +36,18 @@ run = "cargo test --locked --workspace --all-features"
 description = "Run the Playwright end-to-end tests against a fresh server and Mailpit"
 run = "scripts/test-e2e.sh"
 
+# Deep fuzzing of the bolero harnesses under libFuzzer. Needs a nightly
+# toolchain and `cargo install cargo-bolero`, so it stays out of `check` and
+# CI; `cargo test` already runs the same harnesses as property tests.
+[tasks.fuzz]
+description = "Fuzz the forms ingest parser and proof check with libFuzzer (nightly, cargo-bolero)"
+run = """
+set -e
+for target in ingest::parse::tests::fuzz_parse ingest::bot::tests::fuzz_verify; do
+  cargo +nightly bolero test -p bizkit-forms --engine libfuzzer -T ${FUZZ_TIME:-60s} "$target"
+done
+"""
+
 [tasks.coverage]
 description = "Run tests with coverage and write lcov.info"
 run = "cargo llvm-cov --locked --workspace --all-features --lcov --output-path lcov.info"

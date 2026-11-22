@@ -28,7 +28,12 @@ pub use crate::auth::middleware::Authn;
 pub use crate::config::Config;
 pub use crate::deps::Deps;
 pub use crate::error::ApiError;
-pub use crate::module::{Module, ModuleContext};
+pub use crate::module::{DemoSeed, Module, ModuleContext};
+
+/// Projects, for modules that keep data per project.
+pub mod projects {
+    pub use crate::tenancy::projects::exists;
+}
 
 /// The API types core's operations return.
 pub mod api {

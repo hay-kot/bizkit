@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
-import type { ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
+import { apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
+import type { ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
 
 /**
  * Sends a sign-in link if the email may sign in. Always 202, so the response
@@ -271,6 +271,161 @@ export const apiKeysRevokeMutation = (options?: Partial<Options<ApiKeysRevokeDat
     }
 });
 
+export const formsListQueryKey = (options: Options<FormsListData>) => createQueryKey('formsList', options);
+
+/**
+ * List the forms of a workspace
+ */
+export const formsListQuery = defineQueryOptions<Options<FormsListData>, FormsListResponse, FormsListError>((options: Options<FormsListData>) => ({
+    key: formsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await formsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Create a form in a project
+ */
+export const formsCreateMutation = (options?: Partial<Options<FormsCreateData>>): UseMutationOptions<FormsCreateResponse, Options<FormsCreateData>, FormsCreateError> => ({
+    mutation: async (vars) => {
+        const { data } = await formsCreate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Delete a form and its submissions
+ */
+export const formsDeleteMutation = (options?: Partial<Options<FormsDeleteData>>): UseMutationOptions<FormsDeleteResponse, Options<FormsDeleteData>, FormsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await formsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const formsGetQueryKey = (options: Options<FormsGetData>) => createQueryKey('formsGet', options);
+
+/**
+ * Show a form
+ */
+export const formsGetQuery = defineQueryOptions<Options<FormsGetData>, FormsGetResponse, FormsGetError>((options: Options<FormsGetData>) => ({
+    key: formsGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await formsGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Change a form's settings
+ */
+export const formsUpdateMutation = (options?: Partial<Options<FormsUpdateData>>): UseMutationOptions<FormsUpdateResponse, Options<FormsUpdateData>, FormsUpdateError> => ({
+    mutation: async (vars) => {
+        const { data } = await formsUpdate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const formsSubmissionsExportQueryKey = (options: Options<FormsSubmissionsExportData>) => createQueryKey('formsSubmissionsExport', options);
+
+/**
+ * Export a form's submissions as CSV, newest first, at most 10000
+ */
+export const formsSubmissionsExportQuery = defineQueryOptions<Options<FormsSubmissionsExportData>, FormsSubmissionsExportResponse, FormsSubmissionsExportError>((options: Options<FormsSubmissionsExportData>) => ({
+    key: formsSubmissionsExportQueryKey(options),
+    query: async (context) => {
+        const { data } = await formsSubmissionsExport({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const formsSubmissionsListQueryKey = (options: Options<FormsSubmissionsListData>) => createQueryKey('formsSubmissionsList', options);
+
+/**
+ * List a form's submissions, newest first
+ */
+export const formsSubmissionsListQuery = defineQueryOptions<Options<FormsSubmissionsListData>, FormsSubmissionsListResponse, FormsSubmissionsListError>((options: Options<FormsSubmissionsListData>) => ({
+    key: formsSubmissionsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await formsSubmissionsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Delete a submission
+ */
+export const formsSubmissionsDeleteMutation = (options?: Partial<Options<FormsSubmissionsDeleteData>>): UseMutationOptions<FormsSubmissionsDeleteResponse, Options<FormsSubmissionsDeleteData>, FormsSubmissionsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await formsSubmissionsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const formsSubmissionsGetQueryKey = (options: Options<FormsSubmissionsGetData>) => createQueryKey('formsSubmissionsGet', options);
+
+/**
+ * Show a submission
+ */
+export const formsSubmissionsGetQuery = defineQueryOptions<Options<FormsSubmissionsGetData>, FormsSubmissionsGetResponse, FormsSubmissionsGetError>((options: Options<FormsSubmissionsGetData>) => ({
+    key: formsSubmissionsGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await formsSubmissionsGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Move a submission to the inbox or to spam
+ */
+export const formsSubmissionsUpdateMutation = (options?: Partial<Options<FormsSubmissionsUpdateData>>): UseMutationOptions<FormsSubmissionsUpdateResponse, Options<FormsSubmissionsUpdateData>, FormsSubmissionsUpdateError> => ({
+    mutation: async (vars) => {
+        const { data } = await formsSubmissionsUpdate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
 export const invitationsListQueryKey = (options: Options<InvitationsListData>) => createQueryKey('invitationsList', options);
 
 /**
@@ -393,7 +548,7 @@ export const projectsCreateMutation = (options?: Partial<Options<ProjectsCreateD
 });
 
 /**
- * Delete a project
+ * Delete a project and everything modules keep in it
  */
 export const projectsDeleteMutation = (options?: Partial<Options<ProjectsDeleteData>>): UseMutationOptions<ProjectsDeleteResponse, Options<ProjectsDeleteData>, ProjectsDeleteError> => ({
     mutation: async (vars) => {
@@ -436,3 +591,36 @@ export const projectsUpdateMutation = (options?: Partial<Options<ProjectsUpdateD
         return data;
     }
 });
+
+/**
+ * Submit a form
+ *
+ * Takes an `application/x-www-form-urlencoded` or `application/json` body of at most 64 KiB. JSON clients (a JSON body or an `Accept` naming JSON) get JSON; browser form posts get a redirect or an HTML page. Submissions that fail the bot check answer like accepted ones.
+ */
+export const formsPublicSubmitMutation = (options?: Partial<Options<FormsPublicSubmitData>>): UseMutationOptions<FormsPublicSubmitResponse, Options<FormsPublicSubmitData>, FormsPublicSubmitError> => ({
+    mutation: async (vars) => {
+        const { data } = await formsPublicSubmit({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const formsPublicChallengeQueryKey = (options: Options<FormsPublicChallengeData>) => createQueryKey('formsPublicChallenge', options);
+
+/**
+ * Get an ALTCHA challenge for a form
+ */
+export const formsPublicChallengeQuery = defineQueryOptions<Options<FormsPublicChallengeData>, FormsPublicChallengeResponse, FormsPublicChallengeError>((options: Options<FormsPublicChallengeData>) => ({
+    key: formsPublicChallengeQueryKey(options),
+    query: async (context) => {
+        const { data } = await formsPublicChallenge({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));

@@ -45,7 +45,8 @@ function onDelete(project: Project) {
   return runAction({
     confirm: {
       title: `Delete ${project.name}?`,
-      message: 'This removes the project and everything in it. You can’t undo this.',
+      message:
+        'This removes the project and everything in it, such as its forms and their submissions. You can’t undo this.',
       confirmLabel: 'Delete project',
     },
     run: () =>

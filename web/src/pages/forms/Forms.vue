@@ -1,0 +1,137 @@
+<script setup lang="ts">
+import { Inbox, Plus } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import PageHeader from '@/components/PageHeader.vue'
+import DataTable from '@/components/ui/DataTable.vue'
+import Field from '@/components/ui/Field.vue'
+import FormPanel from '@/components/ui/FormPanel.vue'
+import Select from '@/components/ui/Select.vue'
+import { formatDate } from '@/lib/format'
+import { useCreateForm, useForms } from '@/queries/forms'
+import { useProjects } from '@/queries/projects'
+
+const props = defineProps<{ workspaceId: string; workspaceName: string }>()
+const router = useRouter()
+const { data: forms, isPending, error } = useForms(() => props.workspaceId)
+const { data: projects } = useProjects(() => props.workspaceId)
+const create = useCreateForm()
+const panelOpen = ref(false)
+const name = ref('')
+const projectId = ref('')
+
+const projectOptions = computed(() =>
+  (projects.value?.items ?? []).map((p) => ({ value: p.id, label: p.name })),
+)
+const projectName = computed(
+  () => new Map((projects.value?.items ?? []).map((p) => [p.id, p.name])),
+)
+const columns = [
+  { key: 'name', label: 'Name' },
+  { key: 'project', label: 'Project' },
+  { key: 'inbox', label: 'Inbox' },
+  { key: 'check', label: 'Bot check' },
+  { key: 'created', label: 'Created' },
+]
+
+function openPanel() {
+  name.value = ''
+  projectId.value = projectOptions.value[0]?.value ?? ''
+  create.reset()
+  panelOpen.value = true
+}
+
+async function onCreate() {
+  const form = await create.mutateAsync({
+    path: { workspace_id: props.workspaceId },
+    body: { name: name.value, project_id: projectId.value },
+  })
+  panelOpen.value = false
+  await router.push(`/w/${props.workspaceId}/forms/${form.id}`)
+}
+</script>
+
+<template>
+  <div>
+    <PageHeader
+      :section="workspaceName"
+      title="Forms"
+      description="Collect submissions from your sites, with spam kept out."
+    >
+      <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="openPanel">
+        <Plus class="size-4" aria-hidden="true" />New form
+      </button>
+    </PageHeader>
+
+    <DataTable
+      :columns="columns"
+      :rows="forms?.items"
+      :row-key="(f) => f.id"
+      :loading="isPending"
+      :error="error"
+      :empty="{
+        icon: Inbox,
+        title: 'No forms yet',
+        message: 'Create a form, then point your site’s form at its endpoint.',
+      }"
+    >
+      <template #cell-name="{ row }">
+        <RouterLink :to="`/w/${workspaceId}/forms/${row.id}`" class="link font-medium link-hover">
+          {{ row.name }}
+        </RouterLink>
+        <span v-if="!row.enabled" class="ms-2 badge badge-ghost badge-sm">Disabled</span>
+      </template>
+      <template #cell-project="{ row }"
+        ><span class="text-sm">{{ projectName.get(row.project_id) ?? '—' }}</span></template
+      >
+      <template #cell-inbox="{ row }"
+        ><span class="text-sm tabular-nums">{{ row.inbox_count }}</span></template
+      >
+      <template #cell-check="{ row }"
+        ><span class="text-sm">{{
+          row.bot_check === 'challenge' ? 'Challenge' : 'Honeypot'
+        }}</span></template
+      >
+      <template #cell-created="{ row }"
+        ><span class="text-sm">{{ formatDate(row.created_at) }}</span></template
+      >
+      <template #empty-action>
+        <button type="button" class="btn btn-primary btn-sm" @click="openPanel">New form</button>
+      </template>
+    </DataTable>
+
+    <FormPanel
+      :open="panelOpen"
+      title="New form"
+      submit-label="Create form"
+      :pending="create.asyncStatus.value === 'loading'"
+      :error="create.error.value"
+      :disabled="projectOptions.length === 0"
+      @close="panelOpen = false"
+      @submit="onCreate"
+    >
+      <Field label="Name">
+        <input
+          v-model="name"
+          name="form-name"
+          required
+          class="input w-full"
+          placeholder="Contact"
+        />
+      </Field>
+      <Field
+        label="Project"
+        :hint="projectOptions.length === 0 ? 'Create a project first.' : undefined"
+      >
+        <Select
+          v-if="projectOptions.length > 0"
+          v-model="projectId"
+          :options="projectOptions"
+          label="Project"
+          name="form-project"
+        />
+      </Field>
+    </FormPanel>
+  </div>
+</template>

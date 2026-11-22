@@ -8,8 +8,13 @@ use anyhow::{Context as _, bail};
 use serde::de::DeserializeOwned;
 use sqlx::migrate::Migrator;
 
+use futures::future::BoxFuture;
+
+use crate::db::Db;
+use crate::ids::{ProjectId, UserId, WorkspaceId};
 use crate::jobs::{Event, Handlers, Job, JobHandler, Subscriber};
 use crate::ops::{Access, Operation, Registry};
+use crate::time::UnixMillis;
 
 /// A feature module: its migrations, operations, routes, jobs and
 /// subscribers.
@@ -33,6 +38,34 @@ pub trait Module: Send + Sync + fmt::Debug + 'static {
     ///
     /// Anything that should stop the app from starting, such as a registration conflict.
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()>;
+
+    /// Adds sample rows for the dev stack on top of the demo workspace. It
+    /// must be idempotent: a second run changes nothing. Only the
+    /// `test-hooks` dev command calls it.
+    ///
+    /// # Errors
+    ///
+    /// When a database write fails.
+    fn seed_demo<'a>(
+        &'a self,
+        _db: &'a Db,
+        _seed: &'a DemoSeed,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+/// The demo rows core seeded, for [`Module::seed_demo`].
+#[derive(Debug, Clone)]
+pub struct DemoSeed {
+    /// The demo workspace.
+    pub workspace_id: WorkspaceId,
+    /// Its projects by slug: `website` and `docs`.
+    pub project_ids: BTreeMap<String, ProjectId>,
+    /// The demo user, an admin of the workspace.
+    pub user_id: UserId,
+    /// The seed time.
+    pub now: UnixMillis,
 }
 
 /// What modules register into.
@@ -47,8 +80,21 @@ pub(crate) struct Registration {
 #[derive(Debug)]
 pub(crate) struct ModuleRoutes {
     pub(crate) module: &'static str,
+    /// Public routes sit outside the authenticate layer.
+    pub(crate) public: bool,
     pub(crate) router: axum::Router,
     pub(crate) docs: serde_json::Value,
+}
+
+impl ModuleRoutes {
+    /// Where the router nests: `/m/<module>`, or `/m/<module>/public`.
+    pub(crate) fn nest(&self) -> String {
+        if self.public {
+            format!("/m/{}/public", self.module)
+        } else {
+            format!("/m/{}", self.module)
+        }
+    }
 }
 
 /// The registration API a module's [`Module::register`] gets.
@@ -152,11 +198,40 @@ impl<'a> ModuleContext<'a> {
         router: axum::Router,
         docs: utoipa::openapi::OpenApi,
     ) -> anyhow::Result<()> {
-        if self.registration.routes.iter().any(|routes| routes.module == self.module) {
-            bail!("module {} registered routes twice", self.module);
+        self.add_routes(false, router, docs)
+    }
+
+    /// Adds routes that third-party pages call, nested at
+    /// `/m/<module>/public`, such as form ingest. They sit outside the
+    /// authenticate layer: handlers get no `Extension<Authn>`, cookies and
+    /// bearer tokens are never read, and the cookie CSRF check never
+    /// applies. `docs` paths are relative to the nest. Handlers reach the
+    /// platform through `Extension<Platform>`.
+    ///
+    /// # Errors
+    ///
+    /// When the module already registered public routes.
+    pub fn public_routes(
+        &mut self,
+        router: axum::Router,
+        docs: utoipa::openapi::OpenApi,
+    ) -> anyhow::Result<()> {
+        self.add_routes(true, router, docs)
+    }
+
+    fn add_routes(
+        &mut self,
+        public: bool,
+        router: axum::Router,
+        docs: utoipa::openapi::OpenApi,
+    ) -> anyhow::Result<()> {
+        let module = self.module;
+        if self.registration.routes.iter().any(|r| r.module == module && r.public == public) {
+            let kind = if public { "public routes" } else { "routes" };
+            bail!("module {module} registered {kind} twice");
         }
         let docs = serde_json::to_value(docs).context("serializing route docs")?;
-        self.registration.routes.push(ModuleRoutes { module: self.module, router, docs });
+        self.registration.routes.push(ModuleRoutes { module, public, router, docs });
         Ok(())
     }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM form_used_challenges WHERE workspace_id = ? AND expires_at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c39a30363ccbb78f89756953b93398a5e43781f82208270fe7b8b57436f39be9"
+}

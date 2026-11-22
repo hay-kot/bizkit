@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE forms SET name = ?, enabled = ?, fields = ?, bot_check = ?, min_fill_ms = ?,\n                          redirect_url = ?, notify_emails = ?, updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "85ef6b73774ab743a515f9bcd32bca89865e054267ca8d5e8814f6f335b1fde7"
+}

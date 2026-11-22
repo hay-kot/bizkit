@@ -1,0 +1,170 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: FormId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", name, enabled AS \"enabled: bool\", fields,\n                  bot_check, min_fill_ms, redirect_url, notify_emails, challenge_key,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM forms WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: FormId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "fields",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "fields"
+          }
+        }
+      },
+      {
+        "name": "bot_check",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "bot_check"
+          }
+        }
+      },
+      {
+        "name": "min_fill_ms",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "min_fill_ms"
+          }
+        }
+      },
+      {
+        "name": "redirect_url",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "redirect_url"
+          }
+        }
+      },
+      {
+        "name": "notify_emails",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "notify_emails"
+          }
+        }
+      },
+      {
+        "name": "challenge_key",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "challenge_key"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7875910f39c22dba7597a7893c7558b129e63965eb55cfe61d44faf27d1b36eb"
+}

@@ -5,6 +5,16 @@ export type ClientOptions = {
 };
 
 /**
+ * A submission was taken.
+ */
+export type Accepted = {
+    /**
+     * Always true.
+     */
+    ok: boolean;
+};
+
+/**
  * An API key. The secret is shown once, at creation.
  */
 export type ApiKey = {
@@ -47,6 +57,37 @@ export type ApiKeyList = {
      * Newest first, revoked keys included.
      */
     items: Array<ApiKey>;
+};
+
+/**
+ * How a form tells people from bots.
+ */
+export type BotCheck = 'honeypot' | 'challenge';
+
+/**
+ * An ALTCHA v1 challenge.
+ */
+export type Challenge = {
+    /**
+     * Always `SHA-256`.
+     */
+    algorithm: string;
+    /**
+     * The hex SHA-256 of `salt` followed by the secret number.
+     */
+    challenge: string;
+    /**
+     * The secret number is at most this.
+     */
+    maxnumber: number;
+    /**
+     * Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>&`.
+     */
+    salt: string;
+    /**
+     * The hex HMAC-SHA256 of `challenge` under the form's key.
+     */
+    signature: string;
 };
 
 /**
@@ -96,6 +137,125 @@ export type ErrorDetail = {
      * A human-readable message.
      */
     message: string;
+};
+
+/**
+ * A field a form accepts.
+ */
+export type FieldDef = {
+    /**
+     * How values are checked.
+     */
+    kind: FieldKind;
+    /**
+     * A label for the UI and mail; the name when absent.
+     */
+    label?: string | null;
+    /**
+     * The longest value, 1-10000 characters. Default 10000.
+     */
+    max_length?: number | null;
+    /**
+     * A `choice` field may take several values.
+     */
+    multiple?: boolean;
+    /**
+     * The input's `name`: 1-64 of `a-z`, `A-Z`, `0-9`, `_` and `-`, not
+     * starting with `_`, unique in the form.
+     */
+    name: string;
+    /**
+     * The allowed values of a `choice` field, 1-50 of them.
+     */
+    options?: Array<string>;
+    /**
+     * At least one non-blank value is needed.
+     */
+    required?: boolean;
+};
+
+/**
+ * What a field holds, which decides how it is checked.
+ */
+export type FieldKind = 'text' | 'email' | 'url' | 'number' | 'choice';
+
+/**
+ * One field's submitted value.
+ */
+export type FieldValue = string | Array<string>;
+
+/**
+ * A form that collects submissions from a site.
+ */
+export type Form = {
+    /**
+     * The bot check.
+     */
+    bot_check: BotCheck;
+    /**
+     * The URL the ALTCHA widget loads challenges from.
+     */
+    challenge_url: string;
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * Disabled forms answer 404 to submissions.
+     */
+    enabled: boolean;
+    /**
+     * The URL sites post to.
+     */
+    endpoint: string;
+    /**
+     * The accepted fields. Empty means every field is kept.
+     */
+    fields: Array<FieldDef>;
+    /**
+     * The form ID, also its public address.
+     */
+    id: FormId;
+    /**
+     * Submissions in the inbox.
+     */
+    inbox_count: number;
+    /**
+     * With `challenge`: the least time in ms between loading the challenge and submitting.
+     */
+    min_fill_ms: number;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * Who gets mail for each new submission.
+     */
+    notify_emails: Array<string>;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * Where browsers go after a plain form post. A thank-you page when absent.
+     */
+    redirect_url?: string | null;
+    /**
+     * When its settings last changed.
+     */
+    updated_at: Timestamp;
+};
+
+export type FormId = string;
+
+/**
+ * Forms of a workspace.
+ */
+export type FormList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Form>;
 };
 
 /**
@@ -346,6 +506,82 @@ export type SignInBody = {
      */
     next?: string | null;
 };
+
+/**
+ * What someone sent through a form.
+ */
+export type Submission = {
+    /**
+     * When it arrived.
+     */
+    created_at: Timestamp;
+    /**
+     * The values by field name.
+     */
+    data: {
+        [key: string]: FieldValue;
+    };
+    /**
+     * The form.
+     */
+    form_id: FormId;
+    /**
+     * The submission ID.
+     */
+    id: SubmissionId;
+    /**
+     * The page that sent it (`Referer`), at most 512 characters.
+     */
+    referer?: string | null;
+    /**
+     * Why the bot check flagged it, if it did.
+     */
+    spam_reason?: string | null;
+    /**
+     * Inbox or spam.
+     */
+    status: SubmissionStatus;
+    /**
+     * The sender's `User-Agent`, at most 512 characters.
+     */
+    user_agent?: string | null;
+};
+
+/**
+ * Submissions as CSV.
+ */
+export type SubmissionExport = {
+    /**
+     * The CSV text: a header row, then one row per submission, newest first.
+     */
+    csv: string;
+    /**
+     * A suggested file name.
+     */
+    filename: string;
+    /**
+     * True when more submissions exist than the export holds.
+     */
+    truncated: boolean;
+};
+
+export type SubmissionId = string;
+
+/**
+ * A page of submissions, newest first.
+ */
+export type SubmissionList = {
+    /**
+     * The submissions.
+     */
+    items: Array<Submission>;
+    next_before?: SubmissionId | null;
+};
+
+/**
+ * Where a submission sits.
+ */
+export type SubmissionStatus = 'inbox' | 'spam';
 
 export type Timestamp = string;
 
@@ -1018,6 +1254,578 @@ export type ApiKeysRevokeResponses = {
 
 export type ApiKeysRevokeResponse = ApiKeysRevokeResponses[keyof ApiKeysRevokeResponses];
 
+export type FormsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        project_id?: ProjectId | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/forms';
+};
+
+export type FormsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsListError = FormsListErrors[keyof FormsListErrors];
+
+export type FormsListResponses = {
+    /**
+     * OK
+     */
+    200: FormList;
+};
+
+export type FormsListResponse = FormsListResponses[keyof FormsListResponses];
+
+export type FormsCreateData = {
+    body: {
+        bot_check?: BotCheck | null;
+        /**
+         * The accepted fields. Default none, which keeps every field.
+         */
+        fields?: Array<FieldDef> | null;
+        /**
+         * With `challenge`: the least ms between loading the challenge and submitting, 0-600000. Default 2000.
+         */
+        min_fill_ms?: number | null;
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * Who gets mail for each new submission, at most 10.
+         */
+        notify_emails?: Array<string> | null;
+        /**
+         * The project it belongs to.
+         */
+        project_id: ProjectId;
+        /**
+         * Where browsers go after a plain form post, http or https.
+         */
+        redirect_url?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms';
+};
+
+export type FormsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsCreateError = FormsCreateErrors[keyof FormsCreateErrors];
+
+export type FormsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Form;
+};
+
+export type FormsCreateResponse = FormsCreateResponses[keyof FormsCreateResponses];
+
+export type FormsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}';
+};
+
+export type FormsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsDeleteError = FormsDeleteErrors[keyof FormsDeleteErrors];
+
+export type FormsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type FormsDeleteResponse = FormsDeleteResponses[keyof FormsDeleteResponses];
+
+export type FormsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}';
+};
+
+export type FormsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsGetError = FormsGetErrors[keyof FormsGetErrors];
+
+export type FormsGetResponses = {
+    /**
+     * OK
+     */
+    200: Form;
+};
+
+export type FormsGetResponse = FormsGetResponses[keyof FormsGetResponses];
+
+export type FormsUpdateData = {
+    body: {
+        bot_check?: BotCheck | null;
+        /**
+         * Disabled forms refuse submissions.
+         */
+        enabled?: boolean | null;
+        /**
+         * The accepted fields; empty keeps every field.
+         */
+        fields?: Array<FieldDef> | null;
+        /**
+         * With `challenge`: the least ms between loading the challenge and submitting, 0-600000.
+         */
+        min_fill_ms?: number | null;
+        /**
+         * The display name.
+         */
+        name?: string | null;
+        /**
+         * Who gets mail for each new submission, at most 10.
+         */
+        notify_emails?: Array<string> | null;
+        /**
+         * Where browsers go after a plain form post; `null` removes it.
+         */
+        redirect_url?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}';
+};
+
+export type FormsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsUpdateError = FormsUpdateErrors[keyof FormsUpdateErrors];
+
+export type FormsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Form;
+};
+
+export type FormsUpdateResponse = FormsUpdateResponses[keyof FormsUpdateResponses];
+
+export type FormsSubmissionsExportData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+    };
+    query?: {
+        status?: SubmissionStatus | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/export';
+};
+
+export type FormsSubmissionsExportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsSubmissionsExportError = FormsSubmissionsExportErrors[keyof FormsSubmissionsExportErrors];
+
+export type FormsSubmissionsExportResponses = {
+    /**
+     * OK
+     */
+    200: SubmissionExport;
+};
+
+export type FormsSubmissionsExportResponse = FormsSubmissionsExportResponses[keyof FormsSubmissionsExportResponses];
+
+export type FormsSubmissionsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+    };
+    query?: {
+        before?: SubmissionId | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        status?: SubmissionStatus | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions';
+};
+
+export type FormsSubmissionsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsSubmissionsListError = FormsSubmissionsListErrors[keyof FormsSubmissionsListErrors];
+
+export type FormsSubmissionsListResponses = {
+    /**
+     * OK
+     */
+    200: SubmissionList;
+};
+
+export type FormsSubmissionsListResponse = FormsSubmissionsListResponses[keyof FormsSubmissionsListResponses];
+
+export type FormsSubmissionsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+        /**
+         * The submission.
+         */
+        submission_id: SubmissionId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}';
+};
+
+export type FormsSubmissionsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsSubmissionsDeleteError = FormsSubmissionsDeleteErrors[keyof FormsSubmissionsDeleteErrors];
+
+export type FormsSubmissionsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type FormsSubmissionsDeleteResponse = FormsSubmissionsDeleteResponses[keyof FormsSubmissionsDeleteResponses];
+
+export type FormsSubmissionsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+        /**
+         * The submission.
+         */
+        submission_id: SubmissionId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}';
+};
+
+export type FormsSubmissionsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsSubmissionsGetError = FormsSubmissionsGetErrors[keyof FormsSubmissionsGetErrors];
+
+export type FormsSubmissionsGetResponses = {
+    /**
+     * OK
+     */
+    200: Submission;
+};
+
+export type FormsSubmissionsGetResponse = FormsSubmissionsGetResponses[keyof FormsSubmissionsGetResponses];
+
+export type FormsSubmissionsUpdateData = {
+    body: {
+        /**
+         * Inbox or spam.
+         */
+        status: SubmissionStatus;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The form.
+         */
+        form_id: FormId;
+        /**
+         * The submission.
+         */
+        submission_id: SubmissionId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}';
+};
+
+export type FormsSubmissionsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type FormsSubmissionsUpdateError = FormsSubmissionsUpdateErrors[keyof FormsSubmissionsUpdateErrors];
+
+export type FormsSubmissionsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Submission;
+};
+
+export type FormsSubmissionsUpdateResponse = FormsSubmissionsUpdateResponses[keyof FormsSubmissionsUpdateResponses];
+
 export type InvitationsListData = {
     body?: never;
     path: {
@@ -1596,3 +2404,81 @@ export type ProjectsUpdateResponses = {
 };
 
 export type ProjectsUpdateResponse = ProjectsUpdateResponses[keyof ProjectsUpdateResponses];
+
+export type FormsPublicSubmitData = {
+    body: {
+        [key: string]: unknown;
+    };
+    path: {
+        /**
+         * The form ID
+         */
+        form_id: string;
+    };
+    query?: never;
+    url: '/m/forms/public/{form_id}';
+};
+
+export type FormsPublicSubmitErrors = {
+    /**
+     * The body is malformed or over 64 KiB
+     */
+    400: ErrorBody;
+    /**
+     * No enabled form has this ID
+     */
+    404: ErrorBody;
+    /**
+     * The body is over the server's 1 MiB request limit
+     */
+    413: unknown;
+    /**
+     * Fields failed validation
+     */
+    422: ErrorBody;
+};
+
+export type FormsPublicSubmitError = FormsPublicSubmitErrors[keyof FormsPublicSubmitErrors];
+
+export type FormsPublicSubmitResponses = {
+    /**
+     * Taken: a thank-you page
+     */
+    200: string;
+    /**
+     * Taken (JSON clients)
+     */
+    201: Accepted;
+};
+
+export type FormsPublicSubmitResponse = FormsPublicSubmitResponses[keyof FormsPublicSubmitResponses];
+
+export type FormsPublicChallengeData = {
+    body?: never;
+    path: {
+        /**
+         * The form ID
+         */
+        form_id: string;
+    };
+    query?: never;
+    url: '/m/forms/public/{form_id}/challenge';
+};
+
+export type FormsPublicChallengeErrors = {
+    /**
+     * No enabled challenge form has this ID
+     */
+    404: ErrorBody;
+};
+
+export type FormsPublicChallengeError = FormsPublicChallengeErrors[keyof FormsPublicChallengeErrors];
+
+export type FormsPublicChallengeResponses = {
+    /**
+     * A challenge valid for one hour
+     */
+    200: Challenge;
+};
+
+export type FormsPublicChallengeResponse = FormsPublicChallengeResponses[keyof FormsPublicChallengeResponses];

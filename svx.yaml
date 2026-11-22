@@ -25,6 +25,16 @@ services:
     ready: { http: /healthz, timeout: 5m } # the first cargo build is slow
     links: { OpenAPI: /api/openapi.json }
 
+  seed:
+    # Demo data to look at: sign in as demo@bizkit.test. Safe to run again.
+    # Runs the binary the api's `cargo run` just built, instead of a second
+    # cargo invocation.
+    run: >-
+      exec ./target/debug/bizkit --config dev/bizkit.yaml dev seed-demo
+      --data-dir $SVX_STACK_DIR/data
+    oneshot: true
+    depends: [api]
+
   ui:
     run: exec pnpm -C web dev --host 127.0.0.1 --port $PORT --strictPort
     port: 5173

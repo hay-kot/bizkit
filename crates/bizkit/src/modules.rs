@@ -4,8 +4,15 @@ use bizkit_core::Module;
 
 /// Every compiled-in module, in registration order. Cargo features on this
 /// crate decide which modules exist.
+#[cfg_attr(
+    feature = "forms",
+    expect(clippy::vec_init_then_push, reason = "each push sits behind its module's feature")
+)]
 pub(crate) fn modules() -> Vec<Box<dyn Module>> {
-    Vec::new()
+    let mut modules: Vec<Box<dyn Module>> = Vec::new();
+    #[cfg(feature = "forms")]
+    modules.push(Box::new(bizkit_forms::Forms::default()));
+    modules
 }
 
 /// Checks that hold for every operation of every compiled-in module.

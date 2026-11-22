@@ -76,6 +76,26 @@ pub(crate) async fn find(
     .await
 }
 
+/// True when `project_id` is a project of `workspace_id`.
+///
+/// # Errors
+///
+/// When the query fails.
+pub async fn exists(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+) -> sqlx::Result<bool> {
+    let found = sqlx::query_scalar!(
+        "SELECT 1 AS found FROM projects WHERE workspace_id = ? AND id = ?",
+        workspace_id,
+        project_id
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(found.is_some())
+}
+
 pub(crate) async fn rename(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,

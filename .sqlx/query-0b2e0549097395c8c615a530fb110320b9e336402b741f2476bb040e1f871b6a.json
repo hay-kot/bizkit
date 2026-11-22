@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE form_submissions\n         SET status = ?1, spam_reason = CASE WHEN ?1 = 'inbox' THEN NULL ELSE spam_reason END\n         WHERE workspace_id = ?2 AND form_id = ?3 AND id = ?4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "0b2e0549097395c8c615a530fb110320b9e336402b741f2476bb040e1f871b6a"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO form_submissions (id, workspace_id, form_id, status, spam_reason, data,\n                                       user_agent, referer, created_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "e77695ebfa52f9756924f816a10f8e3bad3a433636398b3c73d9f3e04ec16972"
+}

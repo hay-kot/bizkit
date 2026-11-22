@@ -1047,7 +1047,7 @@ impl Operation for ProjectsDelete {
     const METHOD: Method = Method::Delete;
     const PATH: &'static str = "/workspaces/{workspace_id}/projects/{project_id}";
     const ACCESS: Access = PROJECTS_WRITE;
-    const SUMMARY: &'static str = "Delete a project";
+    const SUMMARY: &'static str = "Delete a project and everything modules keep in it";
     const SUCCESS: Success = Success::NoContent;
     const TAGS: &'static [&'static str] = &["projects"];
 
