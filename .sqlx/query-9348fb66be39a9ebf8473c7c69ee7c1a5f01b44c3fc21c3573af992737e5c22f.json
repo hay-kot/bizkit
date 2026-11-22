@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT i.id AS \"id: InvitationId\", w.id AS \"workspace_id: WorkspaceId\", w.slug AS workspace_slug,\n                  w.name AS workspace_name, i.role, u.email AS \"invited_by_email?\",\n                  i.expires_at AS \"expires_at: UnixMillis\"\n           FROM invitations i\n           JOIN workspaces w ON w.id = i.workspace_id\n           LEFT JOIN users u ON u.id = i.invited_by\n           WHERE i.email = ? AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > ?\n           ORDER BY i.created_at DESC, i.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: InvitationId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "invitations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_slug",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "workspace_name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "invitations",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "name": "invited_by_email?",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "expires_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "invitations",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "9348fb66be39a9ebf8473c7c69ee7c1a5f01b44c3fc21c3573af992737e5c22f"
+}

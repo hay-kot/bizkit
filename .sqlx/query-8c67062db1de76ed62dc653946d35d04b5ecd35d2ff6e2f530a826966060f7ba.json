@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.user_id AS \"user_id: UserId\", u.email, u.name, m.role, m.created_at AS \"created_at: UnixMillis\"\n           FROM memberships m JOIN users u ON u.id = m.user_id\n           WHERE m.workspace_id = ? AND m.user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id: UserId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "8c67062db1de76ed62dc653946d35d04b5ecd35d2ff6e2f530a826966060f7ba"
+}

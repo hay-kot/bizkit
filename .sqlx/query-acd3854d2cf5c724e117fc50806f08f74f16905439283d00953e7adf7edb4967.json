@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, ?, ?)\n         ON CONFLICT (workspace_id, user_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "acd3854d2cf5c724e117fc50806f08f74f16905439283d00953e7adf7edb4967"
+}

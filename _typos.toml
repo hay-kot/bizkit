@@ -1,2 +1,12 @@
 [files]
-extend-exclude = ["target", "dist"]
+extend-exclude = [
+  "target",
+  "dist",
+  ".sqlx",
+  "openapi.json",
+  "web/src/api/gen",
+  "node_modules",
+  "pnpm-lock.yaml",
+  "Cargo.lock",
+  "mise.lock",
+]

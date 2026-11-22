@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT w.id AS \"id: WorkspaceId\", w.slug, w.name, w.created_at AS \"created_at: UnixMillis\", m.role\n           FROM workspaces w JOIN memberships m ON m.workspace_id = w.id\n           WHERE m.user_id = ? ORDER BY w.name, w.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "slug",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "36357ff54387f53e8bd8c3f4d84e03875d162fc1799afdc6c564a649c9845e36"
+}

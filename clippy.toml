@@ -16,3 +16,6 @@ disallowed-methods = [
   { path = "std::env::set_var", reason = "process-wide mutation; pass configuration explicitly" },
   { path = "std::env::remove_var", reason = "process-wide mutation; pass configuration explicitly" },
 ]
+
+# ".." keeps clippy's default list.
+doc-valid-idents = ["..", "OpenAPI", "SQLite", "PostgreSQL"]
