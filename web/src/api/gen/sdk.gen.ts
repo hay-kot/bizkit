@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
+import type { ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -217,6 +217,148 @@ export const apiKeysRevoke = <ThrowOnError extends boolean = false>(options: Opt
 });
 
 /**
+ * List the forms of a workspace
+ */
+export const formsList = <ThrowOnError extends boolean = false>(options: Options<FormsListData, ThrowOnError>): RequestResult<FormsListResponses, FormsListErrors, ThrowOnError> => (options.client ?? client).get<FormsListResponses, FormsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms',
+    ...options
+});
+
+/**
+ * Create a form in a project
+ */
+export const formsCreate = <ThrowOnError extends boolean = false>(options: Options<FormsCreateData, ThrowOnError>): RequestResult<FormsCreateResponses, FormsCreateErrors, ThrowOnError> => (options.client ?? client).post<FormsCreateResponses, FormsCreateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a form and its submissions
+ */
+export const formsDelete = <ThrowOnError extends boolean = false>(options: Options<FormsDeleteData, ThrowOnError>): RequestResult<FormsDeleteResponses, FormsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<FormsDeleteResponses, FormsDeleteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}',
+    ...options
+});
+
+/**
+ * Show a form
+ */
+export const formsGet = <ThrowOnError extends boolean = false>(options: Options<FormsGetData, ThrowOnError>): RequestResult<FormsGetResponses, FormsGetErrors, ThrowOnError> => (options.client ?? client).get<FormsGetResponses, FormsGetErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}',
+    ...options
+});
+
+/**
+ * Change a form's settings
+ */
+export const formsUpdate = <ThrowOnError extends boolean = false>(options: Options<FormsUpdateData, ThrowOnError>): RequestResult<FormsUpdateResponses, FormsUpdateErrors, ThrowOnError> => (options.client ?? client).patch<FormsUpdateResponses, FormsUpdateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Export a form's submissions as CSV, newest first, at most 10000
+ */
+export const formsSubmissionsExport = <ThrowOnError extends boolean = false>(options: Options<FormsSubmissionsExportData, ThrowOnError>): RequestResult<FormsSubmissionsExportResponses, FormsSubmissionsExportErrors, ThrowOnError> => (options.client ?? client).get<FormsSubmissionsExportResponses, FormsSubmissionsExportErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/export',
+    ...options
+});
+
+/**
+ * List a form's submissions, newest first
+ */
+export const formsSubmissionsList = <ThrowOnError extends boolean = false>(options: Options<FormsSubmissionsListData, ThrowOnError>): RequestResult<FormsSubmissionsListResponses, FormsSubmissionsListErrors, ThrowOnError> => (options.client ?? client).get<FormsSubmissionsListResponses, FormsSubmissionsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions',
+    ...options
+});
+
+/**
+ * Delete a submission
+ */
+export const formsSubmissionsDelete = <ThrowOnError extends boolean = false>(options: Options<FormsSubmissionsDeleteData, ThrowOnError>): RequestResult<FormsSubmissionsDeleteResponses, FormsSubmissionsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<FormsSubmissionsDeleteResponses, FormsSubmissionsDeleteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}',
+    ...options
+});
+
+/**
+ * Show a submission
+ */
+export const formsSubmissionsGet = <ThrowOnError extends boolean = false>(options: Options<FormsSubmissionsGetData, ThrowOnError>): RequestResult<FormsSubmissionsGetResponses, FormsSubmissionsGetErrors, ThrowOnError> => (options.client ?? client).get<FormsSubmissionsGetResponses, FormsSubmissionsGetErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}',
+    ...options
+});
+
+/**
+ * Move a submission to the inbox or to spam
+ */
+export const formsSubmissionsUpdate = <ThrowOnError extends boolean = false>(options: Options<FormsSubmissionsUpdateData, ThrowOnError>): RequestResult<FormsSubmissionsUpdateResponses, FormsSubmissionsUpdateErrors, ThrowOnError> => (options.client ?? client).patch<FormsSubmissionsUpdateResponses, FormsSubmissionsUpdateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List pending invitations of a workspace
  */
 export const invitationsList = <ThrowOnError extends boolean = false>(options: Options<InvitationsListData, ThrowOnError>): RequestResult<InvitationsListResponses, InvitationsListErrors, ThrowOnError> => (options.client ?? client).get<InvitationsListResponses, InvitationsListErrors, ThrowOnError>({
@@ -333,7 +475,7 @@ export const projectsCreate = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Delete a project
+ * Delete a project and everything modules keep in it
  */
 export const projectsDelete = <ThrowOnError extends boolean = false>(options: Options<ProjectsDeleteData, ThrowOnError>): RequestResult<ProjectsDeleteResponses, ProjectsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<ProjectsDeleteResponses, ProjectsDeleteErrors, ThrowOnError>({
     security: [{
@@ -374,3 +516,22 @@ export const projectsUpdate = <ThrowOnError extends boolean = false>(options: Op
         ...options.headers
     }
 });
+
+/**
+ * Submit a form
+ *
+ * Takes an `application/x-www-form-urlencoded` or `application/json` body of at most 64 KiB. JSON clients (a JSON body or an `Accept` naming JSON) get JSON; browser form posts get a redirect or an HTML page. Submissions that fail the bot check answer like accepted ones.
+ */
+export const formsPublicSubmit = <ThrowOnError extends boolean = false>(options: Options<FormsPublicSubmitData, ThrowOnError>): RequestResult<FormsPublicSubmitResponses, FormsPublicSubmitErrors, ThrowOnError> => (options.client ?? client).post<FormsPublicSubmitResponses, FormsPublicSubmitErrors, ThrowOnError>({
+    url: '/m/forms/public/{form_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get an ALTCHA challenge for a form
+ */
+export const formsPublicChallenge = <ThrowOnError extends boolean = false>(options: Options<FormsPublicChallengeData, ThrowOnError>): RequestResult<FormsPublicChallengeResponses, FormsPublicChallengeErrors, ThrowOnError> => (options.client ?? client).get<FormsPublicChallengeResponses, FormsPublicChallengeErrors, ThrowOnError>({ url: '/m/forms/public/{form_id}/challenge', ...options });

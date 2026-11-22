@@ -1,0 +1,177 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT f.id AS \"id: FormId\", f.workspace_id AS \"workspace_id: WorkspaceId\",\n                  f.project_id AS \"project_id: ProjectId\", f.name, f.enabled AS \"enabled: bool\",\n                  f.fields, f.bot_check, f.min_fill_ms, f.redirect_url, f.notify_emails,\n                  f.challenge_key, f.created_at AS \"created_at: UnixMillis\",\n                  f.updated_at AS \"updated_at: UnixMillis\",\n                  (SELECT COUNT(*) FROM form_submissions s\n                   WHERE s.workspace_id = f.workspace_id AND s.form_id = f.id AND s.status = 'inbox')\n                    AS \"inbox_count!: i64\"\n           FROM forms f\n           WHERE f.workspace_id = ? AND (?2 IS NULL OR f.project_id = ?2)\n           ORDER BY f.name, f.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: FormId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "fields",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "fields"
+          }
+        }
+      },
+      {
+        "name": "bot_check",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "bot_check"
+          }
+        }
+      },
+      {
+        "name": "min_fill_ms",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "min_fill_ms"
+          }
+        }
+      },
+      {
+        "name": "redirect_url",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "redirect_url"
+          }
+        }
+      },
+      {
+        "name": "notify_emails",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "notify_emails"
+          }
+        }
+      },
+      {
+        "name": "challenge_key",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "challenge_key"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "forms",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "inbox_count!: i64",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9022e6d3dafb8afba2717136f8cde74c79ab86eedb9207ddd8311432b40127c9"
+}

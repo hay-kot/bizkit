@@ -324,6 +324,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "bizkit-core",
+ "bizkit-forms",
  "bizkit-testkit",
  "bizkit-web",
  "clap",
@@ -384,19 +385,28 @@ name = "bizkit-forms"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "base64 0.23.1",
  "bizkit-core",
+ "bizkit-testkit",
  "bolero",
  "hex",
  "hmac",
+ "http",
  "insta",
  "proptest",
+ "rand 0.10.4",
  "serde",
  "serde_json",
  "sha2",
+ "sqlx",
  "thiserror",
+ "tokio",
+ "tower-http 0.7.1",
+ "tracing",
  "url",
  "utoipa",
+ "uuid",
 ]
 
 [[package]]

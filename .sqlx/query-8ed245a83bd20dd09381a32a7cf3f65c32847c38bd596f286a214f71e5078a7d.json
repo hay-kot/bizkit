@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: SubmissionId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  form_id AS \"form_id: FormId\", status, spam_reason, data, user_agent, referer,\n                  created_at AS \"created_at: UnixMillis\"\n           FROM form_submissions\n           WHERE workspace_id = ?1 AND form_id = ?2 AND status = ?3 AND (?4 IS NULL OR id < ?4)\n           ORDER BY id DESC LIMIT ?5",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: SubmissionId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "form_id: FormId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "form_id"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "spam_reason",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "spam_reason"
+          }
+        }
+      },
+      {
+        "name": "data",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "data"
+          }
+        }
+      },
+      {
+        "name": "user_agent",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "user_agent"
+          }
+        }
+      },
+      {
+        "name": "referer",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "referer"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "form_submissions",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "8ed245a83bd20dd09381a32a7cf3f65c32847c38bd596f286a214f71e5078a7d"
+}

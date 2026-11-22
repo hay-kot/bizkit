@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM form_submissions WHERE workspace_id = ? AND form_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "658a39d819f76b17b8f40ba455a7b8472053eff3c7bbc1c006480d8de2795918"
+}

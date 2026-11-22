@@ -93,8 +93,6 @@ pub struct Form {
     pub bot_check: BotCheck,
     /// With `challenge`: the least time in ms between loading the challenge and submitting.
     pub min_fill_ms: u32,
-    /// With `challenge`: the proof-of-work difficulty, the largest number a solver tries.
-    pub pow_max_number: u32,
     /// Where browsers go after a plain form post. A thank-you page when absent.
     #[schema(value_type = Option<String>)]
     pub redirect_url: Option<Url>,
@@ -209,8 +207,6 @@ pub struct SubmissionList {
 pub struct SubmissionExport {
     /// A suggested file name.
     pub filename: String,
-    /// Always `text/csv`.
-    pub content_type: String,
     /// The CSV text: a header row, then one row per submission, newest first.
     pub csv: String,
     /// True when more submissions exist than the export holds.

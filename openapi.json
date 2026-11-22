@@ -1138,6 +1138,1235 @@
         "x-bizkit-scope": "workspace:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/forms": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "List the forms of a workspace",
+        "operationId": "forms.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ProjectId",
+                  "description": "Only this project's forms."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:read"
+      },
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Create a form in a project",
+        "operationId": "forms.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "name"
+                ],
+                "properties": {
+                  "bot_check": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/BotCheck",
+                        "description": "The bot check. Default `honeypot`."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fields": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/FieldDef"
+                    },
+                    "description": "The accepted fields. Default none, which keeps every field."
+                  },
+                  "min_fill_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int32",
+                    "description": "With `challenge`: the least ms between loading the challenge and submitting, 0-600000. Default 2000.",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name."
+                  },
+                  "notify_emails": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Who gets mail for each new submission, at most 10."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project it belongs to."
+                  },
+                  "redirect_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Where browsers go after a plain form post, http or https."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Form"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/forms/{form_id}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Show a form",
+        "operationId": "forms.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Form"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:read"
+      },
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Delete a form and its submissions",
+        "operationId": "forms.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:write"
+      },
+      "patch": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Change a form's settings",
+        "operationId": "forms.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bot_check": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/BotCheck",
+                        "description": "The bot check."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "enabled": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Disabled forms refuse submissions."
+                  },
+                  "fields": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/FieldDef"
+                    },
+                    "description": "The accepted fields; empty keeps every field."
+                  },
+                  "min_fill_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int32",
+                    "description": "With `challenge`: the least ms between loading the challenge and submitting, 0-600000.",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The display name."
+                  },
+                  "notify_emails": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Who gets mail for each new submission, at most 10."
+                  },
+                  "redirect_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Where browsers go after a plain form post; `null` removes it."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Form"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/forms/{form_id}/export": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Export a form's submissions as CSV, newest first, at most 10000",
+        "operationId": "forms.submissions.export",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SubmissionStatus",
+                  "description": "Inbox or spam. Default inbox."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "List a form's submissions, newest first",
+        "operationId": "forms.submissions.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SubmissionId",
+                  "description": "Only submissions older than this one, for the next page."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SubmissionStatus",
+                  "description": "Inbox or spam. Default inbox."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/forms/{form_id}/submissions/{submission_id}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Show a submission",
+        "operationId": "forms.submissions.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          },
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SubmissionId",
+              "description": "The submission."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:read"
+      },
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Delete a submission",
+        "operationId": "forms.submissions.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          },
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SubmissionId",
+              "description": "The submission."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:write"
+      },
+      "patch": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Move a submission to the inbox or to spam",
+        "operationId": "forms.submissions.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FormId",
+              "description": "The form."
+            }
+          },
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SubmissionId",
+              "description": "The submission."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/SubmissionStatus",
+                    "description": "Inbox or spam."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "forms:write"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/invitations": {
       "get": {
         "tags": [
@@ -2100,7 +3329,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Delete a project",
+        "summary": "Delete a project and everything modules keep in it",
         "operationId": "projects.delete",
         "parameters": [
           {
@@ -2305,10 +3534,171 @@
         ],
         "x-bizkit-scope": "projects:write"
       }
+    },
+    "/m/forms/public/{form_id}": {
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Submit a form",
+        "description": "Takes an `application/x-www-form-urlencoded` or `application/json` body of at most 64 KiB. JSON clients (a JSON body or an `Accept` naming JSON) get JSON; browser form posts get a redirect or an HTML page. Submissions that fail the bot check answer like accepted ones.",
+        "operationId": "forms.public.submit",
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "description": "The form ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Taken: a thank-you page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Taken (JSON clients)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Taken: go to the form's redirect URL"
+          },
+          "400": {
+            "description": "The body is malformed or too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled form has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Fields failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/forms/public/{form_id}/challenge": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Get an ALTCHA challenge for a form",
+        "operationId": "forms.public.challenge",
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "description": "The form ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A challenge valid for one hour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Challenge"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled challenge form has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Accepted": {
+        "type": "object",
+        "description": "A submission was taken.",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Always true."
+          }
+        }
+      },
       "ApiKey": {
         "type": "object",
         "description": "An API key. The secret is shown once, at creation.",
@@ -2403,6 +3793,49 @@
           }
         }
       },
+      "BotCheck": {
+        "type": "string",
+        "description": "How a form tells people from bots.",
+        "enum": [
+          "honeypot",
+          "challenge"
+        ]
+      },
+      "Challenge": {
+        "type": "object",
+        "description": "An ALTCHA v1 challenge.",
+        "required": [
+          "algorithm",
+          "challenge",
+          "maxnumber",
+          "salt",
+          "signature"
+        ],
+        "properties": {
+          "algorithm": {
+            "type": "string",
+            "description": "Always `SHA-256`."
+          },
+          "challenge": {
+            "type": "string",
+            "description": "The hex SHA-256 of `salt` followed by the secret number."
+          },
+          "maxnumber": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The secret number is at most this.",
+            "minimum": 0
+          },
+          "salt": {
+            "type": "string",
+            "description": "Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>`."
+          },
+          "signature": {
+            "type": "string",
+            "description": "The hex HMAC-SHA256 of `challenge` under the form's key."
+          }
+        }
+      },
       "CreatedApiKey": {
         "type": "object",
         "description": "A new key and its token.",
@@ -2479,6 +3912,193 @@
           "message": {
             "type": "string",
             "description": "A human-readable message."
+          }
+        }
+      },
+      "FieldDef": {
+        "type": "object",
+        "description": "A field a form accepts.",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FieldKind",
+            "description": "How values are checked."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A label for the UI and mail; the name when absent."
+          },
+          "max_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The longest value, 1-10000 characters. Default 10000.",
+            "minimum": 0
+          },
+          "multiple": {
+            "type": "boolean",
+            "description": "A `choice` field may take several values."
+          },
+          "name": {
+            "type": "string",
+            "description": "The input's `name`: 1-64 of `a-z`, `A-Z`, `0-9`, `_` and `-`, not\nstarting with `_`, unique in the form."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The allowed values of a `choice` field, 1-50 of them."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "At least one non-blank value is needed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldKind": {
+        "type": "string",
+        "description": "What a field holds, which decides how it is checked.",
+        "enum": [
+          "text",
+          "email",
+          "url",
+          "number",
+          "choice"
+        ]
+      },
+      "FieldValue": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "A single value."
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Several values, such as checked boxes."
+          }
+        ],
+        "description": "One field's submitted value."
+      },
+      "Form": {
+        "type": "object",
+        "description": "A form that collects submissions from a site.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "enabled",
+          "fields",
+          "bot_check",
+          "min_fill_ms",
+          "notify_emails",
+          "endpoint",
+          "challenge_url",
+          "inbox_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "bot_check": {
+            "$ref": "#/components/schemas/BotCheck",
+            "description": "The bot check."
+          },
+          "challenge_url": {
+            "type": "string",
+            "description": "The URL the ALTCHA widget loads challenges from."
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was created."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Disabled forms answer 404 to submissions."
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "The URL sites post to."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDef"
+            },
+            "description": "The accepted fields. Empty means every field is kept."
+          },
+          "id": {
+            "$ref": "#/components/schemas/FormId",
+            "description": "The form ID, also its public address."
+          },
+          "inbox_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Submissions in the inbox.",
+            "minimum": 0
+          },
+          "min_fill_ms": {
+            "type": "integer",
+            "format": "int32",
+            "description": "With `challenge`: the least time in ms between loading the challenge and submitting.",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "notify_emails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Who gets mail for each new submission."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "redirect_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where browsers go after a plain form post. A thank-you page when absent."
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When its settings last changed."
+          }
+        }
+      },
+      "FormId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "FormList": {
+        "type": "object",
+        "description": "Forms of a workspace.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Form"
+            },
+            "description": "Sorted by name."
           }
         }
       },
@@ -2837,6 +4457,128 @@
           }
         },
         "additionalProperties": false
+      },
+      "Submission": {
+        "type": "object",
+        "description": "What someone sent through a form.",
+        "required": [
+          "id",
+          "form_id",
+          "status",
+          "data",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it arrived."
+          },
+          "data": {
+            "type": "object",
+            "description": "The values by field name.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldValue"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "form_id": {
+            "$ref": "#/components/schemas/FormId",
+            "description": "The form."
+          },
+          "id": {
+            "$ref": "#/components/schemas/SubmissionId",
+            "description": "The submission ID."
+          },
+          "referer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The page that sent it (`Referer`), at most 512 characters."
+          },
+          "spam_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the bot check flagged it, if it did."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubmissionStatus",
+            "description": "Inbox or spam."
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's `User-Agent`, at most 512 characters."
+          }
+        }
+      },
+      "SubmissionExport": {
+        "type": "object",
+        "description": "Submissions as CSV.",
+        "required": [
+          "filename",
+          "csv",
+          "truncated"
+        ],
+        "properties": {
+          "csv": {
+            "type": "string",
+            "description": "The CSV text: a header row, then one row per submission, newest first."
+          },
+          "filename": {
+            "type": "string",
+            "description": "A suggested file name."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when more submissions exist than the export holds."
+          }
+        }
+      },
+      "SubmissionId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "SubmissionList": {
+        "type": "object",
+        "description": "A page of submissions, newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            },
+            "description": "The submissions."
+          },
+          "next_before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SubmissionId",
+                "description": "Pass as `before` for the next page; absent on the last page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SubmissionStatus": {
+        "type": "string",
+        "description": "Where a submission sits.",
+        "enum": [
+          "inbox",
+          "spam"
+        ]
       },
       "Timestamp": {
         "type": "string",

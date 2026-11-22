@@ -275,6 +275,17 @@ impl SpecClient {
         self.send_inner(method, path, Some(Body::Raw(raw)), true).await
     }
 
+    /// [`send_body`](Self::send_body) without the spec check, for requests
+    /// the spec doesn't describe, such as CORS preflights.
+    pub async fn send_body_unchecked(
+        &self,
+        method: Method,
+        path: &str,
+        raw: RawBody<'_>,
+    ) -> ApiResponse {
+        self.send_inner(method, path, Some(Body::Raw(raw)), false).await
+    }
+
     /// Sends a request without the spec check, for paths the spec can't
     /// describe, such as the JSON 404 for unknown `/api` paths.
     pub async fn send_unchecked(
