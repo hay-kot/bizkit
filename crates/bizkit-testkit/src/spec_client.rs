@@ -57,8 +57,20 @@ impl SpecChecker {
     ///
     /// Unless `status` and `body` are documented for `method path`.
     pub fn check(&self, method: &Method, path: &str, status: StatusCode, body: &[u8]) {
+        self.check_typed(method, path, status, Typed { content_type: None, body });
+    }
+
+    /// [`check`](Self::check) for a response with a content type. A body
+    /// that isn't JSON must be documented under its media type and is not
+    /// validated further.
+    ///
+    /// # Panics
+    ///
+    /// Unless `status` and `body` are documented for `method path`.
+    pub fn check_typed(&self, method: &Method, path: &str, status: StatusCode, typed: Typed<'_>) {
+        let Typed { content_type, body } = typed;
         let path = path.split('?').next().unwrap_or(path);
-        if !path.starts_with("/api/") {
+        if !path.starts_with("/api/") && !path.starts_with("/m/") {
             return;
         }
         let Some(template) = self.template(path) else {
@@ -76,6 +88,14 @@ impl SpecChecker {
                 "{method} {path}: status {status} is not documented for {template}; body: {body}"
             );
         };
+        let media = content_type.and_then(|v| v.split(';').next()).map(str::trim);
+        if let Some(media) = media.filter(|m| !body.is_empty() && *m != "application/json") {
+            assert!(
+                response.pointer(&format!("/content/{}", escape(media))).is_some(),
+                "{method} {path}: {status} documents no {media} body"
+            );
+            return;
+        }
         let Some(schema) = response.pointer("/content/application~1json/schema") else {
             assert!(
                 body.is_empty(),
@@ -242,7 +262,17 @@ impl SpecClient {
     ///
     /// When the response strays from the spec.
     pub async fn send(&self, method: Method, path: &str, body: Option<&Value>) -> ApiResponse {
-        self.send_inner(method, path, body, true).await
+        self.send_inner(method, path, body.map(Body::Json), true).await
+    }
+
+    /// Sends a raw body and checks the response against the spec. For raw
+    /// routes such as form ingest.
+    ///
+    /// # Panics
+    ///
+    /// When the response strays from the spec.
+    pub async fn send_body(&self, method: Method, path: &str, raw: RawBody<'_>) -> ApiResponse {
+        self.send_inner(method, path, Some(Body::Raw(raw)), true).await
     }
 
     /// Sends a request without the spec check, for paths the spec can't
@@ -253,14 +283,14 @@ impl SpecClient {
         path: &str,
         body: Option<&Value>,
     ) -> ApiResponse {
-        self.send_inner(method, path, body, false).await
+        self.send_inner(method, path, body.map(Body::Json), false).await
     }
 
     async fn send_inner(
         &self,
         method: Method,
         path: &str,
-        body: Option<&Value>,
+        body: Option<Body<'_>>,
         check: bool,
     ) -> ApiResponse {
         let mut request = self.server.method(method.clone(), path);
@@ -275,14 +305,23 @@ impl SpecClient {
         if !matches!(method, Method::GET | Method::HEAD | Method::OPTIONS) {
             request = request.add_header(header::ORIGIN, header_value(&self.origin));
         }
-        if let Some(body) = body {
-            request = request.json(body);
+        match body {
+            Some(Body::Json(value)) => request = request.json(value),
+            Some(Body::Raw(raw)) => {
+                for (name, value) in raw.headers {
+                    request = request.add_header(name.clone(), header_value(value));
+                }
+                request = request.content_type(raw.content_type).bytes(raw.body);
+            }
+            None => {}
         }
         let response = request.await;
         let status = response.status_code();
         let bytes = response.as_bytes().clone();
         if check {
-            self.checker.check(&method, path, status, &bytes);
+            let content_type =
+                response.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok());
+            self.checker.check_typed(&method, path, status, Typed { content_type, body: &bytes });
         }
         let text = String::from_utf8_lossy(&bytes).into_owned();
         ApiResponse {
@@ -292,6 +331,38 @@ impl SpecClient {
             text,
         }
     }
+}
+
+/// A response body and its `Content-Type`, for [`SpecChecker::check_typed`].
+#[derive(Debug, Clone, Copy)]
+pub struct Typed<'a> {
+    /// The `Content-Type` header; `None` is checked as JSON.
+    pub content_type: Option<&'a str>,
+    /// The body.
+    pub body: &'a [u8],
+}
+
+/// A request body that isn't JSON, for [`SpecClient::send_body`].
+#[derive(Debug, Clone)]
+pub struct RawBody<'a> {
+    /// The `Content-Type` header.
+    pub content_type: &'a str,
+    /// The body.
+    pub body: bytes::Bytes,
+    /// Extra headers, such as `Accept`.
+    pub headers: &'a [(HeaderName, &'a str)],
+}
+
+impl<'a> RawBody<'a> {
+    /// `body` as `content_type`, with no extra headers.
+    pub fn new(content_type: &'a str, body: impl Into<bytes::Bytes>) -> Self {
+        Self { content_type, body: body.into(), headers: &[] }
+    }
+}
+
+enum Body<'a> {
+    Json(&'a Value),
+    Raw(RawBody<'a>),
 }
 
 fn header_value(text: &str) -> HeaderValue {

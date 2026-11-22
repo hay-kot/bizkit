@@ -22,6 +22,7 @@ publish = false
 # (RUSTSEC-2026-0560 to -0565) and url 2.5.9 (RUSTSEC-2026-0592).
 [workspace.dependencies]
 bizkit-core = { path = "crates/bizkit-core" }
+bizkit-forms = { path = "crates/bizkit-forms" }
 bizkit-testkit = { path = "crates/bizkit-testkit" }
 bizkit-web = { path = "crates/bizkit-web" }
 
@@ -30,12 +31,15 @@ async-trait = "0.1.92"
 axum = { version = "0.8.9", features = ["macros"] }
 axum-test = "21.1.0"
 base64 = "0.23.1"
+bolero = "0.13.7"
 bytes = "1.12.1"
 clap = { version = "4", features = ["derive", "env", "string", "wrap_help"] }
 clap_complete = "4"
 etcetera = "0.11"
 futures = "0.3.34"
 globset = "0.4.21"
+hex = "0.4.3"
+hmac = "0.13.0"
 http = "1.5.0"
 insta = { version = "1.49.0", features = ["filters", "json", "redactions"] }
 jsonschema = { version = "=0.61.2", default-features = false }

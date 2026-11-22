@@ -166,20 +166,20 @@ pub fn scope_areas(modules: &[Box<dyn Module>]) -> anyhow::Result<ScopeAreas> {
 fn spec_json(registration: &Registration) -> anyhow::Result<serde_json::Value> {
     let mut extra = vec![serde_json::to_value(AuthDocs::openapi())?];
     for routes in &registration.routes {
-        extra.push(nest_docs(routes.module, &routes.docs));
+        extra.push(nest_docs(&routes.nest(), &routes.docs));
     }
     crate::ops::openapi_document(&registration.registry, &extra)
 }
 
 /// Prefixes a module's documented paths with its nest.
-fn nest_docs(module: &str, docs: &serde_json::Value) -> serde_json::Value {
+fn nest_docs(nest: &str, docs: &serde_json::Value) -> serde_json::Value {
     let mut docs = docs.clone();
     if let Some(paths) = docs.get_mut("paths").and_then(serde_json::Value::as_object_mut) {
         let nested = std::mem::take(paths)
             .into_iter()
             .map(|(path, item)| {
                 let path = if path == "/" { String::new() } else { path };
-                (format!("/m/{module}{path}"), item)
+                (format!("{nest}{path}"), item)
             })
             .collect();
         *paths = nested;
@@ -272,11 +272,15 @@ impl App {
             )
             .route("/api/{*rest}", any(not_found))
             .route("/mcp/{*rest}", any(not_found));
-        for routes in &self.routes {
-            router = router.nest(&format!("/m/{}", routes.module), routes.router.clone());
+        for routes in self.routes.iter().filter(|routes| !routes.public) {
+            router = router.nest(&routes.nest(), routes.router.clone());
+        }
+        router = router.layer(middleware::from_fn_with_state(platform.clone(), authenticate));
+        // Merged after the authenticate layer, so it never wraps them.
+        for routes in self.routes.iter().filter(|routes| routes.public) {
+            router = router.nest(&routes.nest(), routes.router.clone());
         }
         router
-            .layer(middleware::from_fn_with_state(platform.clone(), authenticate))
             .layer(Extension(platform.clone()))
             .layer(RequestBodyLimitLayer::new(crate::ops::http::MAX_BODY_BYTES))
             .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, REQUEST_TIMEOUT))
@@ -368,7 +372,7 @@ mod tests {
     fn module_docs_nest_under_the_module() {
         let docs =
             serde_json::json!({ "paths": { "/": { "post": {} }, "/submit": { "post": {} } } });
-        let nested = nest_docs("forms", &docs);
+        let nested = nest_docs("/m/forms", &docs);
         let paths: Vec<&String> = nested["paths"].as_object().unwrap().keys().collect();
         assert_eq!(paths, ["/m/forms", "/m/forms/submit"], "nested paths");
     }

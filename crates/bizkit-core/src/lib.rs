@@ -30,6 +30,11 @@ pub use crate::deps::Deps;
 pub use crate::error::ApiError;
 pub use crate::module::{Module, ModuleContext};
 
+/// Projects, for modules that keep data per project.
+pub mod projects {
+    pub use crate::tenancy::projects::exists;
+}
+
 /// The API types core's operations return.
 pub mod api {
     pub use crate::auth::ops::{ApiKey, ApiKeyList, CreatedApiKey};
