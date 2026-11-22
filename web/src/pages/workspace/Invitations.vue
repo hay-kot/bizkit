@@ -1,99 +1,108 @@
 <script setup lang="ts">
+import { Mail, MailPlus, X } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import Loading from '@/components/Loading.vue'
-import type { Role } from '@/queries/members'
-import { useInvitations, useInvite, useRevokeInvitation } from '@/queries/members'
+import InvitePanel from '@/components/InvitePanel.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
+import { confirmAction } from '@/lib/confirm'
+import { errorMessage } from '@/lib/errors'
+import { toast } from '@/lib/toast'
+import type { Invitation } from '@/queries/members'
+import { useInvitations, useRevokeInvitation } from '@/queries/members'
 
-const props = defineProps<{ workspaceId: string }>()
+const props = defineProps<{ workspaceId: string; workspaceName: string }>()
 const { data: invitations, isPending, error } = useInvitations(() => props.workspaceId)
-const invite = useInvite()
 const revoke = useRevokeInvitation()
-const email = ref('')
-const role = ref<Role>('member')
-const sentTo = ref('')
+const inviting = ref(false)
 
-async function onInvite() {
-  await invite.mutateAsync({
-    path: { workspace_id: props.workspaceId },
-    body: { email: email.value, role: role.value },
-  })
-  sentTo.value = email.value
-  email.value = ''
+function isExpired(item: Invitation) {
+  return new Date(item.expires_at).getTime() < Date.now()
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString()
+  return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+async function onRevoke(item: Invitation) {
+  const ok = await confirmAction({
+    title: `Revoke the invitation for ${item.email}?`,
+    message: 'The link in their email stops working.',
+    confirmLabel: 'Revoke',
+  })
+  if (!ok) return
+  try {
+    await revoke.mutateAsync({ path: { workspace_id: props.workspaceId, invitation_id: item.id } })
+    toast(`Revoked the invitation for ${item.email}`)
+  } catch (err) {
+    toast(errorMessage(err), 'error')
+  }
 }
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <section class="card bg-base-100" aria-labelledby="invite-heading">
-      <form class="card-body gap-4" @submit.prevent="onInvite">
-        <h2 id="invite-heading" class="card-title text-lg">Invite someone</h2>
-        <div class="grid gap-4 sm:grid-cols-3">
-          <label class="flex flex-col gap-1 sm:col-span-2">
-            <span class="text-sm font-medium">Email</span>
-            <input v-model="email" type="email" name="invite-email" required class="input w-full" />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium">Role</span>
-            <select v-model="role" name="invite-role" class="select w-full">
-              <option value="member">member</option>
-              <option value="admin">admin</option>
-            </select>
-          </label>
-        </div>
-        <div v-if="sentTo" role="status" class="alert alert-success">
-          <span>Invitation sent to {{ sentTo }}.</span>
-        </div>
-        <ErrorAlert :error="invite.error.value" />
-        <div class="card-actions justify-end">
-          <button type="submit" class="btn btn-primary">Send invitation</button>
-        </div>
-      </form>
-    </section>
-    <section class="card bg-base-100" aria-labelledby="pending-heading">
-      <div class="card-body">
-        <h2 id="pending-heading" class="card-title text-lg">Pending invitations</h2>
-        <Loading v-if="isPending" />
-        <ErrorAlert v-else-if="error" :error="error" />
-        <EmptyState v-else-if="!invitations?.items.length" message="No pending invitations." />
-        <div v-else class="overflow-x-auto">
-          <table class="table">
-            <thead>
-              <tr>
-                <th scope="col">Email</th>
-                <th scope="col">Role</th>
-                <th scope="col">Expires</th>
-                <th scope="col"><span class="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in invitations.items" :key="item.id">
-                <td>{{ item.email }}</td>
-                <td>{{ item.role }}</td>
-                <td>{{ formatDate(item.expires_at) }}</td>
-                <td class="text-right">
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    :aria-label="`Revoke the invitation for ${item.email}`"
-                    @click="
-                      revoke.mutate({ path: { workspace_id: workspaceId, invitation_id: item.id } })
-                    "
-                  >
-                    Revoke
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+  <div>
+    <PageHeader
+      :section="workspaceName"
+      title="Invitations"
+      description="Invitations last 7 days. Revoke one to cancel it."
+    >
+      <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="inviting = true">
+        <MailPlus class="size-4" aria-hidden="true" />Invite
+      </button>
+    </PageHeader>
+
+    <SkeletonRows v-if="isPending" />
+    <ErrorAlert v-else-if="error" :error="error" />
+    <EmptyState
+      v-else-if="!invitations?.items.length"
+      :icon="Mail"
+      title="No pending invitations"
+      message="Invite teammates or outside collaborators by email."
+    >
+      <button type="button" class="btn btn-primary btn-sm" @click="inviting = true">
+        Invite someone
+      </button>
+    </EmptyState>
+    <div v-else class="overflow-x-auto rounded-box border border-base-300">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Email</th>
+            <th scope="col">Role</th>
+            <th scope="col">Expires</th>
+            <th scope="col" class="w-12"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="item in invitations.items"
+            :key="item.id"
+            class="transition-colors hover:bg-base-200"
+          >
+            <td>{{ item.email }}</td>
+            <td class="capitalize">{{ item.role }}</td>
+            <td>
+              <span v-if="isExpired(item)" class="badge badge-ghost badge-sm">expired</span>
+              <span v-else class="text-sm">{{ formatDate(item.expires_at) }}</span>
+            </td>
+            <td class="text-right">
+              <button
+                type="button"
+                class="btn btn-square btn-ghost btn-sm"
+                :aria-label="`Revoke the invitation for ${item.email}`"
+                @click="onRevoke(item)"
+              >
+                <X class="size-4" aria-hidden="true" />
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <InvitePanel :workspace-id="workspaceId" :open="inviting" @close="inviting = false" />
   </div>
 </template>

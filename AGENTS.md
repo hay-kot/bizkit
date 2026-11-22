@@ -60,7 +60,10 @@ A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<nam
 - Vue 3, Tailwind v4 and DaisyUI 5. Use Tailwind and DaisyUI classes only: ESLint rejects unknown classes, arbitrary values (`w-[13px]`), raw palette colors (`bg-blue-500`) and inline styles. Use DaisyUI semantic colors (`primary`, `base-200`, `error`).
 - Colors are defined only in `web/src/styles/theme.css`; stylelint rejects hex, named and functional colors elsewhere.
 - Only `web/src/queries/**` and `web/src/api/client.ts` import the generated client in `web/src/api/gen`. Pages use the composables in `src/queries`.
-- Disabling an ESLint rule needs a reason: `// eslint-disable-next-line rule -- why`.
+- Disabling an ESLint rule needs a reason: `// eslint-disable-next-line rule -- why`. The one inline style today is the floating list in `Select.vue`, which needs coordinates.
+- Layout: `/` is the user home (workspaces, invitations, create). Inside a workspace, `layouts/WorkspaceLayout.vue` gives the sidebar: workspace switcher on top, nav in the middle, user menu at the bottom. New sections are sidebar nav items, not tabs.
+- Use the primitives in `src/components/ui`, not native or DaisyUI controls: `Select` (listbox), `Checkbox`, `Menu`/`MenuItem`, `Overlay` (dialog or right-side panel), `Field`, `SkeletonRows`, `CopyButton`, `Avatar`. Create and edit forms open in an `Overlay` panel; destructive actions go through `confirmAction()`; results show with `toast()`.
+- Pages load eagerly and only the content area animates between routes, so the shell never flashes. Show skeletons on first load, not spinners.
 
 ## Dev stack
 

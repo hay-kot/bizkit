@@ -15,9 +15,10 @@ test('an admin invites a new email, who signs in from the mail and joins', async
   const invitee = `guest+${namespace}@outside.e2e.test`
   const workspaceId = world.workspaces.main!.id
   await page.goto(`/w/${workspaceId}/invitations`)
+  await page.getByRole('button', { name: 'Invite', exact: true }).click()
   await page.getByLabel('Email').fill(invitee)
   await page.getByRole('button', { name: 'Send invitation' }).click()
-  await expect(page.getByRole('status')).toContainText(`Invitation sent to ${invitee}`)
+  await expect(page.getByText(`Invitation sent to ${invitee}`)).toBeVisible()
   await expect(page.getByRole('cell', { name: invitee, exact: true })).toBeVisible()
 
   const invitePath = await inviteLinkPath(request, invitee)

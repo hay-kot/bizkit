@@ -21,7 +21,7 @@ test.describe('workspace pages', () => {
   test('the workspace list is clean', async ({ page, world }) => {
     const errors = trackPageErrors(page)
     await page.goto('/')
-    await expect(page.getByRole('link', { name: 'Team' })).toBeVisible()
+    await expect(page.getByRole('link', { name: /^Team/ })).toBeVisible()
     await expect(page.getByTestId('signed-in-as')).toHaveText(world.account('admin').email)
     await expectCleanPage(page, errors)
   })

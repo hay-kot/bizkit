@@ -26,17 +26,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="card mx-auto mt-12 max-w-md bg-base-100">
-    <div class="card-body items-center gap-4 text-center">
-      <template v-if="failed">
-        <h1 class="card-title">This link doesn't work</h1>
-        <p class="text-sm">It was already used or has expired. Request a new one.</p>
-        <RouterLink to="/sign-in" class="btn btn-primary btn-sm">Back to sign-in</RouterLink>
-      </template>
-      <template v-else>
-        <h1 class="card-title">Signing you in</h1>
-        <span class="loading loading-spinner" aria-label="Signing in"></span>
-      </template>
-    </div>
+  <div
+    class="flex flex-col items-center gap-4 rounded-box border border-base-300 bg-base-100 p-8 text-center shadow-sm"
+  >
+    <template v-if="failed">
+      <h1 class="text-lg font-semibold">This link doesn't work</h1>
+      <p class="text-sm text-base-content/80">
+        It was already used or has expired. Request a new one.
+      </p>
+      <RouterLink to="/sign-in" class="btn btn-primary btn-sm">Back to sign-in</RouterLink>
+    </template>
+    <template v-else>
+      <span class="loading loading-spinner" aria-hidden="true"></span>
+      <h1 class="text-lg font-semibold">Signing you in…</h1>
+    </template>
   </div>
 </template>
