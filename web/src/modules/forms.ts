@@ -7,9 +7,9 @@ import { defineWebModule } from './types'
 
 export default defineWebModule({
   name: 'forms',
-  workspaceRoutes: [
+  projectRoutes: [
     { path: 'forms', component: Forms },
-    { path: 'forms/:formId', component: Form, props: true },
+    { path: 'forms/:formId', component: Form },
   ],
-  nav: [{ path: 'forms', label: 'Forms', icon: Inbox, order: 100 }],
+  nav: [{ path: 'forms', label: 'Forms', icon: Inbox, section: 'project', order: 100 }],
 })

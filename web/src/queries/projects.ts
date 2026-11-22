@@ -13,8 +13,16 @@ import { useInvalidate } from './keys'
 
 export type { Project }
 
+/** The server's cap. The sidebar switcher needs every project, not the default first 100. */
+const PROJECTS_LIMIT = 500
+
 export function useProjects(workspaceId: MaybeRefOrGetter<string>) {
-  return useQuery(() => projectsListQuery({ path: { workspace_id: toValue(workspaceId) } }))
+  return useQuery(() =>
+    projectsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { limit: PROJECTS_LIMIT },
+    }),
+  )
 }
 
 export function useCreateProject() {

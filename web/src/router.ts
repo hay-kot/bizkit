@@ -8,7 +8,8 @@ import Invite from './pages/Invite.vue'
 import NotFound from './pages/NotFound.vue'
 import SignIn from './pages/SignIn.vue'
 import SignInVerify from './pages/SignInVerify.vue'
-import { workspaceRoutes } from './modules'
+import WorkspaceHome from './pages/workspace/WorkspaceHome.vue'
+import { projectPath, projectRoutes, workspaceRoutes } from './modules'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -44,8 +45,13 @@ export const router = createRouter({
       component: WorkspaceLayout,
       props: true,
       children: [
-        { path: '', redirect: (to) => `/w/${String(to.params.workspaceId)}/projects` },
+        { path: '', component: WorkspaceHome },
         ...workspaceRoutes,
+        {
+          path: 'p/:projectId',
+          redirect: (to) => projectPath(String(to.params.workspaceId), String(to.params.projectId)),
+        },
+        ...projectRoutes,
       ],
     },
     { path: '/:rest(.*)*', component: NotFound, meta: { public: true } },

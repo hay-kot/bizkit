@@ -1,14 +1,46 @@
+import type { RouteRecordRaw } from 'vue-router'
+
 import core from './core'
 import forms from './forms'
-import type { NavItem, WebModule } from './types'
+import type { NavItem, NavSection, WebModule } from './types'
 
 /** Every web module, in the order their routes register. */
 export const modules: WebModule[] = [core, forms]
 
-/** Every module's workspace routes. */
-export const workspaceRoutes = modules.flatMap((module) => module.workspaceRoutes)
+/** Every module's workspace routes, relative to `/w/:workspaceId/`. */
+export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) => m.workspaceRoutes ?? [])
 
-/** The sidebar, sorted by `order`. */
-export const workspaceNav: NavItem[] = modules
-  .flatMap((module) => module.nav)
-  .sort((a, b) => a.order - b.order)
+/** Every module's project routes, mounted under `p/:projectId/` with params as props. */
+export const projectRoutes: RouteRecordRaw[] = modules
+  .flatMap((m) => m.projectRoutes ?? [])
+  .map(
+    (route) =>
+      ({
+        ...route,
+        path: `p/:projectId/${route.path}`,
+        props: route.props ?? true,
+      }) as RouteRecordRaw,
+  )
+
+function navFor(section: NavSection): NavItem[] {
+  return modules
+    .flatMap((m) => m.nav)
+    .filter((item) => item.section === section)
+    .sort((a, b) => a.order - b.order)
+}
+
+/** The selected project's sidebar entries, sorted by `order`. */
+export const projectNav: NavItem[] = navFor('project')
+
+/** The workspace meta entries pinned to the bottom of the sidebar, sorted by `order`. */
+export const workspaceNav: NavItem[] = navFor('workspace')
+
+/**
+ * The URL of a project's page, `section` being a project nav path such as
+ * `forms`. Without one, the first project page anyone can see, or the
+ * Projects page when no module has project pages.
+ */
+export function projectPath(workspaceId: string, projectId: string, section?: string): string {
+  const target = section ?? projectNav.find((item) => !item.adminOnly)?.path
+  return target ? `/w/${workspaceId}/p/${projectId}/${target}` : `/w/${workspaceId}/projects`
+}

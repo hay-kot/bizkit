@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { Mail, MailPlus, X } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { Mail, X } from 'lucide-vue-next'
 
-import InvitePanel from '@/components/InvitePanel.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import { runAction } from '@/lib/action'
 import { formatShortDate, isPast } from '@/lib/format'
 import type { Invitation } from '@/queries/members'
 import { useInvitations, useRevokeInvitation } from '@/queries/members'
 
-const props = defineProps<{ workspaceId: string; workspaceName: string }>()
+const props = defineProps<{ workspaceId: string }>()
+defineEmits<{ invite: [] }>()
 const { data: invitations, isPending, error } = useInvitations(() => props.workspaceId)
 const revoke = useRevokeInvitation()
-const inviting = ref(false)
 const columns = [
   { key: 'email', label: 'Email' },
   { key: 'role', label: 'Role' },
@@ -37,22 +34,13 @@ function onRevoke(item: Invitation) {
 
 <template>
   <div>
-    <PageHeader
-      :section="workspaceName"
-      title="Invitations"
-      description="Invitations last 7 days. Revoke one to cancel it."
-    >
-      <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="inviting = true">
-        <MailPlus class="size-4" aria-hidden="true" />Invite
-      </button>
-    </PageHeader>
-
     <DataTable
       :columns="columns"
       :rows="invitations?.items"
       :row-key="(i) => i.id"
       :loading="isPending"
       :error="error"
+      label="Pending invitations"
       :empty="{
         icon: Mail,
         title: 'No pending invitations',
@@ -78,12 +66,10 @@ function onRevoke(item: Invitation) {
         </button>
       </template>
       <template #empty-action>
-        <button type="button" class="btn btn-primary btn-sm" @click="inviting = true">
+        <button type="button" class="btn btn-primary btn-sm" @click="$emit('invite')">
           Invite someone
         </button>
       </template>
     </DataTable>
-
-    <InvitePanel :workspace-id="workspaceId" :open="inviting" @close="inviting = false" />
   </div>
 </template>

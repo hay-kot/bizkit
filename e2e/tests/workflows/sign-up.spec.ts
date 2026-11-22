@@ -19,6 +19,6 @@ test('a new email signs up, creates a workspace and is its admin', async ({ page
   await expect(page).toHaveURL(/\/w\/[0-9a-f-]+\/projects$/)
   await expect(page.getByTestId('workspace-name')).toHaveText(`Acme ${namespace}`)
 
-  await page.getByRole('link', { name: 'Members' }).click()
+  await page.getByRole('link', { name: 'Team' }).click()
   await expect(page.getByRole('combobox', { name: `Role of ${email}` })).toHaveAttribute('data-value', 'admin')
 })

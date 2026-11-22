@@ -69,7 +69,7 @@ mod tests {
             ("topic".to_owned(), FieldValue::Many(vec!["a".to_owned(), "b".to_owned()])),
             ("email".to_owned(), FieldValue::One("ada@example.com".to_owned())),
         ]);
-        let link = Url::parse("https://hub.example.com/w/ws/forms/f").unwrap();
+        let link = Url::parse("https://hub.example.com/w/ws/p/p/forms/f").unwrap();
         let mail = mail("Contact", &defs, &data, &link, "owner@example.com");
         assert_eq!(mail.subject, "New submission: Contact", "subject");
         assert_eq!(mail.to, "owner@example.com", "recipient");
@@ -79,7 +79,7 @@ mod tests {
         Email: ada@example.com
         topic: a, b
 
-        See every submission: https://hub.example.com/w/ws/forms/f
+        See every submission: https://hub.example.com/w/ws/p/p/forms/f
         ");
     }
 }

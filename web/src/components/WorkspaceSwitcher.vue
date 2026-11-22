@@ -38,11 +38,7 @@ const title = computed(() => props.name ?? current.value?.workspace.name ?? '')
       </button>
     </template>
     <div class="px-2 py-1.5 text-xs font-medium text-base-content/70">Workspaces</div>
-    <MenuItem
-      v-for="m in me?.memberships ?? []"
-      :key="m.workspace.id"
-      :to="`/w/${m.workspace.id}/projects`"
-    >
+    <MenuItem v-for="m in me?.memberships ?? []" :key="m.workspace.id" :to="`/w/${m.workspace.id}`">
       <Avatar :name="m.workspace.name" size="sm" />
       <span class="flex-1 truncate">{{ m.workspace.name }}</span>
       <Check v-if="m.workspace.id === workspaceId" class="size-4" aria-hidden="true" />

@@ -10,7 +10,7 @@ test('a site posts to a new form; the admin gets mail, flags spam and exports', 
   namespace,
 }) => {
   const owner = `owner+${namespace}@e2e.test`
-  await page.goto(`/w/${world.workspaces.main!.id}/forms`)
+  await page.goto(`/w/${world.workspaces.main!.id}/p/${world.projects.site!.id}/forms`)
   await page.getByRole('button', { name: 'New form' }).first().click()
   await page.getByLabel('Name').fill('Contact')
   await page.getByRole('button', { name: 'Create form' }).click()
@@ -34,7 +34,7 @@ test('a site posts to a new form; the admin gets mail, flags spam and exports', 
   const row = page.getByRole('row', { name: /Hello from the site · Ada/ })
   await expect(row).toBeVisible()
 
-  const link = await emailLinkPath(request, owner, /https?:\/\/\S+\/w\/[0-9a-f-]+\/forms\/[0-9a-f-]+/)
+  const link = await emailLinkPath(request, owner, /https?:\/\/\S+\/w\/[0-9a-f-]+\/p\/[0-9a-f-]+\/forms\/[0-9a-f-]+/)
   expect(link).toBe(new URL(page.url()).pathname)
 
   await row.getByRole('button', { name: 'Mark as spam' }).click()

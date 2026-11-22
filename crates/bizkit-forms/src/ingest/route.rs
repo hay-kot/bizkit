@@ -402,7 +402,7 @@ async fn store_submission(
         if recent < NOTIFY_PER_HOUR {
             let link = platform
                 .base_url()
-                .join(&format!("/w/{}/forms/{}", form.workspace_id, form.id))
+                .join(&format!("/w/{}/p/{}/forms/{}", form.workspace_id, form.project_id, form.id))
                 .map_err(anyhow::Error::from)?;
             let defs = ops::decode_fields(form)?;
             for to in ops::decode_notify(form)? {

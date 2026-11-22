@@ -47,7 +47,7 @@ async function onCreate() {
     body: { name: form.name.value, slug: form.slug.value },
   })
   creating.value = false
-  await router.push(`/w/${workspace.id}/projects`)
+  await router.push(`/w/${workspace.id}`)
 }
 
 function onAccept(invite: MyInvitation) {
@@ -119,7 +119,7 @@ function onDecline(invite: MyInvitation) {
       <ul v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="m in me?.memberships ?? []" :key="m.workspace.id" class="relative">
           <RouterLink
-            :to="`/w/${m.workspace.id}/projects`"
+            :to="`/w/${m.workspace.id}`"
             class="flex h-full items-start gap-3 rounded-box border border-base-300 bg-base-100 p-4 transition hover:border-base-content/40 hover:shadow-sm"
           >
             <Avatar :name="m.workspace.name" size="lg" />

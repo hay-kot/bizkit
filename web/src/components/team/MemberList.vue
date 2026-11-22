@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { UserPlus, UserX } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { UserX } from 'lucide-vue-next'
 
-import InvitePanel from '@/components/InvitePanel.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Select from '@/components/ui/Select.vue'
@@ -17,7 +14,6 @@ const { data: members, isPending, error } = useMembers(() => props.workspaceId)
 const { data: me } = useMe()
 const update = useUpdateMember()
 const remove = useRemoveMember()
-const inviting = ref(false)
 const roles = [
   { value: 'admin' as const, label: 'Admin' },
   { value: 'member' as const, label: 'Member' },
@@ -61,21 +57,6 @@ function onRemove(member: Member) {
 
 <template>
   <div>
-    <PageHeader
-      :section="workspaceName"
-      title="Members"
-      description="Everyone who can work in this workspace."
-    >
-      <button
-        v-if="isAdmin"
-        type="button"
-        class="btn gap-1.5 btn-primary btn-sm"
-        @click="inviting = true"
-      >
-        <UserPlus class="size-4" aria-hidden="true" />Invite
-      </button>
-    </PageHeader>
-
     <DataTable
       :columns="columns"
       :rows="members?.items"
@@ -113,7 +94,5 @@ function onRemove(member: Member) {
         </button>
       </template>
     </DataTable>
-
-    <InvitePanel :workspace-id="workspaceId" :open="inviting" @close="inviting = false" />
   </div>
 </template>
