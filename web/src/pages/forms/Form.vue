@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Download, Eye, Inbox, Settings, ShieldAlert, Trash2 } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import FieldsEditor from '@/components/forms/FieldsEditor.vue'
@@ -38,6 +38,13 @@ const { data: form, error: formError } = useForm(
   () => props.workspaceId,
   () => props.formId,
 )
+// The URL's project comes from the link, the form's from the server. Follow
+// the server so the header, sidebar and back links match the form.
+watch(form, (loaded) => {
+  if (loaded && loaded.project_id !== props.projectId) {
+    void router.replace(`/w/${props.workspaceId}/p/${loaded.project_id}/forms/${loaded.id}`)
+  }
+})
 const status = ref<SubmissionStatus>('inbox')
 const {
   data: submissions,

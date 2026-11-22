@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
+import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -11,14 +11,21 @@ const props = defineProps<{ workspaceId: string }>()
 const router = useRouter()
 const { project, isPending, error } = useCurrentProject(() => props.workspaceId)
 
-watchEffect(() => {
-  if (isPending.value || error.value) return
-  void router.replace(
-    project.value
-      ? projectPath(props.workspaceId, project.value.id)
-      : `/w/${props.workspaceId}/projects`,
-  )
-})
+// One-shot: this page stays mounted through its leave transition, and a
+// re-run then would undo the user's next navigation.
+const stop = watch(
+  [isPending, error],
+  () => {
+    if (isPending.value || error.value) return
+    stop()
+    void router.replace(
+      project.value
+        ? projectPath(props.workspaceId, project.value.id)
+        : `/w/${props.workspaceId}/projects`,
+    )
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

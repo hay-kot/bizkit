@@ -13,7 +13,14 @@ export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) => m.worksp
 /** Every module's project routes, mounted under `p/:projectId/` with params as props. */
 export const projectRoutes: RouteRecordRaw[] = modules
   .flatMap((m) => m.projectRoutes ?? [])
-  .map((route) => ({ ...route, path: `p/:projectId/${route.path}`, props: true }) as RouteRecordRaw)
+  .map(
+    (route) =>
+      ({
+        ...route,
+        path: `p/:projectId/${route.path}`,
+        props: route.props ?? true,
+      }) as RouteRecordRaw,
+  )
 
 function navFor(section: NavSection): NavItem[] {
   return modules
@@ -28,7 +35,12 @@ export const projectNav: NavItem[] = navFor('project')
 /** The workspace meta entries pinned to the bottom of the sidebar, sorted by `order`. */
 export const workspaceNav: NavItem[] = navFor('workspace')
 
-/** The URL of a project's page, `section` being a project nav path such as `forms`. */
+/**
+ * The URL of a project's page, `section` being a project nav path such as
+ * `forms`. Without one, the first project page anyone can see, or the
+ * Projects page when no module has project pages.
+ */
 export function projectPath(workspaceId: string, projectId: string, section?: string): string {
-  return `/w/${workspaceId}/p/${projectId}/${section ?? projectNav[0]?.path ?? ''}`
+  const target = section ?? projectNav.find((item) => !item.adminOnly)?.path
+  return target ? `/w/${workspaceId}/p/${projectId}/${target}` : `/w/${workspaceId}/projects`
 }

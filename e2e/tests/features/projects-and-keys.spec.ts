@@ -29,6 +29,12 @@ test('the sidebar puts project pages under the project and workspace meta at the
   ).toHaveText(['Team', 'API keys', 'Settings'])
 })
 
+test('a link to an unknown project says so', async ({ page, world }) => {
+  await page.goto(`/w/${world.workspaces.main!.id}/p/00000000-0000-7000-8000-000000000000/forms`)
+  await expect(page.getByText('Project not found')).toBeVisible()
+  await expect(page.getByTestId('project-name')).toHaveText('Choose a project')
+})
+
 test('create an API key and see its token once', async ({ page, world }) => {
   await page.goto(`/w/${world.workspaces.main!.id}/api-keys`)
   await page.getByRole('button', { name: 'New API key' }).click()

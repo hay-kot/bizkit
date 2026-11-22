@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Menu as MenuIcon, X } from 'lucide-vue-next'
+import { FolderX, Menu as MenuIcon, X } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import EmptyState from '@/components/EmptyState.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import ProjectSwitcher from '@/components/ProjectSwitcher.vue'
 import SidebarLink from '@/components/SidebarLink.vue'
@@ -22,7 +23,13 @@ const isAdmin = computed(
   () => me.value?.memberships.find((m) => m.workspace.id === props.workspaceId)?.role === 'admin',
 )
 const visible = (items: NavItem[]) => items.filter((item) => !item.adminOnly || isAdmin.value)
-const { projects, project, isPending: projectsPending } = useCurrentProject(() => props.workspaceId)
+const {
+  projects,
+  project,
+  missing: projectMissing,
+  isPending: projectsPending,
+  error: projectsError,
+} = useCurrentProject(() => props.workspaceId)
 const mobileOpen = ref(false)
 watch(
   () => route.fullPath,
@@ -73,7 +80,10 @@ watch(
             </li>
           </ul>
         </template>
-        <div v-else-if="!projectsPending" class="px-2.5 py-2 text-sm text-base-content/80">
+        <div
+          v-else-if="!projectsPending && !projectsError"
+          class="px-2.5 py-2 text-sm text-base-content/80"
+        >
           <p>No projects yet.</p>
           <RouterLink :to="`/w/${workspaceId}/projects`" class="link font-medium link-hover">
             Create a project
@@ -105,6 +115,16 @@ watch(
       <main class="flex-1 px-4 py-6 sm:px-8">
         <div class="mx-auto max-w-5xl">
           <ErrorAlert v-if="error" :error="error" />
+          <EmptyState
+            v-else-if="projectMissing"
+            :icon="FolderX"
+            title="Project not found"
+            message="It may have been deleted, or the link is wrong."
+          >
+            <RouterLink :to="`/w/${workspaceId}/projects`" class="btn btn-primary btn-sm">
+              All projects
+            </RouterLink>
+          </EmptyState>
           <RouterView v-else v-slot="{ Component, route: child }">
             <Transition
               mode="out-in"

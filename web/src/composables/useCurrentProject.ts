@@ -9,7 +9,7 @@ const storageKey = (workspaceId: string) => `bizkit.project.${workspaceId}`
 
 /**
  * The project the sidebar's project section points at. A project in the URL
- * wins, even when it no longer exists (the page then shows its own error);
+ * wins, and an unknown one gives undefined so the layout can say so;
  * otherwise the last project used in this workspace, otherwise the first.
  */
 export function pickProject(
@@ -48,12 +48,16 @@ export function useCurrentProject(workspaceId: MaybeRefOrGetter<string>) {
   const project = computed(() =>
     pickProject(projects.value, routeId.value, readStored(toValue(workspaceId))),
   )
+  /** The URL names a project this workspace doesn't have (deleted, or a bad link). */
+  const missing = computed(
+    () => !!routeId.value && !isPending.value && !error.value && !project.value,
+  )
   watch(
-    routeId,
+    () => (routeId.value ? project.value?.id : undefined),
     (id) => {
       if (id) store(toValue(workspaceId), id)
     },
     { immediate: true },
   )
-  return { projects, project, isPending, error }
+  return { projects, project, missing, isPending, error }
 }
