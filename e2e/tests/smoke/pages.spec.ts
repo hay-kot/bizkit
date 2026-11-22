@@ -26,7 +26,7 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
-  for (const section of ['projects', 'members', 'invitations', 'api-keys', 'settings']) {
+  for (const section of ['projects', 'members', 'invitations', 'api-keys', 'settings', 'forms']) {
     test(`the ${section} page is clean`, async ({ page, world }) => {
       const errors = trackPageErrors(page)
       await page.goto(`/w/${world.workspaces.main!.id}/${section}`)
@@ -35,4 +35,20 @@ test.describe('workspace pages', () => {
       await expectCleanPage(page, errors)
     })
   }
+
+  test('a form page is clean', async ({ page, world, baseURL }) => {
+    const errors = trackPageErrors(page)
+    const workspace = world.workspaces.main!.id
+    const created = await page.request.post(`/api/v1/workspaces/${workspace}/forms`, {
+      data: { name: 'Contact', project_id: world.projects.site!.id, bot_check: 'challenge' },
+      headers: { Origin: new URL(baseURL!).origin },
+    })
+    expect(created.status()).toBe(201)
+    const form = await created.json()
+    await page.request.post(form.endpoint, { form: { name: 'Ada' } })
+    await page.goto(`/w/${workspace}/forms/${form.id}`)
+    await expect(page.getByRole('heading', { name: 'Contact' })).toBeVisible()
+    await page.getByText('HTML form').click()
+    await expectCleanPage(page, errors)
+  })
 })

@@ -1,8 +1,9 @@
 import core from './core'
+import forms from './forms'
 import type { NavItem, WebModule } from './types'
 
 /** Every web module, in the order their routes register. */
-export const modules: WebModule[] = [core]
+export const modules: WebModule[] = [core, forms]
 
 /** Every module's workspace routes. */
 export const workspaceRoutes = modules.flatMap((module) => module.workspaceRoutes)
