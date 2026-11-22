@@ -18,7 +18,7 @@ default = ["forms"]
 forms = ["dep:bizkit-forms"]
 # Test-only routes, the `dev` subcommand and persona seeding. Release builds
 # leave it off.
-test-hooks = ["bizkit-core/test-hooks"]
+test-hooks = ["bizkit-core/test-hooks", "bizkit-forms?/test-hooks"]
 
 [dependencies]
 anyhow.workspace = true
@@ -44,6 +44,7 @@ http.workspace = true
 insta.workspace = true
 predicates = "3"
 serde_json.workspace = true
+sqlx.workspace = true
 tempfile.workspace = true
 uuid.workspace = true
 

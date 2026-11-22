@@ -93,4 +93,18 @@ mod cli {
         assert!(response.starts_with("HTTP/1.1 200"), "healthz response: {response}");
         assert!(response.ends_with("ok"), "healthz body: {response}");
     }
+
+    #[cfg(feature = "test-hooks")]
+    #[test]
+    fn dev_seed_demo_runs_twice() {
+        let dir = tempfile::tempdir().unwrap();
+        for _ in 0..2 {
+            bin()
+                .args(["dev", "seed-demo", "--data-dir"])
+                .arg(dir.path())
+                .assert()
+                .success()
+                .stdout(contains("sign in as demo@bizkit.test"));
+        }
+    }
 }

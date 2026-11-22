@@ -1,6 +1,7 @@
 //! Development and end-to-end helpers. Built only with the `test-hooks`
 //! feature.
 
+pub mod demo;
 pub mod personas;
 
 use anyhow::Context as _;

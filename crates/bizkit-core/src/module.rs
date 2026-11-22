@@ -8,8 +8,13 @@ use anyhow::{Context as _, bail};
 use serde::de::DeserializeOwned;
 use sqlx::migrate::Migrator;
 
+use futures::future::BoxFuture;
+
+use crate::db::Db;
+use crate::ids::{ProjectId, UserId, WorkspaceId};
 use crate::jobs::{Event, Handlers, Job, JobHandler, Subscriber};
 use crate::ops::{Access, Operation, Registry};
+use crate::time::UnixMillis;
 
 /// A feature module: its migrations, operations, routes, jobs and
 /// subscribers.
@@ -33,6 +38,34 @@ pub trait Module: Send + Sync + fmt::Debug + 'static {
     ///
     /// Anything that should stop the app from starting, such as a registration conflict.
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()>;
+
+    /// Adds sample rows for the dev stack on top of the demo workspace. It
+    /// must be idempotent: a second run changes nothing. Only the
+    /// `test-hooks` dev command calls it.
+    ///
+    /// # Errors
+    ///
+    /// When a database write fails.
+    fn seed_demo<'a>(
+        &'a self,
+        _db: &'a Db,
+        _seed: &'a DemoSeed,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+/// The demo rows core seeded, for [`Module::seed_demo`].
+#[derive(Debug, Clone)]
+pub struct DemoSeed {
+    /// The demo workspace.
+    pub workspace_id: WorkspaceId,
+    /// Its projects by slug: `website` and `docs`.
+    pub project_ids: BTreeMap<String, ProjectId>,
+    /// The demo user, an admin of the workspace.
+    pub user_id: UserId,
+    /// The seed time.
+    pub now: UnixMillis,
 }
 
 /// What modules register into.

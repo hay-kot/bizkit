@@ -8,11 +8,17 @@ pub mod hooks;
 pub mod ingest;
 pub mod notify;
 mod ops;
+#[cfg(feature = "test-hooks")]
+mod seed;
 mod store;
 
 use std::sync::Arc;
 
+#[cfg(feature = "test-hooks")]
+use bizkit_core::DemoSeed;
 use bizkit_core::{Module, ModuleContext};
+#[cfg(feature = "test-hooks")]
+use futures::future::BoxFuture;
 use utoipa::OpenApi as _;
 
 use crate::hooks::{NoopHook, SubmitHook};
@@ -52,5 +58,14 @@ impl Module for Forms {
             ingest::route::router(Arc::clone(&self.hook)),
             ingest::route::IngestDocs::openapi(),
         )
+    }
+
+    #[cfg(feature = "test-hooks")]
+    fn seed_demo<'a>(
+        &'a self,
+        db: &'a bizkit_core::db::Db,
+        seed: &'a DemoSeed,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(seed::seed(db, seed))
     }
 }

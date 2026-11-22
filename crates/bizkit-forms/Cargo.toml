@@ -12,11 +12,16 @@ keywords.workspace = true
 categories.workspace = true
 publish.workspace = true
 
+[features]
+# The demo seed for the dev stack; needs core's dev helpers.
+test-hooks = ["bizkit-core/test-hooks"]
+
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
 base64.workspace = true
 bizkit-core.workspace = true
+futures.workspace = true
 hex.workspace = true
 hmac.workspace = true
 rand.workspace = true
