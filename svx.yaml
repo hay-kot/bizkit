@@ -27,8 +27,10 @@ services:
 
   seed:
     # Demo data to look at: sign in as demo@bizkit.test. Safe to run again.
+    # Runs the binary the api's `cargo run` just built, instead of a second
+    # cargo invocation.
     run: >-
-      exec cargo run -p bizkit --features test-hooks -- --config dev/bizkit.yaml dev seed-demo
+      exec ./target/debug/bizkit --config dev/bizkit.yaml dev seed-demo
       --data-dir $SVX_STACK_DIR/data
     oneshot: true
     depends: [api]
