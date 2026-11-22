@@ -55,6 +55,9 @@ export function useDeleteForm() {
   return useMutation({ ...formsDeleteMutation(), onSettled: () => invalidate(...FORM_QUERIES) })
 }
 
+/** The most submissions the form page lists; older ones are in the CSV export. */
+export const SUBMISSIONS_SHOWN = 200
+
 export function useSubmissions(
   workspaceId: MaybeRefOrGetter<string>,
   formId: MaybeRefOrGetter<string>,
@@ -63,7 +66,7 @@ export function useSubmissions(
   return useQuery(() =>
     formsSubmissionsListQuery({
       path: { workspace_id: toValue(workspaceId), form_id: toValue(formId) },
-      query: { status: toValue(status), limit: 200 },
+      query: { status: toValue(status), limit: SUBMISSIONS_SHOWN },
     }),
   )
 }
@@ -99,7 +102,10 @@ export async function downloadExport(
   const link = document.createElement('a')
   link.href = url
   link.download = data.filename
+  document.body.append(link)
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  // Revoking at once can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
   return { filename: data.filename, truncated: data.truncated }
 }

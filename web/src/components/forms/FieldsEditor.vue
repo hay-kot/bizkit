@@ -29,6 +29,11 @@ function update(index: number, patch: Partial<FieldDef>) {
   fields.value = fields.value.map((field, i) => (i === index ? { ...field, ...patch } : field))
 }
 
+/** Options only belong to choice fields, and the server refuses them elsewhere. */
+function setKind(index: number, kind: FieldKind) {
+  update(index, kind === 'choice' ? { kind } : { kind, options: [], multiple: false })
+}
+
 function optionsText(field: FieldDef): string {
   return (field.options ?? []).join(', ')
 }
@@ -67,7 +72,7 @@ function setOptions(index: number, text: string) {
           :options="kinds"
           :label="`Field ${index + 1} kind`"
           size="sm"
-          @update:model-value="update(index, { kind: $event })"
+          @update:model-value="setKind(index, $event)"
         />
         <button
           type="button"

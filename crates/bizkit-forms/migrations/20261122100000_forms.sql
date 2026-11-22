@@ -34,5 +34,8 @@ CREATE INDEX form_submissions_recent ON form_submissions (form_id, created_at);
 -- Solved challenges, so each one is accepted once. Pruned as they expire.
 CREATE TABLE form_used_challenges (
   challenge TEXT PRIMARY KEY NOT NULL,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
   expires_at INTEGER NOT NULL
 ) STRICT;
+CREATE INDEX form_used_challenges_expiry ON form_used_challenges (workspace_id, expires_at);

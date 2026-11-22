@@ -50,8 +50,9 @@ impl SpecChecker {
             .map(String::as_str)
     }
 
-    /// Checks one response. Paths outside `/api/` (health, MCP, test hooks)
-    /// aren't in the spec and pass unchecked.
+    /// Checks one response. `/api/` and module `/m/` paths must be in the
+    /// spec, so an undocumented module raw route fails. Other paths (health,
+    /// MCP, test hooks) pass unchecked.
     ///
     /// # Panics
     ///

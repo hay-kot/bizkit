@@ -40,7 +40,7 @@ describe('embed snippets', () => {
     expect(html).toContain(
       '<altcha-widget challengeurl="https://hub.example.com/m/forms/public/f1/challenge" auto="onload">',
     )
-    expect(html.startsWith('<script')).toBe(true)
+    expect(html).toMatch(/^<script async defer src="[^"]+altcha@2\.3\.0[^"]+" integrity="sha384-/)
   })
 
   it('uses the defined fields and escapes them', () => {

@@ -3594,7 +3594,7 @@
             "description": "Taken: go to the form's redirect URL"
           },
           "400": {
-            "description": "The body is malformed or too large",
+            "description": "The body is malformed or over 64 KiB",
             "content": {
               "application/json": {
                 "schema": {
@@ -3622,6 +3622,9 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The body is over the server's 1 MiB request limit"
           },
           "422": {
             "description": "Fields failed validation",
@@ -3828,7 +3831,7 @@
           },
           "salt": {
             "type": "string",
-            "description": "Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>`."
+            "description": "Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>&`."
           },
           "signature": {
             "type": "string",

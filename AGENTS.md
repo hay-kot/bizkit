@@ -47,6 +47,8 @@ An API operation is one `Operation` impl: ID, method, path under `/api/v1`, acce
 A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<name>` crate and is added to `crates/bizkit/src/modules.rs`.
 
 - `register` declares scope areas (named after the module), operations (paths under `/workspaces/{workspace_id}/<name>` or `/<name>`), raw routes (nested at `/m/<name>`), jobs (kinds starting with `<name>.`) and subscribers. It must not do I/O or branch on config.
+- Endpoints that third-party pages call (form ingest) go in `public_routes`, nested at `/m/<name>/public`. They sit outside authentication: no `Authn`, no cookies, no CSRF check. Escape anything they echo into HTML.
+- `seed_demo` adds the module's sample rows to the dev stack's demo workspace (`bizkit dev seed-demo`, run by the svx `seed` service). Keep it idempotent, put it behind the crate's own `test-hooks` feature, and extend it whenever the module gains a feature.
 - Module tables carry `workspace_id`, and every query filters on it.
 - Migrations live in the module crate's `migrations/` and return from `Module::migrations` as `sqlx::migrate!()`. Versions must be unique across all crates; a test checks it.
 
@@ -83,7 +85,7 @@ A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<nam
 
 ## Dev stack
 
-`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`) and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Sign in as any `@bizkit.test` email and open the link from the stack's Mailpit.
+`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`), the demo seed and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Sign in as `demo@bizkit.test` for the seeded demo workspace (any `@bizkit.test` email works) and open the link from the stack's Mailpit.
 
 ## Tests
 

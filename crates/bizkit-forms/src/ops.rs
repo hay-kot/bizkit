@@ -26,6 +26,7 @@ const TAGS: &[&str] = &["forms"];
 pub(crate) const DEFAULT_MIN_FILL_MS: u32 = 2000;
 const MAX_MIN_FILL_MS: u32 = 600_000;
 const MAX_NOTIFY: usize = 10;
+const EXPORT_PAGE: i64 = 100;
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.scope_area("forms", "Forms and their submissions")?;
@@ -263,8 +264,12 @@ fn check_settings(
 }
 
 fn encode_notify(emails: &[String]) -> anyhow::Result<String> {
-    let mut normalized: Vec<String> = emails.iter().map(|e| normalize_email(e)).collect();
-    normalized.dedup();
+    let mut normalized: Vec<String> = Vec::with_capacity(emails.len());
+    for email in emails.iter().map(|e| normalize_email(e)) {
+        if !normalized.contains(&email) {
+            normalized.push(email);
+        }
+    }
     serde_json::to_string(&normalized).context("encoding notify emails")
 }
 
@@ -634,18 +639,33 @@ impl Operation for SubmissionsExport {
     ) -> Result<SubmissionExport, ApiError> {
         let form = form_in(&cx, input.workspace_id, input.form_id).await?;
         let status = input.status.unwrap_or_default();
-        let max = i64::try_from(export::MAX_ROWS).unwrap_or(i64::MAX);
-        let rows = store::list_submissions(
-            cx.platform().db().read(),
-            input.workspace_id,
-            input.form_id,
-            store::Page { status: status.as_str(), before: None, limit: max + 1 },
-        )
-        .await?;
-        let mut submissions =
-            rows.into_iter().map(submission_to_api).collect::<anyhow::Result<Vec<_>>>()?;
-        let more_rows = submissions.len() > export::MAX_ROWS;
-        submissions.truncate(export::MAX_ROWS);
+        // Pages through rows and stops at the row or byte budget, so a form
+        // full of 64 KiB spam never sits in memory all at once.
+        let mut submissions = Vec::new();
+        let (mut bytes, mut before, mut more_rows) = (0, None, false);
+        loop {
+            let page = store::Page { status: status.as_str(), before, limit: EXPORT_PAGE };
+            let rows = store::list_submissions(
+                cx.platform().db().read(),
+                input.workspace_id,
+                input.form_id,
+                page,
+            )
+            .await?;
+            let last_page = rows.len() < usize::try_from(EXPORT_PAGE).unwrap_or(usize::MAX);
+            for row in rows {
+                if submissions.len() == export::MAX_ROWS || bytes > export::MAX_BYTES {
+                    more_rows = true;
+                    break;
+                }
+                bytes += row.data.len();
+                before = Some(row.id);
+                submissions.push(submission_to_api(row)?);
+            }
+            if more_rows || last_page {
+                break;
+            }
+        }
         let (csv, cut) = export::csv(&decode_fields(&form)?, &submissions);
         let date =
             cx.now().to_rfc3339().map_or_else(|_| String::new(), |t| t.chars().take(10).collect());

@@ -122,6 +122,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "forms")]
     async fn counts(data_dir: &std::path::Path) -> Vec<i64> {
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
         let mut counts = Vec::new();
@@ -139,6 +140,7 @@ mod tests {
         counts
     }
 
+    #[cfg(feature = "forms")]
     #[tokio::test]
     async fn seed_demo_is_idempotent() {
         let dir = tempfile::tempdir().unwrap();

@@ -18,6 +18,7 @@ import { formatDate } from '@/lib/format'
 import type { BotCheck, FieldDef, FieldValue, Submission, SubmissionStatus } from '@/queries/forms'
 import {
   downloadExport,
+  SUBMISSIONS_SHOWN,
   useDeleteForm,
   useDeleteSubmission,
   useForm,
@@ -324,6 +325,10 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
         </div>
       </template>
     </DataTable>
+
+    <p v-if="submissions?.next_before" class="mt-2 text-sm text-base-content/80">
+      Showing the newest {{ SUBMISSIONS_SHOWN }}. Export CSV for the rest.
+    </p>
 
     <DetailPanel
       :open="viewing !== null"

@@ -81,7 +81,7 @@ export type Challenge = {
      */
     maxnumber: number;
     /**
-     * Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>`.
+     * Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>&`.
      */
     salt: string;
     /**
@@ -2421,13 +2421,17 @@ export type FormsPublicSubmitData = {
 
 export type FormsPublicSubmitErrors = {
     /**
-     * The body is malformed or too large
+     * The body is malformed or over 64 KiB
      */
     400: ErrorBody;
     /**
      * No enabled form has this ID
      */
     404: ErrorBody;
+    /**
+     * The body is over the server's 1 MiB request limit
+     */
+    413: unknown;
     /**
      * Fields failed validation
      */

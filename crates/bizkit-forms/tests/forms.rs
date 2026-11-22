@@ -50,12 +50,16 @@ mod forms {
             json!({
                 "name": "Contact",
                 "fields": [{"name": "email", "kind": "email", "required": true}],
-                "notify_emails": [" Owner@Example.com "],
+                "notify_emails": [" Owner@Example.com ", "b@example.com", "owner@example.com"],
             }),
         )
         .await;
         assert_eq!(form["bot_check"], "honeypot", "default check");
-        assert_eq!(form["notify_emails"], json!(["owner@example.com"]), "normalized");
+        assert_eq!(
+            form["notify_emails"],
+            json!(["owner@example.com", "b@example.com"]),
+            "normalized, deduped"
+        );
         let id = form["id"].as_str().unwrap();
         assert_eq!(
             form["endpoint"].as_str().unwrap(),

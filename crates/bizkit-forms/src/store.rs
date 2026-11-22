@@ -323,38 +323,47 @@ pub(crate) async fn delete_submission(
     Ok(result.rows_affected() == 1)
 }
 
-/// Inbox submissions of a form since `since`, for the notification cap.
-pub(crate) async fn recent_inbox(
+/// Submissions of a form with `status` since `since`, for the caps.
+pub(crate) async fn recent(
     exec: impl SqliteExecutor<'_>,
-    workspace_id: WorkspaceId,
-    form_id: FormId,
+    form: &FormRow,
+    status: &str,
     since: UnixMillis,
 ) -> sqlx::Result<i64> {
     sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!: i64" FROM form_submissions
-           WHERE form_id = ? AND workspace_id = ? AND status = 'inbox' AND created_at >= ?"#,
-        form_id,
-        workspace_id,
+           WHERE form_id = ? AND workspace_id = ? AND status = ? AND created_at >= ?"#,
+        form.id,
+        form.workspace_id,
+        status,
         since
     )
     .fetch_one(exec)
     .await
 }
 
-/// Records a solved challenge. False when it was already used. Expired
-/// rows are pruned on the way.
+/// Records a solved challenge. False when it was already used. The
+/// workspace's expired rows are pruned on the way.
 pub(crate) async fn use_challenge(
     tx: &mut sqlx::SqliteConnection,
+    form: &FormRow,
     challenge: &str,
     expires_at: UnixMillis,
     now: UnixMillis,
 ) -> sqlx::Result<bool> {
-    sqlx::query!("DELETE FROM form_used_challenges WHERE expires_at < ?", now)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM form_used_challenges WHERE workspace_id = ? AND expires_at < ?",
+        form.workspace_id,
+        now
+    )
+    .execute(&mut *tx)
+    .await?;
     let result = sqlx::query!(
-        "INSERT INTO form_used_challenges (challenge, expires_at) VALUES (?, ?) ON CONFLICT DO NOTHING",
+        "INSERT INTO form_used_challenges (challenge, workspace_id, form_id, expires_at)
+         VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
         challenge,
+        form.workspace_id,
+        form.id,
         expires_at
     )
     .execute(&mut *tx)

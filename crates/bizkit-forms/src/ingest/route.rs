@@ -36,6 +36,9 @@ use crate::{fields, notify, ops};
 pub const POW_MAX_NUMBER: u32 = 50_000;
 /// Inbox submissions per form per hour that get notification mail.
 pub const NOTIFY_PER_HOUR: i64 = 30;
+/// Spam submissions per form per hour that get stored. Past it, spam is
+/// answered like success and dropped, so a flood can't fill the disk.
+pub const SPAM_STORED_PER_HOUR: i64 = 200;
 const HEADER_CHARS: usize = 512;
 const CSP: &str = "default-src 'none'; style-src 'unsafe-inline'";
 
@@ -81,7 +84,8 @@ pub struct Accepted {
         (status = 201, description = "Taken (JSON clients)", body = Accepted),
         (status = 200, description = "Taken: a thank-you page", content_type = "text/html", body = String),
         (status = 303, description = "Taken: go to the form's redirect URL"),
-        (status = 400, description = "The body is malformed or too large", content(
+        (status = 413, description = "The body is over the server's 1 MiB request limit"),
+        (status = 400, description = "The body is malformed or over 64 KiB", content(
             (ErrorBody = "application/json"),
             (String = "text/html"),
         )),
@@ -364,18 +368,18 @@ async fn store_submission(
     let now = platform.now();
     let mut tx = platform.db().write().await?.with_request_id(request_id(headers));
     if let Some(proof) = &decision.proof
-        && !store::use_challenge(&mut tx, &proof.challenge, proof.expires_at, now).await?
+        && !store::use_challenge(&mut tx, form, &proof.challenge, proof.expires_at, now).await?
     {
         decision.status = SubmissionStatus::Spam;
         decision.spam_reason = Some(SpamReason::Replayed.as_str().to_owned());
     }
-    let recent = store::recent_inbox(
-        &mut *tx,
-        form.workspace_id,
-        form.id,
-        now.minus(Duration::from_hours(1)),
-    )
-    .await?;
+    let hour_ago = now.minus(Duration::from_hours(1));
+    let recent = store::recent(&mut *tx, form, decision.status.as_str(), hour_ago).await?;
+    if decision.status == SubmissionStatus::Spam && recent >= SPAM_STORED_PER_HOUR {
+        tracing::warn!(form_id = %form.id, "spam cap reached; dropping spam");
+        tx.commit().await?;
+        return Ok(());
+    }
     let row = SubmissionRow {
         id: SubmissionId::new(),
         workspace_id: form.workspace_id,

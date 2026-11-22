@@ -1,6 +1,9 @@
 import type { FieldDef, Form } from '@/queries/forms'
 
-const ALTCHA_SCRIPT = 'https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js'
+// Pinned with SRI: ALTCHA 3.x drops the `challengeurl` attribute and the v1
+// challenge format that the server speaks.
+const ALTCHA_SCRIPT = 'https://cdn.jsdelivr.net/npm/altcha@2.3.0/dist/altcha.min.js'
+const ALTCHA_INTEGRITY = 'sha384-8I1KL049hNSwGKuCu/6NlGM1rfkVTfw/5bVzUFNvxO3XLV3isCJR1s5pTyuE2Zuo'
 
 function attr(value: string): string {
   return value
@@ -50,7 +53,9 @@ export function htmlSnippet(form: Form): string {
   }
   lines.push('  <button type="submit">Send</button>', '</form>')
   if (form.bot_check === 'challenge') {
-    lines.unshift(`<script async defer src="${ALTCHA_SCRIPT}" type="module"></script>`)
+    lines.unshift(
+      `<script async defer src="${ALTCHA_SCRIPT}" integrity="${ALTCHA_INTEGRITY}" crossorigin="anonymous" type="module"></script>`,
+    )
   }
   return lines.join('\n')
 }

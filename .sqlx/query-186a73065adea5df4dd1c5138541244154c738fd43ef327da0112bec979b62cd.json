@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM form_submissions\n           WHERE form_id = ? AND workspace_id = ? AND status = 'inbox' AND created_at >= ?",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM form_submissions\n           WHERE form_id = ? AND workspace_id = ? AND status = ? AND created_at >= ?",
   "describe": {
     "columns": [
       {
@@ -11,11 +11,11 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false
     ]
   },
-  "hash": "06de66cd43bdc11978208955e8ae91d3ef31de0e769193c95f1dd2b7e139c625"
+  "hash": "186a73065adea5df4dd1c5138541244154c738fd43ef327da0112bec979b62cd"
 }

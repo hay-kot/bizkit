@@ -82,7 +82,7 @@ pub struct Challenge {
     pub challenge: String,
     /// The secret number is at most this.
     pub maxnumber: u32,
-    /// Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>`.
+    /// Random hex, then `?form=<id>&issued=<unix ms>&expires=<unix s>&`.
     pub salt: String,
     /// The hex HMAC-SHA256 of `challenge` under the form's key.
     pub signature: String,
@@ -130,7 +130,7 @@ pub fn issue(
     let number = number % settings.max_number.saturating_add(1);
     let expires_secs = now.plus(CHALLENGE_TTL).0 / 1000;
     let salt = format!(
-        "{}?form={}&issued={}&expires={expires_secs}",
+        "{}?form={}&issued={}&expires={expires_secs}&",
         hex::encode(salt_bytes),
         settings.form_id,
         now.0
@@ -179,6 +179,10 @@ pub fn verify(
         return Err(SpamReason::TooFast);
     }
     let expires_at = UnixMillis(params.expires_secs.saturating_mul(1000));
+    let ttl_ms = i64::try_from(CHALLENGE_TTL.as_millis()).unwrap_or(i64::MAX);
+    if expires_at.0 > params.issued.0.saturating_add(ttl_ms) {
+        return Err(SpamReason::BadProof);
+    }
     if now > expires_at {
         return Err(SpamReason::Expired);
     }
@@ -193,8 +197,11 @@ struct SaltParams {
 }
 
 impl SaltParams {
+    /// Only the issued shape parses. The hash input is the salt followed by
+    /// the number, so without the trailing `&` a client could move leading
+    /// digits of the number onto `expires` and keep the same signed hash.
     fn parse(salt: &str) -> Option<Self> {
-        let (_, query) = salt.split_once('?')?;
+        let (_, query) = salt.strip_suffix('&')?.split_once('?')?;
         let (mut form_id, mut issued, mut expires_secs) = (None, None, None);
         for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
             match &*key {
@@ -293,6 +300,37 @@ mod tests {
             ..settings()
         };
         assert_eq!(verify(other_form, Some(&good), later), Err(SpamReason::BadProof), "other form");
+    }
+
+    /// The hash covers `salt + number`, so digits can move between them. The
+    /// trailing `&` stops that from stretching `expires`.
+    #[test]
+    fn digits_moved_onto_the_salt_fail() {
+        let challenge = issued();
+        let number = (0..=1000u64)
+            .find(|n| solution_hash(&challenge.salt, *n) == challenge.challenge)
+            .unwrap();
+        let digits = number.to_string();
+        let (first, rest) = digits.split_at(1);
+        let forged_salt = format!("{}{first}", challenge.salt);
+        assert_eq!(
+            solution_hash(&forged_salt, rest.parse().unwrap()),
+            challenge.challenge,
+            "same hash"
+        );
+        let payload = serde_json::json!({
+            "algorithm": challenge.algorithm,
+            "challenge": challenge.challenge,
+            "number": rest.parse::<u64>().unwrap(),
+            "salt": forged_salt,
+            "signature": challenge.signature,
+        });
+        let later = NOW.plus(Duration::from_secs(5));
+        assert_eq!(
+            verify(settings(), Some(&STANDARD.encode(payload.to_string())), later),
+            Err(SpamReason::BadProof),
+            "forged salt"
+        );
     }
 
     #[test]

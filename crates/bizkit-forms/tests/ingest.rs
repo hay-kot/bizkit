@@ -340,4 +340,18 @@ mod ingest {
         assert!(res.status.is_success(), "preflight status {}", res.status);
         assert_eq!(res.headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*", "any origin");
     }
+
+    #[tokio::test]
+    async fn spam_past_the_cap_is_dropped() {
+        let s = setup().await;
+        let form = s.form(json!({"name": "Contact"})).await;
+        for _ in 0..=bizkit_forms::ingest::SPAM_STORED_PER_HOUR {
+            let res = s.post(&form, RawBody::new(FORM, "name=Bot&_gotcha=x")).await;
+            assert_eq!(res.status, StatusCode::OK, "spam always looks accepted");
+        }
+        let path = format!("{}/{}/submissions?status=spam&limit=200", s.forms(), id(&form));
+        let page: Value = s.admin.get(&path).await.json();
+        assert_eq!(page["items"].as_array().unwrap().len(), 200, "a full page");
+        assert_eq!(page["next_before"], Value::Null, "nothing past the cap");
+    }
 }
