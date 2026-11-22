@@ -5,6 +5,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Field from '@/components/ui/Field.vue'
+import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { toast } from '@/lib/toast'
 import { useRenameWorkspace, useWorkspace } from '@/queries/workspaces'
 
@@ -64,13 +65,12 @@ async function onSave() {
         </Field>
         <ErrorAlert :error="rename.error.value" />
         <div class="flex justify-end">
-          <button
-            type="submit"
-            class="btn btn-primary btn-sm"
-            :disabled="name === workspace?.name || rename.asyncStatus.value === 'loading'"
+          <SubmitButton
+            :pending="rename.asyncStatus.value === 'loading'"
+            :disabled="name === workspace?.name"
           >
             Save changes
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </section>

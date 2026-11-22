@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { FolderKanban, KeyRound, Mail, Menu as MenuIcon, Settings, Users, X } from 'lucide-vue-next'
+import { Menu as MenuIcon, X } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
+import { workspaceNav } from '@/modules'
 import { useMe } from '@/queries/auth'
 import { useWorkspace } from '@/queries/workspaces'
 
@@ -16,13 +17,7 @@ const { data: me } = useMe()
 const isAdmin = computed(
   () => me.value?.memberships.find((m) => m.workspace.id === props.workspaceId)?.role === 'admin',
 )
-const nav = computed(() => [
-  { to: 'projects', label: 'Projects', icon: FolderKanban, show: true },
-  { to: 'members', label: 'Members', icon: Users, show: true },
-  { to: 'invitations', label: 'Invitations', icon: Mail, show: isAdmin.value },
-  { to: 'api-keys', label: 'API keys', icon: KeyRound, show: isAdmin.value },
-  { to: 'settings', label: 'Settings', icon: Settings, show: isAdmin.value },
-])
+const nav = computed(() => workspaceNav.filter((item) => !item.adminOnly || isAdmin.value))
 const mobileOpen = ref(false)
 watch(
   () => route.fullPath,
@@ -65,18 +60,16 @@ watch(
       </div>
       <nav class="flex-1 overflow-y-auto p-2" aria-label="Workspace sections">
         <ul class="flex flex-col gap-0.5">
-          <template v-for="item in nav" :key="item.to">
-            <li v-if="item.show">
-              <RouterLink
-                :to="`/w/${workspaceId}/${item.to}`"
-                class="flex items-center gap-2.5 rounded-field px-2.5 py-2 text-sm transition-colors hover:bg-base-300"
-                active-class="bg-base-100 font-medium shadow-sm hover:bg-base-100"
-              >
-                <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
-                {{ item.label }}
-              </RouterLink>
-            </li>
-          </template>
+          <li v-for="item in nav" :key="item.path">
+            <RouterLink
+              :to="`/w/${workspaceId}/${item.path}`"
+              class="flex items-center gap-2.5 rounded-field px-2.5 py-2 text-sm transition-colors hover:bg-base-300"
+              active-class="bg-base-100 font-medium shadow-sm hover:bg-base-100"
+            >
+              <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
+              {{ item.label }}
+            </RouterLink>
+          </li>
         </ul>
       </nav>
       <div class="border-t border-base-300 p-2"><UserMenu placement="above" /></div>

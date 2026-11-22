@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import Field from '@/components/ui/Field.vue'
+import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { useSignIn } from '@/queries/auth'
 
 const route = useRoute()
@@ -64,10 +65,7 @@ async function submit() {
           />
         </Field>
         <ErrorAlert :error="error" />
-        <button type="submit" class="btn btn-primary" :disabled="asyncStatus === 'loading'">
-          <span v-if="asyncStatus === 'loading'" class="loading loading-xs loading-spinner"></span>
-          Email me a link
-        </button>
+        <SubmitButton size="md" :pending="asyncStatus === 'loading'">Email me a link</SubmitButton>
       </form>
     </Transition>
   </div>

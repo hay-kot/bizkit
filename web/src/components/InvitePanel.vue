@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-import ErrorAlert from '@/components/ErrorAlert.vue'
 import Field from '@/components/ui/Field.vue'
-import Overlay from '@/components/ui/Overlay.vue'
+import FormPanel from '@/components/ui/FormPanel.vue'
 import Select from '@/components/ui/Select.vue'
 import { toast } from '@/lib/toast'
 import type { Role } from '@/queries/members'
@@ -49,43 +48,28 @@ async function onInvite() {
 </script>
 
 <template>
-  <Overlay
+  <FormPanel
     :open="open"
-    variant="panel"
     title="Invite someone"
     description="They get an email with a link. They sign in with that address to join."
+    submit-label="Send invitation"
+    :pending="invite.asyncStatus.value === 'loading'"
+    :error="invite.error.value"
     @close="emit('close')"
+    @submit="onInvite"
   >
-    <form id="invite-form" class="flex flex-col gap-4" @submit.prevent="onInvite">
-      <Field label="Email">
-        <input
-          v-model="email"
-          type="email"
-          name="invite-email"
-          required
-          class="input w-full"
-          placeholder="name@example.com"
-        />
-      </Field>
-      <Field label="Role">
-        <Select v-model="role" :options="roles" label="Role" name="invite-role" />
-      </Field>
-      <ErrorAlert :error="invite.error.value" />
-    </form>
-    <template #footer>
-      <button type="button" class="btn btn-ghost btn-sm" @click="emit('close')">Cancel</button>
-      <button
-        type="submit"
-        form="invite-form"
-        class="btn btn-primary btn-sm"
-        :disabled="invite.asyncStatus.value === 'loading'"
-      >
-        <span
-          v-if="invite.asyncStatus.value === 'loading'"
-          class="loading loading-xs loading-spinner"
-        ></span>
-        Send invitation
-      </button>
-    </template>
-  </Overlay>
+    <Field label="Email">
+      <input
+        v-model="email"
+        type="email"
+        name="invite-email"
+        required
+        class="input w-full"
+        placeholder="name@example.com"
+      />
+    </Field>
+    <Field label="Role">
+      <Select v-model="role" :options="roles" label="Role" name="invite-role" />
+    </Field>
+  </FormPanel>
 </template>

@@ -8,11 +8,7 @@ import Invite from './pages/Invite.vue'
 import NotFound from './pages/NotFound.vue'
 import SignIn from './pages/SignIn.vue'
 import SignInVerify from './pages/SignInVerify.vue'
-import ApiKeys from './pages/workspace/ApiKeys.vue'
-import Invitations from './pages/workspace/Invitations.vue'
-import Members from './pages/workspace/Members.vue'
-import Projects from './pages/workspace/Projects.vue'
-import Settings from './pages/workspace/Settings.vue'
+import { workspaceRoutes } from './modules'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -49,11 +45,7 @@ export const router = createRouter({
       props: true,
       children: [
         { path: '', redirect: (to) => `/w/${String(to.params.workspaceId)}/projects` },
-        { path: 'projects', component: Projects },
-        { path: 'members', component: Members },
-        { path: 'invitations', component: Invitations },
-        { path: 'api-keys', component: ApiKeys },
-        { path: 'settings', component: Settings },
+        ...workspaceRoutes,
       ],
     },
     { path: '/:rest(.*)*', component: NotFound, meta: { public: true } },

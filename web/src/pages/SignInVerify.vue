@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import Spinner from '@/components/ui/Spinner.vue'
 import { useVerify } from '@/queries/auth'
 
 const route = useRoute()
@@ -37,7 +38,7 @@ onMounted(async () => {
       <RouterLink to="/sign-in" class="btn btn-primary btn-sm">Back to sign-in</RouterLink>
     </template>
     <template v-else>
-      <span class="loading loading-spinner" aria-hidden="true"></span>
+      <Spinner label="Signing in" />
       <h1 class="text-lg font-semibold">Signing you in…</h1>
     </template>
   </div>

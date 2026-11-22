@@ -61,8 +61,24 @@ A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<nam
 - Colors are defined only in `web/src/styles/theme.css`; stylelint rejects hex, named and functional colors elsewhere.
 - Only `web/src/queries/**` and `web/src/api/client.ts` import the generated client in `web/src/api/gen`. Pages use the composables in `src/queries`.
 - Disabling an ESLint rule needs a reason: `// eslint-disable-next-line rule -- why`. The one inline style today is the floating list in `Select.vue`, which needs coordinates.
-- Layout: `/` is the user home (workspaces, invitations, create). Inside a workspace, `layouts/WorkspaceLayout.vue` gives the sidebar: workspace switcher on top, nav in the middle, user menu at the bottom. New sections are sidebar nav items, not tabs.
-- Use the primitives in `src/components/ui`, not native or DaisyUI controls: `Select` (listbox), `Checkbox`, `Menu`/`MenuItem`, `Overlay` (dialog or right-side panel), `Field`, `SkeletonRows`, `CopyButton`, `Avatar`. Create and edit forms open in an `Overlay` panel; destructive actions go through `confirmAction()`; results show with `toast()`.
+- Layout: `/` is the user home (workspaces, invitations, create). Inside a workspace, `layouts/WorkspaceLayout.vue` gives the sidebar: workspace switcher on top, nav in the middle, user menu at the bottom.
+- A feature's UI is a web module: `web/src/modules/<name>.ts` calls `defineWebModule({ name, workspaceRoutes, nav })` and is listed in `modules/index.ts`. The router and the sidebar read the list, so a module never edits the shell. Sidebar `order` 0-99 is core's; modules start at 100. A unit test checks that nav items point at registered routes and nothing collides.
+- Building blocks, and what ESLint enforces outside `src/components/ui`:
+
+  | Need | Use | Enforced by |
+  |---|---|---|
+  | A list of rows | `DataTable` with `#cell-<key>` slots; it handles loading, error and empty | `<table>` and DaisyUI `table*` classes are errors |
+  | A choice | `Select` | `<select>`, `input[type=radio]` and DaisyUI `select*` classes are errors |
+  | A tick box | `Checkbox` | `input[type=checkbox]` and DaisyUI `checkbox`/`toggle` classes are errors |
+  | A create or edit form | `FormPanel` (side panel, or `variant="dialog"`), `Field`, `SubmitButton` | Pages can't import `Overlay`; DaisyUI `modal` classes are errors |
+  | A menu | `Menu` and `MenuItem` | DaisyUI `dropdown` classes are errors |
+  | Waiting | `SubmitButton` `pending`, `SkeletonRows`, `Spinner` | DaisyUI `loading` classes are errors |
+  | Confirm, run, report | `runAction({ confirm, run, success })` | Pages can't import `lib/confirm`; `alert`/`confirm`/`prompt` are errors |
+  | A date | `formatDate`, `formatShortDate`, `isPast` from `lib/format.ts` | `toLocale*String` and `new Intl.*` are errors elsewhere |
+  | API data | the composables in `src/queries` | Pages and layouts can't import `@pinia/colada` or `src/api/gen` |
+  | A name with a slug | `useSlugFromName()` | |
+
+- When a page needs something these don't cover, add a primitive to `src/components/ui` (or a feature component that wraps one) instead of reaching for the raw element.
 - Pages load eagerly and only the content area animates between routes, so the shell never flashes. Show skeletons on first load, not spinners.
 
 ## Dev stack

@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { Mail, Plus, Settings } from 'lucide-vue-next'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import ErrorAlert from '@/components/ErrorAlert.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import Field from '@/components/ui/Field.vue'
-import Overlay from '@/components/ui/Overlay.vue'
-import { errorMessage } from '@/lib/errors'
-import { slugify } from '@/lib/slug'
-import { toast } from '@/lib/toast'
+import FormPanel from '@/components/ui/FormPanel.vue'
+import { useSlugFromName } from '@/composables/useSlugFromName'
+import { runAction } from '@/lib/action'
 import { useMe } from '@/queries/auth'
 import type { MyInvitation } from '@/queries/workspaces'
 import {
@@ -28,17 +26,10 @@ const accept = useAcceptInvitation()
 const decline = useDeclineInvitation()
 
 const creating = ref(false)
-const name = ref('')
-const slug = ref('')
-const slugEdited = ref(false)
-watch(name, (value) => {
-  if (!slugEdited.value) slug.value = slugify(value)
-})
+const form = useSlugFromName()
 
 function openCreate() {
-  name.value = ''
-  slug.value = ''
-  slugEdited.value = false
+  form.reset()
   create.reset()
   creating.value = true
 }
@@ -52,23 +43,25 @@ onMounted(() => {
 })
 
 async function onCreate() {
-  const workspace = await create.mutateAsync({ body: { name: name.value, slug: slug.value } })
+  const workspace = await create.mutateAsync({
+    body: { name: form.name.value, slug: form.slug.value },
+  })
   creating.value = false
   await router.push(`/w/${workspace.id}/projects`)
 }
 
-async function onAccept(invite: MyInvitation) {
-  try {
-    const membership = await accept.mutateAsync({ path: { invitation_id: invite.id } })
-    toast(`You joined ${membership.workspace.name}`)
-  } catch (err) {
-    toast(errorMessage(err), 'error')
-  }
+function onAccept(invite: MyInvitation) {
+  return runAction({
+    run: () => accept.mutateAsync({ path: { invitation_id: invite.id } }),
+    success: (membership) => `You joined ${membership.workspace.name}`,
+  })
 }
 
-async function onDecline(invite: MyInvitation) {
-  await decline.mutateAsync({ path: { invitation_id: invite.id } })
-  toast(`Declined ${invite.workspace.name}`, 'info')
+function onDecline(invite: MyInvitation) {
+  return runAction({
+    run: () => decline.mutateAsync({ path: { invitation_id: invite.id } }),
+    success: `Declined ${invite.workspace.name}`,
+  })
 }
 </script>
 
@@ -157,43 +150,36 @@ async function onDecline(invite: MyInvitation) {
       </ul>
     </section>
 
-    <Overlay
+    <FormPanel
       :open="creating"
+      variant="dialog"
       title="New workspace"
       description="You'll be its admin. Invite others once it exists."
+      submit-label="Create workspace"
+      :pending="create.asyncStatus.value === 'loading'"
+      :error="create.error.value"
       @close="creating = false"
+      @submit="onCreate"
     >
-      <form id="new-workspace" class="flex flex-col gap-4" @submit.prevent="onCreate">
-        <Field label="Name">
-          <input v-model="name" name="name" required class="input w-full" placeholder="Acme" />
-        </Field>
-        <Field label="Slug" hint="Used in policies and links. It can't change later.">
-          <input
-            v-model="slug"
-            name="slug"
-            required
-            class="input w-full"
-            placeholder="acme"
-            @input="slugEdited = true"
-          />
-        </Field>
-        <ErrorAlert :error="create.error.value" />
-      </form>
-      <template #footer>
-        <button type="button" class="btn btn-ghost btn-sm" @click="creating = false">Cancel</button>
-        <button
-          type="submit"
-          form="new-workspace"
-          class="btn btn-primary btn-sm"
-          :disabled="create.asyncStatus.value === 'loading'"
-        >
-          <span
-            v-if="create.asyncStatus.value === 'loading'"
-            class="loading loading-xs loading-spinner"
-          ></span>
-          Create workspace
-        </button>
-      </template>
-    </Overlay>
+      <Field label="Name">
+        <input
+          v-model="form.name.value"
+          name="name"
+          required
+          class="input w-full"
+          placeholder="Acme"
+        />
+      </Field>
+      <Field label="Slug" hint="Used in policies and links. It can't change later.">
+        <input
+          v-model="form.slug.value"
+          name="slug"
+          required
+          class="input w-full"
+          placeholder="acme"
+          @input="form.onSlugInput"
+        />
+      </Field>
+    </FormPanel>
   </div>
 </template>

@@ -11,6 +11,63 @@ const palette =
 const colorUtilities =
   'bg|text|border|ring|outline|fill|stroke|from|via|to|divide|shadow|accent|caret|decoration|placeholder'
 
+// Everywhere: only design tokens.
+const tokenRestrictions = [
+  {
+    pattern: '^.*\\[.*$',
+    message: 'Arbitrary values $0 bypass the design tokens: use a Tailwind or DaisyUI class.',
+  },
+  {
+    pattern: `^(?:.*:)?(?:${colorUtilities})-(?:(?:${palette})-\\d+|black|white)(?:/\\d+)?$`,
+    message: 'Raw palette color $0: use DaisyUI semantic colors (primary, base-200, error, ...).',
+  },
+]
+
+// Outside src/components/ui: DaisyUI's interactive controls are wrapped by
+// our primitives, which carry the keyboard handling and the look.
+const controlRestrictions = [
+  {
+    pattern: '^(?:checkbox|toggle|radio|range|file-input)(?:-.+)?$',
+    message: '$0: use components/ui/Checkbox.vue.',
+  },
+  {
+    pattern:
+      '^select(?:-(?:xs|sm|md|lg|xl|ghost|bordered|primary|secondary|accent|neutral|info|success|warning|error))?$',
+    message: '$0: use components/ui/Select.vue.',
+  },
+  { pattern: '^table(?:-.+)?$', message: '$0: use components/ui/DataTable.vue.' },
+  {
+    pattern: '^(?:modal|drawer)(?:-.+)?$',
+    message: '$0: use components/ui/FormPanel.vue or Overlay.vue.',
+  },
+  { pattern: '^dropdown(?:-.+)?$', message: '$0: use components/ui/Menu.vue.' },
+  {
+    pattern: '^loading(?:-.+)?$',
+    message: '$0: use SubmitButton, Spinner or SkeletonRows from components/ui.',
+  },
+]
+
+const generatedClient = {
+  group: ['@/api/gen', '@/api/gen/*', '**/api/gen', '**/api/gen/*'],
+  message: 'Only src/queries and src/api/client.ts import the generated client.',
+}
+
+// Dates go through src/lib/format.ts; native dialogs never appear.
+const syntaxRestrictions = [
+  {
+    selector: 'CallExpression[callee.property.name=/^toLocale(?:Date|Time)?String$/]',
+    message: 'Format dates with src/lib/format.ts.',
+  },
+  {
+    selector: "NewExpression[callee.object.name='Intl']",
+    message: 'Format dates with src/lib/format.ts.',
+  },
+  {
+    selector: 'CallExpression[callee.name=/^(?:alert|confirm|prompt)$/]',
+    message: 'Use runAction() with confirm, or toast(), instead of native dialogs.',
+  },
+]
+
 export default tseslint.config(
   { ignores: ['dist', 'src/api/gen', 'node_modules'] },
   js.configs.recommended,
@@ -21,7 +78,11 @@ export default tseslint.config(
     files: ['**/*.{ts,vue}'],
     languageOptions: {
       globals: globals.browser,
-      parserOptions: { parser: tseslint.parser, extraFileExtensions: ['.vue'], sourceType: 'module' },
+      parserOptions: {
+        parser: tseslint.parser,
+        extraFileExtensions: ['.vue'],
+        sourceType: 'module',
+      },
     },
   },
   {
@@ -38,43 +99,78 @@ export default tseslint.config(
       ],
       'better-tailwindcss/no-conflicting-classes': 'error',
       'better-tailwindcss/no-duplicate-classes': 'error',
-      'better-tailwindcss/no-restricted-classes': [
-        'error',
-        {
-          restrict: [
-            {
-              pattern: '^.*\\[.*$',
-              message: 'Arbitrary values $0 bypass the design tokens: use a Tailwind or DaisyUI class.',
-            },
-            {
-              pattern: `^(?:.*:)?(?:${colorUtilities})-(?:(?:${palette})-\\d+|black|white)(?:/\\d+)?$`,
-              message: 'Raw palette color $0: use DaisyUI semantic colors (primary, base-200, error, ...).',
-            },
-          ],
-        },
-      ],
+      'better-tailwindcss/no-restricted-classes': ['error', { restrict: tokenRestrictions }],
       // prettier-plugin-tailwindcss orders classes.
       'better-tailwindcss/enforce-consistent-class-order': 'off',
 
       'vue/no-static-inline-styles': 'error',
-      'vue/no-restricted-v-bind': ['error', { argument: 'style', message: 'Use classes, not inline styles.' }],
+      'vue/no-restricted-v-bind': [
+        'error',
+        { argument: 'style', message: 'Use classes, not inline styles.' },
+      ],
       '@eslint-community/eslint-comments/require-description': ['error', { ignore: [] }],
       'vue/multi-word-component-names': 'off',
     },
   },
   {
     files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/lib/format.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...syntaxRestrictions],
+      'vue/no-restricted-syntax': ['error', ...syntaxRestrictions],
+    },
+  },
+  {
+    // The primitives in components/ui wrap these; everything else uses them.
+    files: ['src/**/*.vue'],
+    ignores: ['src/components/ui/**'],
+    rules: {
+      'better-tailwindcss/no-restricted-classes': [
+        'error',
+        { restrict: [...tokenRestrictions, ...controlRestrictions] },
+      ],
+      'vue/no-restricted-html-elements': [
+        'error',
+        { element: ['table'], message: 'Use components/ui/DataTable.vue.' },
+        { element: ['select'], message: 'Use components/ui/Select.vue.' },
+        { element: ['dialog'], message: 'Use components/ui/FormPanel.vue or Overlay.vue.' },
+      ],
+      'vue/no-restricted-static-attribute': [
+        'error',
+        {
+          key: 'type',
+          value: 'checkbox',
+          element: 'input',
+          message: 'Use components/ui/Checkbox.vue.',
+        },
+        { key: 'type', value: 'radio', element: 'input', message: 'Use components/ui/Select.vue.' },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,vue}'],
     ignores: ['src/queries/**', 'src/api/client.ts'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [generatedClient] }] },
+  },
+  {
+    // Pages and layouts compose; data and overlays come through one door each.
+    files: ['src/pages/**/*.{ts,vue}', 'src/layouts/**/*.{ts,vue}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
+          paths: [
+            { name: '@pinia/colada', message: 'Use the composables in src/queries.' },
             {
-              group: ['@/api/gen', '@/api/gen/*', '**/api/gen', '**/api/gen/*'],
-              message: 'Only src/queries and src/api/client.ts import the generated client.',
+              name: '@/components/ui/Overlay.vue',
+              message: 'Use FormPanel.vue, or wrap the overlay in a component.',
+            },
+            {
+              name: '@/lib/confirm',
+              message: 'Use runAction({ confirm }) from src/lib/action.ts.',
             },
           ],
+          patterns: [generatedClient],
         },
       ],
     },
