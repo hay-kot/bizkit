@@ -27,7 +27,12 @@ import {
   useUpdateSubmission,
 } from '@/queries/forms'
 
-const props = defineProps<{ workspaceId: string; workspaceName: string; formId: string }>()
+const props = defineProps<{
+  workspaceId: string
+  projectId: string
+  projectName: string
+  formId: string
+}>()
 const router = useRouter()
 const { data: form, error: formError } = useForm(
   () => props.workspaceId,
@@ -154,7 +159,7 @@ function onDeleteForm() {
     },
     success: `Deleted ${name}`,
   }).then(async (deleted) => {
-    if (deleted) await router.push(`/w/${props.workspaceId}/forms`)
+    if (deleted) await router.push(`/w/${props.workspaceId}/p/${props.projectId}/forms`)
   })
 }
 
@@ -213,7 +218,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
 <template>
   <div>
     <PageHeader
-      :section="workspaceName"
+      :section="projectName"
       :title="form?.name ?? 'Form'"
       :description="
         form && !form.enabled ? 'Disabled: submissions get a 404.' : 'Submissions from your site.'

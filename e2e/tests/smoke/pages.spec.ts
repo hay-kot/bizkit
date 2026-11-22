@@ -26,10 +26,17 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
-  for (const section of ['projects', 'members', 'invitations', 'api-keys', 'settings', 'forms']) {
+  const workspacePages = ['projects', 'team', 'api-keys', 'settings']
+  const projectPages = ['forms']
+  for (const section of [...workspacePages, ...projectPages]) {
     test(`the ${section} page is clean`, async ({ page, world }) => {
       const errors = trackPageErrors(page)
-      await page.goto(`/w/${world.workspaces.main!.id}/${section}`)
+      const workspace = `/w/${world.workspaces.main!.id}`
+      await page.goto(
+        projectPages.includes(section)
+          ? `${workspace}/p/${world.projects.site!.id}/${section}`
+          : `${workspace}/${section}`,
+      )
       await expect(page.getByTestId('workspace-name')).toHaveText('Team')
       await expect(page.locator('.loading')).toHaveCount(0)
       await expectCleanPage(page, errors)
@@ -46,7 +53,7 @@ test.describe('workspace pages', () => {
     expect(created.status()).toBe(201)
     const form = await created.json()
     await page.request.post(form.endpoint, { form: { name: 'Ada' } })
-    await page.goto(`/w/${workspace}/forms/${form.id}`)
+    await page.goto(`/w/${workspace}/p/${world.projects.site!.id}/forms/${form.id}`)
     await expect(page.getByRole('heading', { name: 'Contact' })).toBeVisible()
     await page.getByText('HTML form').click()
     await expectCleanPage(page, errors)

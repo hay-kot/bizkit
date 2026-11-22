@@ -30,8 +30,16 @@ export type { BotCheck, FieldDef, FieldKind, FieldValue, Form, Submission, Submi
 const FORM_QUERIES = ['formsList', 'formsGet']
 const SUBMISSION_QUERIES = ['formsSubmissionsList', 'formsGet', 'formsList']
 
-export function useForms(workspaceId: MaybeRefOrGetter<string>) {
-  return useQuery(() => formsListQuery({ path: { workspace_id: toValue(workspaceId) } }))
+export function useForms(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    formsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId) },
+    }),
+  )
 }
 
 export function useForm(workspaceId: MaybeRefOrGetter<string>, formId: MaybeRefOrGetter<string>) {

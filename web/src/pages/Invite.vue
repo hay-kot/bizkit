@@ -17,7 +17,7 @@ const decline = useDeclineInvitation()
 
 async function onAccept() {
   const membership = await accept.mutateAsync({ path: { invitation_id: props.id } })
-  await router.replace(`/w/${membership.workspace.id}/projects`)
+  await router.replace(`/w/${membership.workspace.id}`)
 }
 
 async function onDecline() {

@@ -14,7 +14,7 @@ test('an admin invites a new email, who signs in from the mail and joins', async
 }) => {
   const invitee = `guest+${namespace}@outside.e2e.test`
   const workspaceId = world.workspaces.main!.id
-  await page.goto(`/w/${workspaceId}/invitations`)
+  await page.goto(`/w/${workspaceId}/team`)
   await page.getByRole('button', { name: 'Invite', exact: true }).click()
   await page.getByLabel('Email').fill(invitee)
   await page.getByRole('button', { name: 'Send invitation' }).click()
@@ -34,9 +34,15 @@ test('an admin invites a new email, who signs in from the mail and joins', async
   await expect(guest).toHaveURL(new RegExp(`${invitePath}$`))
   await expect(guest.getByRole('heading', { name: 'Join Team' })).toBeVisible()
   await guest.getByRole('button', { name: 'Accept invitation' }).click()
-  await expect(guest).toHaveURL(new RegExp(`/w/${workspaceId}/projects$`))
+  await expect(guest).toHaveURL(
+    new RegExp(`/w/${workspaceId}/p/${world.projects.app!.id}/forms$`),
+  )
   await context.close()
 
-  await page.goto(`/w/${workspaceId}/members`)
-  await expect(page.getByRole('cell', { name: invitee, exact: true })).toBeVisible()
+  await page.reload()
+  const members = page.getByRole('region', { name: 'Members' })
+  await expect(members.getByRole('cell', { name: invitee, exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: 'Pending invitations' }).getByText(invitee),
+  ).toHaveCount(0)
 })

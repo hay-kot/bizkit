@@ -80,9 +80,11 @@ function onDelete(project: Project) {
         message: 'Create a project for each site or app you run.',
       }"
     >
-      <template #cell-name="{ row }"
-        ><span class="font-medium">{{ row.name }}</span></template
-      >
+      <template #cell-name="{ row }">
+        <RouterLink :to="`/w/${workspaceId}/p/${row.id}`" class="link font-medium link-hover">
+          {{ row.name }}
+        </RouterLink>
+      </template>
       <template #cell-slug="{ row }"
         ><code class="text-sm">{{ row.slug }}</code></template
       >

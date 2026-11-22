@@ -12,6 +12,23 @@ test('create a project', async ({ page, world }) => {
   await expect(page.getByRole('cell', { name: 'Docs', exact: true })).toBeVisible()
 })
 
+test('the sidebar puts project pages under the project and workspace meta at the bottom', async ({
+  page,
+  world,
+}) => {
+  const workspace = `/w/${world.workspaces.main!.id}`
+  await page.goto(workspace)
+  // With nothing remembered, the first project by name.
+  await expect(page).toHaveURL(new RegExp(`${workspace}/p/${world.projects.app!.id}/forms$`))
+  await expect(page.getByTestId('project-name')).toHaveText('App')
+  await expect(
+    page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Forms' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('navigation', { name: 'Workspace' }).getByRole('link'),
+  ).toHaveText(['Team', 'API keys', 'Settings'])
+})
+
 test('create an API key and see its token once', async ({ page, world }) => {
   await page.goto(`/w/${world.workspaces.main!.id}/api-keys`)
   await page.getByRole('button', { name: 'New API key' }).click()
@@ -34,8 +51,10 @@ test.describe('as a member', () => {
   test.use({ as: 'member' })
 
   test('admin sections are hidden', async ({ page, world }) => {
-    await page.goto(`/w/${world.workspaces.main!.id}/projects`)
-    await expect(page.getByRole('link', { name: 'Members' })).toBeVisible()
+    await page.goto(`/w/${world.workspaces.main!.id}/team`)
+    await expect(page.getByRole('link', { name: 'Team' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'API keys' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Pending invitations' })).toHaveCount(0)
   })
 })
