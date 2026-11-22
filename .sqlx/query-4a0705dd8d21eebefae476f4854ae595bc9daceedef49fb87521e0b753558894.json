@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "UPDATE jobs SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?\n             WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_at <= ? ORDER BY run_at, id LIMIT 1)\n             RETURNING id, kind, payload, attempts, max_attempts, request_id",
+  "query": "UPDATE jobs SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?\n                 WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_at <= ?\n                             AND kind IN (SELECT value FROM json_each(?)) ORDER BY run_at, id LIMIT 1)\n                 RETURNING id, kind, payload, attempts, max_attempts, request_id",
   "describe": {
     "columns": [
       {
@@ -71,7 +71,7 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false,
@@ -82,5 +82,5 @@
       true
     ]
   },
-  "hash": "a3de47ce85e1499364d7f708de33272cedd514d3e1d17a667e53b90fe5162ce8"
+  "hash": "4a0705dd8d21eebefae476f4854ae595bc9daceedef49fb87521e0b753558894"
 }

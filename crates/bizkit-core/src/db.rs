@@ -11,7 +11,7 @@ use sqlx::migrate::Migrator;
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqliteConnection, SqlitePool, Transaction};
-use tokio::sync::Notify;
+use tokio::sync::watch;
 
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -20,7 +20,7 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 pub struct Db {
     read: SqlitePool,
     write: SqlitePool,
-    wake: Arc<Notify>,
+    wake: Arc<watch::Sender<u64>>,
 }
 
 impl Db {
@@ -55,13 +55,13 @@ impl Db {
             .connect_with(options.read_only(true))
             .await
             .with_context(|| format!("opening {} for reading", path.display()))?;
-        Ok(Self { read, write, wake: Arc::new(Notify::new()) })
+        Ok(Self { read, write, wake: Arc::new(watch::Sender::new(0)) })
     }
 
     /// Wraps one pool for both reads and writes, as `#[sqlx::test]` provides.
     #[must_use]
     pub fn from_pool(pool: SqlitePool) -> Self {
-        Self { read: pool.clone(), write: pool, wake: Arc::new(Notify::new()) }
+        Self { read: pool.clone(), write: pool, wake: Arc::new(watch::Sender::new(0)) }
     }
 
     /// The read pool. Inside a [`WriteTx`], read through the transaction
@@ -105,9 +105,11 @@ impl Db {
         Ok(())
     }
 
-    /// Resolves when a committed transaction wrote jobs.
-    pub(crate) async fn jobs_written(&self) {
-        self.wake.notified().await;
+    /// Watches commits that wrote jobs. Each one bumps the value, and a
+    /// receiver's `changed()` sees every bump since it last looked, so a
+    /// commit that lands while a worker loop is busy still wakes it.
+    pub(crate) fn jobs_written(&self) -> watch::Receiver<u64> {
+        self.wake.subscribe()
     }
 
     /// Closes both pools.
@@ -124,7 +126,7 @@ pub struct WriteTx {
     tx: Transaction<'static, Sqlite>,
     jobs_written: bool,
     request_id: Option<String>,
-    wake: Arc<Notify>,
+    wake: Arc<watch::Sender<u64>>,
 }
 
 impl WriteTx {
@@ -153,7 +155,7 @@ impl WriteTx {
     pub async fn commit(self) -> anyhow::Result<()> {
         self.tx.commit().await.context("committing")?;
         if self.jobs_written {
-            self.wake.notify_one();
+            self.wake.send_modify(|count| *count = count.wrapping_add(1));
         }
         Ok(())
     }

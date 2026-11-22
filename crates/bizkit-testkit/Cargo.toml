@@ -29,6 +29,7 @@ url.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
+tokio-util.workspace = true
 utoipa.workspace = true
 
 [lints]

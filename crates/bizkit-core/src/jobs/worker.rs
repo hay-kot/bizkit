@@ -7,16 +7,17 @@ use anyhow::Context as _;
 use futures::FutureExt as _;
 use tokio_util::sync::CancellationToken;
 
-use super::{Handlers, JobCtx};
+use super::{Handlers, JobCtx, Lane};
 use crate::app::Platform;
 use crate::time::UnixMillis;
 
 const POLL: Duration = Duration::from_secs(1);
-const LOCK: Duration = Duration::from_mins(5);
+pub(super) const LOCK: Duration = Duration::from_mins(5);
 const MAX_BACKOFF_SECS: u64 = 60 * 60;
 const KEEP_DONE: Duration = Duration::from_hours(7 * 24);
 
-/// Runs queued jobs one at a time.
+/// Runs queued jobs. Each lane gets its own loops, so a slow lane never holds
+/// up the default one, which runs one job at a time.
 #[derive(Debug, Clone)]
 pub struct Worker {
     inner: Arc<Inner>,
@@ -26,6 +27,17 @@ pub struct Worker {
 struct Inner {
     platform: Platform,
     handlers: Arc<Handlers>,
+    lanes: Vec<LaneClaim>,
+}
+
+/// What one lane's loops claim.
+#[derive(Debug)]
+struct LaneClaim {
+    lane: Lane,
+    /// JSON array of job kinds. The default lane claims every kind *not*
+    /// listed here, so rows with unknown kinds still reach it and go dead.
+    kinds: String,
+    default: bool,
 }
 
 /// What a drain did.
@@ -67,46 +79,91 @@ struct Claimed {
 
 impl Worker {
     pub(crate) fn new(platform: Platform, handlers: Arc<Handlers>) -> Self {
-        Self { inner: Arc::new(Inner { platform, handlers }) }
+        let lanes = handlers
+            .lanes()
+            .into_iter()
+            .map(|lane| {
+                let default = lane == Lane::DEFAULT;
+                let kinds: Vec<&str> =
+                    handlers
+                        .by_kind
+                        .iter()
+                        .filter(|(_, entry)| {
+                            if default { entry.lane != Lane::DEFAULT } else { entry.lane == lane }
+                        })
+                        .map(|(kind, _)| kind.as_str())
+                        .collect();
+                let kinds = serde_json::Value::from(kinds).to_string();
+                LaneClaim { lane, kinds, default }
+            })
+            .collect();
+        Self { inner: Arc::new(Inner { platform, handlers, lanes }) }
     }
 
-    /// Runs jobs until `shutdown` fires, then returns once the job in flight
-    /// finishes. Wakes on commits that wrote jobs, and polls every second for
-    /// rows other processes wrote.
+    /// Runs jobs until `shutdown` fires, then returns once the jobs in flight
+    /// finish. Each lane runs `concurrency` loops. Loops wake on commits that
+    /// wrote jobs, and poll every second for rows other processes wrote.
     pub async fn run(&self, shutdown: CancellationToken) {
         if let Err(err) = self.requeue_stale().await {
             tracing::error!(error = format!("{err:#}"), "requeuing stale jobs");
         }
+        let mut loops = tokio::task::JoinSet::new();
+        for (lane, claim) in self.inner.lanes.iter().enumerate() {
+            for slot in 0..claim.lane.concurrency {
+                let worker = self.clone();
+                let shutdown = shutdown.clone();
+                // Only one loop cleans up, so idle loops don't add write transactions.
+                let housekeeping = lane == 0 && slot == 0;
+                loops.spawn(async move { worker.lane_loop(lane, housekeeping, shutdown).await });
+            }
+        }
+        while loops.join_next().await.is_some() {}
+    }
+
+    async fn lane_loop(&self, lane: usize, housekeeping: bool, shutdown: CancellationToken) {
+        let Some(lane) = self.inner.lanes.get(lane) else { return };
+        let mut wake = self.inner.platform.db().jobs_written();
         while !shutdown.is_cancelled() {
-            match self.tick().await {
+            wake.borrow_and_update();
+            match self.tick(lane).await {
                 Ok(Some(_)) => continue,
-                Ok(None) => {
+                Ok(None) if housekeeping => {
                     if let Err(err) = self.cleanup().await {
                         tracing::warn!(error = format!("{err:#}"), "deleting old jobs");
                     }
                 }
+                Ok(None) => {}
                 Err(err) => tracing::error!(error = format!("{err:#}"), "running a job"),
             }
             tokio::select! {
                 () = shutdown.cancelled() => break,
-                () = self.inner.platform.db().jobs_written() => {}
+                _ = wake.changed() => {}
                 () = tokio::time::sleep(POLL) => {}
             }
         }
     }
 
-    /// Runs every job that is due now, then returns what happened. Tests and
-    /// `/__test/jobs/drain` use it instead of the background loop.
+    /// Runs every job that is due now in every lane, one at a time, then
+    /// returns what happened. Tests and `/__test/jobs/drain` use it instead of
+    /// the background loops.
     ///
     /// # Errors
     ///
     /// When claiming or finishing a job fails. Job failures are counted, not returned.
     pub async fn run_until_idle(&self) -> anyhow::Result<RunStats> {
         let mut stats = RunStats::default();
-        while let Some(outcome) = self.tick().await? {
-            stats += outcome;
+        loop {
+            let mut ran = false;
+            for lane in &self.inner.lanes {
+                while let Some(outcome) = self.tick(lane).await? {
+                    stats += outcome;
+                    ran = true;
+                }
+            }
+            if !ran {
+                return Ok(stats);
+            }
         }
-        Ok(stats)
     }
 
     fn now(&self) -> UnixMillis {
@@ -145,47 +202,96 @@ impl Worker {
         tx.commit().await
     }
 
-    async fn claim(&self) -> anyhow::Result<Option<Claimed>> {
+    /// Whether `lane` has a due job, checked on the read pool so idle loops
+    /// don't take the write lock.
+    async fn has_due(&self, lane: &LaneClaim, now: UnixMillis) -> anyhow::Result<bool> {
+        let read = self.inner.platform.db().read();
+        let found = if lane.default {
+            sqlx::query_scalar!(
+                "SELECT 1 AS \"found!: i64\" FROM jobs WHERE status = 'queued' AND run_at <= ?
+                 AND kind NOT IN (SELECT value FROM json_each(?)) LIMIT 1",
+                now,
+                lane.kinds,
+            )
+            .fetch_optional(read)
+            .await
+        } else {
+            sqlx::query_scalar!(
+                "SELECT 1 AS \"found!: i64\" FROM jobs WHERE status = 'queued' AND run_at <= ?
+                 AND kind IN (SELECT value FROM json_each(?)) LIMIT 1",
+                now,
+                lane.kinds,
+            )
+            .fetch_optional(read)
+            .await
+        };
+        Ok(found.context("checking for due jobs")?.is_some())
+    }
+
+    async fn claim(&self, lane: &LaneClaim) -> anyhow::Result<Option<Claimed>> {
         let now = self.now();
+        if !self.has_due(lane, now).await? {
+            return Ok(None);
+        }
         let locked_until = now.plus(LOCK);
         let mut tx = self.inner.platform.db().write().await?;
-        let claimed = sqlx::query_as!(
-            Claimed,
-            "UPDATE jobs SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?
-             WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_at <= ? ORDER BY run_at, id LIMIT 1)
-             RETURNING id, kind, payload, attempts, max_attempts, request_id",
-            locked_until,
-            now,
-            now,
-        )
-        .fetch_optional(&mut *tx)
-        .await
+        let claimed = if lane.default {
+            sqlx::query_as!(
+                Claimed,
+                "UPDATE jobs SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?
+                 WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_at <= ?
+                             AND kind NOT IN (SELECT value FROM json_each(?)) ORDER BY run_at, id LIMIT 1)
+                 RETURNING id, kind, payload, attempts, max_attempts, request_id",
+                locked_until,
+                now,
+                now,
+                lane.kinds,
+            )
+            .fetch_optional(&mut *tx)
+            .await
+        } else {
+            sqlx::query_as!(
+                Claimed,
+                "UPDATE jobs SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?
+                 WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND run_at <= ?
+                             AND kind IN (SELECT value FROM json_each(?)) ORDER BY run_at, id LIMIT 1)
+                 RETURNING id, kind, payload, attempts, max_attempts, request_id",
+                locked_until,
+                now,
+                now,
+                lane.kinds,
+            )
+            .fetch_optional(&mut *tx)
+            .await
+        }
         .context("claiming a job")?;
         tx.commit().await?;
         Ok(claimed)
     }
 
-    async fn tick(&self) -> anyhow::Result<Option<Outcome>> {
-        let Some(job) = self.claim().await? else { return Ok(None) };
-        let result = match self.inner.handlers.by_kind.get(&job.kind) {
+    async fn tick(&self, lane: &LaneClaim) -> anyhow::Result<Option<Outcome>> {
+        let Some(job) = self.claim(lane).await? else { return Ok(None) };
+        let entry = self.inner.handlers.by_kind.get(&job.kind);
+        let result = match entry {
             None => Err(anyhow::anyhow!("no handler for job kind {}", job.kind)),
-            Some((handler, _)) => {
+            Some(entry) => {
                 let cx = JobCtx {
                     platform: self.inner.platform.clone(),
                     job_id: job.id,
                     attempt: u32::try_from(job.attempts).unwrap_or(u32::MAX),
                     request_id: job.request_id.clone(),
                 };
-                match AssertUnwindSafe(handler.run(cx, &job.payload)).catch_unwind().await {
-                    Ok(result) => result,
-                    Err(panic) => {
+                let run = AssertUnwindSafe(entry.handler.run(cx, &job.payload)).catch_unwind();
+                match tokio::time::timeout(entry.timeout, run).await {
+                    Ok(Ok(result)) => result,
+                    Ok(Err(panic)) => {
                         Err(anyhow::anyhow!("handler panicked: {}", panic_message(&*panic)))
                     }
+                    Err(_) => Err(anyhow::anyhow!("timed out after {:?}", entry.timeout)),
                 }
             }
         };
-        let known = self.inner.handlers.by_kind.contains_key(&job.kind);
-        let outcome = self.finish(&job, result, known).await?;
+        let outcome = self.finish(&job, result, entry.is_some()).await?;
         Ok(Some(outcome))
     }
 
