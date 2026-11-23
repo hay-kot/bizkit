@@ -50,6 +50,9 @@ A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<nam
 - Endpoints that third-party pages call (form ingest) go in `public_routes`, nested at `/m/<name>/public`. They sit outside authentication: no `Authn`, no cookies, no CSRF check. Escape anything they echo into HTML.
 - `seed_demo` adds the module's sample rows to the dev stack's demo workspace (`bizkit dev seed-demo`, run by the svx `seed` service). Keep it idempotent, put it behind the crate's own `test-hooks` feature, and extend it whenever the module gains a feature.
 - Module tables carry `workspace_id`, and every query filters on it.
+- Module config lives under `modules.<name>` in the config file, parsed into the module's own struct with `deny_unknown_fields`. Analytics reads `geoip_path` (a MaxMind-format country file; without it countries are unknown) and `raw_retention_days` (default 90, at least 7).
+- Public routes that need the visitor's address take the `ClientIp` extractor. It reads the peer address, or the rightmost `X-Forwarded-For` entry when the top-level `trust_proxy_headers` is on. Turn that on only behind a proxy that sets the header (the dev stack does, through Vite); otherwise clients can claim any address.
+- Analytics counts by UTC day. Ingest (the snippet, the beacon and server events) goes through `write::record`, the one write path. Reports read `analytics_daily` up to `rolled_through` and raw events after it, so a report gives the same numbers before and after the rollup job.
 - Migrations live in the module crate's `migrations/` and return from `Module::migrations` as `sqlx::migrate!()`. Versions must be unique across all crates; a test checks it.
 
 ## Hooks
@@ -110,8 +113,9 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | Confirm, run, report | `runAction({ confirm, run, success })` | Pages can't import `lib/confirm`; `alert`/`confirm`/`prompt` are errors |
   | A date | `formatDate`, `formatShortDate`, `isPast` from `lib/format.ts` | `toLocale*String` and `new Intl.*` are errors elsewhere |
   | A number | `formatNumber`, `formatCompactNumber`, `formatPercent` from `lib/format.ts` | `toLocale*String` and `new Intl.*` are errors elsewhere |
+| A UTC day (analytics buckets) | `formatUtcDay`, `formatShortUtcDay` from `lib/format.ts`; the local-time formatters shift it a day west of UTC | |
   | Tabs between a feature's pages | `Tabs` (route links) | |
-  | A report's date range | `DateRangePicker`, with `presetRange` and `previousPeriod` from `lib/range.ts` | |
+  | A report's date range | `DateRangePicker`, with `presetRange` and `previousPeriod` from `lib/range.ts`; `useReportRange` keeps the range and compare flag in the URL | |
   | KPIs with a change | `StatTiles` | |
   | Numbers over time | `TimeSeriesChart` (SVG, no chart library) | Inline styles and arbitrary values are errors |
   | A ranked list with share bars | `BarList` (bars are `progress` elements) | Inline styles and arbitrary values are errors |

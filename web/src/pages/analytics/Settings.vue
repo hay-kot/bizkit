@@ -184,6 +184,7 @@ function viewGoal(goal: Goal | undefined) {
       <Card title="Snippet" description="Add this to the <head> of every page on your site.">
         <div class="flex items-start gap-2">
           <pre
+            tabindex="0"
             class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
           ><code>{{ current.snippet }}</code></pre>
           <CopyButton :text="current.snippet" label="Copy snippet" />
@@ -192,6 +193,7 @@ function viewGoal(goal: Goal | undefined) {
           Send custom events and name your users from the page:
         </p>
         <pre
+          tabindex="0"
           class="overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
         ><code>{{ TRACKING_EXAMPLE }}</code></pre>
       </Card>
@@ -284,6 +286,7 @@ function viewGoal(goal: Goal | undefined) {
       >
         <div class="flex items-start gap-2">
           <pre
+            tabindex="0"
             class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
           ><code>{{ curl }}</code></pre>
           <CopyButton :text="curl" label="Copy curl example" />

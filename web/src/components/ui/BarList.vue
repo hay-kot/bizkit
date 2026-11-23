@@ -38,12 +38,12 @@ const max = computed(() => Math.max(1, ...props.items.map((item) => item.value))
 
 <template>
   <SkeletonRows v-if="loading" :rows="5" />
-  <p v-else-if="!items.length" class="py-6 text-center text-sm text-base-content/60">
+  <p v-else-if="!items.length" class="py-6 text-center text-sm text-base-content/70">
     {{ empty }}
   </p>
   <div v-else class="flex flex-col gap-1">
     <div
-      class="flex items-center gap-4 px-2 text-xs font-medium text-base-content/60"
+      class="flex items-center gap-4 px-2 text-xs font-medium text-base-content/70"
       aria-hidden="true"
     >
       <span class="flex-1"></span>

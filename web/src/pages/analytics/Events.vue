@@ -256,6 +256,7 @@ const viewingFacts = computed(() => {
       <DescriptionList :items="viewingFacts" />
       <pre
         v-if="viewing"
+        tabindex="0"
         class="overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
       ><code>{{ JSON.stringify(viewing.props, null, 2) }}</code></pre>
     </DetailPanel>

@@ -76,6 +76,30 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
+  const analyticsTabs = ['', '/events', '/funnels', '/people', '/retention', '/settings']
+  for (const tab of analyticsTabs) {
+    test(`the analytics${tab} page is clean`, async ({ page, world, baseURL }) => {
+      const errors = trackPageErrors(page)
+      const workspace = world.workspaces.main!.id
+      const project = world.projects.site!.id
+      const created = await page.request.post(`/api/v1/workspaces/${workspace}/analytics/site`, {
+        data: { project_id: project },
+        headers: { Origin: new URL(baseURL!).origin },
+      })
+      expect(created.status()).toBe(201)
+      const site = await created.json()
+      const beacon = await page.request.post('/m/analytics/public/e', {
+        data: { s: site.key, n: 'pageview', u: 'http://site.e2e.test/pricing', w: 1440 },
+      })
+      expect(beacon.ok()).toBe(true)
+      await page.goto(`/w/${workspace}/p/${project}/analytics${tab}`)
+      await expect(page.getByTestId('workspace-name')).toHaveText('Team')
+      await expect(page.getByRole('navigation', { name: 'Analytics pages' })).toBeVisible()
+      await expect(page.locator('.animate-pulse')).toHaveCount(0)
+      await expectCleanPage(page, errors)
+    })
+  }
+
   test('the open command palette is clean', async ({ page, world }) => {
     const errors = trackPageErrors(page)
     await page.goto(`/w/${world.workspaces.main!.id}/p/${world.projects.site!.id}/forms`)

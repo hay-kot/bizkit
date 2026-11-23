@@ -59,6 +59,7 @@ function turnOn() {
   >
     <div class="flex items-start gap-2">
       <pre
+        tabindex="0"
         class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
       ><code data-testid="analytics-snippet">{{ site.snippet }}</code></pre>
       <CopyButton :text="site.snippet" label="Copy snippet" />

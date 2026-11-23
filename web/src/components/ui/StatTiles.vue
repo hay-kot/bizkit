@@ -40,7 +40,7 @@ const tones = {
   up: 'text-success',
   new: 'text-success',
   down: 'text-error',
-  flat: 'text-base-content/60',
+  flat: 'text-base-content/70',
 }
 const icons = { up: ArrowUp, new: ArrowUp, down: ArrowDown, flat: Minus }
 

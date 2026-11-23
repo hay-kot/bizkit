@@ -188,7 +188,7 @@ const summary = computed(() => {
             :y="y(tick)"
             text-anchor="end"
             dominant-baseline="middle"
-            class="fill-base-content/60 text-xs tabular-nums"
+            class="fill-base-content/70 text-xs tabular-nums"
           >
             {{ formatCompactNumber(tick) }}
           </text>
@@ -199,7 +199,7 @@ const summary = computed(() => {
           :x="x(tick.i)"
           :y="height - 8"
           :text-anchor="tick.anchor"
-          class="fill-base-content/60 text-xs"
+          class="fill-base-content/70 text-xs"
         >
           {{ tick.label }}
         </text>
@@ -274,7 +274,7 @@ const summary = computed(() => {
     </svg>
     <p
       v-if="!points.length"
-      class="absolute inset-0 flex items-center justify-center text-sm text-base-content/60"
+      class="absolute inset-0 flex items-center justify-center text-sm text-base-content/70"
     >
       No data for this range
     </p>
