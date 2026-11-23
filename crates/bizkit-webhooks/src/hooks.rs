@@ -19,6 +19,15 @@ use crate::store::{self, EndpointRow, RequestRow};
 /// Async hook input is capped at 256 KiB, and JSON escaping can double the
 /// text.
 pub const MAX_HOOK_BODY: usize = 32 * 1024;
+/// The most header bytes (names and values) a script gets; later headers
+/// are left out, so the whole input stays under the async input cap.
+pub const MAX_HOOK_HEADERS: usize = 32 * 1024;
+
+/// Header names that look like they carry a credential. Scripts never get
+/// them; the inspector still shows them.
+fn is_secret_header(name: &str) -> bool {
+    ["token", "secret", "key", "password", "auth", "session"].iter().any(|word| name.contains(word))
+}
 
 /// Published in the insert transaction for each stored request.
 #[expect(clippy::struct_field_names, reason = "the IDs are named for what they identify")]
@@ -54,11 +63,17 @@ fn endpoint_json(endpoint: &EndpointRow) -> Value {
 }
 
 /// The `webhooks.request_received` input. Headers come as an object; a
-/// repeated header keeps its last value.
+/// repeated header keeps its last value. Credential-like headers and those
+/// past [`MAX_HOOK_HEADERS`] are left out.
 pub(crate) fn request_received_input(endpoint: &EndpointRow, request: &RequestRow) -> Value {
     let pairs: Vec<(String, String)> = serde_json::from_str(&request.headers).unwrap_or_default();
-    let headers: Map<String, Value> =
-        pairs.into_iter().map(|(name, value)| (name, Value::String(value))).collect();
+    let mut budget = MAX_HOOK_HEADERS;
+    let mut headers = Map::new();
+    for (name, value) in pairs.into_iter().filter(|(name, _)| !is_secret_header(name)) {
+        let Some(left) = budget.checked_sub(name.len() + value.len()) else { break };
+        budget = left;
+        headers.insert(name, Value::String(value));
+    }
     let body = (request.body.len() <= MAX_HOOK_BODY)
         .then(|| std::str::from_utf8(&request.body).ok())
         .flatten();
@@ -93,7 +108,7 @@ fn request_received_sample() -> Value {
             "content_type": "application/json",
             "body": "{\"type\":\"payment_intent.succeeded\"}",
             "json": { "type": "payment_intent.succeeded" },
-            "received_at": 1_767_225_600_000_i64,
+            "received_at": "2026-01-01T00:00:00Z",
         },
     })
 }
@@ -209,7 +224,7 @@ mod tests {
             endpoint_id: endpoint.id,
             method: "POST".to_owned(),
             query: Some("a=1".to_owned()),
-            headers: r#"[["content-type","application/json"],["x-a","1"],["x-a","2"]]"#.to_owned(),
+            headers: r#"[["content-type","application/json"],["x-a","1"],["x-a","2"],["x-api-key","sk"],["x-gitlab-token","t"],["stripe-signature","v1"]]"#.to_owned(),
             content_type: Some("application/json".to_owned()),
             body: body.to_vec(),
             delivery: None,
@@ -225,7 +240,24 @@ mod tests {
         assert_eq!(input["request"]["json"], json!({"type": "charge"}), "parsed");
         assert_eq!(input["request"]["body"], r#"{"type":"charge"}"#, "text");
         assert_eq!(input["request"]["headers"]["x-a"], "2", "last value wins");
+        let headers = input["request"]["headers"].as_object().unwrap();
+        assert!(
+            !headers.contains_key("x-api-key") && !headers.contains_key("x-gitlab-token"),
+            "secrets left out"
+        );
+        assert!(headers.contains_key("stripe-signature"), "signatures kept");
         assert_eq!(input["endpoint"]["name"], "Stripe", "endpoint");
+    }
+
+    #[test]
+    fn headers_past_the_budget_are_left_out() {
+        let (endpoint, mut request) = rows(b"{}");
+        let pairs: Vec<(String, String)> =
+            (0..100).map(|i| (format!("x-h{i:03}"), "v".repeat(4000))).collect();
+        request.headers = serde_json::to_string(&pairs).unwrap();
+        let input = request_received_input(&endpoint, &request);
+        let text = serde_json::to_string(&input["request"]["headers"]).unwrap();
+        assert!(text.len() < MAX_HOOK_HEADERS + 2048, "{} bytes", text.len());
     }
 
     #[test]

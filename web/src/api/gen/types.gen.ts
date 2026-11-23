@@ -97,7 +97,8 @@ export type CapturedRequest = RequestSummary & {
      */
     body_encoding: BodyEncoding;
     /**
-     * The headers in arrival order, without `Authorization`, `Cookie`,
+     * The headers by first arrival of each name (a repeated name's values
+     * sit together), without `Authorization`, `Cookie`,
      * `Proxy-Authorization`, hop-by-hop headers and `X-Request-Id`.
      */
     headers: Array<Header>;

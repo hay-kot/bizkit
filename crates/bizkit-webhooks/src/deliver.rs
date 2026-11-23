@@ -4,7 +4,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
-use bizkit_core::Platform;
+use bizkit_core::db::WriteTx;
 use bizkit_core::deps::HttpClient;
 use bizkit_core::ids::WorkspaceId;
 use bizkit_core::jobs::{Job, JobCtx, JobHandler, Lane};
@@ -87,15 +87,13 @@ async fn send(http: &dyn HttpClient, request: &RequestRow, url: &Url) -> anyhow:
 /// Stores `delivery` as the request's latest. A request deleted meanwhile
 /// is not an error.
 pub(crate) async fn record(
-    platform: &Platform,
+    tx: &mut WriteTx,
     workspace_id: WorkspaceId,
     request_id: RequestId,
     delivery: &Delivery,
 ) -> anyhow::Result<()> {
     let text = serde_json::to_string(delivery).context("encoding the delivery")?;
-    let mut tx = platform.db().write().await?;
-    store::set_delivery(&mut *tx, workspace_id, request_id, &text).await?;
-    tx.commit().await?;
+    store::set_delivery(&mut **tx, workspace_id, request_id, &text).await?;
     Ok(())
 }
 
@@ -124,7 +122,9 @@ impl JobHandler<Forward> for ForwardHandler {
             return Ok(());
         };
         let delivery = deliver(platform.deps().http.as_ref(), platform.now(), &request, &url).await;
-        record(platform, job.workspace_id, job.request_id, &delivery).await?;
+        let mut tx = platform.db().write().await?;
+        record(&mut tx, job.workspace_id, job.request_id, &delivery).await?;
+        tx.commit().await?;
         match &delivery.error {
             Some(error) if retryable(&delivery) => anyhow::bail!("forwarding failed: {error}"),
             _ => Ok(()),

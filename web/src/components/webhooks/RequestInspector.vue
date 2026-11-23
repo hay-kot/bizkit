@@ -131,7 +131,7 @@ function onReplay() {
               >base64</span
             >
           </h3>
-          <CopyButton v-if="body.text" :text="body.text" label="Copy body" />
+          <CopyButton v-if="loaded.body" :text="loaded.body" label="Copy body" />
         </div>
         <p v-if="!body.text" class="text-base-content/70">Empty.</p>
         <CodeEditor

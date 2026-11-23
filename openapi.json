@@ -6520,7 +6520,7 @@
                 "items": {
                   "$ref": "#/components/schemas/Header"
                 },
-                "description": "The headers in arrival order, without `Authorization`, `Cookie`,\n`Proxy-Authorization`, hop-by-hop headers and `X-Request-Id`."
+                "description": "The headers by first arrival of each name (a repeated name's values\nsit together), without `Authorization`, `Cookie`,\n`Proxy-Authorization`, hop-by-hop headers and `X-Request-Id`."
               }
             }
           }

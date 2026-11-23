@@ -194,6 +194,11 @@ async fn store_request(
     headers: &HeaderMap,
 ) -> Result<(), ApiError> {
     let mut tx = platform.db().write().await?.with_request_id(request_id(headers));
+    // The body upload can be slow; the endpoint may have been disabled or
+    // deleted since the first check.
+    if store::find_public(&mut *tx, endpoint.id).await?.is_none() {
+        return Err(ApiError::NotFound);
+    }
     let hour_ago = row.received_at.minus(Duration::from_hours(1));
     let recent = store::recent(&mut *tx, endpoint.workspace_id, endpoint.id, hour_ago).await?;
     if recent >= STORED_PER_HOUR {
@@ -219,8 +224,8 @@ async fn store_request(
     Ok(())
 }
 
-/// The headers worth keeping, as lowercase `[name, value]` pairs in
-/// arrival order.
+/// The headers worth keeping, as lowercase `[name, value]` pairs: names in
+/// the order they first arrived, a repeated name's values together.
 pub(crate) fn kept_headers(headers: &HeaderMap) -> Vec<(String, String)> {
     headers
         .iter()

@@ -71,9 +71,11 @@ export function useUpdateEndpoint() {
 
 export function useDeleteEndpoint() {
   const invalidate = useInvalidate()
+  // Only the list: the deleted endpoint's page is still mounted, and
+  // refetching it would flash a 404 before the page leaves.
   return useMutation({
     ...webhooksEndpointsDeleteMutation(),
-    onSettled: () => invalidate(...ENDPOINT_QUERIES),
+    onSettled: () => invalidate('webhooksEndpointsList'),
   })
 }
 

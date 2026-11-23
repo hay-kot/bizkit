@@ -102,7 +102,8 @@ pub struct CapturedRequest {
     /// The summary fields.
     #[serde(flatten)]
     pub summary: RequestSummary,
-    /// The headers in arrival order, without `Authorization`, `Cookie`,
+    /// The headers by first arrival of each name (a repeated name's values
+    /// sit together), without `Authorization`, `Cookie`,
     /// `Proxy-Authorization`, hop-by-hop headers and `X-Request-Id`.
     pub headers: Vec<Header>,
     /// The body, encoded as `body_encoding` says.

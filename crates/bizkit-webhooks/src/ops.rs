@@ -519,7 +519,9 @@ impl Operation for RequestsReplay {
         let platform = cx.platform();
         let delivery =
             deliver::deliver(platform.deps().http.as_ref(), platform.now(), &request, &url).await;
-        deliver::record(platform, input.workspace_id, input.request_id, &delivery).await?;
+        let mut tx = cx.write().await?;
+        deliver::record(&mut tx, input.workspace_id, input.request_id, &delivery).await?;
+        tx.commit().await?;
         Ok(delivery)
     }
 }
