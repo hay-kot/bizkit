@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import Avatar from '@/components/ui/Avatar.vue'
+import Page from '@/components/ui/Page.vue'
 import { useMe } from '@/queries/auth'
 import { useAcceptInvitation, useDeclineInvitation, useMyInvitations } from '@/queries/workspaces'
 
@@ -27,7 +28,7 @@ async function onDecline() {
 </script>
 
 <template>
-  <div class="mx-auto mt-8 max-w-md">
+  <Page width="compact">
     <div v-if="isPending" class="h-48 animate-pulse rounded-box bg-base-300"></div>
     <div
       v-else-if="invitation"
@@ -58,5 +59,5 @@ async function onDecline() {
         >Go to your workspaces</RouterLink
       >
     </div>
-  </div>
+  </Page>
 </template>

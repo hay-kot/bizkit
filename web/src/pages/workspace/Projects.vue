@@ -2,10 +2,11 @@
 import { FolderKanban, Plus, Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
-import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import { useSlugFromName } from '@/composables/useSlugFromName'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
@@ -57,7 +58,7 @@ function onDelete(project: Project) {
 </script>
 
 <template>
-  <div>
+  <Page>
     <PageHeader
       :section="workspaceName"
       title="Projects"
@@ -135,5 +136,5 @@ function onDelete(project: Project) {
         />
       </Field>
     </FormPanel>
-  </div>
+  </Page>
 </template>
