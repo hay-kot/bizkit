@@ -51,10 +51,16 @@ pub async fn seed(
         project_ids.insert(slug.to_owned(), id);
     }
     tx.commit().await?;
-    let seed = DemoSeed { workspace_id: workspace.id, project_ids, user_id: user.id, now };
+    let mut seed = DemoSeed {
+        workspace_id: workspace.id,
+        project_ids,
+        user_id: user.id,
+        now,
+        entities: BTreeMap::new(),
+    };
     for module in modules {
         module
-            .seed_demo(db, &seed)
+            .seed_demo(db, &mut seed)
             .await
             .with_context(|| format!("seeding demo data for module {}", module.name()))?;
     }

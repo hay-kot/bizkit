@@ -1704,6 +1704,18 @@
                 }
               ]
             }
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only scripts that run for this entity, as `targets[].id` spells it:\nthose that name it, and those on points of its kind that target\nevery entity."
+            }
           }
         ],
         "responses": {
@@ -1829,6 +1841,23 @@
                   "source": {
                     "type": "string",
                     "description": "An ES module whose default export runs, at most 64 KiB."
+                  },
+                  "target_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The entities of the point's target kind it runs for, such as form\nIDs, at most 100. Empty or absent: every entity of the kind."
+                  },
+                  "tests": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/TestCase"
+                    },
+                    "description": "Saved test cases, at most 20. Default one case on the point's\nsample input."
                   }
                 },
                 "additionalProperties": false
@@ -2114,7 +2143,7 @@
         "tags": [
           "extensions"
         ],
-        "summary": "Change a script's name, source or enabled flag",
+        "summary": "Change a script's name, source, test cases, enabled flag or targets",
         "operationId": "extensions.scripts.update",
         "parameters": [
           {
@@ -2162,6 +2191,26 @@
                       "null"
                     ],
                     "description": "The ES module source, at most 64 KiB."
+                  },
+                  "target_ids": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Replaces the target set, at most 100. Empty: every entity of the\npoint's kind."
+                  },
+                  "tests": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/TestCase"
+                    },
+                    "description": "Replaces the saved test cases, at most 20."
                   }
                 },
                 "additionalProperties": false
@@ -2177,6 +2226,146 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Script"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "extensions:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}/test": {
+      "post": {
+        "tags": [
+          "extensions"
+        ],
+        "summary": "Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run",
+        "operationId": "extensions.scripts.test",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "script_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ScriptId",
+              "description": "The script."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Runs this source instead of the saved one, at most 64 KiB."
+                  },
+                  "tests": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/TestCase"
+                    },
+                    "description": "Runs these cases instead of the saved ones, at most 20; pass one\nto run a single case."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestReport"
                 }
               }
             }
@@ -2243,13 +2432,13 @@
         "x-bizkit-scope": "extensions:admin"
       }
     },
-    "/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}/test": {
-      "post": {
+    "/api/v1/workspaces/{workspace_id}/extensions/targets": {
+      "get": {
         "tags": [
           "extensions"
         ],
-        "summary": "Run a script now with its hook point's capabilities, real fetch included, and record the run",
-        "operationId": "extensions.scripts.test",
+        "summary": "List a project's entities of one target kind, such as its forms",
+        "operationId": "extensions.targets.list",
         "parameters": [
           {
             "name": "workspace_id",
@@ -2261,52 +2450,31 @@
             }
           },
           {
-            "name": "script_id",
-            "in": "path",
+            "name": "kind",
+            "in": "query",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/ScriptId",
-              "description": "The script."
+              "type": "string",
+              "description": "The target kind, as `hooks[].target.id` spells it, such as `forms.form`."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "input": {
-                    "type": [
-                      "object",
-                      "array",
-                      "string",
-                      "number",
-                      "boolean",
-                      "null"
-                    ]
-                  },
-                  "source": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "description": "Runs this source instead of the saved one, at most 64 KiB."
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Run"
+                  "$ref": "#/components/schemas/TargetList"
                 }
               }
             }
@@ -5402,6 +5570,17 @@
           "summary": {
             "type": "string",
             "description": "What it is for and what it expects back."
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HookTargetKind",
+                "description": "The entity kind scripts on it can bind to; `None`: project-wide only."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -5426,6 +5605,29 @@
               "$ref": "#/components/schemas/Hook"
             },
             "description": "The points, in registration order."
+          }
+        }
+      },
+      "HookTargetKind": {
+        "type": "object",
+        "description": "The kind of entity scripts on a hook point can bind to.",
+        "required": [
+          "id",
+          "noun",
+          "plural"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The kind ID, such as `forms.form`."
+          },
+          "noun": {
+            "type": "string",
+            "description": "The UI noun, such as `form`."
+          },
+          "plural": {
+            "type": "string",
+            "description": "Its plural, such as `forms`."
           }
         }
       },
@@ -5886,8 +6088,10 @@
           "project_id",
           "hook",
           "sync",
+          "targets",
           "name",
           "source",
+          "tests",
           "enabled",
           "available",
           "created_at",
@@ -5930,6 +6134,20 @@
             "type": "boolean",
             "description": "Whether the hook point runs inside the request."
           },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScriptTarget"
+            },
+            "description": "The entities it runs for, by ID. Empty: every entity of the point's\nkind, or the whole project when the point has no kind."
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCase"
+            },
+            "description": "The saved test cases."
+          },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "When it last changed."
@@ -5964,6 +6182,7 @@
           "project_id",
           "hook",
           "sync",
+          "targets",
           "name",
           "enabled",
           "available",
@@ -6003,9 +6222,36 @@
             "type": "boolean",
             "description": "Whether the hook point runs inside the request."
           },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScriptTarget"
+            },
+            "description": "The entities it runs for, by ID. Empty: every entity of the point's\nkind, or the whole project when the point has no kind."
+          },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "When it last changed."
+          }
+        }
+      },
+      "ScriptTarget": {
+        "type": "object",
+        "description": "An entity a script runs for.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The entity ID, such as a form ID."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display name; `None` when it no longer exists."
           }
         }
       },
@@ -6185,6 +6431,133 @@
           "inbox",
           "spam"
         ]
+      },
+      "TargetEntity": {
+        "type": "object",
+        "description": "An entity scripts can target.",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The entity ID, as `target_ids` takes it."
+          },
+          "label": {
+            "type": "string",
+            "description": "Its display name."
+          }
+        }
+      },
+      "TargetList": {
+        "type": "object",
+        "description": "A project's entities of one kind.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetEntity"
+            },
+            "description": "The entities, by label."
+          }
+        }
+      },
+      "TestCase": {
+        "type": "object",
+        "description": "A saved input to run a script on, and what it must return.",
+        "required": [
+          "name",
+          "input"
+        ],
+        "properties": {
+          "expect": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "input": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "A name, unique in the script."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestOutcome": {
+        "type": "string",
+        "description": "How a test case went.",
+        "enum": [
+          "pass",
+          "fail",
+          "error"
+        ]
+      },
+      "TestReport": {
+        "type": "object",
+        "description": "A test run's results.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestResult"
+            },
+            "description": "One result per case, in case order."
+          }
+        }
+      },
+      "TestResult": {
+        "type": "object",
+        "description": "One test case's result.",
+        "required": [
+          "name",
+          "outcome",
+          "run"
+        ],
+        "properties": {
+          "expect": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The case name."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/TestOutcome",
+            "description": "How it went."
+          },
+          "run": {
+            "$ref": "#/components/schemas/Run",
+            "description": "The recorded run, with what the script returned and logged."
+          }
+        }
       },
       "Timestamp": {
         "type": "string",

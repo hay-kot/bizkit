@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: ScriptId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", hook, sync AS \"sync: bool\", name, source,\n                  enabled AS \"enabled: bool\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_scripts\n           WHERE workspace_id = ? AND project_id = ? AND hook = ? AND enabled = 1\n           ORDER BY id",
+  "query": "SELECT s.id AS \"id: ScriptId\", s.workspace_id AS \"workspace_id: WorkspaceId\",\n                  s.project_id AS \"project_id: ProjectId\", s.hook, s.sync AS \"sync: bool\",\n                  (SELECT json_group_array(target_id) FROM (\n                     SELECT target_id FROM extension_script_targets t\n                     WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id\n                     ORDER BY target_id)) AS \"targets!: String\",\n                  s.name, s.source, s.tests, s.enabled AS \"enabled: bool\",\n                  s.created_at AS \"created_at: UnixMillis\", s.updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_scripts s WHERE s.workspace_id = ? AND s.id = ?",
   "describe": {
     "columns": [
       {
@@ -59,8 +59,14 @@
         }
       },
       {
-        "name": "name",
+        "name": "targets!: String",
         "ordinal": 5,
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "name": "name",
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +77,7 @@
       },
       {
         "name": "source",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -81,8 +87,19 @@
         }
       },
       {
+        "name": "tests",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_scripts",
+            "name": "tests"
+          }
+        }
+      },
+      {
         "name": "enabled: bool",
-        "ordinal": 7,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -93,7 +110,7 @@
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 8,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -104,7 +121,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 9,
+        "ordinal": 11,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -115,13 +132,15 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 2
     },
     "nullable": [
       false,
       false,
       false,
       false,
+      false,
+      true,
       false,
       false,
       false,
@@ -130,5 +149,5 @@
       false
     ]
   },
-  "hash": "cff3b8082e8e9cb6ba76bce05d82516e2b37003103adacc6eac32fa3382128f4"
+  "hash": "3e0388c0610f5ac85278b1cfbc61392f0640f2861d69790fd0545969781e30d3"
 }

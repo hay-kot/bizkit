@@ -6,12 +6,12 @@ use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
 
-use crate::api::{RunId, ScriptId};
+use crate::api::{RunId, ScriptId, TestCase};
 
 /// Runs kept per script.
 pub(crate) const RUNS_KEPT: i64 = 100;
 
-/// An `extension_scripts` row.
+/// An `extension_scripts` row with its target set.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ScriptRow {
     pub(crate) id: ScriptId,
@@ -19,11 +19,59 @@ pub(crate) struct ScriptRow {
     pub(crate) project_id: ProjectId,
     pub(crate) hook: String,
     pub(crate) sync: bool,
+    /// The entities it runs for, sorted; empty: every entity of the kind.
+    pub(crate) target_ids: Vec<String>,
     pub(crate) name: String,
     pub(crate) source: String,
+    pub(crate) tests: Vec<TestCase>,
     pub(crate) enabled: bool,
     pub(crate) created_at: UnixMillis,
     pub(crate) updated_at: UnixMillis,
+}
+
+/// A script as queried: the target set is a JSON array from
+/// `json_group_array`.
+struct RawScript {
+    id: ScriptId,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    hook: String,
+    sync: bool,
+    targets: String,
+    name: String,
+    source: String,
+    tests: String,
+    enabled: bool,
+    created_at: UnixMillis,
+    updated_at: UnixMillis,
+}
+
+impl TryFrom<RawScript> for ScriptRow {
+    type Error = sqlx::Error;
+
+    fn try_from(raw: RawScript) -> sqlx::Result<Self> {
+        let decode = |err: serde_json::Error| sqlx::Error::Decode(Box::new(err));
+        let target_ids = serde_json::from_str(&raw.targets).map_err(decode)?;
+        let tests = serde_json::from_str(&raw.tests).map_err(decode)?;
+        Ok(Self {
+            id: raw.id,
+            workspace_id: raw.workspace_id,
+            project_id: raw.project_id,
+            hook: raw.hook,
+            sync: raw.sync,
+            target_ids,
+            name: raw.name,
+            source: raw.source,
+            tests,
+            enabled: raw.enabled,
+            created_at: raw.created_at,
+            updated_at: raw.updated_at,
+        })
+    }
+}
+
+fn rows(raw: Vec<RawScript>) -> sqlx::Result<Vec<ScriptRow>> {
+    raw.into_iter().map(ScriptRow::try_from).collect()
 }
 
 /// An `extension_runs` row. JSON columns stay text here.
@@ -42,14 +90,16 @@ pub(crate) struct RunRow {
     pub(crate) created_at: UnixMillis,
 }
 
+/// Inserts the script and its target set.
 pub(crate) async fn insert_script(
-    exec: impl SqliteExecutor<'_>,
+    tx: &mut sqlx::SqliteConnection,
     row: &ScriptRow,
 ) -> sqlx::Result<()> {
+    let tests = encode_tests(&row.tests)?;
     sqlx::query!(
         "INSERT INTO extension_scripts (id, workspace_id, project_id, hook, sync, name, source,
-                                        enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                        tests, enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.project_id,
@@ -57,32 +107,62 @@ pub(crate) async fn insert_script(
         row.sync,
         row.name,
         row.source,
+        tests,
         row.enabled,
         row.created_at,
         row.updated_at,
     )
-    .execute(exec)
+    .execute(&mut *tx)
     .await?;
-    Ok(())
+    insert_targets(tx, row).await
 }
 
-/// Writes the name, source, enabled flag and `updated_at` of `row`.
+fn encode_tests(tests: &[TestCase]) -> sqlx::Result<String> {
+    serde_json::to_string(tests).map_err(|err| sqlx::Error::Encode(Box::new(err)))
+}
+
+/// Writes the name, source, tests, enabled flag, target set and
+/// `updated_at` of `row`.
 pub(crate) async fn update_script(
-    exec: impl SqliteExecutor<'_>,
+    tx: &mut sqlx::SqliteConnection,
     row: &ScriptRow,
 ) -> sqlx::Result<()> {
+    let tests = encode_tests(&row.tests)?;
     sqlx::query!(
-        "UPDATE extension_scripts SET name = ?, source = ?, enabled = ?, updated_at = ?
+        "UPDATE extension_scripts SET name = ?, source = ?, tests = ?, enabled = ?, updated_at = ?
          WHERE workspace_id = ? AND id = ?",
         row.name,
         row.source,
+        tests,
         row.enabled,
         row.updated_at,
         row.workspace_id,
         row.id,
     )
-    .execute(exec)
+    .execute(&mut *tx)
     .await?;
+    sqlx::query!(
+        "DELETE FROM extension_script_targets WHERE workspace_id = ? AND script_id = ?",
+        row.workspace_id,
+        row.id,
+    )
+    .execute(&mut *tx)
+    .await?;
+    insert_targets(tx, row).await
+}
+
+async fn insert_targets(tx: &mut sqlx::SqliteConnection, row: &ScriptRow) -> sqlx::Result<()> {
+    for target_id in &row.target_ids {
+        sqlx::query!(
+            "INSERT INTO extension_script_targets (workspace_id, script_id, target_id)
+             VALUES (?, ?, ?)",
+            row.workspace_id,
+            row.id,
+            target_id,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
     Ok(())
 }
 
@@ -107,17 +187,23 @@ pub(crate) async fn find_script(
     id: ScriptId,
 ) -> sqlx::Result<Option<ScriptRow>> {
     sqlx::query_as!(
-        ScriptRow,
-        r#"SELECT id AS "id: ScriptId", workspace_id AS "workspace_id: WorkspaceId",
-                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", name, source,
-                  enabled AS "enabled: bool", created_at AS "created_at: UnixMillis",
-                  updated_at AS "updated_at: UnixMillis"
-           FROM extension_scripts WHERE workspace_id = ? AND id = ?"#,
+        RawScript,
+        r#"SELECT s.id AS "id: ScriptId", s.workspace_id AS "workspace_id: WorkspaceId",
+                  s.project_id AS "project_id: ProjectId", s.hook, s.sync AS "sync: bool",
+                  (SELECT json_group_array(target_id) FROM (
+                     SELECT target_id FROM extension_script_targets t
+                     WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id
+                     ORDER BY target_id)) AS "targets!: String",
+                  s.name, s.source, s.tests, s.enabled AS "enabled: bool",
+                  s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
+           FROM extension_scripts s WHERE s.workspace_id = ? AND s.id = ?"#,
         workspace_id,
         id
     )
     .fetch_optional(exec)
-    .await
+    .await?
+    .map(ScriptRow::try_from)
+    .transpose()
 }
 
 /// The workspace's scripts by name, or one project's.
@@ -126,63 +212,114 @@ pub(crate) async fn list_scripts(
     workspace_id: WorkspaceId,
     project_id: Option<ProjectId>,
 ) -> sqlx::Result<Vec<ScriptRow>> {
-    sqlx::query_as!(
-        ScriptRow,
-        r#"SELECT id AS "id: ScriptId", workspace_id AS "workspace_id: WorkspaceId",
-                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", name, source,
-                  enabled AS "enabled: bool", created_at AS "created_at: UnixMillis",
-                  updated_at AS "updated_at: UnixMillis"
-           FROM extension_scripts
-           WHERE workspace_id = ?1 AND (?2 IS NULL OR project_id = ?2)
-           ORDER BY name, id"#,
+    let raw = sqlx::query_as!(
+        RawScript,
+        r#"SELECT s.id AS "id: ScriptId", s.workspace_id AS "workspace_id: WorkspaceId",
+                  s.project_id AS "project_id: ProjectId", s.hook, s.sync AS "sync: bool",
+                  (SELECT json_group_array(target_id) FROM (
+                     SELECT target_id FROM extension_script_targets t
+                     WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id
+                     ORDER BY target_id)) AS "targets!: String",
+                  s.name, s.source, s.tests, s.enabled AS "enabled: bool",
+                  s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
+           FROM extension_scripts s
+           WHERE s.workspace_id = ?1 AND (?2 IS NULL OR s.project_id = ?2)
+           ORDER BY s.name, s.id"#,
         workspace_id,
-        project_id
+        project_id,
     )
     .fetch_all(exec)
-    .await
+    .await?;
+    rows(raw)
 }
 
-/// The enabled scripts on `hook` for a project, oldest first.
+/// The enabled scripts on `hook` for a project that apply to `entity`:
+/// those with no targets and those whose set names it. Oldest first.
 pub(crate) async fn enabled_scripts(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     project_id: ProjectId,
     hook: &str,
+    entity: Option<&str>,
 ) -> sqlx::Result<Vec<ScriptRow>> {
-    sqlx::query_as!(
-        ScriptRow,
-        r#"SELECT id AS "id: ScriptId", workspace_id AS "workspace_id: WorkspaceId",
-                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", name, source,
-                  enabled AS "enabled: bool", created_at AS "created_at: UnixMillis",
-                  updated_at AS "updated_at: UnixMillis"
-           FROM extension_scripts
-           WHERE workspace_id = ? AND project_id = ? AND hook = ? AND enabled = 1
-           ORDER BY id"#,
+    let raw = sqlx::query_as!(
+        RawScript,
+        r#"SELECT s.id AS "id: ScriptId", s.workspace_id AS "workspace_id: WorkspaceId",
+                  s.project_id AS "project_id: ProjectId", s.hook, s.sync AS "sync: bool",
+                  (SELECT json_group_array(target_id) FROM (
+                     SELECT target_id FROM extension_script_targets t
+                     WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id
+                     ORDER BY target_id)) AS "targets!: String",
+                  s.name, s.source, s.tests, s.enabled AS "enabled: bool",
+                  s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
+           FROM extension_scripts s
+           WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.enabled = 1
+             AND (NOT EXISTS (SELECT 1 FROM extension_script_targets t
+                              WHERE t.workspace_id = ?1 AND t.script_id = s.id)
+                  OR EXISTS (SELECT 1 FROM extension_script_targets t
+                             WHERE t.workspace_id = ?1 AND t.script_id = s.id
+                               AND t.target_id = ?4))
+           ORDER BY s.id"#,
         workspace_id,
         project_id,
-        hook
+        hook,
+        entity
     )
     .fetch_all(exec)
-    .await
+    .await?;
+    rows(raw)
 }
 
-/// Whether the project already has a script on the sync point `hook`.
-pub(crate) async fn has_sync_script(
+/// Another sync script that holds a slot `script` wants.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncConflict {
+    /// The other script's name.
+    pub(crate) name: String,
+    /// The entity both name; `None`: both run for every entity.
+    pub(crate) target_id: Option<String>,
+}
+
+/// The first other sync script on the same point and project that names
+/// one of `script`'s targets, or, when `script` has none, another one with
+/// none. Callers run it in the write transaction, which serializes writers.
+pub(crate) async fn sync_conflict(
     exec: impl SqliteExecutor<'_>,
-    workspace_id: WorkspaceId,
-    project_id: ProjectId,
-    hook: &str,
-) -> sqlx::Result<bool> {
-    let found = sqlx::query_scalar!(
-        "SELECT 1 FROM extension_scripts
-         WHERE workspace_id = ? AND project_id = ? AND hook = ? AND sync = 1",
-        workspace_id,
-        project_id,
-        hook
+    script: &ScriptRow,
+) -> sqlx::Result<Option<SyncConflict>> {
+    if script.target_ids.is_empty() {
+        let found = sqlx::query_scalar!(
+            "SELECT s.name FROM extension_scripts s
+             WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.sync = 1
+               AND s.id != ?4
+               AND NOT EXISTS (SELECT 1 FROM extension_script_targets t
+                               WHERE t.workspace_id = ?1 AND t.script_id = s.id)
+             ORDER BY s.id LIMIT 1",
+            script.workspace_id,
+            script.project_id,
+            script.hook,
+            script.id,
+        )
+        .fetch_optional(exec)
+        .await?;
+        return Ok(found.map(|name| SyncConflict { name, target_id: None }));
+    }
+    let targets = serde_json::to_string(&script.target_ids)
+        .map_err(|err| sqlx::Error::Encode(Box::new(err)))?;
+    let found = sqlx::query!(
+        "SELECT s.name, t.target_id FROM extension_scripts s
+         JOIN extension_script_targets t ON t.workspace_id = s.workspace_id AND t.script_id = s.id
+         WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.sync = 1
+           AND s.id != ?4 AND t.target_id IN (SELECT value FROM json_each(?5))
+         ORDER BY s.id, t.target_id LIMIT 1",
+        script.workspace_id,
+        script.project_id,
+        script.hook,
+        script.id,
+        targets,
     )
     .fetch_optional(exec)
     .await?;
-    Ok(found.is_some())
+    Ok(found.map(|row| SyncConflict { name: row.name, target_id: Some(row.target_id) }))
 }
 
 /// Inserts a run and drops the script's runs past the newest [`RUNS_KEPT`].

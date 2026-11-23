@@ -12,9 +12,12 @@ use http::StatusCode;
 use serde::Deserialize;
 use utoipa::ToSchema;
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::api::{
-    Capability, Hook, HookKindName, HookList, Run, RunCause, RunList, Script, ScriptId, ScriptList,
-    ScriptSummary, Secret, SecretList,
+    Capability, Hook, HookKindName, HookList, HookTargetKind, Run, RunCause, RunList, Script,
+    ScriptId, ScriptList, ScriptSummary, ScriptTarget, Secret, SecretList, TargetEntity,
+    TargetList, TestCase, TestOutcome, TestReport, TestResult,
 };
 use crate::runner::{ASYNC_BUDGET, Execution, MAX_SOURCE_BYTES, ScriptRunner};
 use crate::store::{self, RunRow, ScriptRow};
@@ -25,6 +28,10 @@ const TAGS: &[&str] = &["extensions"];
 const MAX_SECRET_BYTES: usize = 4 << 10;
 const DEFAULT_RUNS: u32 = 50;
 const MAX_RUNS: u32 = 100;
+const MAX_TARGETS: usize = 100;
+const MAX_TESTS: usize = 20;
+const MAX_TEST_NAME: usize = 80;
+const MAX_TESTS_BYTES: usize = 256 << 10;
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>, runner: &ScriptRunner) -> anyhow::Result<()> {
     cx.scope_area("extensions", "Scripts on hook points, their secrets and runs")?;
@@ -35,6 +42,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>, runner: &ScriptRunner) -> any
     cx.op(ScriptsUpdate { runner: runner.clone() })?;
     cx.op(ScriptsDelete)?;
     cx.op(ScriptsTest { runner: runner.clone() })?;
+    cx.op(TargetsList)?;
     cx.op(RunsList)?;
     cx.op(SecretsList)?;
     cx.op(SecretsPut)?;
@@ -61,13 +69,53 @@ fn hook_to_api(point: &HookPoint) -> Hook {
         budget_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
         event,
         capabilities,
+        target: point.target.map(|target| HookTargetKind {
+            id: target.id.to_owned(),
+            noun: target.noun.to_owned(),
+            plural: target.plural.to_owned(),
+        }),
         sample: (point.sample)(),
     }
 }
 
-fn summary(platform: &Platform, row: ScriptRow) -> ScriptSummary {
+/// Entity labels by ID, from each kind's resolver.
+type Labels = BTreeMap<String, String>;
+
+/// Looks up the labels of the entities `rows` target, one resolver call
+/// per kind. A kind whose module is compiled out gives no labels.
+async fn labels(
+    platform: &Platform,
+    workspace_id: WorkspaceId,
+    rows: &[ScriptRow],
+) -> Result<Labels, ApiError> {
+    let mut by_kind: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+    for row in rows {
+        let kind = platform.hook_point(&row.hook).and_then(|point| point.target);
+        if let Some(kind) = kind {
+            by_kind.entry(kind.id).or_default().extend(row.target_ids.iter().cloned());
+        }
+    }
+    let mut labels = Labels::new();
+    for (kind, ids) in by_kind {
+        let Some((_, resolver)) = platform.hook_target_kind(kind) else { continue };
+        let ids: Vec<String> = ids.into_iter().collect();
+        let found = resolver
+            .find(platform, workspace_id, &ids)
+            .await
+            .with_context(|| format!("looking up {kind} targets"))?;
+        labels.extend(found.into_iter().map(|entity| (entity.id, entity.label)));
+    }
+    Ok(labels)
+}
+
+fn targets_to_api(labels: &Labels, ids: Vec<String>) -> Vec<ScriptTarget> {
+    ids.into_iter().map(|id| ScriptTarget { label: labels.get(&id).cloned(), id }).collect()
+}
+
+fn summary(platform: &Platform, labels: &Labels, row: ScriptRow) -> ScriptSummary {
     ScriptSummary {
         available: platform.hook_point(&row.hook).is_some(),
+        targets: targets_to_api(labels, row.target_ids),
         id: row.id,
         project_id: row.project_id,
         hook: row.hook,
@@ -79,19 +127,22 @@ fn summary(platform: &Platform, row: ScriptRow) -> ScriptSummary {
     }
 }
 
-fn script_to_api(platform: &Platform, row: ScriptRow) -> Script {
-    Script {
+async fn script_to_api(platform: &Platform, row: ScriptRow) -> Result<Script, ApiError> {
+    let labels = labels(platform, row.workspace_id, std::slice::from_ref(&row)).await?;
+    Ok(Script {
         available: platform.hook_point(&row.hook).is_some(),
+        targets: targets_to_api(&labels, row.target_ids),
         id: row.id,
         project_id: row.project_id,
         hook: row.hook,
         sync: row.sync,
         name: row.name,
         source: row.source,
+        tests: row.tests,
         enabled: row.enabled,
         created_at: row.created_at,
         updated_at: row.updated_at,
-    }
+    })
 }
 
 fn run_to_api(row: RunRow) -> anyhow::Result<Run> {
@@ -139,6 +190,34 @@ fn check_source(errors: &mut FieldErrors, source: &str) {
     }
 }
 
+fn check_tests(errors: &mut FieldErrors, tests: &[TestCase]) {
+    if tests.len() > MAX_TESTS {
+        errors.add("tests", format!("must have at most {MAX_TESTS} cases"));
+    }
+    let mut names = BTreeSet::new();
+    for case in tests {
+        let name = case.name.trim();
+        if name.is_empty() || name.chars().count() > MAX_TEST_NAME {
+            errors.add("tests", format!("case names must be 1-{MAX_TEST_NAME} characters"));
+        } else if !names.insert(name) {
+            errors.add("tests", format!("{name:?} is used twice; case names must be unique"));
+        }
+    }
+    if serde_json::to_vec(tests).map_or(true, |bytes| bytes.len() > MAX_TESTS_BYTES) {
+        errors.add("tests", format!("must be at most {} KiB in all", MAX_TESTS_BYTES >> 10));
+    }
+}
+
+fn trimmed(tests: Vec<TestCase>) -> Vec<TestCase> {
+    tests.into_iter().map(|case| TestCase { name: case.name.trim().to_owned(), ..case }).collect()
+}
+
+fn check_target_count(errors: &mut FieldErrors, target_ids: &[String]) {
+    if target_ids.len() > MAX_TARGETS {
+        errors.add("target_ids", format!("must have at most {MAX_TARGETS} entries"));
+    }
+}
+
 fn is_secret_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|first| first.is_ascii_uppercase())
@@ -161,12 +240,18 @@ impl Validate for InWorkspace {}
 /// Which scripts to list.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[expect(clippy::struct_field_names, reason = "the filters are IDs and are named for them")]
 pub(crate) struct ListScripts {
     /// The workspace.
     workspace_id: WorkspaceId,
     /// Only this project's scripts.
     #[serde(default)]
     project_id: Option<ProjectId>,
+    /// Only scripts that run for this entity, as `targets[].id` spells it:
+    /// those that name it, and those on points of its kind that target
+    /// every entity.
+    #[serde(default)]
+    target_id: Option<String>,
 }
 impl Validate for ListScripts {}
 
@@ -191,10 +276,18 @@ pub(crate) struct CreateScript {
     project_id: ProjectId,
     /// The hook point ID, such as `forms.pre_validate`. Fixed after create.
     hook: String,
+    /// The entities of the point's target kind it runs for, such as form
+    /// IDs, at most 100. Empty or absent: every entity of the kind.
+    #[serde(default)]
+    target_ids: Vec<String>,
     /// The display name.
     name: String,
     /// An ES module whose default export runs, at most 64 KiB.
     source: String,
+    /// Saved test cases, at most 20. Default one case on the point's
+    /// sample input.
+    #[serde(default)]
+    tests: Option<Vec<TestCase>>,
     /// Whether it runs. Default true.
     #[serde(default)]
     enabled: Option<bool>,
@@ -205,6 +298,10 @@ impl Validate for CreateScript {
         let mut errors = FieldErrors::default();
         check_name(&mut errors, "name", &self.name);
         check_source(&mut errors, &self.source);
+        check_target_count(&mut errors, &self.target_ids);
+        if let Some(tests) = &self.tests {
+            check_tests(&mut errors, tests);
+        }
         errors.into_result()
     }
 }
@@ -226,11 +323,24 @@ pub(crate) struct UpdateScript {
     /// Whether it runs.
     #[serde(default)]
     enabled: Option<bool>,
+    /// Replaces the target set, at most 100. Empty: every entity of the
+    /// point's kind.
+    #[serde(default)]
+    target_ids: Option<Vec<String>>,
+    /// Replaces the saved test cases, at most 20.
+    #[serde(default)]
+    tests: Option<Vec<TestCase>>,
 }
 
 impl Validate for UpdateScript {
     fn validate(&self) -> Result<(), FieldErrors> {
         let mut errors = FieldErrors::default();
+        if let Some(target_ids) = &self.target_ids {
+            check_target_count(&mut errors, target_ids);
+        }
+        if let Some(tests) = &self.tests {
+            check_tests(&mut errors, tests);
+        }
         if let Some(name) = &self.name {
             check_name(&mut errors, "name", name);
         }
@@ -249,10 +359,10 @@ pub(crate) struct TestScript {
     workspace_id: WorkspaceId,
     /// The script.
     script_id: ScriptId,
-    /// The input. Default the hook point's sample.
+    /// Runs these cases instead of the saved ones, at most 20; pass one
+    /// to run a single case.
     #[serde(default)]
-    #[schema(schema_with = crate::api::any_json)]
-    input: Option<serde_json::Value>,
+    tests: Option<Vec<TestCase>>,
     /// Runs this source instead of the saved one, at most 64 KiB.
     #[serde(default)]
     source: Option<String>,
@@ -263,6 +373,9 @@ impl Validate for TestScript {
         let mut errors = FieldErrors::default();
         if let Some(source) = &self.source {
             check_source(&mut errors, source);
+        }
+        if let Some(tests) = &self.tests {
+            check_tests(&mut errors, tests);
         }
         errors.into_result()
     }
@@ -342,6 +455,19 @@ pub(crate) struct InSecret {
 }
 impl Validate for InSecret {}
 
+/// Which entities to list.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListTargets {
+    /// The workspace.
+    workspace_id: WorkspaceId,
+    /// The project.
+    project_id: ProjectId,
+    /// The target kind, as `hooks[].target.id` spells it, such as `forms.form`.
+    kind: String,
+}
+impl Validate for ListTargets {}
+
 // ---------------------------------------------------------------- hooks
 
 struct HooksList;
@@ -379,10 +505,21 @@ impl Operation for ScriptsList {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: ListScripts) -> Result<ScriptList, ApiError> {
-        let rows =
+        let mut rows =
             store::list_scripts(cx.platform().db().read(), input.workspace_id, input.project_id)
                 .await?;
-        Ok(ScriptList { items: rows.into_iter().map(|row| summary(cx.platform(), row)).collect() })
+        if let Some(entity) = &input.target_id {
+            match find_entity(cx.platform(), input.workspace_id, entity).await? {
+                Some((kind, found)) => rows.retain(|row| {
+                    row.project_id == found.project_id
+                        && runs_for(cx.platform(), row, &found.id, Some(kind))
+                }),
+                None => rows.retain(|row| runs_for(cx.platform(), row, entity, None)),
+            }
+        }
+        let labels = labels(cx.platform(), input.workspace_id, &rows).await?;
+        let items = rows.into_iter().map(|row| summary(cx.platform(), &labels, row)).collect();
+        Ok(ScriptList { items })
     }
 }
 
@@ -399,7 +536,7 @@ impl Operation for ScriptsGet {
 
     async fn call(&self, cx: OpCtx, input: InScript) -> Result<Script, ApiError> {
         let row = script_in(&cx, input.workspace_id, input.script_id).await?;
-        Ok(script_to_api(cx.platform(), row))
+        script_to_api(cx.platform(), row).await
     }
 }
 
@@ -422,6 +559,14 @@ impl Operation for ScriptsCreate {
         let Some(point) = cx.platform().hook_point(&input.hook) else {
             return Err(field_error("hook", "is not a hook point of this server"));
         };
+        let target_ids = resolve_targets(
+            cx.platform(),
+            point,
+            (input.workspace_id, input.project_id),
+            &input.target_ids,
+            &[],
+        )
+        .await?;
         self.runner.check(&input.source).await.map_err(|err| field_error("source", err))?;
         let now = cx.now();
         let row = ScriptRow {
@@ -430,8 +575,19 @@ impl Operation for ScriptsCreate {
             project_id: input.project_id,
             hook: point.id.to_owned(),
             sync: point.kind.is_sync(),
+            target_ids,
             name: input.name.trim().to_owned(),
             source: input.source,
+            tests: input.tests.map_or_else(
+                || {
+                    vec![TestCase {
+                        name: "Sample input".to_owned(),
+                        input: (point.sample)(),
+                        expect: None,
+                    }]
+                },
+                trimmed,
+            ),
             enabled: input.enabled.unwrap_or(true),
             created_at: now,
             updated_at: now,
@@ -440,17 +596,126 @@ impl Operation for ScriptsCreate {
         if !bizkit_core::projects::exists(&mut *tx, input.workspace_id, input.project_id).await? {
             return Err(field_error("project_id", "is not a project of this workspace"));
         }
-        if row.sync
-            && store::has_sync_script(&mut *tx, row.workspace_id, row.project_id, &row.hook).await?
-        {
-            return Err(ApiError::Conflict(format!(
-                "the project already has a script on {}; a sync hook point takes one",
-                row.hook
-            )));
-        }
-        store::insert_script(&mut *tx, &row).await?;
+        check_sync_slots(cx.platform(), &mut tx, point, &row).await?;
+        store::insert_script(&mut tx, &row).await?;
         tx.commit().await?;
-        Ok(script_to_api(cx.platform(), row))
+        script_to_api(cx.platform(), row).await
+    }
+}
+
+/// Checks that every ID names an entity of the point's target kind in the
+/// project, and returns the canonical IDs, sorted and without repeats. IDs
+/// in `stored`, the script's current set, are kept unchecked: a deleted
+/// entity in the set must not block saving the script. The
+/// check reads outside the write transaction; an entity deleted in between
+/// leaves a target that never matches, the same as deleting it later.
+async fn resolve_targets(
+    platform: &Platform,
+    point: &HookPoint,
+    (workspace_id, project_id): (WorkspaceId, ProjectId),
+    ids: &[String],
+    stored: &[String],
+) -> Result<Vec<String>, ApiError> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Some(kind) = point.target else {
+        return Err(field_error(
+            "target_ids",
+            format!("{} scripts run for the whole project and take no targets", point.id),
+        ));
+    };
+    let Some((_, resolver)) = platform.hook_target_kind(kind.id) else {
+        return Err(field_error(
+            "target_ids",
+            format!("{} isn't compiled into this server", kind.id),
+        ));
+    };
+    let mut canonical = BTreeSet::new();
+    for id in ids {
+        if stored.contains(id) {
+            canonical.insert(id.clone());
+            continue;
+        }
+        let found = resolver
+            .find(platform, workspace_id, std::slice::from_ref(id))
+            .await
+            .with_context(|| format!("looking up a {} target", kind.id))?;
+        let Some(entity) = found.into_iter().find(|entity| entity.project_id == project_id) else {
+            return Err(field_error(
+                "target_ids",
+                format!("{id} is not a {} in this project", kind.noun),
+            ));
+        };
+        canonical.insert(entity.id);
+    }
+    Ok(canonical.into_iter().collect())
+}
+
+/// Refuses a sync script that would share a slot: per entity at most one
+/// script names it, and at most one script targets every entity.
+async fn check_sync_slots(
+    platform: &Platform,
+    tx: &mut sqlx::SqliteConnection,
+    point: &HookPoint,
+    row: &ScriptRow,
+) -> Result<(), ApiError> {
+    if !row.sync {
+        return Ok(());
+    }
+    let Some(conflict) = store::sync_conflict(&mut *tx, row).await? else { return Ok(()) };
+    let (noun, plural) =
+        point.target.map_or(("project", "the project"), |kind| (kind.noun, kind.plural));
+    let message = match conflict.target_id {
+        Some(target_id) => {
+            let labels = labels(platform, row.workspace_id, std::slice::from_ref(row)).await?;
+            let label = labels.get(&target_id).cloned().unwrap_or(target_id);
+            format!(
+                "{} already runs on {} for {label}; a sync hook point takes one script per {noun}",
+                conflict.name, row.hook
+            )
+        }
+        None => format!(
+            "{} already runs on {} for all {plural}; a sync hook point takes one script for all of them",
+            conflict.name, row.hook
+        ),
+    };
+    Err(ApiError::Conflict(message))
+}
+
+/// The kind and the entity `entity` names: the first kind whose resolver
+/// finds it. `None` when no resolver does, such as for a deleted entity.
+async fn find_entity(
+    platform: &Platform,
+    workspace_id: WorkspaceId,
+    entity: &str,
+) -> Result<Option<(&'static str, bizkit_core::hooks::TargetEntity)>, ApiError> {
+    let kinds: BTreeSet<&'static str> = platform
+        .hook_points()
+        .iter()
+        .filter_map(|point| point.target)
+        .map(|kind| kind.id)
+        .collect();
+    for kind in kinds {
+        let Some((_, resolver)) = platform.hook_target_kind(kind) else { continue };
+        let found = resolver
+            .find(platform, workspace_id, &[entity.to_owned()])
+            .await
+            .with_context(|| format!("looking up a {kind} target"))?;
+        if let Some(found) = found.into_iter().next() {
+            return Ok(Some((kind, found)));
+        }
+    }
+    Ok(None)
+}
+
+/// Whether `row` runs for `entity`, an entity of `kind`.
+fn runs_for(platform: &Platform, row: &ScriptRow, entity: &str, kind: Option<&str>) -> bool {
+    if row.target_ids.is_empty() {
+        let point_kind = platform.hook_point(&row.hook).and_then(|point| point.target);
+        point_kind.is_some_and(|point_kind| Some(point_kind.id) == kind)
+    } else {
+        row.target_ids.iter().any(|id| id == entity)
     }
 }
 
@@ -464,11 +729,34 @@ impl Operation for ScriptsUpdate {
     const METHOD: Method = Method::Patch;
     const PATH: &'static str = "/workspaces/{workspace_id}/extensions/scripts/{script_id}";
     const ACCESS: Access = ADMIN;
-    const SUMMARY: &'static str = "Change a script's name, source or enabled flag";
+    const SUMMARY: &'static str =
+        "Change a script's name, source, test cases, enabled flag or targets";
     const TAGS: &'static [&'static str] = TAGS;
 
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+
     async fn call(&self, cx: OpCtx, input: UpdateScript) -> Result<Script, ApiError> {
-        script_in(&cx, input.workspace_id, input.script_id).await?;
+        let before = script_in(&cx, input.workspace_id, input.script_id).await?;
+        let point = cx.platform().hook_point(&before.hook);
+        let target_ids = match (&input.target_ids, point) {
+            (None, _) => None,
+            (Some(ids), Some(point)) => Some(
+                resolve_targets(
+                    cx.platform(),
+                    point,
+                    (before.workspace_id, before.project_id),
+                    ids,
+                    &before.target_ids,
+                )
+                .await?,
+            ),
+            (Some(_), None) => {
+                return Err(field_error(
+                    "target_ids",
+                    "its hook point isn't compiled into this server",
+                ));
+            }
+        };
         if let Some(source) = &input.source {
             self.runner.check(source).await.map_err(|err| field_error("source", err))?;
         }
@@ -487,10 +775,19 @@ impl Operation for ScriptsUpdate {
         if let Some(enabled) = input.enabled {
             row.enabled = enabled;
         }
+        if let Some(tests) = input.tests {
+            row.tests = trimmed(tests);
+        }
+        if let Some(target_ids) = target_ids {
+            row.target_ids = target_ids;
+            if let Some(point) = point {
+                check_sync_slots(cx.platform(), &mut tx, point, &row).await?;
+            }
+        }
         row.updated_at = cx.now();
-        store::update_script(&mut *tx, &row).await?;
+        store::update_script(&mut tx, &row).await?;
         tx.commit().await?;
-        Ok(script_to_api(cx.platform(), row))
+        script_to_api(cx.platform(), row).await
     }
 }
 
@@ -519,28 +816,53 @@ struct ScriptsTest {
 }
 impl Operation for ScriptsTest {
     type Input = TestScript;
-    type Output = Run;
+    type Output = TestReport;
     const ID: &'static str = "extensions.scripts.test";
     const METHOD: Method = Method::Post;
     const PATH: &'static str = "/workspaces/{workspace_id}/extensions/scripts/{script_id}/test";
     const ACCESS: Access = ADMIN;
-    const SUMMARY: &'static str = "Run a script now with its hook point's capabilities, real fetch included, and record the run";
+    const SUMMARY: &'static str = "Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run";
     const TAGS: &'static [&'static str] = TAGS;
 
-    async fn call(&self, cx: OpCtx, input: TestScript) -> Result<Run, ApiError> {
+    async fn call(&self, cx: OpCtx, input: TestScript) -> Result<TestReport, ApiError> {
         let row = script_in(&cx, input.workspace_id, input.script_id).await?;
         let Some(point) = cx.platform().hook_point(&row.hook) else {
             return Err(field_error("script_id", "its hook point isn't compiled into this server"));
         };
-        let exec = Execution {
-            script: &row,
-            point,
-            input: input.input.unwrap_or_else(point.sample),
-            cause: RunCause::Test,
-            attempt: None,
-            source: input.source,
-        };
-        Ok(self.runner.execute(cx.platform(), exec).await)
+        let cases = input.tests.map_or_else(|| row.tests.clone(), trimmed);
+        let mut items = Vec::with_capacity(cases.len());
+        // One at a time: the pools queue at most 8 runs, and a test run
+        // must never crowd out the live hook calls sharing them.
+        for case in cases {
+            let exec = Execution {
+                script: &row,
+                point,
+                input: case.input,
+                cause: RunCause::Test,
+                attempt: None,
+                source: input.source.clone(),
+            };
+            let run = self.runner.execute(cx.platform(), exec).await;
+            let expect = case.expect.filter(|expect| !expect.is_null());
+            items.push(TestResult {
+                outcome: outcome(&run, expect.as_ref()),
+                name: case.name,
+                expect,
+                run,
+            });
+        }
+        Ok(TestReport { items })
+    }
+}
+
+fn outcome(run: &Run, expect: Option<&serde_json::Value>) -> TestOutcome {
+    if run.status != bizkit_core::hooks::RunStatus::Ok {
+        return TestOutcome::Error;
+    }
+    let returned = run.output.as_ref().unwrap_or(&serde_json::Value::Null);
+    match expect {
+        Some(expect) if expect != returned => TestOutcome::Fail,
+        _ => TestOutcome::Pass,
     }
 }
 
@@ -565,6 +887,36 @@ impl Operation for RunsList {
                 .await?;
         let items = rows.into_iter().map(run_to_api).collect::<anyhow::Result<_>>()?;
         Ok(RunList { items })
+    }
+}
+
+// ---------------------------------------------------------------- targets
+
+struct TargetsList;
+impl Operation for TargetsList {
+    type Input = ListTargets;
+    type Output = TargetList;
+    const ID: &'static str = "extensions.targets.list";
+    const METHOD: Method = Method::Get;
+    const PATH: &'static str = "/workspaces/{workspace_id}/extensions/targets";
+    const ACCESS: Access = ADMIN;
+    const SUMMARY: &'static str = "List a project's entities of one target kind, such as its forms";
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: ListTargets) -> Result<TargetList, ApiError> {
+        let Some((kind, resolver)) = cx.platform().hook_target_kind(&input.kind) else {
+            return Err(field_error("kind", "is not a target kind of this server"));
+        };
+        project_in(&cx, input.workspace_id, input.project_id).await?;
+        let found = resolver
+            .list(cx.platform(), input.workspace_id, input.project_id)
+            .await
+            .with_context(|| format!("listing {} targets", kind.id))?;
+        let items = found
+            .into_iter()
+            .map(|entity| TargetEntity { id: entity.id, label: entity.label })
+            .collect();
+        Ok(TargetList { items })
     }
 }
 

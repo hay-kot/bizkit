@@ -47,6 +47,42 @@ pub enum Capability {
     Fetch,
 }
 
+/// The kind of entity scripts on a hook point can bind to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct HookTargetKind {
+    /// The kind ID, such as `forms.form`.
+    pub id: String,
+    /// The UI noun, such as `form`.
+    pub noun: String,
+    /// Its plural, such as `forms`.
+    pub plural: String,
+}
+
+/// An entity a script runs for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ScriptTarget {
+    /// The entity ID, such as a form ID.
+    pub id: String,
+    /// Its display name; `None` when it no longer exists.
+    pub label: Option<String>,
+}
+
+/// An entity scripts can target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TargetEntity {
+    /// The entity ID, as `target_ids` takes it.
+    pub id: String,
+    /// Its display name.
+    pub label: String,
+}
+
+/// A project's entities of one kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TargetList {
+    /// The entities, by label.
+    pub items: Vec<TargetEntity>,
+}
+
 /// A hook point a compiled-in module declares.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Hook {
@@ -62,6 +98,8 @@ pub struct Hook {
     pub event: Option<String>,
     /// What scripts on it can use.
     pub capabilities: Vec<Capability>,
+    /// The entity kind scripts on it can bind to; `None`: project-wide only.
+    pub target: Option<HookTargetKind>,
     /// A sample input.
     #[schema(schema_with = any_json)]
     pub sample: serde_json::Value,
@@ -85,6 +123,9 @@ pub struct ScriptSummary {
     pub hook: String,
     /// Whether the hook point runs inside the request.
     pub sync: bool,
+    /// The entities it runs for, by ID. Empty: every entity of the point's
+    /// kind, or the whole project when the point has no kind.
+    pub targets: Vec<ScriptTarget>,
     /// The display name.
     pub name: String,
     /// Whether it runs.
@@ -115,10 +156,15 @@ pub struct Script {
     pub hook: String,
     /// Whether the hook point runs inside the request.
     pub sync: bool,
+    /// The entities it runs for, by ID. Empty: every entity of the point's
+    /// kind, or the whole project when the point has no kind.
+    pub targets: Vec<ScriptTarget>,
     /// The display name.
     pub name: String,
     /// The ES module source. Its default export runs.
     pub source: String,
+    /// The saved test cases.
+    pub tests: Vec<TestCase>,
     /// Whether it runs.
     pub enabled: bool,
     /// False when no compiled-in module declares the hook point.
@@ -127,6 +173,55 @@ pub struct Script {
     pub created_at: UnixMillis,
     /// When it last changed.
     pub updated_at: UnixMillis,
+}
+
+/// A saved input to run a script on, and what it must return.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TestCase {
+    /// A name, unique in the script.
+    pub name: String,
+    /// The hook input.
+    #[schema(schema_with = any_json)]
+    pub input: serde_json::Value,
+    /// The value the script must return, compared as JSON, with
+    /// `undefined` as `null`. Absent or `null`: the run must only not fail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(schema_with = any_json)]
+    pub expect: Option<serde_json::Value>,
+}
+
+/// How a test case went.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TestOutcome {
+    /// The run succeeded and matched `expect`, if any.
+    Pass,
+    /// The run succeeded but returned something other than `expect`.
+    Fail,
+    /// The run failed: an error, a timeout or an invalid output.
+    Error,
+}
+
+/// One test case's result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TestResult {
+    /// The case name.
+    pub name: String,
+    /// How it went.
+    pub outcome: TestOutcome,
+    /// The case's `expect`.
+    #[schema(schema_with = any_json)]
+    pub expect: Option<serde_json::Value>,
+    /// The recorded run, with what the script returned and logged.
+    pub run: Run,
+}
+
+/// A test run's results.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TestReport {
+    /// One result per case, in case order.
+    pub items: Vec<TestResult>,
 }
 
 /// What started a run.

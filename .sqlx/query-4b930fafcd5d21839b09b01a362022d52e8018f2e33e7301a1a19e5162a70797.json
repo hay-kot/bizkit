@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO extension_scripts (id, workspace_id, project_id, hook, sync, name, source,\n                                        tests, enabled, created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "4b930fafcd5d21839b09b01a362022d52e8018f2e33e7301a1a19e5162a70797"
+}

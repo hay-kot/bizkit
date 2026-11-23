@@ -294,6 +294,7 @@ export type Hook = {
      * What it is for and what it expects back.
      */
     summary: string;
+    target?: HookTargetKind | null;
 };
 
 /**
@@ -309,6 +310,24 @@ export type HookList = {
      * The points, in registration order.
      */
     items: Array<Hook>;
+};
+
+/**
+ * The kind of entity scripts on a hook point can bind to.
+ */
+export type HookTargetKind = {
+    /**
+     * The kind ID, such as `forms.form`.
+     */
+    id: string;
+    /**
+     * The UI noun, such as `form`.
+     */
+    noun: string;
+    /**
+     * Its plural, such as `forms`.
+     */
+    plural: string;
 };
 
 /**
@@ -655,6 +674,15 @@ export type Script = {
      */
     sync: boolean;
     /**
+     * The entities it runs for, by ID. Empty: every entity of the point's
+     * kind, or the whole project when the point has no kind.
+     */
+    targets: Array<ScriptTarget>;
+    /**
+     * The saved test cases.
+     */
+    tests: Array<TestCase>;
+    /**
      * When it last changed.
      */
     updated_at: Timestamp;
@@ -709,9 +737,28 @@ export type ScriptSummary = {
      */
     sync: boolean;
     /**
+     * The entities it runs for, by ID. Empty: every entity of the point's
+     * kind, or the whole project when the point has no kind.
+     */
+    targets: Array<ScriptTarget>;
+    /**
      * When it last changed.
      */
     updated_at: Timestamp;
+};
+
+/**
+ * An entity a script runs for.
+ */
+export type ScriptTarget = {
+    /**
+     * The entity ID, such as a form ID.
+     */
+    id: string;
+    /**
+     * Its display name; `None` when it no longer exists.
+     */
+    label?: string | null;
 };
 
 /**
@@ -827,6 +874,82 @@ export type SubmissionList = {
  * Where a submission sits.
  */
 export type SubmissionStatus = 'inbox' | 'spam';
+
+/**
+ * An entity scripts can target.
+ */
+export type TargetEntity = {
+    /**
+     * The entity ID, as `target_ids` takes it.
+     */
+    id: string;
+    /**
+     * Its display name.
+     */
+    label: string;
+};
+
+/**
+ * A project's entities of one kind.
+ */
+export type TargetList = {
+    /**
+     * The entities, by label.
+     */
+    items: Array<TargetEntity>;
+};
+
+/**
+ * A saved input to run a script on, and what it must return.
+ */
+export type TestCase = {
+    expect?: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    input: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    /**
+     * A name, unique in the script.
+     */
+    name: string;
+};
+
+/**
+ * How a test case went.
+ */
+export type TestOutcome = 'pass' | 'fail' | 'error';
+
+/**
+ * A test run's results.
+ */
+export type TestReport = {
+    /**
+     * One result per case, in case order.
+     */
+    items: Array<TestResult>;
+};
+
+/**
+ * One test case's result.
+ */
+export type TestResult = {
+    expect?: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    /**
+     * The case name.
+     */
+    name: string;
+    /**
+     * How it went.
+     */
+    outcome: TestOutcome;
+    /**
+     * The recorded run, with what the script returned and logged.
+     */
+    run: Run;
+};
 
 export type Timestamp = string;
 
@@ -1773,6 +1896,12 @@ export type ExtensionsScriptsListData = {
     };
     query?: {
         project_id?: ProjectId | null;
+        /**
+         * Only scripts that run for this entity, as `targets[].id` spells it:
+         * those that name it, and those on points of its kind that target
+         * every entity.
+         */
+        target_id?: string | null;
     };
     url: '/api/v1/workspaces/{workspace_id}/extensions/scripts';
 };
@@ -1833,6 +1962,16 @@ export type ExtensionsScriptsCreateData = {
          * An ES module whose default export runs, at most 64 KiB.
          */
         source: string;
+        /**
+         * The entities of the point's target kind it runs for, such as form
+         * IDs, at most 100. Empty or absent: every entity of the kind.
+         */
+        target_ids?: Array<string>;
+        /**
+         * Saved test cases, at most 20. Default one case on the point's
+         * sample input.
+         */
+        tests?: Array<TestCase> | null;
     };
     path: {
         /**
@@ -1996,6 +2135,15 @@ export type ExtensionsScriptsUpdateData = {
          * The ES module source, at most 64 KiB.
          */
         source?: string | null;
+        /**
+         * Replaces the target set, at most 100. Empty: every entity of the
+         * point's kind.
+         */
+        target_ids?: Array<string> | null;
+        /**
+         * Replaces the saved test cases, at most 20.
+         */
+        tests?: Array<TestCase> | null;
     };
     path: {
         /**
@@ -2025,6 +2173,10 @@ export type ExtensionsScriptsUpdateErrors = {
      */
     404: ErrorBody;
     /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
      * Unprocessable Entity
      */
     422: ErrorBody;
@@ -2047,13 +2199,15 @@ export type ExtensionsScriptsUpdateResponse = ExtensionsScriptsUpdateResponses[k
 
 export type ExtensionsScriptsTestData = {
     body: {
-        input?: {
-            [key: string]: unknown;
-        } | Array<unknown> | string | number | boolean | null;
         /**
          * Runs this source instead of the saved one, at most 64 KiB.
          */
         source?: string | null;
+        /**
+         * Runs these cases instead of the saved ones, at most 20; pass one
+         * to run a single case.
+         */
+        tests?: Array<TestCase> | null;
     };
     path: {
         /**
@@ -2098,10 +2252,65 @@ export type ExtensionsScriptsTestResponses = {
     /**
      * OK
      */
-    200: Run;
+    200: TestReport;
 };
 
 export type ExtensionsScriptsTestResponse = ExtensionsScriptsTestResponses[keyof ExtensionsScriptsTestResponses];
+
+export type ExtensionsTargetsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The target kind, as `hooks[].target.id` spells it, such as `forms.form`.
+         */
+        kind: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/extensions/targets';
+};
+
+export type ExtensionsTargetsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsTargetsListError = ExtensionsTargetsListErrors[keyof ExtensionsTargetsListErrors];
+
+export type ExtensionsTargetsListResponses = {
+    /**
+     * OK
+     */
+    200: TargetList;
+};
+
+export type ExtensionsTargetsListResponse = ExtensionsTargetsListResponses[keyof ExtensionsTargetsListResponses];
 
 export type FormsListData = {
     body?: never;

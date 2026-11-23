@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { Code, KeyRound, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import NewScriptPanel from '@/components/extensions/NewScriptPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
+import { runsForText } from '@/components/extensions/targets'
+import type { ScriptSummary } from '@/queries/extensions'
 import {
-  useCreateScript,
   useDeleteSecret,
   useHooks,
   usePutSecret,
@@ -20,7 +22,6 @@ import {
 } from '@/queries/extensions'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
-const router = useRouter()
 const { data: hooks } = useHooks(() => props.workspaceId)
 const {
   data: scripts,
@@ -38,71 +39,70 @@ const {
   () => props.workspaceId,
   () => props.projectId,
 )
-const create = useCreateScript()
 const putSecret = usePutSecret()
 const deleteSecret = useDeleteSecret()
-
-const hookOptions = computed(() =>
-  (hooks.value?.items ?? []).map((hook) => ({
-    value: hook.id,
-    label: hook.id,
-    description: `${hook.kind === 'sync' ? 'In the request' : 'After the event'}: ${hook.summary}`,
-  })),
-)
 
 const scriptColumns = [
   { key: 'name', label: 'Name' },
   { key: 'hook', label: 'Hook' },
+  { key: 'target', label: 'Runs for' },
   { key: 'updated', label: 'Updated' },
 ]
+
+const pointsById = computed(() => new Map((hooks.value?.items ?? []).map((h) => [h.id, h])))
+
+function targetKind(script: ScriptSummary) {
+  return pointsById.value.get(script.hook)?.target ?? undefined
+}
+
+function targetText(script: ScriptSummary): string {
+  return runsForText(script.targets, targetKind(script))
+}
+
+const ALL = 'all'
+const FOR_ALL = 'for-all'
+const targetFilter = ref(ALL)
+/** The entities scripts name, by ID, with their kind and label. */
+const namedTargets = computed(() => {
+  const seen = new Map<string, { kind: string | undefined; label: string }>()
+  for (const script of scripts.value?.items ?? []) {
+    const kind = targetKind(script)
+    for (const target of script.targets) {
+      seen.set(target.id, {
+        kind: kind?.id,
+        label: target.label ?? `Deleted ${kind?.noun ?? 'entity'}`,
+      })
+    }
+  }
+  return seen
+})
+const targetOptions = computed(() => [
+  { value: ALL, label: 'All scripts' },
+  { value: FOR_ALL, label: 'Scripts for every entity' },
+  ...[...namedTargets.value].map(([value, { label }]) => ({ value, label })),
+])
+/** A named entity shows the scripts that run for it: those naming it and those for all of its kind. */
+const shownScripts = computed(() =>
+  scripts.value?.items.filter((script) => {
+    if (targetFilter.value === ALL) return true
+    if (script.targets.length === 0) {
+      if (targetFilter.value === FOR_ALL) return true
+      const kind = targetKind(script)?.id
+      return kind !== undefined && namedTargets.value.get(targetFilter.value)?.kind === kind
+    }
+    return script.targets.some((target) => target.id === targetFilter.value)
+  }),
+)
 const secretColumns = [
   { key: 'name', label: 'Name' },
   { key: 'updated', label: 'Set' },
   { key: 'actions', label: 'Actions', hidden: true, class: 'w-16 text-right' },
 ]
 
-const STARTERS: Record<string, string> = {
-  sync: `// Return nothing to accept, or { action: 'reject', errors: { field: ['message'] } },
-// or { action: 'spam', reason: 'why' }.
-export default function (input, ctx) {
-  ctx.log('checking', input.form.name)
-}
-`,
-  async: `// Runs after the event. ctx.secrets holds this project's secrets; ctx.fetch reaches public URLs.
-export default async function (input, ctx) {
-  ctx.log('got', JSON.stringify(input))
-}
-`,
-}
-
 const panelOpen = ref(false)
-const name = ref('')
-const hook = ref('')
-
-function openPanel() {
-  name.value = ''
-  hook.value = hookOptions.value[0]?.value ?? ''
-  create.reset()
-  panelOpen.value = true
-}
 
 function scriptPath(scriptId: string) {
   return `/w/${props.workspaceId}/p/${props.projectId}/extensions/${scriptId}`
-}
-
-async function onCreate() {
-  const point = hooks.value?.items.find((h) => h.id === hook.value)
-  const script = await create.mutateAsync({
-    path: { workspace_id: props.workspaceId },
-    body: {
-      name: name.value,
-      hook: hook.value,
-      project_id: props.projectId,
-      source: STARTERS[point?.kind ?? 'async'] ?? '',
-    },
-  })
-  panelOpen.value = false
-  await router.push(scriptPath(script.id))
 }
 
 const secretOpen = ref(false)
@@ -151,14 +151,26 @@ function removeSecret(secret: string) {
       title="Extensions"
       description="Scripts that run on this project's hook points, such as after each form submission."
     >
-      <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="openPanel">
+      <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="panelOpen = true">
         <Plus class="size-4" aria-hidden="true" />New script
       </button>
     </PageHeader>
 
+    <SectionHeading title="Scripts" class="mb-3">
+      <template v-if="(scripts?.items.length ?? 0) > 0" #actions>
+        <Select
+          v-model="targetFilter"
+          :options="targetOptions"
+          label="Runs for"
+          size="sm"
+          name="target"
+        />
+      </template>
+    </SectionHeading>
+
     <DataTable
       :columns="scriptColumns"
-      :rows="scripts?.items"
+      :rows="shownScripts"
       :row-key="(s) => s.id"
       :loading="isPending"
       :error="error"
@@ -180,26 +192,32 @@ function removeSecret(secret: string) {
         <code class="text-xs">{{ row.hook }}</code>
         <span class="ms-2 badge badge-outline badge-sm">{{ row.sync ? 'sync' : 'async' }}</span>
       </template>
+      <template #cell-target="{ row }"
+        ><span class="text-sm" :class="{ 'text-base-content/70': row.targets.length === 0 }">{{
+          targetText(row)
+        }}</span></template
+      >
       <template #cell-updated="{ row }"
         ><span class="text-sm">{{ formatDate(row.updated_at) }}</span></template
       >
       <template #empty-action>
-        <button type="button" class="btn btn-primary btn-sm" @click="openPanel">New script</button>
+        <button type="button" class="btn btn-primary btn-sm" @click="panelOpen = true">
+          New script
+        </button>
       </template>
     </DataTable>
 
-    <div class="mt-8 mb-3 flex items-center justify-between gap-2">
-      <div>
-        <h2 class="text-sm font-semibold">Secrets</h2>
-        <p class="text-xs text-base-content/70">
-          Async scripts read these as <code>ctx.secrets</code>. Values are never shown again, and
-          run logs show <code>[secret:NAME]</code> instead.
-        </p>
-      </div>
-      <button type="button" class="btn gap-1.5 btn-sm" @click="openSecret">
-        <Plus class="size-4" aria-hidden="true" />Add secret
-      </button>
-    </div>
+    <SectionHeading title="Secrets" class="mt-8 mb-3">
+      <template #description>
+        Async scripts read these as <code>ctx.secrets</code>. Values are never shown again, and run
+        logs show <code>[secret:NAME]</code> instead.
+      </template>
+      <template #actions>
+        <button type="button" class="btn gap-1.5 btn-sm" @click="openSecret">
+          <Plus class="size-4" aria-hidden="true" />Add secret
+        </button>
+      </template>
+    </SectionHeading>
 
     <DataTable
       :columns="secretColumns"
@@ -228,26 +246,12 @@ function removeSecret(secret: string) {
       </template>
     </DataTable>
 
-    <FormPanel
+    <NewScriptPanel
       :open="panelOpen"
-      title="New script"
-      submit-label="Create script"
-      :pending="create.asyncStatus.value === 'loading'"
-      :error="create.error.value"
+      :workspace-id="workspaceId"
+      :project-id="projectId"
       @close="panelOpen = false"
-      @submit="onCreate"
-    >
-      <Field label="Name">
-        <input
-          v-model="name"
-          name="script-name"
-          required
-          class="input w-full"
-          placeholder="Post to Discord"
-        />
-      </Field>
-      <Select v-model="hook" :options="hookOptions" label="Hook point" name="hook" />
-    </FormPanel>
+    />
 
     <FormPanel
       :open="secretOpen"

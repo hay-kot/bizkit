@@ -147,6 +147,41 @@ expression: tools
           "ProjectId": {
             "format": "uuid",
             "type": "string"
+          },
+          "TestCase": {
+            "additionalProperties": false,
+            "description": "A saved input to run a script on, and what it must return.",
+            "properties": {
+              "expect": {
+                "type": [
+                  "object",
+                  "array",
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "input": {
+                "type": [
+                  "object",
+                  "array",
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "A name, unique in the script.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "input"
+            ],
+            "type": "object"
           }
         },
         "additionalProperties": false,
@@ -174,6 +209,23 @@ expression: tools
           "source": {
             "description": "An ES module whose default export runs, at most 64 KiB.",
             "type": "string"
+          },
+          "target_ids": {
+            "description": "The entities of the point's target kind it runs for, such as form\nIDs, at most 100. Empty or absent: every entity of the kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tests": {
+            "description": "Saved test cases, at most 20. Default one case on the point's\nsample input.",
+            "items": {
+              "$ref": "#/$defs/TestCase"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
           }
         },
         "required": [
@@ -268,6 +320,13 @@ expression: tools
                 "type": "null"
               }
             ]
+          },
+          "target_id": {
+            "description": "Only scripts that run for this entity, as `targets[].id` spells it:\nthose that name it, and those on points of its kind that target\nevery entity.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "type": "object"
@@ -279,27 +338,52 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Run a script now with its hook point's capabilities, real fetch included, and record the run",
+      "description": "Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run",
       "inputSchema": {
         "$defs": {
           "ScriptId": {
             "format": "uuid",
             "type": "string"
+          },
+          "TestCase": {
+            "additionalProperties": false,
+            "description": "A saved input to run a script on, and what it must return.",
+            "properties": {
+              "expect": {
+                "type": [
+                  "object",
+                  "array",
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "input": {
+                "type": [
+                  "object",
+                  "array",
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "A name, unique in the script.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "input"
+            ],
+            "type": "object"
           }
         },
         "additionalProperties": false,
         "description": "A test run.",
         "properties": {
-          "input": {
-            "type": [
-              "object",
-              "array",
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
           "script_id": {
             "$ref": "#/$defs/ScriptId",
             "description": "The script."
@@ -308,6 +392,16 @@ expression: tools
             "description": "Runs this source instead of the saved one, at most 64 KiB.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "tests": {
+            "description": "Runs these cases instead of the saved ones, at most 20; pass one\nto run a single case.",
+            "items": {
+              "$ref": "#/$defs/TestCase"
+            },
+            "type": [
+              "array",
               "null"
             ]
           }
@@ -324,12 +418,47 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Change a script's name, source or enabled flag",
+      "description": "Change a script's name, source, test cases, enabled flag or targets",
       "inputSchema": {
         "$defs": {
           "ScriptId": {
             "format": "uuid",
             "type": "string"
+          },
+          "TestCase": {
+            "additionalProperties": false,
+            "description": "A saved input to run a script on, and what it must return.",
+            "properties": {
+              "expect": {
+                "type": [
+                  "object",
+                  "array",
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "input": {
+                "type": [
+                  "object",
+                  "array",
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "A name, unique in the script.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "input"
+            ],
+            "type": "object"
           }
         },
         "additionalProperties": false,
@@ -357,6 +486,26 @@ expression: tools
             "description": "The ES module source, at most 64 KiB.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "target_ids": {
+            "description": "Replaces the target set, at most 100. Empty: every entity of the\npoint's kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "tests": {
+            "description": "Replaces the saved test cases, at most 20.",
+            "items": {
+              "$ref": "#/$defs/TestCase"
+            },
+            "type": [
+              "array",
               "null"
             ]
           }
@@ -466,6 +615,39 @@ expression: tools
         "type": "object"
       },
       "name": "extensions_secrets_put"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's entities of one target kind, such as its forms",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which entities to list.",
+        "properties": {
+          "kind": {
+            "description": "The target kind, as `hooks[].target.id` spells it, such as `forms.form`.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_targets_list"
     },
     {
       "annotations": {

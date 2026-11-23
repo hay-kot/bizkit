@@ -14,20 +14,41 @@ import {
   extensionsSecretsDeleteMutation,
   extensionsSecretsListQuery,
   extensionsSecretsPutMutation,
+  extensionsTargetsListQuery,
 } from '@/api/gen/@pinia/colada.gen'
 import type {
   Capability,
   Hook,
+  HookTargetKind,
   Run,
   RunStatus,
   Script,
   ScriptSummary,
+  ScriptTarget,
   Secret,
+  TargetEntity,
+  TestCase,
+  TestOutcome,
+  TestResult,
 } from '@/api/gen/types.gen'
 
 import { useInvalidate } from './keys'
 
-export type { Capability, Hook, Run, RunStatus, Script, ScriptSummary, Secret }
+export type {
+  Capability,
+  Hook,
+  HookTargetKind,
+  Run,
+  RunStatus,
+  Script,
+  ScriptSummary,
+  ScriptTarget,
+  Secret,
+  TargetEntity,
+  TestCase,
+  TestOutcome,
+  TestResult,
+}
 
 const SCRIPT_QUERIES = ['extensionsScriptsList', 'extensionsScriptsGet']
 const RUN_QUERIES = ['extensionsRunsList']
@@ -37,16 +58,33 @@ export function useHooks(workspaceId: MaybeRefOrGetter<string>) {
   return useQuery(() => extensionsHooksListQuery({ path: { workspace_id: toValue(workspaceId) } }))
 }
 
+/** A project's scripts, or only those that run for the entity `targetId`. */
 export function useScripts(
   workspaceId: MaybeRefOrGetter<string>,
   projectId: MaybeRefOrGetter<string>,
+  targetId?: MaybeRefOrGetter<string | undefined>,
 ) {
   return useQuery(() =>
     extensionsScriptsListQuery({
       path: { workspace_id: toValue(workspaceId) },
-      query: { project_id: toValue(projectId) },
+      query: { project_id: toValue(projectId), target_id: toValue(targetId) },
     }),
   )
+}
+
+/** A project's entities of one target kind, such as its forms. Idle while `kind` is unset. */
+export function useTargets(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+  kind: MaybeRefOrGetter<string | undefined>,
+) {
+  return useQuery(() => ({
+    ...extensionsTargetsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId), kind: toValue(kind) ?? '' },
+    }),
+    enabled: !!toValue(kind),
+  }))
 }
 
 export function useScript(

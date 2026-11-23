@@ -8,6 +8,7 @@ use bizkit_core::db::Db;
 use serde_json::json;
 
 use crate::api::{BotCheck, FieldDef, FieldKind, FormId, SubmissionId};
+use crate::hooks::FORM;
 use crate::ops::DEFAULT_MIN_FILL_MS;
 use crate::store::{self, FormRow, SubmissionRow};
 
@@ -23,11 +24,12 @@ fn field(name: &str, label: &str, kind: FieldKind, required: bool) -> FieldDef {
     }
 }
 
-/// Seeds "Contact" and "Newsletter" in the `website` project. A form that
-/// already exists by name is left alone, with its submissions.
-pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
-    let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
-    let existing = store::list_forms(db.read(), seed.workspace_id, Some(project_id)).await?;
+/// A demo form: name, fields, bot check and sample submissions, each with
+/// an optional spam reason.
+type DemoForm =
+    (&'static str, Vec<FieldDef>, BotCheck, Vec<(serde_json::Value, Option<&'static str>)>);
+
+fn demo_forms() -> [DemoForm; 2] {
     let contact = (
         "Contact",
         vec![
@@ -61,9 +63,19 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
         BotCheck::Challenge,
         vec![(json!({"email": "reader@example.com", "source": "footer"}), None)],
     );
+    [contact, newsletter]
+}
+
+/// Seeds "Contact" and "Newsletter" in the `website` project and records
+/// them in `seed.entities`. A form that already exists by name is left
+/// alone, with its submissions.
+pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
+    let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
+    let existing = store::list_forms(db.read(), seed.workspace_id, Some(project_id)).await?;
     let mut tx = db.write().await?;
-    for (name, fields, bot_check, samples) in [contact, newsletter] {
-        if existing.iter().any(|f| f.form.name == name) {
+    for (name, fields, bot_check, samples) in demo_forms() {
+        if let Some(found) = existing.iter().find(|f| f.form.name == name) {
+            seed.entities.insert((FORM.id.to_owned(), name.to_owned()), found.form.id.to_string());
             continue;
         }
         let form = FormRow {
@@ -82,6 +94,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             updated_at: seed.now,
         };
         store::insert_form(&mut *tx, &form).await?;
+        seed.entities.insert((FORM.id.to_owned(), name.to_owned()), form.id.to_string());
         let count = u64::try_from(samples.len()).unwrap_or(0);
         for (i, (data, spam)) in samples.into_iter().enumerate() {
             let age = Duration::from_hours(count.saturating_sub(u64::try_from(i).unwrap_or(0)));

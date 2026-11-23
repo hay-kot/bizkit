@@ -28,6 +28,20 @@ export interface NavItem {
 }
 
 /**
+ * A block a module adds to other modules' entity pages, such as the
+ * extensions bound to a form. The page renders `EntitySections` with its
+ * entity kind and ID; the component gets `workspaceId`, `projectId`, `kind`
+ * and `entityId` as props and renders nothing when the kind isn't its
+ * business.
+ */
+export interface EntitySection {
+  key: string
+  component: Component
+  /** Only workspace admins see it. */
+  adminOnly?: boolean
+}
+
+/**
  * What a feature contributes to the web app. Each backend module with a UI
  * gets one, listed in `modules/index.ts`; the router and the sidebar read
  * them, so a module never edits the shell.
@@ -42,6 +56,8 @@ export interface WebModule {
    */
   projectRoutes?: RouteRecordRaw[]
   nav: NavItem[]
+  /** Blocks for other modules' entity pages. */
+  entitySections?: EntitySection[]
 }
 
 /** Typed identity, so module files get checked against `WebModule`. */
