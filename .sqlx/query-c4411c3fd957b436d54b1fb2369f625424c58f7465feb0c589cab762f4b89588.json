@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS found FROM analytics_goals WHERE project_id = ? AND kind = ? AND match = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "found",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c4411c3fd957b436d54b1fb2369f625424c58f7465feb0c589cab762f4b89588"
+}

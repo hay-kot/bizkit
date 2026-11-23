@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_goals (id, workspace_id, project_id, name, kind, match, created_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "d58fdf2773cd9cac479c3d69ee091f6a313958db5d99ad9d9f49f889c043c760"
+}

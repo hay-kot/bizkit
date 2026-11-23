@@ -24,6 +24,7 @@ publish = false
 bizkit-core = { path = "crates/bizkit-core" }
 bizkit-extensions = { path = "crates/bizkit-extensions" }
 bizkit-forms = { path = "crates/bizkit-forms" }
+bizkit-analytics = { path = "crates/bizkit-analytics" }
 bizkit-webhooks = { path = "crates/bizkit-webhooks" }
 bizkit-testkit = { path = "crates/bizkit-testkit" }
 bizkit-web = { path = "crates/bizkit-web" }

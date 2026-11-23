@@ -1,0 +1,34 @@
+[package]
+name = "bizkit-analytics"
+description = "The bizkit analytics module: web analytics and product events from one snippet and one events store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[features]
+# The demo seed for the dev stack; needs core's dev helpers.
+test-hooks = ["bizkit-core/test-hooks"]
+
+[dependencies]
+anyhow.workspace = true
+bizkit-core.workspace = true
+http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+bizkit-testkit.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

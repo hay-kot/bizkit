@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_sites (project_id, workspace_id, site_key, hostnames, identity_mode,\n                                      last_event_day, rolled_through, created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "041596b70abcc4738d4376ce2c699d9964ce456f91f1659f167de313b4081677"
+}

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, ExtensionsHooksListData, ExtensionsHooksListErrors, ExtensionsHooksListResponses, ExtensionsRunsListData, ExtensionsRunsListErrors, ExtensionsRunsListResponses, ExtensionsScriptsCreateData, ExtensionsScriptsCreateErrors, ExtensionsScriptsCreateResponses, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteErrors, ExtensionsScriptsDeleteResponses, ExtensionsScriptsGetData, ExtensionsScriptsGetErrors, ExtensionsScriptsGetResponses, ExtensionsScriptsListData, ExtensionsScriptsListErrors, ExtensionsScriptsListResponses, ExtensionsScriptsTestData, ExtensionsScriptsTestErrors, ExtensionsScriptsTestResponses, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateErrors, ExtensionsScriptsUpdateResponses, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteErrors, ExtensionsSecretsDeleteResponses, ExtensionsSecretsListData, ExtensionsSecretsListErrors, ExtensionsSecretsListResponses, ExtensionsSecretsPutData, ExtensionsSecretsPutErrors, ExtensionsSecretsPutResponses, ExtensionsTargetsListData, ExtensionsTargetsListErrors, ExtensionsTargetsListResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WebhooksEndpointsCreateData, WebhooksEndpointsCreateErrors, WebhooksEndpointsCreateResponses, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteErrors, WebhooksEndpointsDeleteResponses, WebhooksEndpointsGetData, WebhooksEndpointsGetErrors, WebhooksEndpointsGetResponses, WebhooksEndpointsListData, WebhooksEndpointsListErrors, WebhooksEndpointsListResponses, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateErrors, WebhooksEndpointsUpdateResponses, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteErrors, WebhooksPublicCaptureDeleteResponses, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetErrors, WebhooksPublicCaptureGetResponses, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchErrors, WebhooksPublicCapturePatchResponses, WebhooksPublicCapturePostData, WebhooksPublicCapturePostErrors, WebhooksPublicCapturePostResponses, WebhooksPublicCapturePutData, WebhooksPublicCapturePutErrors, WebhooksPublicCapturePutResponses, WebhooksRequestsGetData, WebhooksRequestsGetErrors, WebhooksRequestsGetResponses, WebhooksRequestsListData, WebhooksRequestsListErrors, WebhooksRequestsListResponses, WebhooksRequestsReplayData, WebhooksRequestsReplayErrors, WebhooksRequestsReplayResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
+import type { AnalyticsGoalsCreateData, AnalyticsGoalsCreateErrors, AnalyticsGoalsCreateResponses, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteErrors, AnalyticsGoalsDeleteResponses, AnalyticsGoalsListData, AnalyticsGoalsListErrors, AnalyticsGoalsListResponses, AnalyticsSiteCreateData, AnalyticsSiteCreateErrors, AnalyticsSiteCreateResponses, AnalyticsSiteGetData, AnalyticsSiteGetErrors, AnalyticsSiteGetResponses, AnalyticsSiteUpdateData, AnalyticsSiteUpdateErrors, AnalyticsSiteUpdateResponses, ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, ExtensionsHooksListData, ExtensionsHooksListErrors, ExtensionsHooksListResponses, ExtensionsRunsListData, ExtensionsRunsListErrors, ExtensionsRunsListResponses, ExtensionsScriptsCreateData, ExtensionsScriptsCreateErrors, ExtensionsScriptsCreateResponses, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteErrors, ExtensionsScriptsDeleteResponses, ExtensionsScriptsGetData, ExtensionsScriptsGetErrors, ExtensionsScriptsGetResponses, ExtensionsScriptsListData, ExtensionsScriptsListErrors, ExtensionsScriptsListResponses, ExtensionsScriptsTestData, ExtensionsScriptsTestErrors, ExtensionsScriptsTestResponses, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateErrors, ExtensionsScriptsUpdateResponses, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteErrors, ExtensionsSecretsDeleteResponses, ExtensionsSecretsListData, ExtensionsSecretsListErrors, ExtensionsSecretsListResponses, ExtensionsSecretsPutData, ExtensionsSecretsPutErrors, ExtensionsSecretsPutResponses, ExtensionsTargetsListData, ExtensionsTargetsListErrors, ExtensionsTargetsListResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WebhooksEndpointsCreateData, WebhooksEndpointsCreateErrors, WebhooksEndpointsCreateResponses, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteErrors, WebhooksEndpointsDeleteResponses, WebhooksEndpointsGetData, WebhooksEndpointsGetErrors, WebhooksEndpointsGetResponses, WebhooksEndpointsListData, WebhooksEndpointsListErrors, WebhooksEndpointsListResponses, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateErrors, WebhooksEndpointsUpdateResponses, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteErrors, WebhooksPublicCaptureDeleteResponses, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetErrors, WebhooksPublicCaptureGetResponses, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchErrors, WebhooksPublicCapturePatchResponses, WebhooksPublicCapturePostData, WebhooksPublicCapturePostErrors, WebhooksPublicCapturePostResponses, WebhooksPublicCapturePutData, WebhooksPublicCapturePutErrors, WebhooksPublicCapturePutResponses, WebhooksRequestsGetData, WebhooksRequestsGetErrors, WebhooksRequestsGetResponses, WebhooksRequestsListData, WebhooksRequestsListErrors, WebhooksRequestsListResponses, WebhooksRequestsReplayData, WebhooksRequestsReplayErrors, WebhooksRequestsReplayResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -166,6 +166,96 @@ export const workspacesUpdate = <ThrowOnError extends boolean = false>(options: 
             type: 'apiKey'
         }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/workspaces/{workspace_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List a project's analytics goals
+ */
+export const analyticsGoalsList = <ThrowOnError extends boolean = false>(options: Options<AnalyticsGoalsListData, ThrowOnError>): RequestResult<AnalyticsGoalsListResponses, AnalyticsGoalsListErrors, ThrowOnError> => (options.client ?? client).get<AnalyticsGoalsListResponses, AnalyticsGoalsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals',
+    ...options
+});
+
+/**
+ * Add a goal: a page or event that counts as a conversion
+ */
+export const analyticsGoalsCreate = <ThrowOnError extends boolean = false>(options: Options<AnalyticsGoalsCreateData, ThrowOnError>): RequestResult<AnalyticsGoalsCreateResponses, AnalyticsGoalsCreateErrors, ThrowOnError> => (options.client ?? client).post<AnalyticsGoalsCreateResponses, AnalyticsGoalsCreateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete an analytics goal
+ */
+export const analyticsGoalsDelete = <ThrowOnError extends boolean = false>(options: Options<AnalyticsGoalsDeleteData, ThrowOnError>): RequestResult<AnalyticsGoalsDeleteResponses, AnalyticsGoalsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<AnalyticsGoalsDeleteResponses, AnalyticsGoalsDeleteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals/{goal_id}',
+    ...options
+});
+
+/**
+ * Show a project's analytics settings and snippet
+ */
+export const analyticsSiteGet = <ThrowOnError extends boolean = false>(options: Options<AnalyticsSiteGetData, ThrowOnError>): RequestResult<AnalyticsSiteGetResponses, AnalyticsSiteGetErrors, ThrowOnError> => (options.client ?? client).get<AnalyticsSiteGetResponses, AnalyticsSiteGetErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site',
+    ...options
+});
+
+/**
+ * Change a project's analytics settings
+ */
+export const analyticsSiteUpdate = <ThrowOnError extends boolean = false>(options: Options<AnalyticsSiteUpdateData, ThrowOnError>): RequestResult<AnalyticsSiteUpdateResponses, AnalyticsSiteUpdateErrors, ThrowOnError> => (options.client ?? client).patch<AnalyticsSiteUpdateResponses, AnalyticsSiteUpdateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Turn on analytics for a project
+ */
+export const analyticsSiteCreate = <ThrowOnError extends boolean = false>(options: Options<AnalyticsSiteCreateData, ThrowOnError>): RequestResult<AnalyticsSiteCreateResponses, AnalyticsSiteCreateErrors, ThrowOnError> => (options.client ?? client).post<AnalyticsSiteCreateResponses, AnalyticsSiteCreateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site',
     ...options,
     headers: {
         'Content-Type': 'application/json',

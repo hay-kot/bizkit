@@ -5,7 +5,7 @@ use bizkit_core::Module;
 /// Every compiled-in module, in registration order. Cargo features on this
 /// crate decide which modules exist.
 #[cfg_attr(
-    any(feature = "forms", feature = "webhooks", feature = "extensions"),
+    any(feature = "forms", feature = "webhooks", feature = "extensions", feature = "analytics"),
     expect(clippy::vec_init_then_push, reason = "each push sits behind its module's feature")
 )]
 pub(crate) fn modules() -> Vec<Box<dyn Module>> {
@@ -15,6 +15,9 @@ pub(crate) fn modules() -> Vec<Box<dyn Module>> {
     // Before extensions: its demo seed binds scripts to the seeded endpoints.
     #[cfg(feature = "webhooks")]
     modules.push(Box::new(bizkit_webhooks::Webhooks));
+    // Before extensions: its demo seed binds scripts to the seeded goals.
+    #[cfg(feature = "analytics")]
+    modules.push(Box::new(bizkit_analytics::Analytics));
     #[cfg(feature = "extensions")]
     modules.push(Box::new(bizkit_extensions::Extensions::default()));
     modules

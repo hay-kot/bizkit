@@ -828,6 +828,682 @@
         "x-bizkit-scope": "workspace:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/analytics/goals": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List a project's analytics goals",
+        "operationId": "analytics.goals.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Add a goal: a page or event that counts as a conversion",
+        "operationId": "analytics.goals.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "name",
+                  "kind",
+                  "match"
+                ],
+                "properties": {
+                  "kind": {
+                    "$ref": "#/components/schemas/GoalKind",
+                    "description": "What it matches."
+                  },
+                  "match": {
+                    "type": "string",
+                    "description": "A page path starting with `/`, or an event name."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/goals/{goal_id}": {
+      "delete": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Delete an analytics goal",
+        "operationId": "analytics.goals.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "goal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/GoalId",
+              "description": "The goal."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/site": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Show a project's analytics settings and snippet",
+        "operationId": "analytics.site.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Site"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Turn on analytics for a project",
+        "operationId": "analytics.site.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id"
+                ],
+                "properties": {
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Site"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:admin"
+      },
+      "patch": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Change a project's analytics settings",
+        "operationId": "analytics.site.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id"
+                ],
+                "properties": {
+                  "hostnames": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Hostnames the snippet may send from, exact or `*.example.com`; empty\nallows any host."
+                  },
+                  "identity_mode": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/IdentityMode",
+                        "description": "What the snippet may store in a visitor's browser."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Site"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:admin"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/api-keys": {
       "get": {
         "tags": [
@@ -6994,6 +7670,72 @@
           }
         }
       },
+      "Goal": {
+        "type": "object",
+        "description": "A page or event that counts as a conversion.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "kind",
+          "match",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was created."
+          },
+          "id": {
+            "$ref": "#/components/schemas/GoalId",
+            "description": "The goal ID."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GoalKind",
+            "description": "What it matches."
+          },
+          "match": {
+            "type": "string",
+            "description": "The page path (`/signup/done`) or event name (`signup_completed`)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
+          }
+        }
+      },
+      "GoalId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "GoalKind": {
+        "type": "string",
+        "description": "What a goal matches.",
+        "enum": [
+          "page",
+          "event"
+        ]
+      },
+      "GoalList": {
+        "type": "object",
+        "description": "A project's goals.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Goal"
+            },
+            "description": "Sorted by name."
+          }
+        }
+      },
       "Header": {
         "type": "object",
         "description": "One request header.",
@@ -7133,6 +7875,15 @@
             "description": "Its plural, such as `forms`."
           }
         }
+      },
+      "IdentityMode": {
+        "type": "string",
+        "description": "What the snippet may store in a visitor's browser.",
+        "enum": [
+          "cookieless",
+          "after_identify",
+          "always"
+        ]
       },
       "Invitation": {
         "type": "object",
@@ -7898,6 +8649,57 @@
           }
         },
         "additionalProperties": false
+      },
+      "Site": {
+        "type": "object",
+        "description": "A project's analytics settings and snippet.",
+        "required": [
+          "project_id",
+          "key",
+          "snippet",
+          "hostnames",
+          "identity_mode",
+          "has_events",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When analytics was turned on."
+          },
+          "has_events": {
+            "type": "boolean",
+            "description": "Whether any event has arrived yet."
+          },
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hostnames the snippet may send from, exact or `*.example.com`. Empty\nmeans any host."
+          },
+          "identity_mode": {
+            "$ref": "#/components/schemas/IdentityMode",
+            "description": "What the snippet may store in a visitor's browser."
+          },
+          "key": {
+            "type": "string",
+            "description": "The public key in the snippet tag."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The `<script>` tag to add to every page."
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When its settings last changed."
+          }
+        }
       },
       "Submission": {
         "type": "object",

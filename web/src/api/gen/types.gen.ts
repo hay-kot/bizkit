@@ -406,6 +406,53 @@ export type FormList = {
 };
 
 /**
+ * A page or event that counts as a conversion.
+ */
+export type Goal = {
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * The goal ID.
+     */
+    id: GoalId;
+    /**
+     * What it matches.
+     */
+    kind: GoalKind;
+    /**
+     * The page path (`/signup/done`) or event name (`signup_completed`).
+     */
+    match: string;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+};
+
+export type GoalId = string;
+
+/**
+ * What a goal matches.
+ */
+export type GoalKind = 'page' | 'event';
+
+/**
+ * A project's goals.
+ */
+export type GoalList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Goal>;
+};
+
+/**
  * One request header.
  */
 export type Header = {
@@ -490,6 +537,11 @@ export type HookTargetKind = {
      */
     plural: string;
 };
+
+/**
+ * What the snippet may store in a visitor's browser.
+ */
+export type IdentityMode = 'cookieless' | 'after_identify' | 'always';
 
 /**
  * An invitation to a workspace.
@@ -1002,6 +1054,45 @@ export type SignInBody = {
      * A path in the app to return to after signing in, such as `/invite/...`.
      */
     next?: string | null;
+};
+
+/**
+ * A project's analytics settings and snippet.
+ */
+export type Site = {
+    /**
+     * When analytics was turned on.
+     */
+    created_at: Timestamp;
+    /**
+     * Whether any event has arrived yet.
+     */
+    has_events: boolean;
+    /**
+     * Hostnames the snippet may send from, exact or `*.example.com`. Empty
+     * means any host.
+     */
+    hostnames: Array<string>;
+    /**
+     * What the snippet may store in a visitor's browser.
+     */
+    identity_mode: IdentityMode;
+    /**
+     * The public key in the snippet tag.
+     */
+    key: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * The `<script>` tag to add to every page.
+     */
+    snippet: string;
+    /**
+     * When its settings last changed.
+     */
+    updated_at: Timestamp;
 };
 
 /**
@@ -1671,6 +1762,337 @@ export type WorkspacesUpdateResponses = {
 };
 
 export type WorkspacesUpdateResponse = WorkspacesUpdateResponses[keyof WorkspacesUpdateResponses];
+
+export type AnalyticsGoalsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals';
+};
+
+export type AnalyticsGoalsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsGoalsListError = AnalyticsGoalsListErrors[keyof AnalyticsGoalsListErrors];
+
+export type AnalyticsGoalsListResponses = {
+    /**
+     * OK
+     */
+    200: GoalList;
+};
+
+export type AnalyticsGoalsListResponse = AnalyticsGoalsListResponses[keyof AnalyticsGoalsListResponses];
+
+export type AnalyticsGoalsCreateData = {
+    body: {
+        /**
+         * What it matches.
+         */
+        kind: GoalKind;
+        /**
+         * A page path starting with `/`, or an event name.
+         */
+        match: string;
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals';
+};
+
+export type AnalyticsGoalsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsGoalsCreateError = AnalyticsGoalsCreateErrors[keyof AnalyticsGoalsCreateErrors];
+
+export type AnalyticsGoalsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Goal;
+};
+
+export type AnalyticsGoalsCreateResponse = AnalyticsGoalsCreateResponses[keyof AnalyticsGoalsCreateResponses];
+
+export type AnalyticsGoalsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The goal.
+         */
+        goal_id: GoalId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals/{goal_id}';
+};
+
+export type AnalyticsGoalsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsGoalsDeleteError = AnalyticsGoalsDeleteErrors[keyof AnalyticsGoalsDeleteErrors];
+
+export type AnalyticsGoalsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AnalyticsGoalsDeleteResponse = AnalyticsGoalsDeleteResponses[keyof AnalyticsGoalsDeleteResponses];
+
+export type AnalyticsSiteGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site';
+};
+
+export type AnalyticsSiteGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSiteGetError = AnalyticsSiteGetErrors[keyof AnalyticsSiteGetErrors];
+
+export type AnalyticsSiteGetResponses = {
+    /**
+     * OK
+     */
+    200: Site;
+};
+
+export type AnalyticsSiteGetResponse = AnalyticsSiteGetResponses[keyof AnalyticsSiteGetResponses];
+
+export type AnalyticsSiteUpdateData = {
+    body: {
+        /**
+         * Hostnames the snippet may send from, exact or `*.example.com`; empty
+         * allows any host.
+         */
+        hostnames?: Array<string> | null;
+        identity_mode?: IdentityMode | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site';
+};
+
+export type AnalyticsSiteUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSiteUpdateError = AnalyticsSiteUpdateErrors[keyof AnalyticsSiteUpdateErrors];
+
+export type AnalyticsSiteUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Site;
+};
+
+export type AnalyticsSiteUpdateResponse = AnalyticsSiteUpdateResponses[keyof AnalyticsSiteUpdateResponses];
+
+export type AnalyticsSiteCreateData = {
+    body: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site';
+};
+
+export type AnalyticsSiteCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSiteCreateError = AnalyticsSiteCreateErrors[keyof AnalyticsSiteCreateErrors];
+
+export type AnalyticsSiteCreateResponses = {
+    /**
+     * Created
+     */
+    201: Site;
+};
+
+export type AnalyticsSiteCreateResponse = AnalyticsSiteCreateResponses[keyof AnalyticsSiteCreateResponses];
 
 export type ApiKeysListData = {
     body?: never;

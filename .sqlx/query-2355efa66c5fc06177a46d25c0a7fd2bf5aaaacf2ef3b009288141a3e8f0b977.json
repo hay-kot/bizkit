@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT project_id AS \"project_id: ProjectId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  site_key, hostnames, identity_mode, last_event_day, rolled_through,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM analytics_sites WHERE workspace_id = ? AND project_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "site_key",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "site_key"
+          }
+        }
+      },
+      {
+        "name": "hostnames",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "hostnames"
+          }
+        }
+      },
+      {
+        "name": "identity_mode",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "identity_mode"
+          }
+        }
+      },
+      {
+        "name": "last_event_day",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "last_event_day"
+          }
+        }
+      },
+      {
+        "name": "rolled_through",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "rolled_through"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "2355efa66c5fc06177a46d25c0a7fd2bf5aaaacf2ef3b009288141a3e8f0b977"
+}

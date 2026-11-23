@@ -9,6 +9,227 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Add a goal: a page or event that counts as a conversion",
+      "inputSchema": {
+        "$defs": {
+          "GoalKind": {
+            "description": "What a goal matches.",
+            "enum": [
+              "page",
+              "event"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new goal.",
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/GoalKind",
+            "description": "What it matches."
+          },
+          "match": {
+            "description": "A page path starting with `/`, or an event name.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "kind",
+          "match"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_goals_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete an analytics goal",
+      "inputSchema": {
+        "$defs": {
+          "GoalId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A goal of a workspace.",
+        "properties": {
+          "goal_id": {
+            "$ref": "#/$defs/GoalId",
+            "description": "The goal."
+          }
+        },
+        "required": [
+          "goal_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_goals_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's analytics goals",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which goals to list.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_goals_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Turn on analytics for a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project's analytics site.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_site_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a project's analytics settings and snippet",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project's analytics site.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_site_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a project's analytics settings",
+      "inputSchema": {
+        "$defs": {
+          "IdentityMode": {
+            "description": "What the snippet may store in a visitor's browser.",
+            "enum": [
+              "cookieless",
+              "after_identify",
+              "always"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a site. Absent fields stay as they are.",
+        "properties": {
+          "hostnames": {
+            "description": "Hostnames the snippet may send from, exact or `*.example.com`; empty\nallows any host.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "identity_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/IdentityMode",
+                "description": "What the snippet may store in a visitor's browser."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_site_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Create an API key; the token is shown once",
       "inputSchema": {
         "additionalProperties": false,
