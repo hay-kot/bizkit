@@ -88,6 +88,388 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the hook points scripts can attach to",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "The workspace.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "extensions_hooks_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a script's runs, newest first",
+      "inputSchema": {
+        "$defs": {
+          "ScriptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which runs to list.",
+        "properties": {
+          "limit": {
+            "description": "How many, 1-100. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "script_id": {
+            "$ref": "#/$defs/ScriptId",
+            "description": "The script."
+          }
+        },
+        "required": [
+          "script_id"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_runs_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Attach a script to a hook point in a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new script.",
+        "properties": {
+          "enabled": {
+            "description": "Whether it runs. Default true.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "hook": {
+            "description": "The hook point ID, such as `forms.pre_validate`. Fixed after create.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "source": {
+            "description": "An ES module whose default export runs, at most 64 KiB.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "hook",
+          "name",
+          "source"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_scripts_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a script and its runs",
+      "inputSchema": {
+        "$defs": {
+          "ScriptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One script.",
+        "properties": {
+          "script_id": {
+            "$ref": "#/$defs/ScriptId",
+            "description": "The script."
+          }
+        },
+        "required": [
+          "script_id"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_scripts_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Get a script with its source",
+      "inputSchema": {
+        "$defs": {
+          "ScriptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One script.",
+        "properties": {
+          "script_id": {
+            "$ref": "#/$defs/ScriptId",
+            "description": "The script."
+          }
+        },
+        "required": [
+          "script_id"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_scripts_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List scripts, by name",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which scripts to list.",
+        "properties": {
+          "project_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProjectId",
+                "description": "Only this project's scripts."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "extensions_scripts_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Run a script now with its hook point's capabilities, real fetch included, and record the run",
+      "inputSchema": {
+        "$defs": {
+          "ScriptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A test run.",
+        "properties": {
+          "input": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "script_id": {
+            "$ref": "#/$defs/ScriptId",
+            "description": "The script."
+          },
+          "source": {
+            "description": "Runs this source instead of the saved one, at most 64 KiB.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "script_id"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_scripts_test"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a script's name, source or enabled flag",
+      "inputSchema": {
+        "$defs": {
+          "ScriptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a script. Absent fields stay as they are.",
+        "properties": {
+          "enabled": {
+            "description": "Whether it runs.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "script_id": {
+            "$ref": "#/$defs/ScriptId",
+            "description": "The script."
+          },
+          "source": {
+            "description": "The ES module source, at most 64 KiB.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "script_id"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_scripts_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a project secret",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One secret.",
+        "properties": {
+          "name": {
+            "description": "The secret name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_secrets_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's secret names",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_secrets_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Set a project secret that async scripts read as ctx.secrets",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A secret's new value.",
+        "properties": {
+          "name": {
+            "description": "The name: an uppercase letter, then up to 63 uppercase letters, digits or `_`.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "value": {
+            "description": "The value, at most 4 KiB. Never returned.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "value"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_secrets_put"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": false
       },
       "description": "Create a form in a project",

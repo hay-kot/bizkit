@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: RunId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  script_id AS \"script_id: ScriptId\", cause, status, attempt, duration_ms, error,\n                  logs, output, created_at AS \"created_at: UnixMillis\"\n           FROM extension_runs WHERE workspace_id = ? AND script_id = ?\n           ORDER BY id DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: RunId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "script_id: ScriptId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "script_id"
+          }
+        }
+      },
+      {
+        "name": "cause",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "cause"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "attempt",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "attempt"
+          }
+        }
+      },
+      {
+        "name": "duration_ms",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "duration_ms"
+          }
+        }
+      },
+      {
+        "name": "error",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "name": "logs",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "logs"
+          }
+        }
+      },
+      {
+        "name": "output",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "output"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "extension_runs",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "deb4b8c8ee1dedc83a97b7a3d0c9990ee66a4597c90a381653d568f8fe5c9b57"
+}

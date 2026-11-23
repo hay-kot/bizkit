@@ -18,4 +18,4 @@ disallowed-methods = [
 ]
 
 # ".." keeps clippy's default list.
-doc-valid-idents = ["..", "OpenAPI", "SQLite", "PostgreSQL"]
+doc-valid-idents = ["..", "OpenAPI", "SQLite", "PostgreSQL", "QuickJS"]

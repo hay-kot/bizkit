@@ -27,7 +27,7 @@ test.describe('workspace pages', () => {
   })
 
   const workspacePages = ['projects', 'team', 'api-keys', 'settings']
-  const projectPages = ['forms']
+  const projectPages = ['forms', 'extensions']
   for (const section of [...workspacePages, ...projectPages]) {
     test(`the ${section} page is clean`, async ({ page, world }) => {
       const errors = trackPageErrors(page)

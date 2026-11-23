@@ -12,6 +12,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context as _, bail};
 use serde::Serialize;
@@ -22,12 +23,35 @@ pub use self::mail::SendMail;
 pub use self::worker::{RunStats, Worker};
 use crate::app::Platform;
 
+/// A group of job kinds with its own worker loops, so slow kinds can't hold
+/// up the rest. Lane names are owned like job kinds: the module's name first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Lane {
+    /// The lane name, such as `extensions`.
+    pub name: &'static str,
+    /// How many jobs of this lane run at once.
+    pub concurrency: usize,
+}
+
+impl Lane {
+    /// Where jobs run unless they say otherwise: one at a time.
+    pub const DEFAULT: Self = Self { name: "default", concurrency: 1 };
+}
+
+/// The longest a job may run. A claimed row stays locked this long, so a
+/// longer run could be claimed twice after a restart.
+pub const MAX_TIMEOUT: Duration = worker::LOCK;
+
 /// A unit of background work.
 pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     /// The kind stored in the row, such as `mail.send`.
     const KIND: &'static str;
     /// Attempts before the job goes `dead`.
     const MAX_ATTEMPTS: u32 = 5;
+    /// The worker lane the job runs in.
+    const LANE: Lane = Lane::DEFAULT;
+    /// How long one attempt may run before it fails and retries. At most [`MAX_TIMEOUT`].
+    const TIMEOUT: Duration = MAX_TIMEOUT;
 }
 
 /// Runs jobs of one kind.
@@ -48,6 +72,10 @@ pub trait Subscriber<E: Event>: Send + Sync + 'static {
     const NAME: &'static str;
     /// Attempts before the delivery goes `dead`.
     const MAX_ATTEMPTS: u32 = 5;
+    /// The worker lane deliveries run in.
+    const LANE: Lane = Lane::DEFAULT;
+    /// How long one delivery attempt may run. At most [`MAX_TIMEOUT`].
+    const TIMEOUT: Duration = MAX_TIMEOUT;
     /// Handles one delivery. An error or panic retries it with backoff.
     fn handle(&self, cx: JobCtx, event: E) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
@@ -111,10 +139,19 @@ pub fn delivery_kind(event: &str, subscriber: &str) -> String {
     format!("event:{event}:{subscriber}")
 }
 
+/// How the worker runs one job kind.
+#[derive(Debug, Clone)]
+pub(crate) struct KindEntry {
+    pub(crate) handler: Arc<dyn ErasedHandler>,
+    pub(crate) max_attempts: u32,
+    pub(crate) lane: Lane,
+    pub(crate) timeout: Duration,
+}
+
 /// Every job kind and event subscription, collected during registration.
 #[derive(Debug, Default)]
 pub(crate) struct Handlers {
-    pub(crate) by_kind: BTreeMap<String, (Arc<dyn ErasedHandler>, u32)>,
+    pub(crate) by_kind: BTreeMap<String, KindEntry>,
     /// Event name → delivery kinds.
     pub(crate) subscribers: BTreeMap<&'static str, Vec<String>>,
 }
@@ -126,8 +163,42 @@ impl Handlers {
         }
         let adapter: Arc<dyn ErasedHandler> =
             Arc::new(JobAdapter::<J, H>(Arc::new(handler), PhantomData));
-        self.by_kind.insert(J::KIND.to_owned(), (adapter, J::MAX_ATTEMPTS));
+        let entry = KindEntry {
+            handler: adapter,
+            max_attempts: J::MAX_ATTEMPTS,
+            lane: J::LANE,
+            timeout: J::TIMEOUT,
+        };
+        self.insert(J::KIND.to_owned(), entry)
+    }
+
+    fn insert(&mut self, kind: String, entry: KindEntry) -> anyhow::Result<()> {
+        let KindEntry { lane, timeout, .. } = entry;
+        if timeout > MAX_TIMEOUT || timeout.is_zero() {
+            bail!(
+                "job kind {kind} has timeout {timeout:?}; it must be above zero and at most {MAX_TIMEOUT:?}"
+            );
+        }
+        if lane.concurrency == 0 {
+            bail!("lane {} of job kind {kind} has no concurrency", lane.name);
+        }
+        let known = self.lanes().into_iter().find(|known| known.name == lane.name);
+        if known.is_some_and(|known| known != lane) {
+            bail!("lane {} is declared with two different concurrencies", lane.name);
+        }
+        self.by_kind.insert(kind, entry);
         Ok(())
+    }
+
+    /// Every lane, the default one first.
+    pub(crate) fn lanes(&self) -> Vec<Lane> {
+        let mut lanes = vec![Lane::DEFAULT];
+        for entry in self.by_kind.values() {
+            if !lanes.iter().any(|lane| lane.name == entry.lane.name) {
+                lanes.push(entry.lane);
+            }
+        }
+        lanes
     }
 
     pub(crate) fn add_subscriber<E: Event, S: Subscriber<E>>(
@@ -140,7 +211,13 @@ impl Handlers {
         }
         let adapter: Arc<dyn ErasedHandler> =
             Arc::new(SubscriberAdapter::<E, S>(Arc::new(subscriber), PhantomData));
-        self.by_kind.insert(kind.clone(), (adapter, S::MAX_ATTEMPTS));
+        let entry = KindEntry {
+            handler: adapter,
+            max_attempts: S::MAX_ATTEMPTS,
+            lane: S::LANE,
+            timeout: S::TIMEOUT,
+        };
+        self.insert(kind.clone(), entry)?;
         self.subscribers.entry(E::NAME).or_default().push(kind);
         Ok(())
     }

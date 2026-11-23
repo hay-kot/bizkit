@@ -12,8 +12,6 @@ mod ops;
 mod seed;
 mod store;
 
-use std::sync::Arc;
-
 #[cfg(feature = "test-hooks")]
 use bizkit_core::DemoSeed;
 use bizkit_core::{Module, ModuleContext};
@@ -21,27 +19,11 @@ use bizkit_core::{Module, ModuleContext};
 use futures::future::BoxFuture;
 use utoipa::OpenApi as _;
 
-use crate::hooks::{NoopHook, SubmitHook};
+use crate::hooks::{FormsHookSource, PRE_VALIDATE, SUBMISSION_CREATED, SubmissionCreated};
 
 /// The forms module.
-#[derive(Debug, Clone)]
-pub struct Forms {
-    hook: Arc<dyn SubmitHook>,
-}
-
-impl Default for Forms {
-    fn default() -> Self {
-        Self { hook: Arc::new(NoopHook) }
-    }
-}
-
-impl Forms {
-    /// The module with `hook` run before field validation.
-    #[must_use]
-    pub fn with_hook(hook: impl SubmitHook) -> Self {
-        Self { hook: Arc::new(hook) }
-    }
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Forms;
 
 impl Module for Forms {
     fn name(&self) -> &'static str {
@@ -54,10 +36,9 @@ impl Module for Forms {
 
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
         ops::register(cx)?;
-        cx.public_routes(
-            ingest::route::router(Arc::clone(&self.hook)),
-            ingest::route::IngestDocs::openapi(),
-        )
+        cx.sync_hook(PRE_VALIDATE)?;
+        cx.async_hook::<SubmissionCreated, _>(SUBMISSION_CREATED, FormsHookSource)?;
+        cx.public_routes(ingest::route::router(), ingest::route::IngestDocs::openapi())
     }
 
     #[cfg(feature = "test-hooks")]

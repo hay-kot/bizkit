@@ -52,6 +52,17 @@ A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<nam
 - Module tables carry `workspace_id`, and every query filters on it.
 - Migrations live in the module crate's `migrations/` and return from `Module::migrations` as `sqlx::migrate!()`. Versions must be unique across all crates; a test checks it.
 
+## Hooks
+
+Modules let workspace scripts run at **hook points** they declare. Core owns the contract (`bizkit_core::hooks`); the `extensions` module runs the scripts in QuickJS sandboxes. A module never depends on extensions, and without it every point is inert.
+
+- Declare points in `register`. IDs start with the module name (`forms.pre_validate`). Keep the `HookPoint` consts in the module's `hooks.rs` with a `sample` input.
+- **Sync** (`cx.sync_hook`): runs inside the request through `platform.call_sync_hook(&POINT, target, &input).await`, with a budget of at most 100 ms and an `output` check on the returned value. Sync hooks fail open: on any failure the call gives `HookResult::Continue`, so a broken script never blocks the request. Scripts get `ctx.log` only. One script per project and point.
+- **Async** (`cx.async_hook::<Event, _>(POINT, source)`): runs as a retried job for each event (3 attempts; a failed attempt reruns the whole script, so scripts must tolerate repeats). The `HookSource` gives the target project and rebuilds the input when the run starts, so job payloads hold IDs only and a deleted row skips the run. Scripts also get `ctx.secrets` and `ctx.fetch` (public addresses only).
+- Inputs are plain JSON with no secrets or internal keys. Leave control fields out. Cap any text you take back from a script.
+- Tests use `FakeHooks` with `TestAppBuilder::hook_runner` to script outcomes per point. Test that every `RunStatus` failure leaves the request working.
+- Outbound HTTP goes through `Deps.http`, which reaches public addresses only. Check user URLs with `bizkit_core::net::check_url` too, for a clear error.
+
 ## Database and generated code
 
 - Queries use the `sqlx::query!` macros. Builds read the committed `.sqlx/` (`SQLX_OFFLINE=true` in `mise.toml`). After changing a query or a migration, run `mise run db:prepare` and commit `.sqlx/`.

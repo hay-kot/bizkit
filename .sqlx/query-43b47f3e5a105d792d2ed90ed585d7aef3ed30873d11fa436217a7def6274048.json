@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"found!: i64\" FROM jobs WHERE status = 'queued' AND run_at <= ?\n                 AND kind IN (SELECT value FROM json_each(?)) LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "found!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "43b47f3e5a105d792d2ed90ed585d7aef3ed30873d11fa436217a7def6274048"
+}

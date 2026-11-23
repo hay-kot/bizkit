@@ -22,6 +22,7 @@ publish = false
 # (RUSTSEC-2026-0560 to -0565) and url 2.5.9 (RUSTSEC-2026-0592).
 [workspace.dependencies]
 bizkit-core = { path = "crates/bizkit-core" }
+bizkit-extensions = { path = "crates/bizkit-extensions" }
 bizkit-forms = { path = "crates/bizkit-forms" }
 bizkit-testkit = { path = "crates/bizkit-testkit" }
 bizkit-web = { path = "crates/bizkit-web" }
@@ -48,6 +49,7 @@ mime_guess = "2.0.5"
 proptest = "1.12.0"
 rand = "0.10.4"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+rquickjs = { version = "=0.14.0", default-features = false }
 rmcp = { version = "=3.10.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
 rust-embed = "8.14.0"
 serde = { version = "1.0.229", features = ["derive"] }

@@ -24,6 +24,7 @@ use crate::config::Config;
 use crate::db::Db;
 use crate::deps::Deps;
 use crate::error::ApiError;
+use crate::hooks::Hooks;
 use crate::jobs::{Bus, Worker};
 use crate::module::{Module, Registration, register_all};
 use crate::ops::{Registry, ScopeAreas};
@@ -46,6 +47,7 @@ struct PlatformInner {
     policies: Policies,
     scope_areas: ScopeAreas,
     modules: Vec<&'static str>,
+    hooks: Hooks,
 }
 
 impl Platform {
@@ -101,6 +103,10 @@ impl Platform {
     #[must_use]
     pub fn modules(&self) -> &[&'static str] {
         &self.0.modules
+    }
+
+    pub(crate) fn hooks(&self) -> &Hooks {
+        &self.0.hooks
     }
 
     /// How long a session lasts without use.
@@ -228,7 +234,7 @@ impl App {
                 }
             }
         }
-        let Registration { registry, handlers, routes } = registration;
+        let Registration { registry, handlers, routes, hooks } = registration;
         let handlers = Arc::new(handlers);
         let bus = Bus::new(Arc::clone(&handlers), Arc::clone(&deps.clock));
         let platform = Platform(Arc::new(PlatformInner {
@@ -239,6 +245,7 @@ impl App {
             policies,
             scope_areas: registry.areas().clone(),
             modules: names,
+            hooks: hooks.finish(),
             config,
         }));
         let worker = Worker::new(platform.clone(), handlers);

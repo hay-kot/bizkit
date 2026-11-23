@@ -37,7 +37,7 @@ impl Bus {
         job: &J,
         opts: Enqueue,
     ) -> anyhow::Result<i64> {
-        let (_, max_attempts) = self
+        let entry = self
             .handlers
             .by_kind
             .get(J::KIND)
@@ -48,7 +48,7 @@ impl Bus {
         let row = NewJob {
             kind: J::KIND,
             payload: &payload,
-            max_attempts: *max_attempts,
+            max_attempts: entry.max_attempts,
             run_at: opts.run_at.unwrap_or(now),
         };
         insert(tx, row, now).await
@@ -65,12 +65,12 @@ impl Bus {
             .with_context(|| format!("encoding a {} event", E::NAME))?;
         let now = self.clock.now();
         for kind in kinds {
-            let Some((_, max_attempts)) = self.handlers.by_kind.get(kind) else {
+            let Some(entry) = self.handlers.by_kind.get(kind) else {
                 bail!("subscriber kind {kind} has no handler");
             };
             insert(
                 tx,
-                NewJob { kind, payload: &payload, max_attempts: *max_attempts, run_at: now },
+                NewJob { kind, payload: &payload, max_attempts: entry.max_attempts, run_at: now },
                 now,
             )
             .await?;

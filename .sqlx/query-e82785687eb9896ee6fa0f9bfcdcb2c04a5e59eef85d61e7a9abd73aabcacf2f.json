@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE extension_scripts SET name = ?, source = ?, enabled = ?, updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "e82785687eb9896ee6fa0f9bfcdcb2c04a5e59eef85d61e7a9abd73aabcacf2f"
+}

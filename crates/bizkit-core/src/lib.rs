@@ -13,9 +13,11 @@ pub mod deps;
 #[cfg(feature = "test-hooks")]
 pub mod dev;
 pub mod error;
+pub mod hooks;
 pub mod ids;
 pub mod jobs;
 mod module;
+pub mod net;
 pub mod ops;
 mod tenancy;
 #[cfg(feature = "test-hooks")]

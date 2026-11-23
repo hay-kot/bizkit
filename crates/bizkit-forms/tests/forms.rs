@@ -15,7 +15,7 @@ mod forms {
     }
 
     async fn setup() -> Setup {
-        let app = TestApp::builder().module(Forms::default()).build().await;
+        let app = TestApp::builder().module(Forms).build().await;
         let team = app.seed(Persona::Team, "forms").await;
         let admin = app.with_session(&team.accounts["admin"].session_token);
         let base = format!("/api/v1/workspaces/{}/forms", team.workspaces["main"].id);

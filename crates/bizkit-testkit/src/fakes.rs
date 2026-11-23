@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bizkit_core::Platform;
 use bizkit_core::deps::{Blob, BlobKey, BlobStore, Clock, HttpClient, Mail, Mailer};
+use bizkit_core::hooks::{HookPoint, HookRunner, HookTarget, SyncOutcome};
 use bizkit_core::time::UnixMillis;
 use bytes::Bytes;
 use http::{HeaderMap, Method, StatusCode};
@@ -215,5 +217,104 @@ mod tests {
         let other = http::Request::get("https://other.example.com/").body(Bytes::new()).unwrap();
         assert!(http.send(other).await.is_err(), "unmatched is an error");
         assert_eq!(http.requests().len(), 2, "both requests recorded");
+    }
+}
+
+/// One sync hook call a [`FakeHooks`] answered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncCall {
+    /// The point ID.
+    pub point: &'static str,
+    /// Whose script it asked for.
+    pub target: HookTarget,
+    /// The input it passed.
+    pub input: serde_json::Value,
+}
+
+/// One async dispatch a [`FakeHooks`] received.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dispatch {
+    /// The point ID.
+    pub point: &'static str,
+    /// Whose scripts it would queue.
+    pub target: HookTarget,
+    /// The raw event JSON.
+    pub event: serde_json::Value,
+}
+
+#[derive(Debug, Default)]
+struct HookState {
+    outcomes: BTreeMap<&'static str, SyncOutcome>,
+    hanging: Vec<&'static str>,
+    calls: Vec<SyncCall>,
+    dispatches: Vec<Dispatch>,
+}
+
+/// A hook runner with canned sync outcomes that records every call. Points
+/// without an outcome answer [`SyncOutcome::NoScript`]. Register it with
+/// [`TestAppBuilder::hook_runner`](crate::TestAppBuilder::hook_runner).
+#[derive(Debug, Clone, Default)]
+pub struct FakeHooks {
+    state: Arc<Mutex<HookState>>,
+}
+
+impl FakeHooks {
+    /// Answers sync calls on `point` with `outcome` from now on.
+    pub fn answer(&self, point: &'static str, outcome: SyncOutcome) {
+        lock(&self.state).outcomes.insert(point, outcome);
+    }
+
+    /// Makes sync calls on `point` never answer, as a stuck runner would.
+    pub fn hang(&self, point: &'static str) {
+        lock(&self.state).hanging.push(point);
+    }
+
+    /// Every sync call so far.
+    #[must_use]
+    pub fn calls(&self) -> Vec<SyncCall> {
+        lock(&self.state).calls.clone()
+    }
+
+    /// Every dispatch so far.
+    #[must_use]
+    pub fn dispatches(&self) -> Vec<Dispatch> {
+        lock(&self.state).dispatches.clone()
+    }
+}
+
+#[async_trait]
+impl HookRunner for FakeHooks {
+    async fn run_sync(
+        &self,
+        _platform: &Platform,
+        point: &HookPoint,
+        target: HookTarget,
+        input: &serde_json::Value,
+    ) -> SyncOutcome {
+        let (outcome, hanging) = {
+            let mut state = lock(&self.state);
+            state.calls.push(SyncCall { point: point.id, target, input: input.clone() });
+            let outcome = state.outcomes.get(point.id).cloned().unwrap_or(SyncOutcome::NoScript);
+            (outcome, state.hanging.contains(&point.id))
+        };
+        if hanging {
+            std::future::pending::<()>().await;
+        }
+        outcome
+    }
+
+    async fn dispatch(
+        &self,
+        _platform: &Platform,
+        point: &HookPoint,
+        target: HookTarget,
+        event: &serde_json::Value,
+    ) -> anyhow::Result<()> {
+        lock(&self.state).dispatches.push(Dispatch {
+            point: point.id,
+            target,
+            event: event.clone(),
+        });
+        Ok(())
     }
 }
