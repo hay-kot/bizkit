@@ -294,6 +294,7 @@ export type Hook = {
      * What it is for and what it expects back.
      */
     summary: string;
+    target?: HookTargetKind | null;
 };
 
 /**
@@ -309,6 +310,24 @@ export type HookList = {
      * The points, in registration order.
      */
     items: Array<Hook>;
+};
+
+/**
+ * The kind of entity scripts on a hook point can bind to.
+ */
+export type HookTargetKind = {
+    /**
+     * The kind ID, such as `forms.form`.
+     */
+    id: string;
+    /**
+     * The UI noun, such as `form`.
+     */
+    noun: string;
+    /**
+     * Its plural, such as `forms`.
+     */
+    plural: string;
 };
 
 /**
@@ -654,6 +673,7 @@ export type Script = {
      * Whether the hook point runs inside the request.
      */
     sync: boolean;
+    target?: ScriptTarget | null;
     /**
      * When it last changed.
      */
@@ -708,10 +728,25 @@ export type ScriptSummary = {
      * Whether the hook point runs inside the request.
      */
     sync: boolean;
+    target?: ScriptTarget | null;
     /**
      * When it last changed.
      */
     updated_at: Timestamp;
+};
+
+/**
+ * The entity a script is bound to.
+ */
+export type ScriptTarget = {
+    /**
+     * The entity ID, such as a form ID.
+     */
+    id: string;
+    /**
+     * Its display name; `None` when it no longer exists.
+     */
+    label?: string | null;
 };
 
 /**
@@ -1773,6 +1808,10 @@ export type ExtensionsScriptsListData = {
     };
     query?: {
         project_id?: ProjectId | null;
+        /**
+         * Only scripts bound to this entity, as `target.id` spells it.
+         */
+        target_id?: string | null;
     };
     url: '/api/v1/workspaces/{workspace_id}/extensions/scripts';
 };
@@ -1833,6 +1872,11 @@ export type ExtensionsScriptsCreateData = {
          * An ES module whose default export runs, at most 64 KiB.
          */
         source: string;
+        /**
+         * Binds the script to one entity of the point's target kind, such as
+         * a form ID. Absent: project-wide. Fixed after create.
+         */
+        target_id?: string | null;
     };
     path: {
         /**

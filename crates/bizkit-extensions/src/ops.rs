@@ -12,9 +12,11 @@ use http::StatusCode;
 use serde::Deserialize;
 use utoipa::ToSchema;
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::api::{
-    Capability, Hook, HookKindName, HookList, Run, RunCause, RunList, Script, ScriptId, ScriptList,
-    ScriptSummary, Secret, SecretList,
+    Capability, Hook, HookKindName, HookList, HookTargetKind, Run, RunCause, RunList, Script,
+    ScriptId, ScriptList, ScriptSummary, ScriptTarget, Secret, SecretList,
 };
 use crate::runner::{ASYNC_BUDGET, Execution, MAX_SOURCE_BYTES, ScriptRunner};
 use crate::store::{self, RunRow, ScriptRow};
@@ -61,13 +63,53 @@ fn hook_to_api(point: &HookPoint) -> Hook {
         budget_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
         event,
         capabilities,
+        target: point.target.map(|target| HookTargetKind {
+            id: target.id.to_owned(),
+            noun: target.noun.to_owned(),
+            plural: target.plural.to_owned(),
+        }),
         sample: (point.sample)(),
     }
 }
 
-fn summary(platform: &Platform, row: ScriptRow) -> ScriptSummary {
+/// Entity labels by ID, from each kind's resolver.
+type Labels = BTreeMap<String, String>;
+
+/// Looks up the labels of the entities `rows` are bound to, one resolver
+/// call per kind. A kind whose module is compiled out gives no labels.
+async fn labels(
+    platform: &Platform,
+    workspace_id: WorkspaceId,
+    rows: &[ScriptRow],
+) -> Result<Labels, ApiError> {
+    let mut by_kind: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+    for row in rows {
+        let kind = platform.hook_point(&row.hook).and_then(|point| point.target);
+        if let (Some(kind), Some(target_id)) = (kind, &row.target_id) {
+            by_kind.entry(kind.id).or_default().insert(target_id.clone());
+        }
+    }
+    let mut labels = Labels::new();
+    for (kind, ids) in by_kind {
+        let Some((_, resolver)) = platform.hook_target_kind(kind) else { continue };
+        let ids: Vec<String> = ids.into_iter().collect();
+        let found = resolver
+            .find(platform, workspace_id, &ids)
+            .await
+            .with_context(|| format!("looking up {kind} targets"))?;
+        labels.extend(found.into_iter().map(|entity| (entity.id, entity.label)));
+    }
+    Ok(labels)
+}
+
+fn target_to_api(labels: &Labels, id: String) -> ScriptTarget {
+    ScriptTarget { label: labels.get(&id).cloned(), id }
+}
+
+fn summary(platform: &Platform, labels: &Labels, row: ScriptRow) -> ScriptSummary {
     ScriptSummary {
         available: platform.hook_point(&row.hook).is_some(),
+        target: row.target_id.map(|id| target_to_api(labels, id)),
         id: row.id,
         project_id: row.project_id,
         hook: row.hook,
@@ -79,9 +121,11 @@ fn summary(platform: &Platform, row: ScriptRow) -> ScriptSummary {
     }
 }
 
-fn script_to_api(platform: &Platform, row: ScriptRow) -> Script {
-    Script {
+async fn script_to_api(platform: &Platform, row: ScriptRow) -> Result<Script, ApiError> {
+    let labels = labels(platform, row.workspace_id, std::slice::from_ref(&row)).await?;
+    Ok(Script {
         available: platform.hook_point(&row.hook).is_some(),
+        target: row.target_id.map(|id| target_to_api(&labels, id)),
         id: row.id,
         project_id: row.project_id,
         hook: row.hook,
@@ -91,7 +135,7 @@ fn script_to_api(platform: &Platform, row: ScriptRow) -> Script {
         enabled: row.enabled,
         created_at: row.created_at,
         updated_at: row.updated_at,
-    }
+    })
 }
 
 fn run_to_api(row: RunRow) -> anyhow::Result<Run> {
@@ -161,12 +205,16 @@ impl Validate for InWorkspace {}
 /// Which scripts to list.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[expect(clippy::struct_field_names, reason = "the filters are IDs and are named for them")]
 pub(crate) struct ListScripts {
     /// The workspace.
     workspace_id: WorkspaceId,
     /// Only this project's scripts.
     #[serde(default)]
     project_id: Option<ProjectId>,
+    /// Only scripts bound to this entity, as `target.id` spells it.
+    #[serde(default)]
+    target_id: Option<String>,
 }
 impl Validate for ListScripts {}
 
@@ -191,6 +239,10 @@ pub(crate) struct CreateScript {
     project_id: ProjectId,
     /// The hook point ID, such as `forms.pre_validate`. Fixed after create.
     hook: String,
+    /// Binds the script to one entity of the point's target kind, such as
+    /// a form ID. Absent: project-wide. Fixed after create.
+    #[serde(default)]
+    target_id: Option<String>,
     /// The display name.
     name: String,
     /// An ES module whose default export runs, at most 64 KiB.
@@ -379,10 +431,16 @@ impl Operation for ScriptsList {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: ListScripts) -> Result<ScriptList, ApiError> {
-        let rows =
-            store::list_scripts(cx.platform().db().read(), input.workspace_id, input.project_id)
-                .await?;
-        Ok(ScriptList { items: rows.into_iter().map(|row| summary(cx.platform(), row)).collect() })
+        let rows = store::list_scripts(
+            cx.platform().db().read(),
+            input.workspace_id,
+            input.project_id,
+            input.target_id.as_deref(),
+        )
+        .await?;
+        let labels = labels(cx.platform(), input.workspace_id, &rows).await?;
+        let items = rows.into_iter().map(|row| summary(cx.platform(), &labels, row)).collect();
+        Ok(ScriptList { items })
     }
 }
 
@@ -399,7 +457,7 @@ impl Operation for ScriptsGet {
 
     async fn call(&self, cx: OpCtx, input: InScript) -> Result<Script, ApiError> {
         let row = script_in(&cx, input.workspace_id, input.script_id).await?;
-        Ok(script_to_api(cx.platform(), row))
+        script_to_api(cx.platform(), row).await
     }
 }
 
@@ -422,6 +480,10 @@ impl Operation for ScriptsCreate {
         let Some(point) = cx.platform().hook_point(&input.hook) else {
             return Err(field_error("hook", "is not a hook point of this server"));
         };
+        let target_id = match &input.target_id {
+            Some(id) => Some(resolve_target(cx.platform(), point, &input, id).await?),
+            None => None,
+        };
         self.runner.check(&input.source).await.map_err(|err| field_error("source", err))?;
         let now = cx.now();
         let row = ScriptRow {
@@ -430,6 +492,7 @@ impl Operation for ScriptsCreate {
             project_id: input.project_id,
             hook: point.id.to_owned(),
             sync: point.kind.is_sync(),
+            target_id,
             name: input.name.trim().to_owned(),
             source: input.source,
             enabled: input.enabled.unwrap_or(true),
@@ -441,17 +504,62 @@ impl Operation for ScriptsCreate {
             return Err(field_error("project_id", "is not a project of this workspace"));
         }
         if row.sync
-            && store::has_sync_script(&mut *tx, row.workspace_id, row.project_id, &row.hook).await?
+            && store::has_sync_script(
+                &mut *tx,
+                row.workspace_id,
+                row.project_id,
+                &row.hook,
+                row.target_id.as_deref(),
+            )
+            .await?
         {
+            let holder = match point.target {
+                Some(kind) if row.target_id.is_some() => format!("the {}", kind.noun),
+                _ => "the project".to_owned(),
+            };
+            let scope = if row.target_id.is_some() { "a" } else { "a project-wide" };
             return Err(ApiError::Conflict(format!(
-                "the project already has a script on {}; a sync hook point takes one",
+                "{holder} already has {scope} script on {}; a sync hook point takes one",
                 row.hook
             )));
         }
         store::insert_script(&mut *tx, &row).await?;
         tx.commit().await?;
-        Ok(script_to_api(cx.platform(), row))
+        script_to_api(cx.platform(), row).await
     }
+}
+
+/// Checks that `id` names an entity of the point's target kind in the
+/// script's project, and returns its canonical ID. The check reads outside
+/// the write transaction; an entity deleted in between leaves a script that
+/// never runs, the same as deleting it later.
+async fn resolve_target(
+    platform: &Platform,
+    point: &HookPoint,
+    input: &CreateScript,
+    id: &str,
+) -> Result<String, ApiError> {
+    let Some(kind) = point.target else {
+        return Err(field_error(
+            "target_id",
+            format!("{} scripts can't bind to an entity", point.id),
+        ));
+    };
+    let Some((_, resolver)) = platform.hook_target_kind(kind.id) else {
+        return Err(field_error(
+            "target_id",
+            format!("{} isn't compiled into this server", kind.id),
+        ));
+    };
+    let found = resolver
+        .find(platform, input.workspace_id, &[id.to_owned()])
+        .await
+        .with_context(|| format!("looking up a {} target", kind.id))?;
+    found
+        .into_iter()
+        .find(|entity| entity.project_id == input.project_id)
+        .map(|entity| entity.id)
+        .ok_or_else(|| field_error("target_id", format!("is not a {} in this project", kind.noun)))
 }
 
 struct ScriptsUpdate {
@@ -490,7 +598,7 @@ impl Operation for ScriptsUpdate {
         row.updated_at = cx.now();
         store::update_script(&mut *tx, &row).await?;
         tx.commit().await?;
-        Ok(script_to_api(cx.platform(), row))
+        script_to_api(cx.platform(), row).await
     }
 }
 

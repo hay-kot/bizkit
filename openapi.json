@@ -1704,6 +1704,18 @@
                 }
               ]
             }
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only scripts bound to this entity, as `target.id` spells it."
+            }
           }
         ],
         "responses": {
@@ -1829,6 +1841,13 @@
                   "source": {
                     "type": "string",
                     "description": "An ES module whose default export runs, at most 64 KiB."
+                  },
+                  "target_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Binds the script to one entity of the point's target kind, such as\na form ID. Absent: project-wide. Fixed after create."
                   }
                 },
                 "additionalProperties": false
@@ -5402,6 +5421,17 @@
           "summary": {
             "type": "string",
             "description": "What it is for and what it expects back."
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HookTargetKind",
+                "description": "The entity kind scripts on it can bind to; `None`: project-wide only."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -5426,6 +5456,29 @@
               "$ref": "#/components/schemas/Hook"
             },
             "description": "The points, in registration order."
+          }
+        }
+      },
+      "HookTargetKind": {
+        "type": "object",
+        "description": "The kind of entity scripts on a hook point can bind to.",
+        "required": [
+          "id",
+          "noun",
+          "plural"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The kind ID, such as `forms.form`."
+          },
+          "noun": {
+            "type": "string",
+            "description": "The UI noun, such as `form`."
+          },
+          "plural": {
+            "type": "string",
+            "description": "Its plural, such as `forms`."
           }
         }
       },
@@ -5930,6 +5983,17 @@
             "type": "boolean",
             "description": "Whether the hook point runs inside the request."
           },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ScriptTarget",
+                "description": "The bound entity; `None` for a project-wide script, which runs for\nevery entity of the point's kind."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "When it last changed."
@@ -6003,9 +6067,40 @@
             "type": "boolean",
             "description": "Whether the hook point runs inside the request."
           },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ScriptTarget",
+                "description": "The bound entity; `None` for a project-wide script, which runs for\nevery entity of the point's kind."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "When it last changed."
+          }
+        }
+      },
+      "ScriptTarget": {
+        "type": "object",
+        "description": "The entity a script is bound to.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The entity ID, such as a form ID."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display name; `None` when it no longer exists."
           }
         }
       },

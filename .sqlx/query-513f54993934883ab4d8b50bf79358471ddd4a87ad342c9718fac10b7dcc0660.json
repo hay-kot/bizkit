@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT 1 FROM extension_scripts\n         WHERE workspace_id = ? AND project_id = ? AND hook = ? AND sync = 1",
+  "query": "SELECT 1 FROM extension_scripts\n         WHERE workspace_id = ? AND project_id = ? AND hook = ? AND sync = 1 AND target_id IS ?",
   "describe": {
     "columns": [
       {
@@ -11,11 +11,11 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false
     ]
   },
-  "hash": "b3f829e0afae7568610157ce4fa8a0f25e83b2b5592266c941fad765cb9b2daa"
+  "hash": "513f54993934883ab4d8b50bf79358471ddd4a87ad342c9718fac10b7dcc0660"
 }

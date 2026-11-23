@@ -47,6 +47,26 @@ pub enum Capability {
     Fetch,
 }
 
+/// The kind of entity scripts on a hook point can bind to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct HookTargetKind {
+    /// The kind ID, such as `forms.form`.
+    pub id: String,
+    /// The UI noun, such as `form`.
+    pub noun: String,
+    /// Its plural, such as `forms`.
+    pub plural: String,
+}
+
+/// The entity a script is bound to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ScriptTarget {
+    /// The entity ID, such as a form ID.
+    pub id: String,
+    /// Its display name; `None` when it no longer exists.
+    pub label: Option<String>,
+}
+
 /// A hook point a compiled-in module declares.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Hook {
@@ -62,6 +82,8 @@ pub struct Hook {
     pub event: Option<String>,
     /// What scripts on it can use.
     pub capabilities: Vec<Capability>,
+    /// The entity kind scripts on it can bind to; `None`: project-wide only.
+    pub target: Option<HookTargetKind>,
     /// A sample input.
     #[schema(schema_with = any_json)]
     pub sample: serde_json::Value,
@@ -85,6 +107,9 @@ pub struct ScriptSummary {
     pub hook: String,
     /// Whether the hook point runs inside the request.
     pub sync: bool,
+    /// The bound entity; `None` for a project-wide script, which runs for
+    /// every entity of the point's kind.
+    pub target: Option<ScriptTarget>,
     /// The display name.
     pub name: String,
     /// Whether it runs.
@@ -115,6 +140,9 @@ pub struct Script {
     pub hook: String,
     /// Whether the hook point runs inside the request.
     pub sync: bool,
+    /// The bound entity; `None` for a project-wide script, which runs for
+    /// every entity of the point's kind.
+    pub target: Option<ScriptTarget>,
     /// The display name.
     pub name: String,
     /// The ES module source. Its default export runs.

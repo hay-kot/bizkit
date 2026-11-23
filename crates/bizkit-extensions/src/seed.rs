@@ -7,7 +7,7 @@ use bizkit_core::db::Db;
 use crate::api::ScriptId;
 use crate::store::{self, ScriptRow};
 
-const POST_TO_DISCORD: &str = r"// Posts each Contact submission to a Discord channel. Set the
+const POST_TO_DISCORD: &str = r"// Posts each submission to a Discord channel. Set the
 // DISCORD_WEBHOOK secret to a webhook URL; without it, the script only logs.
 export default async function (input, ctx) {
   const { form, submission } = input
@@ -27,9 +27,8 @@ export default async function (input, ctx) {
 }
 ";
 
-const BLOCK_CASINO: &str = r"// Marks Contact submissions that mention a casino as spam.
+const BLOCK_CASINO: &str = r"// Marks submissions that mention a casino as spam.
 export default function (input) {
-  if (input.form.name !== 'Contact') return
   const text = Object.values(input.fields).flat().join(' ').toLowerCase()
   if (text.includes('casino')) return { action: 'spam', reason: 'mentions casino' }
   return { action: 'accept' }
@@ -37,11 +36,14 @@ export default function (input) {
 ";
 
 /// Seeds "Post to Discord" (after each submission) and "Block casino spam"
-/// (before validation) in the `website` project. A script that already
-/// exists by name is left alone.
+/// (before validation) in the `website` project, bound to the Contact form
+/// when the forms seed made one. A script that already exists by name is
+/// left alone, except that a project-wide one from an earlier seed gets
+/// bound.
 pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
-    let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id))
+    let contact = seed.entities.get(&("forms.form".to_owned(), "Contact".to_owned()));
+    let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id), None)
         .await
         .context("listing the demo scripts")?;
     let scripts = [
@@ -50,9 +52,30 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     ];
     let mut tx = db.write().await.context("starting the seed transaction")?;
     for (name, hook, sync, source) in scripts {
-        let taken =
-            existing.iter().any(|script| script.name == name || (sync && script.hook == hook));
-        if taken {
+        let slot_taken = |conn| async move {
+            Ok::<_, anyhow::Error>(
+                sync && store::has_sync_script(
+                    conn,
+                    seed.workspace_id,
+                    project_id,
+                    hook,
+                    contact.map(String::as_str),
+                )
+                .await
+                .context("checking the sync slot")?,
+            )
+        };
+        if let Some(found) = existing.iter().find(|script| script.name == name) {
+            if let (Some(contact), None) = (contact, &found.target_id)
+                && !slot_taken(&mut *tx).await?
+            {
+                store::bind_script(&mut *tx, seed.workspace_id, found.id, contact)
+                    .await
+                    .with_context(|| format!("binding the {name} script"))?;
+            }
+            continue;
+        }
+        if slot_taken(&mut *tx).await? {
             continue;
         }
         let row = ScriptRow {
@@ -61,6 +84,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             project_id,
             hook: hook.to_owned(),
             sync,
+            target_id: contact.cloned(),
             name: name.to_owned(),
             source: source.to_owned(),
             enabled: true,

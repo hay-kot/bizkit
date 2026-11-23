@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: ScriptId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", hook, sync AS \"sync: bool\", name, source,\n                  enabled AS \"enabled: bool\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_scripts\n           WHERE workspace_id = ? AND project_id = ? AND hook = ? AND enabled = 1\n           ORDER BY id",
+  "query": "SELECT id AS \"id: ScriptId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", hook, sync AS \"sync: bool\", target_id,\n                  name, source,\n                  enabled AS \"enabled: bool\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_scripts\n           WHERE workspace_id = ?1 AND (?2 IS NULL OR project_id = ?2)\n             AND (?3 IS NULL OR target_id = ?3)\n           ORDER BY name, id",
   "describe": {
     "columns": [
       {
@@ -59,8 +59,19 @@
         }
       },
       {
-        "name": "name",
+        "name": "target_id",
         "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_scripts",
+            "name": "target_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +82,7 @@
       },
       {
         "name": "source",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "enabled: bool",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -104,7 +115,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -123,6 +134,7 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       false,
@@ -130,5 +142,5 @@
       false
     ]
   },
-  "hash": "cff3b8082e8e9cb6ba76bce05d82516e2b37003103adacc6eac32fa3382128f4"
+  "hash": "227283084c9f5d2e8bea209471796a606c8b979aa331dd5b190134e0066e586f"
 }

@@ -19,6 +19,8 @@ pub(crate) struct ScriptRow {
     pub(crate) project_id: ProjectId,
     pub(crate) hook: String,
     pub(crate) sync: bool,
+    /// The bound entity; `None` for a project-wide script.
+    pub(crate) target_id: Option<String>,
     pub(crate) name: String,
     pub(crate) source: String,
     pub(crate) enabled: bool,
@@ -47,14 +49,15 @@ pub(crate) async fn insert_script(
     row: &ScriptRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "INSERT INTO extension_scripts (id, workspace_id, project_id, hook, sync, name, source,
-                                        enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO extension_scripts (id, workspace_id, project_id, hook, sync, target_id, name,
+                                        source, enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.project_id,
         row.hook,
         row.sync,
+        row.target_id,
         row.name,
         row.source,
         row.enabled,
@@ -86,6 +89,26 @@ pub(crate) async fn update_script(
     Ok(())
 }
 
+/// Binds a project-wide script to an entity. Only the demo seed does this:
+/// the API keeps targets fixed after create.
+#[cfg(feature = "test-hooks")]
+pub(crate) async fn bind_script(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: ScriptId,
+    target_id: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE extension_scripts SET target_id = ? WHERE workspace_id = ? AND id = ?",
+        target_id,
+        workspace_id,
+        id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
 pub(crate) async fn delete_script(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
@@ -109,7 +132,8 @@ pub(crate) async fn find_script(
     sqlx::query_as!(
         ScriptRow,
         r#"SELECT id AS "id: ScriptId", workspace_id AS "workspace_id: WorkspaceId",
-                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", name, source,
+                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", target_id,
+                  name, source,
                   enabled AS "enabled: bool", created_at AS "created_at: UnixMillis",
                   updated_at AS "updated_at: UnixMillis"
            FROM extension_scripts WHERE workspace_id = ? AND id = ?"#,
@@ -120,65 +144,79 @@ pub(crate) async fn find_script(
     .await
 }
 
-/// The workspace's scripts by name, or one project's.
+/// The workspace's scripts by name, or one project's, or those bound to
+/// one entity.
 pub(crate) async fn list_scripts(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     project_id: Option<ProjectId>,
+    target_id: Option<&str>,
 ) -> sqlx::Result<Vec<ScriptRow>> {
     sqlx::query_as!(
         ScriptRow,
         r#"SELECT id AS "id: ScriptId", workspace_id AS "workspace_id: WorkspaceId",
-                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", name, source,
+                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", target_id,
+                  name, source,
                   enabled AS "enabled: bool", created_at AS "created_at: UnixMillis",
                   updated_at AS "updated_at: UnixMillis"
            FROM extension_scripts
            WHERE workspace_id = ?1 AND (?2 IS NULL OR project_id = ?2)
+             AND (?3 IS NULL OR target_id = ?3)
            ORDER BY name, id"#,
         workspace_id,
-        project_id
+        project_id,
+        target_id
     )
     .fetch_all(exec)
     .await
 }
 
-/// The enabled scripts on `hook` for a project, oldest first.
+/// The enabled scripts on `hook` for a project that apply to `entity`:
+/// the project-wide ones and those bound to it. Oldest first.
 pub(crate) async fn enabled_scripts(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     project_id: ProjectId,
     hook: &str,
+    entity: Option<&str>,
 ) -> sqlx::Result<Vec<ScriptRow>> {
     sqlx::query_as!(
         ScriptRow,
         r#"SELECT id AS "id: ScriptId", workspace_id AS "workspace_id: WorkspaceId",
-                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", name, source,
+                  project_id AS "project_id: ProjectId", hook, sync AS "sync: bool", target_id,
+                  name, source,
                   enabled AS "enabled: bool", created_at AS "created_at: UnixMillis",
                   updated_at AS "updated_at: UnixMillis"
            FROM extension_scripts
-           WHERE workspace_id = ? AND project_id = ? AND hook = ? AND enabled = 1
+           WHERE workspace_id = ?1 AND project_id = ?2 AND hook = ?3 AND enabled = 1
+             AND (target_id IS NULL OR target_id = ?4)
            ORDER BY id"#,
         workspace_id,
         project_id,
-        hook
+        hook,
+        entity
     )
     .fetch_all(exec)
     .await
 }
 
-/// Whether the project already has a script on the sync point `hook`.
+/// Whether the sync point `hook` already has a script for `target_id`, or
+/// a project-wide one when it is `None`.
 pub(crate) async fn has_sync_script(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     project_id: ProjectId,
     hook: &str,
+    target_id: Option<&str>,
 ) -> sqlx::Result<bool> {
+    // `IS`, not `=`: a NULL target must match the project-wide slot.
     let found = sqlx::query_scalar!(
         "SELECT 1 FROM extension_scripts
-         WHERE workspace_id = ? AND project_id = ? AND hook = ? AND sync = 1",
+         WHERE workspace_id = ? AND project_id = ? AND hook = ? AND sync = 1 AND target_id IS ?",
         workspace_id,
         project_id,
-        hook
+        hook,
+        target_id
     )
     .fetch_optional(exec)
     .await?;

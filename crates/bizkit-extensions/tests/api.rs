@@ -58,6 +58,51 @@ mod api {
             form["id"].as_str().unwrap().to_owned()
         }
 
+        async fn form_in(&self, project: &str, name: &str) -> String {
+            let project_id = self.team.projects[project].id.to_string();
+            let body = json!({"project_id": project_id, "name": name});
+            let form: Value = self
+                .admin
+                .post(&format!("{}/forms", self.ws()), &body)
+                .await
+                .expect(StatusCode::CREATED)
+                .json();
+            form["id"].as_str().unwrap().to_owned()
+        }
+
+        async fn create(
+            &self,
+            hook: &str,
+            name: &str,
+            source: &str,
+            target: Option<&str>,
+        ) -> bizkit_testkit::ApiResponse {
+            let mut body =
+                json!({"project_id": self.project(), "hook": hook, "name": name, "source": source});
+            if let Some(target) = target {
+                body["target_id"] = json!(target);
+            }
+            self.admin.post(&format!("{}/extensions/scripts", self.ws()), &body).await
+        }
+
+        async fn list(&self, query: &str) -> Vec<Value> {
+            let path = format!("{}/extensions/scripts?{query}", self.ws());
+            let list: Value = self.admin.get(&path).await.expect(StatusCode::OK).json();
+            list["items"].as_array().unwrap().clone()
+        }
+
+        /// Sync runs are recorded off the request path, so wait for them.
+        async fn runs_at_least(&self, script: &Value, n: usize) -> Vec<Value> {
+            for _ in 0..100 {
+                let runs = self.runs(script).await;
+                if runs.len() >= n {
+                    return runs;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+            panic!("fewer than {n} runs of {script}");
+        }
+
         async fn submit(&self, form: &str, body: &str) -> StatusCode {
             let path = format!("/m/forms/public/{form}");
             self.app
@@ -309,12 +354,164 @@ mod api {
             "fails open"
         );
         assert_eq!(s.submissions(&form, "inbox").await.len(), 2, "stored in the inbox");
-        let runs = s.runs(&script).await;
+        let runs = s.runs_at_least(&script, 3).await;
         assert_eq!(
             (runs[0]["cause"].clone(), runs[0]["status"].clone()),
             (json!("sync"), json!("timeout")),
             "{}",
             runs[0]
+        );
+    }
+
+    const SPAM_IF_CASINO: &str = "export default (input) => input.fields.message?.[0]?.includes('casino') ? { action: 'spam', reason: 'bound' } : undefined";
+
+    #[tokio::test]
+    async fn targets_are_checked_and_canonical() {
+        let s = setup().await;
+        let form = s.form().await;
+        let other_project = s.form_in("app", "Elsewhere").await;
+        let source = "export default () => {}";
+
+        let upper = s.create(PRE, "Upper", source, Some(&form.to_uppercase())).await;
+        let script: Value = upper.expect(StatusCode::CREATED).json();
+        assert_eq!(
+            script["target"],
+            json!({"id": form, "label": "Contact"}),
+            "canonical and labelled"
+        );
+
+        for (target, why) in [
+            ("not-an-id", "malformed"),
+            (other_project.as_str(), "another project's form"),
+            ("01a20560-0a68-7703-8e0c-5c2bc679782b", "unknown"),
+        ] {
+            let res = s.create(PRE, "Bad", source, Some(target)).await;
+            assert_eq!(res.status, StatusCode::UNPROCESSABLE_ENTITY, "{why}");
+            assert!(res.json::<Value>()["error"]["fields"]["target_id"].is_array(), "{why}");
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_slots_are_per_entity_plus_one_project_wide() {
+        let s = setup().await;
+        let form = s.form().await;
+        let source = "export default () => {}";
+        s.create(PRE, "Wide", source, None).await.expect(StatusCode::CREATED);
+        s.create(PRE, "Bound", source, Some(&form)).await.expect(StatusCode::CREATED);
+
+        let wide = s.create(PRE, "Wide 2", source, None).await;
+        assert_eq!(wide.status, StatusCode::CONFLICT, "a second project-wide sync script");
+        let bound = s.create(PRE, "Bound 2", source, Some(&form)).await;
+        assert_eq!(bound.status, StatusCode::CONFLICT, "a second sync script on the form");
+        assert!(
+            bound.json::<Value>()["error"]["message"].as_str().unwrap().starts_with("the form"),
+            "the message names the form"
+        );
+        s.create(POST, "Async 1", source, Some(&form)).await.expect(StatusCode::CREATED);
+        s.create(POST, "Async 2", source, Some(&form)).await.expect(StatusCode::CREATED);
+    }
+
+    #[tokio::test]
+    async fn bound_scripts_run_only_for_their_form() {
+        let s = setup().await;
+        let contact = s.form().await;
+        let other = s.form_in("site", "Other").await;
+        let script: Value = s
+            .create(PRE, "Bound", SPAM_IF_CASINO, Some(&contact))
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        let wide = s.script(POST, "export default (input, ctx) => ctx.log(input.form.name)").await;
+        let only_contact: Value = s
+            .create(
+                POST,
+                "Contact only",
+                "export default (input, ctx) => ctx.log('bound')",
+                Some(&contact),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+
+        s.submit(&contact, r#"{"message": "casino"}"#).await;
+        s.submit(&other, r#"{"message": "casino"}"#).await;
+        assert_eq!(s.submissions(&contact, "spam").await.len(), 1, "the bound script ran");
+        assert_eq!(s.submissions(&other, "inbox").await.len(), 1, "not for the other form");
+        assert_eq!(s.runs_at_least(&script, 1).await.len(), 1, "one sync run");
+
+        s.app.drain_jobs().await;
+        assert_eq!(
+            s.runs(&wide).await.len(),
+            1,
+            "project-wide ran for the other form's inbox post"
+        );
+        assert_eq!(s.runs(&only_contact).await.len(), 0, "the contact post was spam, so no event");
+        s.submit(&contact, r#"{"message": "hi"}"#).await;
+        s.app.drain_jobs().await;
+        assert_eq!(s.runs(&wide).await.len(), 2, "project-wide runs for every form");
+        assert_eq!(s.runs(&only_contact).await.len(), 1, "bound runs for its form");
+
+        let filtered = s.list(&format!("target_id={contact}")).await;
+        let names: Vec<&str> = filtered.iter().map(|item| item["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["Bound", "Contact only"], "the target filter");
+    }
+
+    #[tokio::test]
+    async fn the_bound_sync_script_wins_until_disabled() {
+        let s = setup().await;
+        let form = s.form().await;
+        s.create(PRE, "Wide", "export default () => ({ action: 'spam', reason: 'wide' })", None)
+            .await
+            .expect(StatusCode::CREATED);
+        let bound: Value = s
+            .create(
+                PRE,
+                "Bound",
+                "export default () => ({ action: 'spam', reason: 'bound' })",
+                Some(&form),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        s.submit(&form, r#"{"message": "a"}"#).await;
+        let path = format!("{}/extensions/scripts/{}", s.ws(), bound["id"].as_str().unwrap());
+        s.admin.patch(&path, &json!({"enabled": false})).await.expect(StatusCode::OK);
+        s.submit(&form, r#"{"message": "b"}"#).await;
+        let mut reasons: Vec<String> = s
+            .submissions(&form, "spam")
+            .await
+            .iter()
+            .map(|item| item["spam_reason"].as_str().unwrap().to_owned())
+            .collect();
+        reasons.sort();
+        assert_eq!(reasons, ["bound", "wide"], "bound first, then the project-wide fallback");
+    }
+
+    #[tokio::test]
+    async fn scripts_of_deleted_forms_lose_their_label() {
+        let s = setup().await;
+        let form = s.form().await;
+        s.create(POST, "Orphan", "export default () => {}", Some(&form))
+            .await
+            .expect(StatusCode::CREATED);
+        s.admin.delete(&format!("{}/forms/{form}", s.ws())).await.expect(StatusCode::NO_CONTENT);
+        let items = s.list("").await;
+        assert_eq!(items[0]["target"], json!({"id": form, "label": null}), "kept, unlabelled");
+    }
+
+    #[tokio::test]
+    async fn hooks_name_their_target_kind() {
+        let s = setup().await;
+        let list: Value = s
+            .admin
+            .get(&format!("{}/extensions/hooks", s.ws()))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(
+            list["items"][0]["target"],
+            json!({"id": "forms.form", "noun": "form", "plural": "forms"}),
+            "pre_validate targets forms"
         );
     }
 }

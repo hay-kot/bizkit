@@ -300,6 +300,7 @@ impl HookRunner for ScriptRunner {
             target.workspace_id,
             target.project_id,
             point.id,
+            target.entity.as_deref(),
         )
         .await
         {
@@ -312,7 +313,13 @@ impl HookRunner for ScriptRunner {
                 };
             }
         };
-        let Some(script) = scripts.iter().find(|script| script.sync) else {
+        // The entity's own script wins over the project-wide one. A disabled
+        // bound script isn't in `scripts`, so the project-wide one runs: turning
+        // off an override goes back to the default rather than to no hook.
+        let sync = || scripts.iter().filter(|script| script.sync);
+        let Some(script) =
+            sync().find(|script| script.target_id.is_some()).or_else(|| sync().next())
+        else {
             return SyncOutcome::NoScript;
         };
         let exec = Execution {
@@ -347,6 +354,7 @@ impl HookRunner for ScriptRunner {
             target.workspace_id,
             target.project_id,
             point.id,
+            target.entity.as_deref(),
         )
         .await
         .context("loading the async scripts")?;
