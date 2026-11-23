@@ -679,6 +679,10 @@ export type Script = {
      */
     targets: Array<ScriptTarget>;
     /**
+     * The saved test cases.
+     */
+    tests: Array<TestCase>;
+    /**
      * When it last changed.
      */
     updated_at: Timestamp;
@@ -893,6 +897,58 @@ export type TargetList = {
      * The entities, by label.
      */
     items: Array<TargetEntity>;
+};
+
+/**
+ * A saved input to run a script on, and what it must return.
+ */
+export type TestCase = {
+    expect?: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    input: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    /**
+     * A name, unique in the script.
+     */
+    name: string;
+};
+
+/**
+ * How a test case went.
+ */
+export type TestOutcome = 'pass' | 'fail' | 'error';
+
+/**
+ * A test run's results.
+ */
+export type TestReport = {
+    /**
+     * One result per case, in case order.
+     */
+    items: Array<TestResult>;
+};
+
+/**
+ * One test case's result.
+ */
+export type TestResult = {
+    expect?: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    /**
+     * The case name.
+     */
+    name: string;
+    /**
+     * How it went.
+     */
+    outcome: TestOutcome;
+    /**
+     * The recorded run, with what the script returned and logged.
+     */
+    run: Run;
 };
 
 export type Timestamp = string;
@@ -1911,6 +1967,11 @@ export type ExtensionsScriptsCreateData = {
          * IDs, at most 100. Empty or absent: every entity of the kind.
          */
         target_ids?: Array<string>;
+        /**
+         * Saved test cases, at most 20. Default one case on the point's
+         * sample input.
+         */
+        tests?: Array<TestCase> | null;
     };
     path: {
         /**
@@ -2079,6 +2140,10 @@ export type ExtensionsScriptsUpdateData = {
          * point's kind.
          */
         target_ids?: Array<string> | null;
+        /**
+         * Replaces the saved test cases, at most 20.
+         */
+        tests?: Array<TestCase> | null;
     };
     path: {
         /**
@@ -2134,13 +2199,15 @@ export type ExtensionsScriptsUpdateResponse = ExtensionsScriptsUpdateResponses[k
 
 export type ExtensionsScriptsTestData = {
     body: {
-        input?: {
-            [key: string]: unknown;
-        } | Array<unknown> | string | number | boolean | null;
         /**
          * Runs this source instead of the saved one, at most 64 KiB.
          */
         source?: string | null;
+        /**
+         * Runs these cases instead of the saved ones, at most 20; pass one
+         * to run a single case.
+         */
+        tests?: Array<TestCase> | null;
     };
     path: {
         /**
@@ -2185,7 +2252,7 @@ export type ExtensionsScriptsTestResponses = {
     /**
      * OK
      */
-    200: Run;
+    200: TestReport;
 };
 
 export type ExtensionsScriptsTestResponse = ExtensionsScriptsTestResponses[keyof ExtensionsScriptsTestResponses];

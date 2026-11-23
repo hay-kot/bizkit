@@ -6,7 +6,7 @@ use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
 
-use crate::api::{RunId, ScriptId};
+use crate::api::{RunId, ScriptId, TestCase};
 
 /// Runs kept per script.
 pub(crate) const RUNS_KEPT: i64 = 100;
@@ -23,6 +23,7 @@ pub(crate) struct ScriptRow {
     pub(crate) target_ids: Vec<String>,
     pub(crate) name: String,
     pub(crate) source: String,
+    pub(crate) tests: Vec<TestCase>,
     pub(crate) enabled: bool,
     pub(crate) created_at: UnixMillis,
     pub(crate) updated_at: UnixMillis,
@@ -39,6 +40,7 @@ struct RawScript {
     targets: String,
     name: String,
     source: String,
+    tests: String,
     enabled: bool,
     created_at: UnixMillis,
     updated_at: UnixMillis,
@@ -48,8 +50,9 @@ impl TryFrom<RawScript> for ScriptRow {
     type Error = sqlx::Error;
 
     fn try_from(raw: RawScript) -> sqlx::Result<Self> {
-        let target_ids =
-            serde_json::from_str(&raw.targets).map_err(|err| sqlx::Error::Decode(Box::new(err)))?;
+        let decode = |err: serde_json::Error| sqlx::Error::Decode(Box::new(err));
+        let target_ids = serde_json::from_str(&raw.targets).map_err(decode)?;
+        let tests = serde_json::from_str(&raw.tests).map_err(decode)?;
         Ok(Self {
             id: raw.id,
             workspace_id: raw.workspace_id,
@@ -59,6 +62,7 @@ impl TryFrom<RawScript> for ScriptRow {
             target_ids,
             name: raw.name,
             source: raw.source,
+            tests,
             enabled: raw.enabled,
             created_at: raw.created_at,
             updated_at: raw.updated_at,
@@ -91,10 +95,11 @@ pub(crate) async fn insert_script(
     tx: &mut sqlx::SqliteConnection,
     row: &ScriptRow,
 ) -> sqlx::Result<()> {
+    let tests = encode_tests(&row.tests)?;
     sqlx::query!(
         "INSERT INTO extension_scripts (id, workspace_id, project_id, hook, sync, name, source,
-                                        enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                        tests, enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.project_id,
@@ -102,6 +107,7 @@ pub(crate) async fn insert_script(
         row.sync,
         row.name,
         row.source,
+        tests,
         row.enabled,
         row.created_at,
         row.updated_at,
@@ -111,17 +117,23 @@ pub(crate) async fn insert_script(
     insert_targets(tx, row).await
 }
 
-/// Writes the name, source, enabled flag, target set and `updated_at` of
-/// `row`.
+fn encode_tests(tests: &[TestCase]) -> sqlx::Result<String> {
+    serde_json::to_string(tests).map_err(|err| sqlx::Error::Encode(Box::new(err)))
+}
+
+/// Writes the name, source, tests, enabled flag, target set and
+/// `updated_at` of `row`.
 pub(crate) async fn update_script(
     tx: &mut sqlx::SqliteConnection,
     row: &ScriptRow,
 ) -> sqlx::Result<()> {
+    let tests = encode_tests(&row.tests)?;
     sqlx::query!(
-        "UPDATE extension_scripts SET name = ?, source = ?, enabled = ?, updated_at = ?
+        "UPDATE extension_scripts SET name = ?, source = ?, tests = ?, enabled = ?, updated_at = ?
          WHERE workspace_id = ? AND id = ?",
         row.name,
         row.source,
+        tests,
         row.enabled,
         row.updated_at,
         row.workspace_id,
@@ -182,7 +194,7 @@ pub(crate) async fn find_script(
                      SELECT target_id FROM extension_script_targets t
                      WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id
                      ORDER BY target_id)) AS "targets!: String",
-                  s.name, s.source, s.enabled AS "enabled: bool",
+                  s.name, s.source, s.tests, s.enabled AS "enabled: bool",
                   s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
            FROM extension_scripts s WHERE s.workspace_id = ? AND s.id = ?"#,
         workspace_id,
@@ -208,7 +220,7 @@ pub(crate) async fn list_scripts(
                      SELECT target_id FROM extension_script_targets t
                      WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id
                      ORDER BY target_id)) AS "targets!: String",
-                  s.name, s.source, s.enabled AS "enabled: bool",
+                  s.name, s.source, s.tests, s.enabled AS "enabled: bool",
                   s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
            FROM extension_scripts s
            WHERE s.workspace_id = ?1 AND (?2 IS NULL OR s.project_id = ?2)
@@ -238,7 +250,7 @@ pub(crate) async fn enabled_scripts(
                      SELECT target_id FROM extension_script_targets t
                      WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id
                      ORDER BY target_id)) AS "targets!: String",
-                  s.name, s.source, s.enabled AS "enabled: bool",
+                  s.name, s.source, s.tests, s.enabled AS "enabled: bool",
                   s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
            FROM extension_scripts s
            WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.enabled = 1

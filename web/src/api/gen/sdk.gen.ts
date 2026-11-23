@@ -342,7 +342,7 @@ export const extensionsScriptsGet = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
- * Change a script's name, source, enabled flag or targets
+ * Change a script's name, source, test cases, enabled flag or targets
  */
 export const extensionsScriptsUpdate = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsUpdateData, ThrowOnError>): RequestResult<ExtensionsScriptsUpdateResponses, ExtensionsScriptsUpdateErrors, ThrowOnError> => (options.client ?? client).patch<ExtensionsScriptsUpdateResponses, ExtensionsScriptsUpdateErrors, ThrowOnError>({
     security: [{
@@ -359,7 +359,7 @@ export const extensionsScriptsUpdate = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Run a script now with its hook point's capabilities, real fetch included, and record the run
+ * Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run
  */
 export const extensionsScriptsTest = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsTestData, ThrowOnError>): RequestResult<ExtensionsScriptsTestResponses, ExtensionsScriptsTestErrors, ThrowOnError> => (options.client ?? client).post<ExtensionsScriptsTestResponses, ExtensionsScriptsTestErrors, ThrowOnError>({
     security: [{

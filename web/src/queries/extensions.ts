@@ -27,6 +27,9 @@ import type {
   ScriptTarget,
   Secret,
   TargetEntity,
+  TestCase,
+  TestOutcome,
+  TestResult,
 } from '@/api/gen/types.gen'
 
 import { useInvalidate } from './keys'
@@ -42,6 +45,9 @@ export type {
   ScriptTarget,
   Secret,
   TargetEntity,
+  TestCase,
+  TestOutcome,
+  TestResult,
 }
 
 const SCRIPT_QUERIES = ['extensionsScriptsList', 'extensionsScriptsGet']

@@ -163,6 +163,8 @@ pub struct Script {
     pub name: String,
     /// The ES module source. Its default export runs.
     pub source: String,
+    /// The saved test cases.
+    pub tests: Vec<TestCase>,
     /// Whether it runs.
     pub enabled: bool,
     /// False when no compiled-in module declares the hook point.
@@ -171,6 +173,55 @@ pub struct Script {
     pub created_at: UnixMillis,
     /// When it last changed.
     pub updated_at: UnixMillis,
+}
+
+/// A saved input to run a script on, and what it must return.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TestCase {
+    /// A name, unique in the script.
+    pub name: String,
+    /// The hook input.
+    #[schema(schema_with = any_json)]
+    pub input: serde_json::Value,
+    /// The value the script must return, compared as JSON, with
+    /// `undefined` as `null`. Absent or `null`: the run must only not fail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(schema_with = any_json)]
+    pub expect: Option<serde_json::Value>,
+}
+
+/// How a test case went.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TestOutcome {
+    /// The run succeeded and matched `expect`, if any.
+    Pass,
+    /// The run succeeded but returned something other than `expect`.
+    Fail,
+    /// The run failed: an error, a timeout or an invalid output.
+    Error,
+}
+
+/// One test case's result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TestResult {
+    /// The case name.
+    pub name: String,
+    /// How it went.
+    pub outcome: TestOutcome,
+    /// The case's `expect`.
+    #[schema(schema_with = any_json)]
+    pub expect: Option<serde_json::Value>,
+    /// The recorded run, with what the script returned and logged.
+    pub run: Run,
+}
+
+/// A test run's results.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TestReport {
+    /// One result per case, in case order.
+    pub items: Vec<TestResult>,
 }
 
 /// What started a run.

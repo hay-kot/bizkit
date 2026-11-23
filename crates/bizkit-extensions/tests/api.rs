@@ -244,7 +244,9 @@ mod api {
         s.put_secret("TOKEN", "hunter2-very-secret").await;
         let script = s.script(POST, "export default (input, ctx) => { ctx.log('token', ctx.secrets.TOKEN); return { echo: ctx.secrets.TOKEN, form: input.form.name } }").await;
         let test = format!("{}/extensions/scripts/{}/test", s.ws(), script["id"].as_str().unwrap());
-        let run: Value = s.admin.post(&test, &json!({})).await.expect(StatusCode::OK).json();
+        let report: Value = s.admin.post(&test, &json!({})).await.expect(StatusCode::OK).json();
+        assert_eq!(report["items"][0]["name"], "Sample input", "the default case");
+        let run = &report["items"][0]["run"];
         assert_eq!(run["status"], "ok", "{run}");
         assert_eq!(run["logs"], json!(["token [secret:TOKEN]"]), "logs redacted");
         assert_eq!(
@@ -259,6 +261,8 @@ mod api {
 
         let blocked = json!({"source": "export default async (input, ctx) => { await ctx.fetch('http://127.0.0.1:9/') }"});
         let refused: Value = s.admin.post(&test, &blocked).await.expect(StatusCode::OK).json();
+        assert_eq!(refused["items"][0]["outcome"], "error", "{refused}");
+        let refused = &refused["items"][0]["run"];
         assert_eq!(refused["status"], "error", "{refused}");
         assert!(refused["error"].as_str().unwrap().contains("not a public address"), "{refused}");
         assert!(s.app.http.requests().is_empty(), "never reached the client");
@@ -370,7 +374,7 @@ mod api {
 
     const SPAM_IF_CASINO: &str = "export default (input) => input.fields.message?.[0]?.includes('casino') ? { action: 'spam', reason: 'bound' } : undefined";
 
-    fn message(res: bizkit_testkit::ApiResponse) -> String {
+    fn message(res: &bizkit_testkit::ApiResponse) -> String {
         assert_eq!(res.status, StatusCode::CONFLICT, "a conflict");
         res.json::<Value>()["error"]["message"].as_str().unwrap().to_owned()
     }
@@ -402,8 +406,8 @@ mod api {
             let res = s.create(PRE, "Bad", source, &[&form, target]).await;
             assert_eq!(res.status, StatusCode::UNPROCESSABLE_ENTITY, "{why}");
             assert!(res.json::<Value>()["error"]["fields"]["target_ids"].is_array(), "{why}");
-            let res = s.retarget(&script, &[target]).await;
-            assert_eq!(res.status, StatusCode::UNPROCESSABLE_ENTITY, "{why} on update");
+            let updated = s.retarget(&script, &[target]).await;
+            assert_eq!(updated.status, StatusCode::UNPROCESSABLE_ENTITY, "{why} on update");
         }
     }
 
@@ -417,9 +421,9 @@ mod api {
         s.create(PRE, "Wide", source, &[]).await.expect(StatusCode::CREATED);
         s.create(PRE, "Bound", source, &[&contact]).await.expect(StatusCode::CREATED);
 
-        let wide = message(s.create(PRE, "Wide 2", source, &[]).await);
+        let wide = message(&s.create(PRE, "Wide 2", source, &[]).await);
         assert!(wide.contains("Wide already runs on forms.pre_validate for all forms"), "{wide}");
-        let shared = message(s.create(PRE, "Bound 2", source, &[&other, &contact]).await);
+        let shared = message(&s.create(PRE, "Bound 2", source, &[&other, &contact]).await);
         assert!(
             shared.contains("Bound already runs on forms.pre_validate for Contact"),
             "{shared}"
@@ -430,9 +434,9 @@ mod api {
             .await
             .expect(StatusCode::CREATED)
             .json();
-        let taken = message(s.retarget(&elsewhere, &[&third, &contact]).await);
+        let taken = message(&s.retarget(&elsewhere, &[&third, &contact]).await);
         assert!(taken.contains("Bound already runs"), "updates are checked: {taken}");
-        message(s.retarget(&elsewhere, &[]).await);
+        message(&s.retarget(&elsewhere, &[]).await);
         s.retarget(&elsewhere, &[&other]).await.expect(StatusCode::OK);
 
         s.create(POST, "Async 1", source, &[&contact]).await.expect(StatusCode::CREATED);
@@ -480,8 +484,8 @@ mod api {
 
         let filtered = s.list(&format!("target_id={contact}")).await;
         assert_eq!(names(&filtered), ["Contact only", "Shared", "Test"], "what runs for contact");
-        let filtered = s.list(&format!("target_id={other}")).await;
-        assert_eq!(names(&filtered), ["Test"], "what runs for the other form");
+        let for_other = s.list(&format!("target_id={other}")).await;
+        assert_eq!(names(&for_other), ["Test"], "what runs for the other form");
     }
 
     #[tokio::test]
@@ -542,8 +546,8 @@ mod api {
             json!([{"id": contact, "label": "Contact"}]),
             "this project only"
         );
-        let path = format!("{}/extensions/targets?project_id={}&kind=nope", s.ws(), s.project());
-        let res = s.admin.get(&path).await;
+        let unknown = format!("{}/extensions/targets?project_id={}&kind=nope", s.ws(), s.project());
+        let res = s.admin.get(&unknown).await;
         assert_eq!(res.status, StatusCode::UNPROCESSABLE_ENTITY, "unknown kind");
     }
 
@@ -561,5 +565,54 @@ mod api {
             json!({"id": "forms.form", "noun": "form", "plural": "forms"}),
             "pre_validate targets forms"
         );
+    }
+
+    #[tokio::test]
+    async fn saved_test_cases_pass_fail_and_error() {
+        let s = setup().await;
+        let script = s.script(PRE, SPAM_IF_CASINO).await;
+        assert_eq!(script["tests"][0]["name"], "Sample input", "a sample case on create");
+        let path = format!("{}/extensions/scripts/{}", s.ws(), script["id"].as_str().unwrap());
+        let input =
+            |message: &str| json!({"form": {"name": "Contact"}, "fields": {"message": [message]}});
+        let cases = json!([
+            {"name": " Casino ", "input": input("casino"), "expect": {"action": "spam", "reason": "bound"}},
+            {"name": "Hello", "input": input("hello")},
+            {"name": "Wrong", "input": input("hello"), "expect": {"action": "accept"}},
+        ]);
+        let saved: Value =
+            s.admin.patch(&path, &json!({"tests": cases})).await.expect(StatusCode::OK).json();
+        assert_eq!(saved["tests"][0]["name"], "Casino", "names trimmed");
+        assert!(saved["tests"][1].get("expect").is_none(), "no expect stays absent");
+
+        let report: Value =
+            s.admin.post(&format!("{path}/test"), &json!({})).await.expect(StatusCode::OK).json();
+        let outcomes: Vec<(&str, &str)> = report["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| (item["name"].as_str().unwrap(), item["outcome"].as_str().unwrap()))
+            .collect();
+        assert_eq!(
+            outcomes,
+            [("Casino", "pass"), ("Hello", "pass"), ("Wrong", "fail")],
+            "outcomes"
+        );
+        assert_eq!(s.runs(&script).await.len(), 3, "a run per case");
+
+        let one = json!({"tests": [{"name": "Only", "input": input("x")}], "source": "export default () => { throw new Error('no') }"});
+        let single: Value =
+            s.admin.post(&format!("{path}/test"), &one).await.expect(StatusCode::OK).json();
+        assert_eq!(single["items"].as_array().unwrap().len(), 1, "a single given case");
+        assert_eq!(single["items"][0]["outcome"], "error", "an unsaved source that throws");
+
+        for (bad, why) in [
+            (json!([{"name": "A", "input": {}}, {"name": "A", "input": {}}]), "a repeated name"),
+            (json!([{"name": " ", "input": {}}]), "an empty name"),
+            (json!([{"name": "A"}]), "no input"),
+        ] {
+            let res = s.admin.patch(&path, &json!({"tests": bad})).await;
+            assert_eq!(res.status, StatusCode::UNPROCESSABLE_ENTITY, "{why}");
+        }
     }
 }

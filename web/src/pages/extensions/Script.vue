@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { CircleCheck, CircleDot, Ellipsis, History, Play, Trash2 } from 'lucide-vue-next'
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import {
+  CircleCheck,
+  CircleDot,
+  Ellipsis,
+  FlaskConical,
+  History,
+  Play,
+  Trash2,
+} from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import TargetPicker from '@/components/extensions/TargetPicker.vue'
 import { runsForText } from '@/components/extensions/targets'
+import type { CasesResult } from '@/components/extensions/testCases'
+import { lineDiff, parseCases } from '@/components/extensions/testCases'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
@@ -13,6 +23,7 @@ import DataTable from '@/components/ui/DataTable.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
+import type { Json } from '@/components/ui/JsonEditor.vue'
 import JsonEditor from '@/components/ui/JsonEditor.vue'
 import Menu from '@/components/ui/Menu.vue'
 import MenuItem from '@/components/ui/MenuItem.vue'
@@ -21,7 +32,7 @@ import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { runAction } from '@/lib/action'
 import { errorMessage } from '@/lib/errors'
 import { formatDate } from '@/lib/format'
-import type { Run, RunStatus } from '@/queries/extensions'
+import type { Run, RunStatus, TestCase, TestOutcome, TestResult } from '@/queries/extensions'
 import {
   useDeleteScript,
   useHooks,
@@ -61,10 +72,11 @@ const name = ref('')
 const source = ref('')
 const enabled = ref(true)
 const targetIds = ref<string[]>([])
-const testInput = ref('')
-const inputEditor = useTemplateRef('inputEditor')
-const lastTest = ref<Run | null>(null)
+const testsText = ref('')
+const results = ref(new Map<string, TestResult>())
+const running = ref<string | 'all' | null>(null)
 const viewing = ref<Run | null>(null)
+const viewingCase = ref<TestResult | null>(null)
 
 // The server copy the fields were last filled from. A refetch (after a
 // save, failed or not) only replaces the fields the user hasn't edited since,
@@ -82,17 +94,47 @@ watch(
     if (fresh || source.value === synced?.source) source.value = loaded.source
     if (fresh || enabled.value === synced?.enabled) enabled.value = loaded.enabled
     if (fresh || sameSet(targetIds.value, idsOf(synced))) targetIds.value = idsOf(loaded)
+    if (fresh || testsText.value === casesText(synced?.tests))
+      testsText.value = casesText(loaded.tests)
     synced = loaded
   },
   { immediate: true },
 )
-watch(
-  hook,
-  (point) => {
-    if (point && testInput.value === '') testInput.value = JSON.stringify(point.sample, null, 2)
-  },
-  { immediate: true },
-)
+function pretty(value: unknown): string {
+  return value === undefined ? '' : JSON.stringify(value, null, 2)
+}
+
+/** Cases as the editor shows them: name first, whatever order the API sent. */
+function casesText(tests: TestCase[] | undefined): string {
+  return tests === undefined
+    ? ''
+    : pretty(tests.map(({ name, input, expect }) => ({ name, input, expect })))
+}
+
+/** JSON with object keys sorted, so key order never counts as a change. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([x], [y]) => (x < y ? -1 : 1)))
+      : item,
+  )
+}
+
+/** The tests editor's cases, or why they can't be used. */
+const cases = computed((): CasesResult => {
+  try {
+    return parseCases(JSON.parse(testsText.value) as Json)
+  } catch {
+    // JsonEditor shows the parse error itself.
+    return { ok: false, error: '' }
+  }
+})
+
+function addSampleCase() {
+  const sample: TestCase = { name: 'Sample input', input: hook.value?.sample ?? {} }
+  const current = cases.value.ok ? cases.value.cases : []
+  testsText.value = casesText([...current, sample])
+}
 
 function idsOf(loaded: typeof script.value): string[] {
   return loaded?.targets.map((target) => target.id) ?? []
@@ -108,7 +150,9 @@ const dirty = computed(
     (name.value !== script.value.name ||
       source.value !== script.value.source ||
       enabled.value !== script.value.enabled ||
-      !sameSet(targetIds.value, idsOf(script.value))),
+      !sameSet(targetIds.value, idsOf(script.value)) ||
+      !cases.value.ok ||
+      canonical(cases.value.cases) !== canonical(script.value.tests)),
 )
 
 const CAPABILITY_NAMES: Record<string, string> = {
@@ -142,7 +186,21 @@ const facts = computed(() => {
   return items
 })
 
-const sampleInput = computed(() => (hook.value ? JSON.stringify(hook.value.sample, null, 2) : ''))
+const sampleInput = computed(() => pretty(hook.value?.sample))
+
+const OUTCOME_LABELS: Record<TestOutcome, string> = { pass: 'Pass', fail: 'Fail', error: 'Error' }
+const OUTCOME_CLASSES: Record<TestOutcome, string> = {
+  pass: 'badge-success',
+  fail: 'badge-error',
+  error: 'badge-warning',
+}
+const caseColumns = [
+  { key: 'name', label: 'Case' },
+  { key: 'outcome', label: 'Result' },
+  { key: 'duration', label: 'Took' },
+  { key: 'returned', label: 'Returned' },
+  { key: 'actions', label: 'Actions', hidden: true, class: 'w-20 text-right' },
+]
 
 const STATUS_LABELS: Record<RunStatus, string> = {
   ok: 'OK',
@@ -176,6 +234,7 @@ function save() {
           name: name.value,
           source: source.value,
           enabled: enabled.value,
+          ...(cases.value.ok ? { tests: cases.value.cases } : {}),
           ...(hook.value?.target ? { target_ids: targetIds.value } : {}),
         },
       }),
@@ -183,19 +242,41 @@ function save() {
   })
 }
 
-const testOutput = computed(() =>
-  lastTest.value?.output == null ? '' : JSON.stringify(lastTest.value.output, null, 2),
-)
-
-async function runTest() {
-  const parsed = inputEditor.value?.parsed
-  if (!parsed?.ok) return
-  lastTest.value = await test.mutateAsync({
-    path: { workspace_id: props.workspaceId, script_id: props.scriptId },
-    body: { input: parsed.value, source: source.value },
-  })
+/** Runs the given cases, or all of them, on the source in the editor. */
+async function runCases(only?: TestCase) {
+  if (!cases.value.ok) return
+  running.value = only?.name ?? 'all'
+  try {
+    const report = await test.mutateAsync({
+      path: { workspace_id: props.workspaceId, script_id: props.scriptId },
+      body: { tests: only ? [only] : cases.value.cases, source: source.value },
+    })
+    const next = only ? new Map(results.value) : new Map<string, TestResult>()
+    for (const result of report.items) next.set(result.name.trim(), result)
+    results.value = next
+  } finally {
+    running.value = null
+  }
   await refetchRuns()
 }
+
+function resultOf(testCase: TestCase): TestResult | undefined {
+  return results.value.get(testCase.name.trim())
+}
+
+const passed = computed(
+  () => [...results.value.values()].filter((r) => r.outcome === 'pass').length,
+)
+
+function returnedText(output: unknown): string {
+  return output === null || output === undefined ? 'undefined' : JSON.stringify(output)
+}
+
+const viewingDiff = computed(() => {
+  const result = viewingCase.value
+  if (result?.outcome !== 'fail') return []
+  return lineDiff(pretty(result.expect), pretty(result.run.output ?? null))
+})
 
 function deleteScript() {
   return runAction({
@@ -269,119 +350,146 @@ function summaryOf(run: Run): string {
         </template>
       </DescriptionList>
 
-      <div class="grid items-start gap-6 xl:grid-cols-5">
-        <Card title="Script" class="xl:col-span-3">
-          <form id="script-form" class="flex flex-col gap-4" @submit.prevent="save">
-            <div class="flex flex-wrap items-end gap-4">
-              <Field label="Name" class="min-w-64 flex-1">
-                <input v-model="name" name="script-name" required class="input w-full" />
-              </Field>
-              <div class="flex h-10 items-center">
-                <Checkbox v-model="enabled" label="Enabled" />
-              </div>
+      <Card title="Script">
+        <form id="script-form" class="flex flex-col gap-4" @submit.prevent="save">
+          <div class="flex flex-wrap items-end gap-4">
+            <Field label="Name" class="min-w-64 flex-1">
+              <input v-model="name" name="script-name" required class="input w-full" />
+            </Field>
+            <div class="flex h-10 items-center">
+              <Checkbox v-model="enabled" label="Enabled" />
             </div>
-            <TargetPicker
-              v-if="hook?.target"
-              v-model="targetIds"
-              :workspace-id="workspaceId"
-              :project-id="projectId"
-              :kind="hook.target"
+          </div>
+          <TargetPicker
+            v-if="hook?.target"
+            v-model="targetIds"
+            :workspace-id="workspaceId"
+            :project-id="projectId"
+            :kind="hook.target"
+          />
+          <div class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium">Source</span>
+            <CodeEditor
+              v-model="source"
+              language="javascript"
+              label="Script source"
+              :min-lines="12"
+              :max-lines="40"
             />
-            <div class="flex flex-col gap-1.5">
-              <span class="text-sm font-medium">Source</span>
-              <CodeEditor
-                v-model="source"
-                language="javascript"
-                label="Script source"
-                :min-lines="12"
-                :max-lines="36"
-              />
-            </div>
-          </form>
-          <details v-if="hook" class="rounded-field border border-base-300 px-3 py-2">
-            <summary class="cursor-pointer text-sm font-medium">
-              What the script gets and returns
-            </summary>
-            <p class="mt-2 text-sm text-base-content/80">{{ hook.summary }}</p>
-            <p v-if="!script.sync" class="mt-2 text-sm text-base-content/80">
-              A failed run retries, 3 attempts in all, and each attempt runs the whole script, so
-              repeated runs must be harmless.
-            </p>
-            <p class="mt-3 mb-1 text-xs font-medium">Sample input</p>
-            <pre tabindex="0" class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
-              sampleInput
-            }}</pre>
-          </details>
-        </Card>
+          </div>
+        </form>
+        <details v-if="hook" class="rounded-field border border-base-300 px-3 py-2">
+          <summary class="cursor-pointer text-sm font-medium">
+            What the script gets and returns
+          </summary>
+          <p class="mt-2 text-sm text-base-content/80">{{ hook.summary }}</p>
+          <p v-if="!script.sync" class="mt-2 text-sm text-base-content/80">
+            A failed run retries, 3 attempts in all, and each attempt runs the whole script, so
+            repeated runs must be harmless.
+          </p>
+          <p class="mt-3 mb-1 text-xs font-medium">Sample input</p>
+          <pre tabindex="0" class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
+            sampleInput
+          }}</pre>
+        </details>
+      </Card>
 
-        <Card
-          title="Test run"
-          class="xl:col-span-2"
-          :description="`Runs the source on the left, saved or not.${script.sync ? '' : ' Fetches are real.'}`"
+      <Card
+        title="Tests"
+        class="mt-6"
+        :description="`Saved with the script. Each case runs the source above, saved or not.${script.sync ? '' : ' Fetches are real.'}`"
+      >
+        <template #actions>
+          <span
+            v-if="results.size > 0"
+            class="text-xs text-base-content/70 tabular-nums"
+            role="status"
+          >
+            {{ passed }} of {{ results.size }} passed
+          </span>
+          <button
+            type="button"
+            class="btn gap-1.5 btn-sm"
+            :disabled="running !== null || !cases.ok || cases.cases.length === 0"
+            @click="runCases()"
+          >
+            <Play class="size-4" aria-hidden="true" />Run all
+          </button>
+        </template>
+        <div class="flex flex-col gap-1.5">
+          <span class="text-sm font-medium">Cases</span>
+          <p class="text-xs text-base-content/70">
+            A JSON array of <code>{"name", "input", "expect"}</code>. Without <code>expect</code>, a
+            case passes when the run doesn’t fail.
+          </p>
+          <JsonEditor v-model="testsText" label="Test cases" :max-lines="30" />
+          <p v-if="!cases.ok && cases.error" role="alert" class="text-xs text-error">
+            {{ cases.error }}
+          </p>
+        </div>
+        <p v-if="test.error.value" class="text-sm text-error">
+          {{ errorMessage(test.error.value) }}
+        </p>
+        <DataTable
+          :columns="caseColumns"
+          :rows="cases.ok ? cases.cases : []"
+          :row-key="(c) => c.name"
+          label="Test cases"
+          :empty="{
+            icon: FlaskConical,
+            title: 'No test cases',
+            message: 'Start from the hook point’s sample input.',
+          }"
         >
-          <template #actions>
+          <template #cell-name="{ row }">
+            <button
+              v-if="resultOf(row)"
+              type="button"
+              class="link text-sm font-medium link-hover"
+              @click="viewingCase = resultOf(row) ?? null"
+            >
+              {{ row.name }}
+            </button>
+            <span v-else class="text-sm font-medium">{{ row.name }}</span>
+          </template>
+          <template #cell-outcome="{ row }">
+            <span
+              v-if="resultOf(row)"
+              class="badge badge-sm"
+              :class="OUTCOME_CLASSES[resultOf(row)!.outcome]"
+            >
+              {{ OUTCOME_LABELS[resultOf(row)!.outcome] }}
+            </span>
+            <span v-else class="text-xs text-base-content/60">Not run</span>
+          </template>
+          <template #cell-duration="{ row }"
+            ><span v-if="resultOf(row)" class="text-sm tabular-nums"
+              >{{ resultOf(row)!.run.duration_ms }} ms</span
+            ></template
+          >
+          <template #cell-returned="{ row }"
+            ><code v-if="resultOf(row)" class="line-clamp-1 text-xs">{{
+              resultOf(row)!.run.error ?? returnedText(resultOf(row)!.run.output)
+            }}</code></template
+          >
+          <template #cell-actions="{ row }">
             <button
               type="button"
-              class="btn gap-1.5 btn-sm"
-              :disabled="test.asyncStatus.value === 'loading' || inputEditor?.parsed.ok === false"
-              @click="runTest"
+              class="btn btn-ghost btn-xs"
+              :aria-label="`Run ${row.name}`"
+              :disabled="running !== null"
+              @click="runCases(row)"
             >
-              <Play class="size-4" aria-hidden="true" />Run test
+              <Play class="size-3.5" aria-hidden="true" />Run
             </button>
           </template>
-          <div class="flex flex-col gap-1.5">
-            <span class="text-sm font-medium">Input</span>
-            <JsonEditor ref="inputEditor" v-model="testInput" label="Test input" :max-lines="16" />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <span class="text-sm font-medium">Result</span>
-            <p v-if="test.error.value" class="text-sm text-error">
-              {{ errorMessage(test.error.value) }}
-            </p>
-            <div
-              v-if="lastTest"
-              class="flex flex-col gap-3 rounded-field border border-base-300 p-3"
-              data-testid="test-result"
-            >
-              <div class="flex items-center gap-2 text-sm">
-                <span class="badge badge-sm" :class="STATUS_CLASSES[lastTest.status]">
-                  {{ STATUS_LABELS[lastTest.status] }}
-                </span>
-                <span class="text-base-content/70 tabular-nums">{{ lastTest.duration_ms }} ms</span>
-              </div>
-              <p v-if="lastTest.error" class="text-sm text-error">{{ lastTest.error }}</p>
-              <div>
-                <p class="mb-1 text-xs font-medium">Logs</p>
-                <pre
-                  v-if="lastTest.logs.length"
-                  tabindex="0"
-                  class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs"
-                  >{{ lastTest.logs.join('\n') }}</pre>
-                <p v-else class="text-xs text-base-content/70">Nothing logged.</p>
-              </div>
-              <div>
-                <p class="mb-1 text-xs font-medium">Returned</p>
-                <CodeEditor
-                  v-if="lastTest.output !== null"
-                  :model-value="testOutput"
-                  language="json"
-                  label="Test output"
-                  readonly
-                  :min-lines="1"
-                  :max-lines="16"
-                />
-                <p v-else class="text-xs text-base-content/70">Nothing (undefined).</p>
-              </div>
-            </div>
-            <p
-              v-else
-              class="rounded-field border border-dashed border-base-300 p-4 text-center text-sm text-base-content/70"
-            >
-              Run the script to see its status, logs and return value here.
-            </p>
-          </div>
-        </Card>
-      </div>
+          <template #empty-action>
+            <button type="button" class="btn btn-sm" @click="addSampleCase">
+              Add a sample case
+            </button>
+          </template>
+        </DataTable>
+      </Card>
 
       <SectionHeading
         title="Run log"
@@ -452,6 +560,44 @@ function summaryOf(run: Run): string {
           <h3 class="mb-1 text-xs font-semibold">Output</h3>
           <pre class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
             viewing.output === null ? '(none)' : JSON.stringify(viewing.output, null, 2)
+          }}</pre>
+        </template>
+      </DetailPanel>
+
+      <DetailPanel
+        :open="viewingCase !== null"
+        :title="viewingCase ? viewingCase.name : ''"
+        @close="viewingCase = null"
+      >
+        <template v-if="viewingCase">
+          <p class="mb-3 text-sm">
+            <span class="badge badge-sm" :class="OUTCOME_CLASSES[viewingCase.outcome]">
+              {{ OUTCOME_LABELS[viewingCase.outcome] }}
+            </span>
+            {{ STATUS_LABELS[viewingCase.run.status] }} · {{ viewingCase.run.duration_ms }} ms
+          </p>
+          <p v-if="viewingCase.run.error" class="mb-3 text-sm text-error">
+            {{ viewingCase.run.error }}
+          </p>
+          <template v-if="viewingDiff.length">
+            <h3 class="mb-1 text-xs font-semibold">Expected (-) and returned (+)</h3>
+            <pre
+              class="mb-3 overflow-x-auto rounded-field bg-base-200 p-2 text-xs"
+              data-testid="case-diff"
+            ><span
+              v-for="(line, i) in viewingDiff"
+              :key="i"
+              class="block"
+              :class="{ 'text-error': line.kind === 'removed', 'text-success': line.kind === 'added' }"
+            >{{ line.kind === 'removed' ? '-' : line.kind === 'added' ? '+' : ' ' }} {{ line.text }}</span></pre>
+          </template>
+          <h3 class="mb-1 text-xs font-semibold">Logs</h3>
+          <pre class="mb-3 overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
+            viewingCase.run.logs.length ? viewingCase.run.logs.join('\n') : '(none)'
+          }}</pre>
+          <h3 class="mb-1 text-xs font-semibold">Returned</h3>
+          <pre class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
+            viewingCase.run.output === null ? 'undefined' : pretty(viewingCase.run.output)
           }}</pre>
         </template>
       </DetailPanel>

@@ -4,7 +4,9 @@ use anyhow::Context as _;
 use bizkit_core::DemoSeed;
 use bizkit_core::db::Db;
 
-use crate::api::ScriptId;
+use serde_json::json;
+
+use crate::api::{ScriptId, TestCase};
 use crate::store::{self, ScriptRow};
 
 const POST_TO_DISCORD: &str = r"// Posts each submission to a Discord channel. Set the
@@ -35,6 +37,43 @@ export default function (input) {
 }
 ";
 
+fn case(name: &str, input: serde_json::Value, expect: Option<serde_json::Value>) -> TestCase {
+    TestCase { name: name.to_owned(), input, expect }
+}
+
+fn form() -> serde_json::Value {
+    json!({ "id": "0190a5f0-0000-7000-8000-000000000001", "name": "Contact",
+            "project_id": "0190a5f0-0000-7000-8000-000000000002" })
+}
+
+fn discord_tests() -> Vec<TestCase> {
+    let input = json!({
+        "form": form(),
+        "submission": {
+            "id": "0190a5f0-0000-7000-8000-000000000003",
+            "created_at": 1_767_225_600_000_i64,
+            "data": { "email": "ada@example.com", "message": "Hello there" },
+        },
+    });
+    vec![case("Posts a submission", input, None)]
+}
+
+fn casino_tests() -> Vec<TestCase> {
+    let fields = |message: &str| json!({ "form": form(), "fields": { "email": ["ada@example.com"], "message": [message] } });
+    vec![
+        case(
+            "Casino is spam",
+            fields("Win big at our casino"),
+            Some(json!({ "action": "spam", "reason": "mentions casino" })),
+        ),
+        case(
+            "A normal message is accepted",
+            fields("Hello there"),
+            Some(json!({ "action": "accept" })),
+        ),
+    ]
+}
+
 /// Seeds "Post to Discord" (after each submission, for every form) and
 /// "Block casino spam" (before validation, for the Contact form when the
 /// forms seed made one) in the `website` project. A script that already
@@ -47,11 +86,18 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
         .await
         .context("listing the demo scripts")?;
     let scripts = [
-        ("Post to Discord", "forms.submission_created", false, POST_TO_DISCORD, None),
-        ("Block casino spam", "forms.pre_validate", true, BLOCK_CASINO, contact),
+        (
+            "Post to Discord",
+            "forms.submission_created",
+            false,
+            POST_TO_DISCORD,
+            None,
+            discord_tests(),
+        ),
+        ("Block casino spam", "forms.pre_validate", true, BLOCK_CASINO, contact, casino_tests()),
     ];
     let mut tx = db.write().await.context("starting the seed transaction")?;
-    for (name, hook, sync, source, target) in scripts {
+    for (name, hook, sync, source, target, tests) in scripts {
         if existing.iter().any(|script| script.name == name) {
             continue;
         }
@@ -64,6 +110,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             target_ids: target.into_iter().cloned().collect(),
             name: name.to_owned(),
             source: source.to_owned(),
+            tests,
             enabled: true,
             created_at: seed.now,
             updated_at: seed.now,

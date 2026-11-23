@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT s.id AS \"id: ScriptId\", s.workspace_id AS \"workspace_id: WorkspaceId\",\n                  s.project_id AS \"project_id: ProjectId\", s.hook, s.sync AS \"sync: bool\",\n                  (SELECT json_group_array(target_id) FROM (\n                     SELECT target_id FROM extension_script_targets t\n                     WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id\n                     ORDER BY target_id)) AS \"targets!: String\",\n                  s.name, s.source, s.enabled AS \"enabled: bool\",\n                  s.created_at AS \"created_at: UnixMillis\", s.updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_scripts s WHERE s.workspace_id = ? AND s.id = ?",
+  "query": "SELECT s.id AS \"id: ScriptId\", s.workspace_id AS \"workspace_id: WorkspaceId\",\n                  s.project_id AS \"project_id: ProjectId\", s.hook, s.sync AS \"sync: bool\",\n                  (SELECT json_group_array(target_id) FROM (\n                     SELECT target_id FROM extension_script_targets t\n                     WHERE t.workspace_id = s.workspace_id AND t.script_id = s.id\n                     ORDER BY target_id)) AS \"targets!: String\",\n                  s.name, s.source, s.tests, s.enabled AS \"enabled: bool\",\n                  s.created_at AS \"created_at: UnixMillis\", s.updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_scripts s\n           WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.enabled = 1\n             AND (NOT EXISTS (SELECT 1 FROM extension_script_targets t\n                              WHERE t.workspace_id = ?1 AND t.script_id = s.id)\n                  OR EXISTS (SELECT 1 FROM extension_script_targets t\n                             WHERE t.workspace_id = ?1 AND t.script_id = s.id\n                               AND t.target_id = ?4))\n           ORDER BY s.id",
   "describe": {
     "columns": [
       {
@@ -87,8 +87,19 @@
         }
       },
       {
-        "name": "enabled: bool",
+        "name": "tests",
         "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_scripts",
+            "name": "tests"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -99,7 +110,7 @@
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -110,7 +121,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -121,7 +132,7 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 4
     },
     "nullable": [
       false,
@@ -134,8 +145,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "0bedb09b63022b5ee2444c9db306e7865436fe457f63b7f0bb375e275b63228a"
+  "hash": "6b5ef3ae4b3ca7c75bf591d4d0ee82584f93d5708b9bd2c520f65bcc1a2c8d1c"
 }

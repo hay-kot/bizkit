@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::api::{
     Capability, Hook, HookKindName, HookList, HookTargetKind, Run, RunCause, RunList, Script,
     ScriptId, ScriptList, ScriptSummary, ScriptTarget, Secret, SecretList, TargetEntity,
-    TargetList,
+    TargetList, TestCase, TestOutcome, TestReport, TestResult,
 };
 use crate::runner::{ASYNC_BUDGET, Execution, MAX_SOURCE_BYTES, ScriptRunner};
 use crate::store::{self, RunRow, ScriptRow};
@@ -29,6 +29,9 @@ const MAX_SECRET_BYTES: usize = 4 << 10;
 const DEFAULT_RUNS: u32 = 50;
 const MAX_RUNS: u32 = 100;
 const MAX_TARGETS: usize = 100;
+const MAX_TESTS: usize = 20;
+const MAX_TEST_NAME: usize = 80;
+const MAX_TESTS_BYTES: usize = 256 << 10;
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>, runner: &ScriptRunner) -> anyhow::Result<()> {
     cx.scope_area("extensions", "Scripts on hook points, their secrets and runs")?;
@@ -135,6 +138,7 @@ async fn script_to_api(platform: &Platform, row: ScriptRow) -> Result<Script, Ap
         sync: row.sync,
         name: row.name,
         source: row.source,
+        tests: row.tests,
         enabled: row.enabled,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -184,6 +188,28 @@ fn check_source(errors: &mut FieldErrors, source: &str) {
     } else if source.len() > MAX_SOURCE_BYTES {
         errors.add("source", format!("must be at most {} KiB", MAX_SOURCE_BYTES >> 10));
     }
+}
+
+fn check_tests(errors: &mut FieldErrors, tests: &[TestCase]) {
+    if tests.len() > MAX_TESTS {
+        errors.add("tests", format!("must have at most {MAX_TESTS} cases"));
+    }
+    let mut names = BTreeSet::new();
+    for case in tests {
+        let name = case.name.trim();
+        if name.is_empty() || name.chars().count() > MAX_TEST_NAME {
+            errors.add("tests", format!("case names must be 1-{MAX_TEST_NAME} characters"));
+        } else if !names.insert(name) {
+            errors.add("tests", format!("{name:?} is used twice; case names must be unique"));
+        }
+    }
+    if serde_json::to_vec(tests).map_or(true, |bytes| bytes.len() > MAX_TESTS_BYTES) {
+        errors.add("tests", format!("must be at most {} KiB in all", MAX_TESTS_BYTES >> 10));
+    }
+}
+
+fn trimmed(tests: Vec<TestCase>) -> Vec<TestCase> {
+    tests.into_iter().map(|case| TestCase { name: case.name.trim().to_owned(), ..case }).collect()
 }
 
 fn check_target_count(errors: &mut FieldErrors, target_ids: &[String]) {
@@ -258,6 +284,10 @@ pub(crate) struct CreateScript {
     name: String,
     /// An ES module whose default export runs, at most 64 KiB.
     source: String,
+    /// Saved test cases, at most 20. Default one case on the point's
+    /// sample input.
+    #[serde(default)]
+    tests: Option<Vec<TestCase>>,
     /// Whether it runs. Default true.
     #[serde(default)]
     enabled: Option<bool>,
@@ -269,6 +299,9 @@ impl Validate for CreateScript {
         check_name(&mut errors, "name", &self.name);
         check_source(&mut errors, &self.source);
         check_target_count(&mut errors, &self.target_ids);
+        if let Some(tests) = &self.tests {
+            check_tests(&mut errors, tests);
+        }
         errors.into_result()
     }
 }
@@ -294,6 +327,9 @@ pub(crate) struct UpdateScript {
     /// point's kind.
     #[serde(default)]
     target_ids: Option<Vec<String>>,
+    /// Replaces the saved test cases, at most 20.
+    #[serde(default)]
+    tests: Option<Vec<TestCase>>,
 }
 
 impl Validate for UpdateScript {
@@ -301,6 +337,9 @@ impl Validate for UpdateScript {
         let mut errors = FieldErrors::default();
         if let Some(target_ids) = &self.target_ids {
             check_target_count(&mut errors, target_ids);
+        }
+        if let Some(tests) = &self.tests {
+            check_tests(&mut errors, tests);
         }
         if let Some(name) = &self.name {
             check_name(&mut errors, "name", name);
@@ -320,10 +359,10 @@ pub(crate) struct TestScript {
     workspace_id: WorkspaceId,
     /// The script.
     script_id: ScriptId,
-    /// The input. Default the hook point's sample.
+    /// Runs these cases instead of the saved ones, at most 20; pass one
+    /// to run a single case.
     #[serde(default)]
-    #[schema(schema_with = crate::api::any_json)]
-    input: Option<serde_json::Value>,
+    tests: Option<Vec<TestCase>>,
     /// Runs this source instead of the saved one, at most 64 KiB.
     #[serde(default)]
     source: Option<String>,
@@ -334,6 +373,9 @@ impl Validate for TestScript {
         let mut errors = FieldErrors::default();
         if let Some(source) = &self.source {
             check_source(&mut errors, source);
+        }
+        if let Some(tests) = &self.tests {
+            check_tests(&mut errors, tests);
         }
         errors.into_result()
     }
@@ -531,6 +573,16 @@ impl Operation for ScriptsCreate {
             target_ids,
             name: input.name.trim().to_owned(),
             source: input.source,
+            tests: input.tests.map_or_else(
+                || {
+                    vec![TestCase {
+                        name: "Sample input".to_owned(),
+                        input: (point.sample)(),
+                        expect: None,
+                    }]
+                },
+                trimmed,
+            ),
             enabled: input.enabled.unwrap_or(true),
             created_at: now,
             updated_at: now,
@@ -666,7 +718,8 @@ impl Operation for ScriptsUpdate {
     const METHOD: Method = Method::Patch;
     const PATH: &'static str = "/workspaces/{workspace_id}/extensions/scripts/{script_id}";
     const ACCESS: Access = ADMIN;
-    const SUMMARY: &'static str = "Change a script's name, source, enabled flag or targets";
+    const SUMMARY: &'static str =
+        "Change a script's name, source, test cases, enabled flag or targets";
     const TAGS: &'static [&'static str] = TAGS;
 
     const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
@@ -704,6 +757,9 @@ impl Operation for ScriptsUpdate {
         }
         if let Some(enabled) = input.enabled {
             row.enabled = enabled;
+        }
+        if let Some(tests) = input.tests {
+            row.tests = trimmed(tests);
         }
         if let Some(target_ids) = target_ids {
             row.target_ids = target_ids;
@@ -743,28 +799,53 @@ struct ScriptsTest {
 }
 impl Operation for ScriptsTest {
     type Input = TestScript;
-    type Output = Run;
+    type Output = TestReport;
     const ID: &'static str = "extensions.scripts.test";
     const METHOD: Method = Method::Post;
     const PATH: &'static str = "/workspaces/{workspace_id}/extensions/scripts/{script_id}/test";
     const ACCESS: Access = ADMIN;
-    const SUMMARY: &'static str = "Run a script now with its hook point's capabilities, real fetch included, and record the run";
+    const SUMMARY: &'static str = "Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run";
     const TAGS: &'static [&'static str] = TAGS;
 
-    async fn call(&self, cx: OpCtx, input: TestScript) -> Result<Run, ApiError> {
+    async fn call(&self, cx: OpCtx, input: TestScript) -> Result<TestReport, ApiError> {
         let row = script_in(&cx, input.workspace_id, input.script_id).await?;
         let Some(point) = cx.platform().hook_point(&row.hook) else {
             return Err(field_error("script_id", "its hook point isn't compiled into this server"));
         };
-        let exec = Execution {
-            script: &row,
-            point,
-            input: input.input.unwrap_or_else(point.sample),
-            cause: RunCause::Test,
-            attempt: None,
-            source: input.source,
-        };
-        Ok(self.runner.execute(cx.platform(), exec).await)
+        let cases = input.tests.map_or_else(|| row.tests.clone(), trimmed);
+        let mut items = Vec::with_capacity(cases.len());
+        // One at a time: the pools queue at most 8 runs, and a test run
+        // must never crowd out the live hook calls sharing them.
+        for case in cases {
+            let exec = Execution {
+                script: &row,
+                point,
+                input: case.input,
+                cause: RunCause::Test,
+                attempt: None,
+                source: input.source.clone(),
+            };
+            let run = self.runner.execute(cx.platform(), exec).await;
+            let expect = case.expect.filter(|expect| !expect.is_null());
+            items.push(TestResult {
+                outcome: outcome(&run, expect.as_ref()),
+                name: case.name,
+                expect,
+                run,
+            });
+        }
+        Ok(TestReport { items })
+    }
+}
+
+fn outcome(run: &Run, expect: Option<&serde_json::Value>) -> TestOutcome {
+    if run.status != bizkit_core::hooks::RunStatus::Ok {
+        return TestOutcome::Error;
+    }
+    let returned = run.output.as_ref().unwrap_or(&serde_json::Value::Null);
+    match expect {
+        Some(expect) if expect != returned => TestOutcome::Fail,
+        _ => TestOutcome::Pass,
     }
 }
 

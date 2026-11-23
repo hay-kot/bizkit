@@ -1848,6 +1848,16 @@
                       "type": "string"
                     },
                     "description": "The entities of the point's target kind it runs for, such as form\nIDs, at most 100. Empty or absent: every entity of the kind."
+                  },
+                  "tests": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/TestCase"
+                    },
+                    "description": "Saved test cases, at most 20. Default one case on the point's\nsample input."
                   }
                 },
                 "additionalProperties": false
@@ -2133,7 +2143,7 @@
         "tags": [
           "extensions"
         ],
-        "summary": "Change a script's name, source, enabled flag or targets",
+        "summary": "Change a script's name, source, test cases, enabled flag or targets",
         "operationId": "extensions.scripts.update",
         "parameters": [
           {
@@ -2191,6 +2201,16 @@
                       "type": "string"
                     },
                     "description": "Replaces the target set, at most 100. Empty: every entity of the\npoint's kind."
+                  },
+                  "tests": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/TestCase"
+                    },
+                    "description": "Replaces the saved test cases, at most 20."
                   }
                 },
                 "additionalProperties": false
@@ -2287,7 +2307,7 @@
         "tags": [
           "extensions"
         ],
-        "summary": "Run a script now with its hook point's capabilities, real fetch included, and record the run",
+        "summary": "Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run",
         "operationId": "extensions.scripts.test",
         "parameters": [
           {
@@ -2315,22 +2335,22 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "input": {
-                    "type": [
-                      "object",
-                      "array",
-                      "string",
-                      "number",
-                      "boolean",
-                      "null"
-                    ]
-                  },
                   "source": {
                     "type": [
                       "string",
                       "null"
                     ],
                     "description": "Runs this source instead of the saved one, at most 64 KiB."
+                  },
+                  "tests": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/TestCase"
+                    },
+                    "description": "Runs these cases instead of the saved ones, at most 20; pass one\nto run a single case."
                   }
                 },
                 "additionalProperties": false
@@ -2345,7 +2365,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Run"
+                  "$ref": "#/components/schemas/TestReport"
                 }
               }
             }
@@ -6071,6 +6091,7 @@
           "targets",
           "name",
           "source",
+          "tests",
           "enabled",
           "available",
           "created_at",
@@ -6119,6 +6140,13 @@
               "$ref": "#/components/schemas/ScriptTarget"
             },
             "description": "The entities it runs for, by ID. Empty: every entity of the point's\nkind, or the whole project when the point has no kind."
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCase"
+            },
+            "description": "The saved test cases."
           },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -6435,6 +6463,99 @@
               "$ref": "#/components/schemas/TargetEntity"
             },
             "description": "The entities, by label."
+          }
+        }
+      },
+      "TestCase": {
+        "type": "object",
+        "description": "A saved input to run a script on, and what it must return.",
+        "required": [
+          "name",
+          "input"
+        ],
+        "properties": {
+          "expect": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "input": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "A name, unique in the script."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestOutcome": {
+        "type": "string",
+        "description": "How a test case went.",
+        "enum": [
+          "pass",
+          "fail",
+          "error"
+        ]
+      },
+      "TestReport": {
+        "type": "object",
+        "description": "A test run's results.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestResult"
+            },
+            "description": "One result per case, in case order."
+          }
+        }
+      },
+      "TestResult": {
+        "type": "object",
+        "description": "One test case's result.",
+        "required": [
+          "name",
+          "outcome",
+          "run"
+        ],
+        "properties": {
+          "expect": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The case name."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/TestOutcome",
+            "description": "How it went."
+          },
+          "run": {
+            "$ref": "#/components/schemas/Run",
+            "description": "The recorded run, with what the script returned and logged."
           }
         }
       },

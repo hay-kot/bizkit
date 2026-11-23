@@ -413,7 +413,7 @@ export const extensionsScriptsGetQuery = defineQueryOptions<Options<ExtensionsSc
 }));
 
 /**
- * Change a script's name, source, enabled flag or targets
+ * Change a script's name, source, test cases, enabled flag or targets
  */
 export const extensionsScriptsUpdateMutation = (options?: Partial<Options<ExtensionsScriptsUpdateData>>): UseMutationOptions<ExtensionsScriptsUpdateResponse, Options<ExtensionsScriptsUpdateData>, ExtensionsScriptsUpdateError> => ({
     mutation: async (vars) => {
@@ -427,7 +427,7 @@ export const extensionsScriptsUpdateMutation = (options?: Partial<Options<Extens
 });
 
 /**
- * Run a script now with its hook point's capabilities, real fetch included, and record the run
+ * Run a script's test cases, saved or given, one after another with its hook point's capabilities, real fetch included, and record each run
  */
 export const extensionsScriptsTestMutation = (options?: Partial<Options<ExtensionsScriptsTestData>>): UseMutationOptions<ExtensionsScriptsTestResponse, Options<ExtensionsScriptsTestData>, ExtensionsScriptsTestError> => ({
     mutation: async (vars) => {
