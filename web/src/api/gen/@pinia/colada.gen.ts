@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
-import type { ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
+import { apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, extensionsHooksList, extensionsRunsList, extensionsScriptsCreate, extensionsScriptsDelete, extensionsScriptsGet, extensionsScriptsList, extensionsScriptsTest, extensionsScriptsUpdate, extensionsSecretsDelete, extensionsSecretsList, extensionsSecretsPut, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
+import type { ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, ExtensionsHooksListData, ExtensionsHooksListError, ExtensionsHooksListResponse, ExtensionsRunsListData, ExtensionsRunsListError, ExtensionsRunsListResponse, ExtensionsScriptsCreateData, ExtensionsScriptsCreateError, ExtensionsScriptsCreateResponse, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteError, ExtensionsScriptsDeleteResponse, ExtensionsScriptsGetData, ExtensionsScriptsGetError, ExtensionsScriptsGetResponse, ExtensionsScriptsListData, ExtensionsScriptsListError, ExtensionsScriptsListResponse, ExtensionsScriptsTestData, ExtensionsScriptsTestError, ExtensionsScriptsTestResponse, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateError, ExtensionsScriptsUpdateResponse, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteError, ExtensionsSecretsDeleteResponse, ExtensionsSecretsListData, ExtensionsSecretsListError, ExtensionsSecretsListResponse, ExtensionsSecretsPutData, ExtensionsSecretsPutError, ExtensionsSecretsPutResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
 
 /**
  * Sends a sign-in link if the email may sign in. Always 202, so the response
@@ -263,6 +263,175 @@ export const apiKeysCreateMutation = (options?: Partial<Options<ApiKeysCreateDat
 export const apiKeysRevokeMutation = (options?: Partial<Options<ApiKeysRevokeData>>): UseMutationOptions<ApiKeysRevokeResponse, Options<ApiKeysRevokeData>, ApiKeysRevokeError> => ({
     mutation: async (vars) => {
         const { data } = await apiKeysRevoke({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const extensionsHooksListQueryKey = (options: Options<ExtensionsHooksListData>) => createQueryKey('extensionsHooksList', options);
+
+/**
+ * List the hook points scripts can attach to
+ */
+export const extensionsHooksListQuery = defineQueryOptions<Options<ExtensionsHooksListData>, ExtensionsHooksListResponse, ExtensionsHooksListError>((options: Options<ExtensionsHooksListData>) => ({
+    key: extensionsHooksListQueryKey(options),
+    query: async (context) => {
+        const { data } = await extensionsHooksList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const extensionsSecretsListQueryKey = (options: Options<ExtensionsSecretsListData>) => createQueryKey('extensionsSecretsList', options);
+
+/**
+ * List a project's secret names
+ */
+export const extensionsSecretsListQuery = defineQueryOptions<Options<ExtensionsSecretsListData>, ExtensionsSecretsListResponse, ExtensionsSecretsListError>((options: Options<ExtensionsSecretsListData>) => ({
+    key: extensionsSecretsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await extensionsSecretsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Delete a project secret
+ */
+export const extensionsSecretsDeleteMutation = (options?: Partial<Options<ExtensionsSecretsDeleteData>>): UseMutationOptions<ExtensionsSecretsDeleteResponse, Options<ExtensionsSecretsDeleteData>, ExtensionsSecretsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await extensionsSecretsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Set a project secret that async scripts read as ctx.secrets
+ */
+export const extensionsSecretsPutMutation = (options?: Partial<Options<ExtensionsSecretsPutData>>): UseMutationOptions<ExtensionsSecretsPutResponse, Options<ExtensionsSecretsPutData>, ExtensionsSecretsPutError> => ({
+    mutation: async (vars) => {
+        const { data } = await extensionsSecretsPut({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const extensionsRunsListQueryKey = (options: Options<ExtensionsRunsListData>) => createQueryKey('extensionsRunsList', options);
+
+/**
+ * List a script's runs, newest first
+ */
+export const extensionsRunsListQuery = defineQueryOptions<Options<ExtensionsRunsListData>, ExtensionsRunsListResponse, ExtensionsRunsListError>((options: Options<ExtensionsRunsListData>) => ({
+    key: extensionsRunsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await extensionsRunsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const extensionsScriptsListQueryKey = (options: Options<ExtensionsScriptsListData>) => createQueryKey('extensionsScriptsList', options);
+
+/**
+ * List scripts, by name
+ */
+export const extensionsScriptsListQuery = defineQueryOptions<Options<ExtensionsScriptsListData>, ExtensionsScriptsListResponse, ExtensionsScriptsListError>((options: Options<ExtensionsScriptsListData>) => ({
+    key: extensionsScriptsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await extensionsScriptsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Attach a script to a hook point in a project
+ */
+export const extensionsScriptsCreateMutation = (options?: Partial<Options<ExtensionsScriptsCreateData>>): UseMutationOptions<ExtensionsScriptsCreateResponse, Options<ExtensionsScriptsCreateData>, ExtensionsScriptsCreateError> => ({
+    mutation: async (vars) => {
+        const { data } = await extensionsScriptsCreate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Delete a script and its runs
+ */
+export const extensionsScriptsDeleteMutation = (options?: Partial<Options<ExtensionsScriptsDeleteData>>): UseMutationOptions<ExtensionsScriptsDeleteResponse, Options<ExtensionsScriptsDeleteData>, ExtensionsScriptsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await extensionsScriptsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const extensionsScriptsGetQueryKey = (options: Options<ExtensionsScriptsGetData>) => createQueryKey('extensionsScriptsGet', options);
+
+/**
+ * Get a script with its source
+ */
+export const extensionsScriptsGetQuery = defineQueryOptions<Options<ExtensionsScriptsGetData>, ExtensionsScriptsGetResponse, ExtensionsScriptsGetError>((options: Options<ExtensionsScriptsGetData>) => ({
+    key: extensionsScriptsGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await extensionsScriptsGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Change a script's name, source or enabled flag
+ */
+export const extensionsScriptsUpdateMutation = (options?: Partial<Options<ExtensionsScriptsUpdateData>>): UseMutationOptions<ExtensionsScriptsUpdateResponse, Options<ExtensionsScriptsUpdateData>, ExtensionsScriptsUpdateError> => ({
+    mutation: async (vars) => {
+        const { data } = await extensionsScriptsUpdate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Run a script now with its hook point's capabilities, real fetch included, and record the run
+ */
+export const extensionsScriptsTestMutation = (options?: Partial<Options<ExtensionsScriptsTestData>>): UseMutationOptions<ExtensionsScriptsTestResponse, Options<ExtensionsScriptsTestData>, ExtensionsScriptsTestError> => ({
+    mutation: async (vars) => {
+        const { data } = await extensionsScriptsTest({
             ...options,
             ...vars,
             throwOnError: true

@@ -65,6 +65,11 @@ export type ApiKeyList = {
 export type BotCheck = 'honeypot' | 'challenge';
 
 /**
+ * What a script on a hook point can use besides plain JavaScript.
+ */
+export type Capability = 'log' | 'secrets' | 'fetch';
+
+/**
  * An ALTCHA v1 challenge.
  */
 export type Challenge = {
@@ -256,6 +261,54 @@ export type FormList = {
      * Sorted by name.
      */
     items: Array<Form>;
+};
+
+/**
+ * A hook point a compiled-in module declares.
+ */
+export type Hook = {
+    /**
+     * The script's time budget, in milliseconds.
+     */
+    budget_ms: number;
+    /**
+     * What scripts on it can use.
+     */
+    capabilities: Array<Capability>;
+    /**
+     * The event an async point runs on.
+     */
+    event?: string | null;
+    /**
+     * The point ID, such as `forms.pre_validate`.
+     */
+    id: string;
+    /**
+     * When it runs.
+     */
+    kind: HookKindName;
+    sample: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    /**
+     * What it is for and what it expects back.
+     */
+    summary: string;
+};
+
+/**
+ * When a hook point runs.
+ */
+export type HookKindName = 'sync' | 'async';
+
+/**
+ * Every hook point.
+ */
+export type HookList = {
+    /**
+     * The points, in registration order.
+     */
+    items: Array<Hook>;
 };
 
 /**
@@ -480,6 +533,74 @@ export type ProjectList = {
 export type Role = 'admin' | 'member';
 
 /**
+ * One script run. Logs, output and error have the project's secrets
+ * replaced with `[secret:NAME]`.
+ */
+export type Run = {
+    /**
+     * The job attempt, for event runs.
+     */
+    attempt?: number | null;
+    /**
+     * What started it.
+     */
+    cause: RunCause;
+    /**
+     * When it ran.
+     */
+    created_at: Timestamp;
+    /**
+     * How long it took, in milliseconds.
+     */
+    duration_ms: number;
+    /**
+     * Why it failed.
+     */
+    error?: string | null;
+    /**
+     * The run.
+     */
+    id: RunId;
+    /**
+     * What it logged.
+     */
+    logs: Array<string>;
+    output?: {
+        [key: string]: unknown;
+    } | Array<unknown> | string | number | boolean | null;
+    /**
+     * The script.
+     */
+    script_id: ScriptId;
+    /**
+     * What it ended as.
+     */
+    status: RunStatus;
+};
+
+/**
+ * What started a run.
+ */
+export type RunCause = 'sync' | 'event' | 'test';
+
+export type RunId = string;
+
+/**
+ * A script's runs.
+ */
+export type RunList = {
+    /**
+     * The runs, newest first.
+     */
+    items: Array<Run>;
+};
+
+/**
+ * What a script run ended as.
+ */
+export type RunStatus = 'ok' | 'error' | 'timeout' | 'overloaded' | 'invalid_output';
+
+/**
  * An area API key scopes name, such as `projects`.
  */
 export type ScopeArea = {
@@ -491,6 +612,130 @@ export type ScopeArea = {
      * The area name; scopes are `<name>:read`, `:write` or `:admin`.
      */
     name: string;
+};
+
+/**
+ * A script with its source.
+ */
+export type Script = {
+    /**
+     * False when no compiled-in module declares the hook point.
+     */
+    available: boolean;
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * Whether it runs.
+     */
+    enabled: boolean;
+    /**
+     * Its hook point.
+     */
+    hook: string;
+    /**
+     * The script.
+     */
+    id: ScriptId;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * Its project.
+     */
+    project_id: ProjectId;
+    /**
+     * The ES module source. Its default export runs.
+     */
+    source: string;
+    /**
+     * Whether the hook point runs inside the request.
+     */
+    sync: boolean;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+export type ScriptId = string;
+
+/**
+ * A project's scripts.
+ */
+export type ScriptList = {
+    /**
+     * The scripts, by name.
+     */
+    items: Array<ScriptSummary>;
+};
+
+/**
+ * A script, without its source.
+ */
+export type ScriptSummary = {
+    /**
+     * False when no compiled-in module declares the hook point.
+     */
+    available: boolean;
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * Whether it runs.
+     */
+    enabled: boolean;
+    /**
+     * Its hook point.
+     */
+    hook: string;
+    /**
+     * The script.
+     */
+    id: ScriptId;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * Its project.
+     */
+    project_id: ProjectId;
+    /**
+     * Whether the hook point runs inside the request.
+     */
+    sync: boolean;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * A secret's name. Values are never returned.
+ */
+export type Secret = {
+    /**
+     * The name, such as `DISCORD_WEBHOOK`.
+     */
+    name: string;
+    /**
+     * When it was last set.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * A project's secrets.
+ */
+export type SecretList = {
+    /**
+     * The secrets, by name.
+     */
+    items: Array<Secret>;
 };
 
 /**
@@ -1253,6 +1498,610 @@ export type ApiKeysRevokeResponses = {
 };
 
 export type ApiKeysRevokeResponse = ApiKeysRevokeResponses[keyof ApiKeysRevokeResponses];
+
+export type ExtensionsHooksListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/hooks';
+};
+
+export type ExtensionsHooksListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsHooksListError = ExtensionsHooksListErrors[keyof ExtensionsHooksListErrors];
+
+export type ExtensionsHooksListResponses = {
+    /**
+     * OK
+     */
+    200: HookList;
+};
+
+export type ExtensionsHooksListResponse = ExtensionsHooksListResponses[keyof ExtensionsHooksListResponses];
+
+export type ExtensionsSecretsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/projects/{project_id}/secrets';
+};
+
+export type ExtensionsSecretsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsSecretsListError = ExtensionsSecretsListErrors[keyof ExtensionsSecretsListErrors];
+
+export type ExtensionsSecretsListResponses = {
+    /**
+     * OK
+     */
+    200: SecretList;
+};
+
+export type ExtensionsSecretsListResponse = ExtensionsSecretsListResponses[keyof ExtensionsSecretsListResponses];
+
+export type ExtensionsSecretsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The secret name.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/projects/{project_id}/secrets/{name}';
+};
+
+export type ExtensionsSecretsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsSecretsDeleteError = ExtensionsSecretsDeleteErrors[keyof ExtensionsSecretsDeleteErrors];
+
+export type ExtensionsSecretsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ExtensionsSecretsDeleteResponse = ExtensionsSecretsDeleteResponses[keyof ExtensionsSecretsDeleteResponses];
+
+export type ExtensionsSecretsPutData = {
+    body: {
+        /**
+         * The value, at most 4 KiB. Never returned.
+         */
+        value: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The name: an uppercase letter, then up to 63 uppercase letters, digits or `_`.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/projects/{project_id}/secrets/{name}';
+};
+
+export type ExtensionsSecretsPutErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsSecretsPutError = ExtensionsSecretsPutErrors[keyof ExtensionsSecretsPutErrors];
+
+export type ExtensionsSecretsPutResponses = {
+    /**
+     * OK
+     */
+    200: Secret;
+};
+
+export type ExtensionsSecretsPutResponse = ExtensionsSecretsPutResponses[keyof ExtensionsSecretsPutResponses];
+
+export type ExtensionsRunsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * How many, 1-100. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * The script.
+         */
+        script_id: ScriptId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/extensions/runs';
+};
+
+export type ExtensionsRunsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsRunsListError = ExtensionsRunsListErrors[keyof ExtensionsRunsListErrors];
+
+export type ExtensionsRunsListResponses = {
+    /**
+     * OK
+     */
+    200: RunList;
+};
+
+export type ExtensionsRunsListResponse = ExtensionsRunsListResponses[keyof ExtensionsRunsListResponses];
+
+export type ExtensionsScriptsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        project_id?: ProjectId | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts';
+};
+
+export type ExtensionsScriptsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsScriptsListError = ExtensionsScriptsListErrors[keyof ExtensionsScriptsListErrors];
+
+export type ExtensionsScriptsListResponses = {
+    /**
+     * OK
+     */
+    200: ScriptList;
+};
+
+export type ExtensionsScriptsListResponse = ExtensionsScriptsListResponses[keyof ExtensionsScriptsListResponses];
+
+export type ExtensionsScriptsCreateData = {
+    body: {
+        /**
+         * Whether it runs. Default true.
+         */
+        enabled?: boolean | null;
+        /**
+         * The hook point ID, such as `forms.pre_validate`. Fixed after create.
+         */
+        hook: string;
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project it belongs to.
+         */
+        project_id: ProjectId;
+        /**
+         * An ES module whose default export runs, at most 64 KiB.
+         */
+        source: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts';
+};
+
+export type ExtensionsScriptsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsScriptsCreateError = ExtensionsScriptsCreateErrors[keyof ExtensionsScriptsCreateErrors];
+
+export type ExtensionsScriptsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Script;
+};
+
+export type ExtensionsScriptsCreateResponse = ExtensionsScriptsCreateResponses[keyof ExtensionsScriptsCreateResponses];
+
+export type ExtensionsScriptsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The script.
+         */
+        script_id: ScriptId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}';
+};
+
+export type ExtensionsScriptsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsScriptsDeleteError = ExtensionsScriptsDeleteErrors[keyof ExtensionsScriptsDeleteErrors];
+
+export type ExtensionsScriptsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ExtensionsScriptsDeleteResponse = ExtensionsScriptsDeleteResponses[keyof ExtensionsScriptsDeleteResponses];
+
+export type ExtensionsScriptsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The script.
+         */
+        script_id: ScriptId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}';
+};
+
+export type ExtensionsScriptsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsScriptsGetError = ExtensionsScriptsGetErrors[keyof ExtensionsScriptsGetErrors];
+
+export type ExtensionsScriptsGetResponses = {
+    /**
+     * OK
+     */
+    200: Script;
+};
+
+export type ExtensionsScriptsGetResponse = ExtensionsScriptsGetResponses[keyof ExtensionsScriptsGetResponses];
+
+export type ExtensionsScriptsUpdateData = {
+    body: {
+        /**
+         * Whether it runs.
+         */
+        enabled?: boolean | null;
+        /**
+         * The display name.
+         */
+        name?: string | null;
+        /**
+         * The ES module source, at most 64 KiB.
+         */
+        source?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The script.
+         */
+        script_id: ScriptId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}';
+};
+
+export type ExtensionsScriptsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsScriptsUpdateError = ExtensionsScriptsUpdateErrors[keyof ExtensionsScriptsUpdateErrors];
+
+export type ExtensionsScriptsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Script;
+};
+
+export type ExtensionsScriptsUpdateResponse = ExtensionsScriptsUpdateResponses[keyof ExtensionsScriptsUpdateResponses];
+
+export type ExtensionsScriptsTestData = {
+    body: {
+        input?: {
+            [key: string]: unknown;
+        } | Array<unknown> | string | number | boolean | null;
+        /**
+         * Runs this source instead of the saved one, at most 64 KiB.
+         */
+        source?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The script.
+         */
+        script_id: ScriptId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}/test';
+};
+
+export type ExtensionsScriptsTestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsScriptsTestError = ExtensionsScriptsTestErrors[keyof ExtensionsScriptsTestErrors];
+
+export type ExtensionsScriptsTestResponses = {
+    /**
+     * OK
+     */
+    200: Run;
+};
+
+export type ExtensionsScriptsTestResponse = ExtensionsScriptsTestResponses[keyof ExtensionsScriptsTestResponses];
 
 export type FormsListData = {
     body?: never;

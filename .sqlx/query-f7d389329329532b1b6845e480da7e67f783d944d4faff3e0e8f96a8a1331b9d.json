@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO extension_runs (id, workspace_id, script_id, cause, status, attempt,\n                                     duration_ms, error, logs, output, created_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "f7d389329329532b1b6845e480da7e67f783d944d4faff3e0e8f96a8a1331b9d"
+}

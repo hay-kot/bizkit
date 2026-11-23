@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM extension_secrets WHERE workspace_id = ? AND project_id = ? AND name = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "672f438c5949bcd00aa62d82c3f26f7281087301f7eb4d1376aafe3a89c6cd30"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM extension_runs\n         WHERE workspace_id = ?1 AND script_id = ?2 AND id NOT IN (\n           SELECT id FROM extension_runs WHERE workspace_id = ?1 AND script_id = ?2\n           ORDER BY id DESC LIMIT ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "88ed89f243a670ba8585847ec87b9b1a8d719f840b523ab65dd5fe993f2c0362"
+}

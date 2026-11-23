@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
+import type { ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, ExtensionsHooksListData, ExtensionsHooksListErrors, ExtensionsHooksListResponses, ExtensionsRunsListData, ExtensionsRunsListErrors, ExtensionsRunsListResponses, ExtensionsScriptsCreateData, ExtensionsScriptsCreateErrors, ExtensionsScriptsCreateResponses, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteErrors, ExtensionsScriptsDeleteResponses, ExtensionsScriptsGetData, ExtensionsScriptsGetErrors, ExtensionsScriptsGetResponses, ExtensionsScriptsListData, ExtensionsScriptsListErrors, ExtensionsScriptsListResponses, ExtensionsScriptsTestData, ExtensionsScriptsTestErrors, ExtensionsScriptsTestResponses, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateErrors, ExtensionsScriptsUpdateResponses, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteErrors, ExtensionsSecretsDeleteResponses, ExtensionsSecretsListData, ExtensionsSecretsListErrors, ExtensionsSecretsListResponses, ExtensionsSecretsPutData, ExtensionsSecretsPutErrors, ExtensionsSecretsPutResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -214,6 +214,165 @@ export const apiKeysRevoke = <ThrowOnError extends boolean = false>(options: Opt
         }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/workspaces/{workspace_id}/api-keys/{api_key_id}',
     ...options
+});
+
+/**
+ * List the hook points scripts can attach to
+ */
+export const extensionsHooksList = <ThrowOnError extends boolean = false>(options: Options<ExtensionsHooksListData, ThrowOnError>): RequestResult<ExtensionsHooksListResponses, ExtensionsHooksListErrors, ThrowOnError> => (options.client ?? client).get<ExtensionsHooksListResponses, ExtensionsHooksListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/hooks',
+    ...options
+});
+
+/**
+ * List a project's secret names
+ */
+export const extensionsSecretsList = <ThrowOnError extends boolean = false>(options: Options<ExtensionsSecretsListData, ThrowOnError>): RequestResult<ExtensionsSecretsListResponses, ExtensionsSecretsListErrors, ThrowOnError> => (options.client ?? client).get<ExtensionsSecretsListResponses, ExtensionsSecretsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/projects/{project_id}/secrets',
+    ...options
+});
+
+/**
+ * Delete a project secret
+ */
+export const extensionsSecretsDelete = <ThrowOnError extends boolean = false>(options: Options<ExtensionsSecretsDeleteData, ThrowOnError>): RequestResult<ExtensionsSecretsDeleteResponses, ExtensionsSecretsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<ExtensionsSecretsDeleteResponses, ExtensionsSecretsDeleteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/projects/{project_id}/secrets/{name}',
+    ...options
+});
+
+/**
+ * Set a project secret that async scripts read as ctx.secrets
+ */
+export const extensionsSecretsPut = <ThrowOnError extends boolean = false>(options: Options<ExtensionsSecretsPutData, ThrowOnError>): RequestResult<ExtensionsSecretsPutResponses, ExtensionsSecretsPutErrors, ThrowOnError> => (options.client ?? client).put<ExtensionsSecretsPutResponses, ExtensionsSecretsPutErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/projects/{project_id}/secrets/{name}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List a script's runs, newest first
+ */
+export const extensionsRunsList = <ThrowOnError extends boolean = false>(options: Options<ExtensionsRunsListData, ThrowOnError>): RequestResult<ExtensionsRunsListResponses, ExtensionsRunsListErrors, ThrowOnError> => (options.client ?? client).get<ExtensionsRunsListResponses, ExtensionsRunsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/runs',
+    ...options
+});
+
+/**
+ * List scripts, by name
+ */
+export const extensionsScriptsList = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsListData, ThrowOnError>): RequestResult<ExtensionsScriptsListResponses, ExtensionsScriptsListErrors, ThrowOnError> => (options.client ?? client).get<ExtensionsScriptsListResponses, ExtensionsScriptsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts',
+    ...options
+});
+
+/**
+ * Attach a script to a hook point in a project
+ */
+export const extensionsScriptsCreate = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsCreateData, ThrowOnError>): RequestResult<ExtensionsScriptsCreateResponses, ExtensionsScriptsCreateErrors, ThrowOnError> => (options.client ?? client).post<ExtensionsScriptsCreateResponses, ExtensionsScriptsCreateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a script and its runs
+ */
+export const extensionsScriptsDelete = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsDeleteData, ThrowOnError>): RequestResult<ExtensionsScriptsDeleteResponses, ExtensionsScriptsDeleteErrors, ThrowOnError> => (options.client ?? client).delete<ExtensionsScriptsDeleteResponses, ExtensionsScriptsDeleteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}',
+    ...options
+});
+
+/**
+ * Get a script with its source
+ */
+export const extensionsScriptsGet = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsGetData, ThrowOnError>): RequestResult<ExtensionsScriptsGetResponses, ExtensionsScriptsGetErrors, ThrowOnError> => (options.client ?? client).get<ExtensionsScriptsGetResponses, ExtensionsScriptsGetErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}',
+    ...options
+});
+
+/**
+ * Change a script's name, source or enabled flag
+ */
+export const extensionsScriptsUpdate = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsUpdateData, ThrowOnError>): RequestResult<ExtensionsScriptsUpdateResponses, ExtensionsScriptsUpdateErrors, ThrowOnError> => (options.client ?? client).patch<ExtensionsScriptsUpdateResponses, ExtensionsScriptsUpdateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Run a script now with its hook point's capabilities, real fetch included, and record the run
+ */
+export const extensionsScriptsTest = <ThrowOnError extends boolean = false>(options: Options<ExtensionsScriptsTestData, ThrowOnError>): RequestResult<ExtensionsScriptsTestResponses, ExtensionsScriptsTestErrors, ThrowOnError> => (options.client ?? client).post<ExtensionsScriptsTestResponses, ExtensionsScriptsTestErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/extensions/scripts/{script_id}/test',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

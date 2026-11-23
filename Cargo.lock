@@ -324,6 +324,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "bizkit-core",
+ "bizkit-extensions",
  "bizkit-forms",
  "bizkit-testkit",
  "bizkit-web",
@@ -386,16 +387,21 @@ name = "bizkit-extensions"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bizkit-core",
+ "bizkit-forms",
  "bizkit-testkit",
  "bytes",
+ "futures",
  "http",
  "rquickjs",
  "serde",
  "serde_json",
+ "sqlx",
  "tokio",
  "tracing",
  "url",
+ "utoipa",
 ]
 
 [[package]]
