@@ -3,6 +3,7 @@ import { Code, Plus } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 
 import DataTable from '@/components/ui/DataTable.vue'
+import PageSection from '@/components/ui/PageSection.vue'
 import { useHooks, useScripts } from '@/queries/extensions'
 
 import NewScriptPanel from './NewScriptPanel.vue'
@@ -47,19 +48,16 @@ function scriptPath(scriptId: string) {
 </script>
 
 <template>
-  <section v-if="targetKind" class="mt-8" aria-labelledby="entity-extensions">
-    <div class="mb-3 flex items-center justify-between gap-2">
-      <div>
-        <h2 id="entity-extensions" class="text-sm font-semibold">Extensions</h2>
-        <p class="text-xs text-base-content/70">
-          Scripts that run for this {{ targetKind.noun }}: those picked for it and those for all
-          {{ targetKind.plural }}.
-        </p>
-      </div>
+  <PageSection v-if="targetKind" title="Extensions">
+    <template #description>
+      Scripts that run for this {{ targetKind.noun }}: those picked for it and those for all
+      {{ targetKind.plural }}.
+    </template>
+    <template #actions>
       <button type="button" class="btn gap-1.5 btn-sm" @click="panelOpen = true">
         <Plus class="size-4" aria-hidden="true" />New script
       </button>
-    </div>
+    </template>
     <DataTable
       :columns="columns"
       :rows="scripts?.items"
@@ -96,5 +94,5 @@ function scriptPath(scriptId: string) {
       :target="{ kind, id: entityId }"
       @close="panelOpen = false"
     />
-  </section>
+  </PageSection>
 </template>

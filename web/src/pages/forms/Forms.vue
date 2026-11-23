@@ -3,10 +3,11 @@ import { Inbox, Plus } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import { formatDate } from '@/lib/format'
 import { useCreateForm, useForms } from '@/queries/forms'
 
@@ -51,7 +52,7 @@ async function onCreate() {
 </script>
 
 <template>
-  <div>
+  <Page>
     <PageHeader
       :section="projectName"
       title="Forms"
@@ -115,5 +116,5 @@ async function onCreate() {
         />
       </Field>
     </FormPanel>
-  </div>
+  </Page>
 </template>
