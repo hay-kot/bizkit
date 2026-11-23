@@ -1,5 +1,6 @@
 //! Sample scripts for the dev stack's demo workspace.
 
+use anyhow::Context as _;
 use bizkit_core::DemoSeed;
 use bizkit_core::db::Db;
 
@@ -40,12 +41,14 @@ export default function (input) {
 /// exists by name is left alone.
 pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
-    let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id)).await?;
+    let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id))
+        .await
+        .context("listing the demo scripts")?;
     let scripts = [
         ("Post to Discord", "forms.submission_created", false, POST_TO_DISCORD),
         ("Block casino spam", "forms.pre_validate", true, BLOCK_CASINO),
     ];
-    let mut tx = db.write().await?;
+    let mut tx = db.write().await.context("starting the seed transaction")?;
     for (name, hook, sync, source) in scripts {
         let taken =
             existing.iter().any(|script| script.name == name || (sync && script.hook == hook));
@@ -64,8 +67,10 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             created_at: seed.now,
             updated_at: seed.now,
         };
-        store::insert_script(&mut *tx, &row).await?;
+        store::insert_script(&mut *tx, &row)
+            .await
+            .with_context(|| format!("inserting the {name} script"))?;
     }
-    tx.commit().await?;
+    tx.commit().await.context("committing the demo scripts")?;
     Ok(())
 }

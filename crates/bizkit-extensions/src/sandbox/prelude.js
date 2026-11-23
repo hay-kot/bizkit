@@ -1,6 +1,7 @@
-// Runs before each script. It removes code generation from the globals,
+// Runs before each script. It removes the eval and Function globals,
 // installs console, and returns the frozen input and ctx for the script's
-// default export.
+// default export. `(() => {}).constructor` still compiles code; that is
+// fine, because it runs in the same runtime under the same limits.
 (function (hostLog, hostFetch, inputJson, secretsJson) {
   'use strict';
   delete globalThis.eval;

@@ -137,7 +137,17 @@ impl ScriptRunner {
             }
             HookKind::Async { .. } => self.run_async_script(platform, script, source, input).await,
         };
-        record(platform, script, (cause, attempt), &report, &Redactor::new(&secrets)).await
+        let run = to_run(platform, script, (cause, attempt), &report, &Redactor::new(&secrets));
+        if cause == RunCause::Sync {
+            // A sync run answers a request that is waiting under a deadline;
+            // queueing for the write lock there could drop the verdict.
+            let (platform, workspace_id, run) =
+                (platform.clone(), script.workspace_id, run.clone());
+            tokio::spawn(async move { record(&platform, workspace_id, &run).await });
+        } else {
+            record(platform, script.workspace_id, &run).await;
+        }
+        run
     }
 
     async fn run_sync_script(
@@ -219,16 +229,14 @@ impl ScriptRunner {
     }
 }
 
-/// Writes the run row. A failed write is logged and doesn't change the
-/// outcome.
-async fn record(
+fn to_run(
     platform: &Platform,
     script: &ScriptRow,
     (cause, attempt): (RunCause, Option<u32>),
     report: &RunReport,
     redactor: &Redactor,
 ) -> Run {
-    let run = Run {
+    Run {
         id: RunId::new(),
         script_id: script.id,
         cause,
@@ -239,11 +247,15 @@ async fn record(
         logs: report.logs.iter().map(|line| redactor.text(line)).collect(),
         output: report.output.clone().map(|output| redactor.json(output)),
         created_at: platform.now(),
-    };
-    if let Err(err) = write_run(platform, script.workspace_id, &run).await {
-        tracing::warn!(script_id = %script.id, "recording a script run: {err:#}");
     }
-    run
+}
+
+/// Writes the run row. A failed write is logged and doesn't change the
+/// outcome.
+async fn record(platform: &Platform, workspace_id: WorkspaceId, run: &Run) {
+    if let Err(err) = write_run(platform, workspace_id, run).await {
+        tracing::warn!(script_id = %run.script_id, "recording a script run: {err:#}");
+    }
 }
 
 async fn write_run(
@@ -269,7 +281,7 @@ async fn write_run(
             .context("encoding output")?,
         created_at: run.created_at,
     };
-    let mut tx = platform.db().write().await?;
+    let mut tx = platform.db().write().await.context("starting the run transaction")?;
     store::insert_run(&mut tx, &row).await.context("inserting the run")?;
     tx.commit().await
 }
@@ -342,7 +354,7 @@ impl HookRunner for ScriptRunner {
         if scripts.is_empty() {
             return Ok(());
         }
-        let mut tx = platform.db().write().await?;
+        let mut tx = platform.db().write().await.context("starting the dispatch transaction")?;
         for script in scripts {
             let job = RunScript {
                 workspace_id: script.workspace_id,
@@ -350,7 +362,11 @@ impl HookRunner for ScriptRunner {
                 point: point.id.to_owned(),
                 event: event.clone(),
             };
-            platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
+            platform
+                .bus()
+                .enqueue(&mut tx, &job, Enqueue::default())
+                .await
+                .with_context(|| format!("enqueueing a run of script {}", script.id))?;
         }
         tx.commit().await
     }

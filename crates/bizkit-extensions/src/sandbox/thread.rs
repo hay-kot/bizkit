@@ -15,8 +15,8 @@ use rquickjs::{
 };
 
 use super::{
-    ABANDONED, CHECK_BUDGET, MAX_ERROR_CHARS, MAX_LOG_CHARS, MAX_LOG_LINES, MAX_OUTPUT_BYTES,
-    PoolLimits, RunReport, RunRequest, STARTED, Shared, Task, Work, capped,
+    CHECK_BUDGET, MAX_ERROR_CHARS, MAX_LOG_CHARS, MAX_LOG_LINES, MAX_OUTPUT_BYTES, PoolLimits,
+    RunReport, RunRequest, Shared, Task, Work, capped,
 };
 
 const PRELUDE: &str = include_str!("prelude.js");
@@ -39,14 +39,14 @@ fn serve(shared: &Shared) {
             receiver.recv()
         };
         let Ok(Task { work, state, reply }) = task else { return };
-        if state.fetch_or(STARTED, Ordering::SeqCst) & ABANDONED != 0 {
+        if !super::take(&state) {
             continue;
         }
         let report = catch_unwind(AssertUnwindSafe(|| execute(work, shared.limits)))
             .unwrap_or_else(|_| RunReport::failed(RunStatus::Error, "the sandbox panicked"));
         // The caller may have stopped waiting; that is fine.
         drop(reply.send(report));
-        if state.load(Ordering::SeqCst) & ABANDONED != 0 {
+        if super::finish(&state) {
             shared.overrunning.fetch_sub(1, Ordering::SeqCst);
             return;
         }

@@ -57,6 +57,10 @@ const inputError = ref('')
 const lastTest = ref<Run | null>(null)
 const viewing = ref<Run | null>(null)
 
+// The server copy the fields were last filled from. A refetch (after a
+// save, failed or not) only replaces the fields the user hasn't edited since,
+// so a rejected save or typing during a save never loses work.
+let synced: typeof script.value
 watch(
   script,
   (loaded) => {
@@ -64,9 +68,11 @@ watch(
     if (loaded.project_id !== props.projectId) {
       void router.replace(`/w/${props.workspaceId}/p/${loaded.project_id}/extensions/${loaded.id}`)
     }
-    name.value = loaded.name
-    source.value = loaded.source
-    enabled.value = loaded.enabled
+    const fresh = synced?.id !== loaded.id
+    if (fresh || name.value === synced?.name) name.value = loaded.name
+    if (fresh || source.value === synced?.source) source.value = loaded.source
+    if (fresh || enabled.value === synced?.enabled) enabled.value = loaded.enabled
+    synced = loaded
   },
   { immediate: true },
 )
@@ -184,6 +190,9 @@ function summaryOf(run: Run): string {
         <span class="badge badge-outline badge-sm">{{ script.sync ? 'sync' : 'async' }}</span>
         <span v-if="hook" class="text-base-content/70">
           Budget {{ hook.budget_ms }} ms · ctx: {{ hook.capabilities.join(', ') }}
+          <template v-if="!script.sync">
+            · Failed runs retry, 3 attempts in all, so repeats must be harmless
+          </template>
         </span>
       </div>
 

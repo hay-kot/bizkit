@@ -468,9 +468,17 @@ impl Operation for ScriptsUpdate {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: UpdateScript) -> Result<Script, ApiError> {
-        let mut row = script_in(&cx, input.workspace_id, input.script_id).await?;
+        script_in(&cx, input.workspace_id, input.script_id).await?;
+        if let Some(source) = &input.source {
+            self.runner.check(source).await.map_err(|err| field_error("source", err))?;
+        }
+        // Read again under the write lock: the check can take a while, and a
+        // concurrent PATCH or delete may have landed meanwhile.
+        let mut tx = cx.write().await?;
+        let mut row = store::find_script(&mut *tx, input.workspace_id, input.script_id)
+            .await?
+            .ok_or(ApiError::NotFound)?;
         if let Some(source) = input.source {
-            self.runner.check(&source).await.map_err(|err| field_error("source", err))?;
             row.source = source;
         }
         if let Some(name) = input.name {
@@ -480,7 +488,6 @@ impl Operation for ScriptsUpdate {
             row.enabled = enabled;
         }
         row.updated_at = cx.now();
-        let mut tx = cx.write().await?;
         store::update_script(&mut *tx, &row).await?;
         tx.commit().await?;
         Ok(script_to_api(cx.platform(), row))

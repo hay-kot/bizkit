@@ -96,7 +96,9 @@ impl FetchBridge {
             .block_on(async move { tokio::time::timeout(left, http.send(request)).await });
         let response = match sent {
             Err(_) => return Err(format!("{label}: timed out after {left:?}")),
-            Ok(Err(_)) => return Err(format!("{label}: the request failed")),
+            // The HTTP client strips URLs from its errors, and the run
+            // record redacts secrets, so the cause is safe to show.
+            Ok(Err(err)) => return Err(format!("{label}: {err:#}")),
             Ok(Ok(response)) => response,
         };
         let headers: BTreeMap<&str, &str> = response

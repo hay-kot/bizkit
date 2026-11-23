@@ -77,9 +77,17 @@ async fn loops_time_out() {
 
 #[tokio::test]
 async fn memory_and_stack_are_limited() {
-    let oom = run("export default () => { const a = []; for (;;) a.push({ a }) }").await;
+    // A loaded machine can take longer than BUDGET to fill 8 MiB.
+    let unhurried = |source| RunRequest {
+        budget: Duration::from_secs(5),
+        hard: Duration::from_secs(6),
+        ..request(source)
+    };
+    let pool = pool(1, LIMITS);
+    let oom =
+        pool.run(unhurried("export default () => { const a = []; for (;;) a.push({ a }) }")).await;
     assert_eq!(oom.status, RunStatus::Error, "{oom:?}");
-    let deep = run("const f = (n) => f(n + 1); export default () => f(0)").await;
+    let deep = pool.run(unhurried("const f = (n) => f(n + 1); export default () => f(0)")).await;
     assert_eq!(deep.status, RunStatus::Error, "{deep:?}");
 }
 
@@ -92,6 +100,23 @@ async fn native_overruns_meet_the_hard_deadline_and_the_thread_is_replaced() {
     assert!(start.elapsed() < HARD + Duration::from_millis(100), "the caller got its answer");
     let next = pool.run(request("export default () => 2")).await;
     assert_eq!(next.output, Some(json!(2)), "a replacement thread ran the next script: {next:?}");
+}
+
+#[test]
+fn the_handshake_counts_each_overrun_once() {
+    let finished_first = AtomicU8::new(0);
+    assert!(take(&finished_first));
+    assert!(!finish(&finished_first), "the thread serves on");
+    assert_eq!(abandon(&finished_first), GaveUp::Finished, "the caller takes the report");
+
+    let abandoned_first = AtomicU8::new(0);
+    assert!(take(&abandoned_first));
+    assert_eq!(abandon(&abandoned_first), GaveUp::Overrunning);
+    assert!(finish(&abandoned_first), "the counted thread exits");
+
+    let queued = AtomicU8::new(0);
+    assert_eq!(abandon(&queued), GaveUp::Queued);
+    assert!(!take(&queued), "the thread skips it");
 }
 
 #[tokio::test]

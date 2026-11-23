@@ -54,6 +54,19 @@ test('scripts filter spam before validation, run after submissions and test-run'
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Script saved')).toBeVisible()
 
+  const broken = 'export default (input, ctx) => {'
+  await page.getByLabel('Script source').fill(broken)
+  const refetched = page.waitForResponse(
+    (r) => r.request().method() === 'GET' && /\/extensions\/scripts\/[^/?]+$/.test(r.url()),
+  )
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText(/unexpected token/).first()).toBeVisible()
+  await refetched
+  await expect(page.getByLabel('Script source')).toHaveValue(broken)
+  await page
+    .getByLabel('Script source')
+    .fill("export default (input, ctx) => { ctx.log('from', input.submission.data.name) }")
+
   await page.getByRole('button', { name: 'Run test' }).click()
   await expect(page.getByTestId('test-result')).toContainText('from undefined')
 

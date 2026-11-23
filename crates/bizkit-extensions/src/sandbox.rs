@@ -106,12 +106,51 @@ enum Work {
 const STARTED: u8 = 1;
 /// Set by the caller when it stops waiting.
 const ABANDONED: u8 = 2;
+/// Set by the thread after it sends the report.
+const FINISHED: u8 = 4;
+
+/// What the caller finds when it stops waiting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GaveUp {
+    /// No thread took the task; the thread that does will skip it.
+    Queued,
+    /// The thread is still running it, and will exit when done.
+    Overrunning,
+    /// The thread already sent the report and serves on.
+    Finished,
+}
+
+/// The thread's side, when it takes the task. False when the caller
+/// already gave up.
+fn take(state: &AtomicU8) -> bool {
+    state.fetch_or(STARTED, Ordering::SeqCst) & ABANDONED == 0
+}
+
+/// The thread's side, after it sends the report. True when the caller gave
+/// up during the run, counted this thread as overrunning and spawned its
+/// replacement, so the thread must exit.
+fn finish(state: &AtomicU8) -> bool {
+    state.fetch_or(FINISHED, Ordering::SeqCst) & ABANDONED != 0
+}
+
+/// The caller's side, at the hard deadline.
+fn abandon(state: &AtomicU8) -> GaveUp {
+    let seen = state.fetch_or(ABANDONED, Ordering::SeqCst);
+    if seen & FINISHED != 0 {
+        GaveUp::Finished
+    } else if seen & STARTED != 0 {
+        GaveUp::Overrunning
+    } else {
+        GaveUp::Queued
+    }
+}
 
 #[derive(Debug)]
 struct Task {
     work: Work,
-    /// [`STARTED`] and [`ABANDONED`] bits. Both sides use `fetch_or`, so
-    /// exactly one of them sees the other's bit and acts on it.
+    /// The handshake bits, set only through [`take`], [`finish`] and
+    /// [`abandon`]. Each side uses one `fetch_or`, so when a run ends just
+    /// as the caller gives up, exactly one side sees the other's bit.
     state: Arc<AtomicU8>,
     reply: oneshot::Sender<RunReport>,
 }
@@ -187,7 +226,7 @@ impl SandboxPool {
         if self.shared.overrunning.load(Ordering::SeqCst) >= self.shared.threads * 2 {
             return RunReport::failed(RunStatus::Overloaded, "too many scripts are overrunning");
         }
-        let (reply, answer) = oneshot::channel();
+        let (reply, mut answer) = oneshot::channel();
         let state = Arc::new(AtomicU8::new(0));
         let task = Task { work, state: Arc::clone(&state), reply };
         match self.sender.try_send(task) {
@@ -199,18 +238,26 @@ impl SandboxPool {
                 return RunReport::failed(RunStatus::Error, "the sandbox pool is gone");
             }
         }
-        match tokio::time::timeout(hard, answer).await {
+        match tokio::time::timeout(hard, &mut answer).await {
             Ok(Ok(report)) => report,
             Ok(Err(_)) => RunReport::failed(RunStatus::Error, "the sandbox thread stopped"),
             Err(_) => {
-                if state.fetch_or(ABANDONED, Ordering::SeqCst) & STARTED != 0 {
-                    self.shared.overrunning.fetch_add(1, Ordering::SeqCst);
-                    if let Err(err) = thread::spawn(&self.shared) {
-                        tracing::warn!(
-                            pool = self.shared.name,
-                            "replacing a sandbox thread: {err:#}"
-                        );
+                match abandon(&state) {
+                    GaveUp::Finished => {
+                        return answer.try_recv().unwrap_or_else(|_| {
+                            RunReport::failed(RunStatus::Error, "the sandbox thread stopped")
+                        });
                     }
+                    GaveUp::Overrunning => {
+                        self.shared.overrunning.fetch_add(1, Ordering::SeqCst);
+                        if let Err(err) = thread::spawn(&self.shared) {
+                            tracing::warn!(
+                                pool = self.shared.name,
+                                "replacing a sandbox thread: {err:#}"
+                            );
+                        }
+                    }
+                    GaveUp::Queued => {}
                 }
                 RunReport::failed(RunStatus::Timeout, format!("the script ran past {hard:?}"))
             }
