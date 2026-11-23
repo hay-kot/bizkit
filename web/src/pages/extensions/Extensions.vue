@@ -7,6 +7,7 @@ import DataTable from '@/components/ui/DataTable.vue'
 import NewScriptPanel from '@/components/extensions/NewScriptPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
@@ -139,15 +140,17 @@ function removeSecret(secret: string) {
       </button>
     </PageHeader>
 
-    <div v-if="(scripts?.items.length ?? 0) > 0" class="mb-3 flex justify-end">
-      <Select
-        v-model="targetFilter"
-        :options="targetOptions"
-        label="Runs for"
-        size="sm"
-        name="target"
-      />
-    </div>
+    <SectionHeading title="Scripts" class="mb-3">
+      <template v-if="(scripts?.items.length ?? 0) > 0" #actions>
+        <Select
+          v-model="targetFilter"
+          :options="targetOptions"
+          label="Runs for"
+          size="sm"
+          name="target"
+        />
+      </template>
+    </SectionHeading>
 
     <DataTable
       :columns="scriptColumns"
@@ -188,18 +191,17 @@ function removeSecret(secret: string) {
       </template>
     </DataTable>
 
-    <div class="mt-8 mb-3 flex items-center justify-between gap-2">
-      <div>
-        <h2 class="text-sm font-semibold">Secrets</h2>
-        <p class="text-xs text-base-content/70">
-          Async scripts read these as <code>ctx.secrets</code>. Values are never shown again, and
-          run logs show <code>[secret:NAME]</code> instead.
-        </p>
-      </div>
-      <button type="button" class="btn gap-1.5 btn-sm" @click="openSecret">
-        <Plus class="size-4" aria-hidden="true" />Add secret
-      </button>
-    </div>
+    <SectionHeading title="Secrets" class="mt-8 mb-3">
+      <template #description>
+        Async scripts read these as <code>ctx.secrets</code>. Values are never shown again, and run
+        logs show <code>[secret:NAME]</code> instead.
+      </template>
+      <template #actions>
+        <button type="button" class="btn gap-1.5 btn-sm" @click="openSecret">
+          <Plus class="size-4" aria-hidden="true" />Add secret
+        </button>
+      </template>
+    </SectionHeading>
 
     <DataTable
       :columns="secretColumns"
