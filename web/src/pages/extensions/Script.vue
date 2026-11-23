@@ -22,6 +22,7 @@ import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
 import SaveStatus from '@/components/ui/SaveStatus.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { runAction } from '@/lib/action'
 import { errorMessage } from '@/lib/errors'
@@ -292,10 +293,16 @@ function deleteScript() {
       message: 'Its run log goes too. You can’t undo this.',
       confirmLabel: 'Delete script',
     },
-    run: () =>
-      remove.mutateAsync({ path: { workspace_id: props.workspaceId, script_id: props.scriptId } }),
+    run: async () => {
+      await remove.mutateAsync({
+        path: { workspace_id: props.workspaceId, script_id: props.scriptId },
+      })
+      return true
+    },
     success: 'Script deleted',
-  }).then(() => router.push(`/w/${props.workspaceId}/p/${props.projectId}/extensions`))
+  }).then((deleted) => {
+    if (deleted) void router.push(`/w/${props.workspaceId}/p/${props.projectId}/extensions`)
+  })
 }
 
 function summaryOf(run: Run): string {
@@ -587,5 +594,6 @@ function summaryOf(run: Run): string {
         </template>
       </DetailPanel>
     </template>
+    <SkeletonRows v-else :rows="6" />
   </Page>
 </template>

@@ -50,7 +50,7 @@ const controlRestrictions = [
 // In src/pages: one column, width set on <Page>.
 const pageRestrictions = [
   {
-    pattern: '^(?:.*:)?(?:grid-cols|col-span|max-w)-.+$',
+    pattern: '^(?:.*:)?(?:(?:grid-cols|col-span|columns|max-w)-.+|grid-flow-col(?:-dense)?)$',
     message:
       '$0: pages are one column inside <Page>; set the width on Page and put grids in a component.',
   },

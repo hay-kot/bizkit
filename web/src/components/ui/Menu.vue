@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onClickOutside, onKeyStroke } from '@vueuse/core'
-import { ref, useId } from 'vue'
+import { nextTick, ref, useId } from 'vue'
 
 /**
  * A button that opens a menu of actions. Put `MenuItem`s (or any links and
- * buttons with role="menuitem") in the default slot.
+ * buttons with role="menuitem") in the default slot. The trigger must set
+ * `aria-controls` to the `controls` slot prop: the menu finds it by that to
+ * return focus.
  */
 withDefaults(
   defineProps<{ label: string; align?: 'start' | 'end'; placement?: 'below' | 'above' }>(),
@@ -19,7 +21,15 @@ const menu = ref<HTMLElement>()
 const id = useId()
 
 onClickOutside(root, () => (open.value = false))
-onKeyStroke('Escape', () => (open.value = false))
+onKeyStroke('Escape', () => {
+  if (!open.value) return
+  open.value = false
+  trigger()?.focus()
+})
+
+function trigger(): HTMLElement | null {
+  return root.value?.querySelector<HTMLElement>(`[aria-controls="${id}"]`) ?? null
+}
 
 function items(): HTMLElement[] {
   return [...(menu.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
@@ -39,6 +49,15 @@ function onMenuKey(event: KeyboardEvent) {
 
 function toggle() {
   open.value = !open.value
+  if (open.value) void nextTick(() => items()[0]?.focus())
+}
+
+// Runs in the capture phase, before the item's own handler, so a confirm
+// dialog the item opens records the trigger, not the item that is about to
+// unmount, as the element to give focus back to.
+function onPick() {
+  trigger()?.focus()
+  open.value = false
 }
 </script>
 
@@ -65,7 +84,7 @@ function toggle() {
           placement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1',
         ]"
         @keydown="onMenuKey"
-        @click="open = false"
+        @click.capture="onPick"
       >
         <slot />
       </div>

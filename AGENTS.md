@@ -85,7 +85,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 
   | Need | Use | Enforced by |
   |---|---|---|
-  | A page | `Page` (sets the width) > `PageHeader` > `PageSection`s and `Card`s | `grid-cols-*`, `col-span-*` and `max-w-*` are errors in `src/pages` |
+  | A page | `Page` (sets the width) > `PageHeader` > `PageSection`s and `Card`s | `grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*` are errors in `src/pages` |
   | Secondary or destructive header actions | `ActionsMenu` with `MenuItem` (`danger` for delete, last) | |
   | Save state of an inline editor | `SaveStatus` next to the header Save | |
   | A list of rows | `DataTable` with `#cell-<key>` slots; it handles loading, error and empty | `<table>` and DaisyUI `table*` classes are errors |

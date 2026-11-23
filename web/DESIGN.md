@@ -1,6 +1,6 @@
 # Page design
 
-Every page follows one of three archetypes. The primitives live in `src/components/ui`; ESLint enforces the layout rules in `src/pages` (no `grid-cols-*`, `col-span-*` or `max-w-*` there).
+Every page follows one of three archetypes. The primitives live in `src/components/ui`; ESLint catches the common breaks of the layout rules in `src/pages` (`grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*`); the rest is on review.
 
 ## Building blocks
 
