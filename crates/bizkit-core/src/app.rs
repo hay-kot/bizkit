@@ -1,5 +1,6 @@
 //! The application: platform state, router and background worker.
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -346,13 +347,14 @@ impl App {
         let worker_task = tokio::spawn(async move { worker.run(worker_shutdown).await });
         let mcp_shutdown = self.shutdown.clone();
         let server_shutdown = shutdown.clone();
-        let served = axum::serve(listener, router)
-            .with_graceful_shutdown(async move {
-                server_shutdown.cancelled().await;
-                mcp_shutdown.cancel();
-            })
-            .await
-            .context("serving HTTP");
+        let served =
+            axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>())
+                .with_graceful_shutdown(async move {
+                    server_shutdown.cancelled().await;
+                    mcp_shutdown.cancel();
+                })
+                .await
+                .context("serving HTTP");
         shutdown.cancel();
         worker_task.await.context("joining the worker")?;
         self.platform.db().close().await;

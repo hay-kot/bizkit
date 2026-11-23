@@ -26,6 +26,10 @@ pub struct Config {
     pub mail: MailConfig,
     /// Sign-in and sessions.
     pub auth: AuthConfig,
+    /// Take the client address from the rightmost `X-Forwarded-For` entry.
+    /// Turn it on only behind a reverse proxy that sets that header, or
+    /// clients can claim any address.
+    pub trust_proxy_headers: bool,
     /// Each module's own section, keyed by module name.
     pub modules: BTreeMap<String, serde_json::Value>,
 }
