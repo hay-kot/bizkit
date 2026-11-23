@@ -376,6 +376,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bizkit-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "serde",
+ "sqlx",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "bizkit-core"
 version = "0.1.0"
 dependencies = [
