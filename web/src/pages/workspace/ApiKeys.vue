@@ -3,11 +3,12 @@ import { KeyRound, Plus } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 
 import ApiTokenPanel from '@/components/ApiTokenPanel.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
 import type { ApiKey } from '@/queries/apiKeys'
@@ -65,7 +66,7 @@ function onRevoke(key: ApiKey) {
 </script>
 
 <template>
-  <div>
+  <Page>
     <PageHeader
       :section="workspaceName"
       title="API keys"
@@ -166,5 +167,5 @@ function onRevoke(key: ApiKey) {
     </FormPanel>
 
     <ApiTokenPanel :token="token" @close="token = undefined" />
-  </div>
+  </Page>
 </template>

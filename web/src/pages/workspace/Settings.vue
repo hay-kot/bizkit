@@ -2,9 +2,11 @@
 import { ref, watch } from 'vue'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import PageHeader from '@/components/PageHeader.vue'
+import Card from '@/components/ui/Card.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Field from '@/components/ui/Field.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { toast } from '@/lib/toast'
 import { useRenameWorkspace, useWorkspace } from '@/queries/workspaces'
@@ -25,19 +27,10 @@ async function onSave() {
 </script>
 
 <template>
-  <div>
+  <Page width="narrow">
     <PageHeader :section="workspaceName" title="Settings" />
-    <section class="grid gap-6 md:grid-cols-3" aria-labelledby="general-heading">
-      <div>
-        <h2 id="general-heading" class="font-medium">General</h2>
-        <p class="mt-1 text-sm text-base-content/80">
-          The name shows in the switcher and in invitation emails.
-        </p>
-      </div>
-      <form
-        class="flex flex-col gap-4 rounded-box border border-base-300 p-5 md:col-span-2"
-        @submit.prevent="onSave"
-      >
+    <form @submit.prevent="onSave">
+      <Card title="General" description="The name shows in the switcher and in invitation emails.">
         <Field label="Name">
           <input v-model="name" name="workspace-name" required class="input w-full" />
         </Field>
@@ -64,15 +57,15 @@ async function onSave() {
           </div>
         </Field>
         <ErrorAlert :error="rename.error.value" />
-        <div class="flex justify-end">
+        <template #footer>
           <SubmitButton
             :pending="rename.asyncStatus.value === 'loading'"
-            :disabled="name === workspace?.name"
+            :disabled="!workspace || name === workspace.name"
           >
             Save changes
           </SubmitButton>
-        </div>
-      </form>
-    </section>
-  </div>
+        </template>
+      </Card>
+    </form>
+  </Page>
 </template>

@@ -6,13 +6,18 @@ import { useRouter } from 'vue-router'
 import EntitySections from '@/components/EntitySections.vue'
 import FieldsEditor from '@/components/forms/FieldsEditor.vue'
 import { fetchSnippet, htmlSnippet } from '@/components/forms/embed'
-import PageHeader from '@/components/PageHeader.vue'
+import ActionsMenu from '@/components/ui/ActionsMenu.vue'
+import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import MenuItem from '@/components/ui/MenuItem.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PageSection from '@/components/ui/PageSection.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
@@ -224,7 +229,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
 </script>
 
 <template>
-  <div>
+  <Page>
     <PageHeader
       :section="projectName"
       :title="form?.name ?? 'Form'"
@@ -238,20 +243,21 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="openSettings">
         <Settings class="size-4" aria-hidden="true" />Settings
       </button>
-      <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="onDeleteForm">
-        <Trash2 class="size-4" aria-hidden="true" />Delete
-      </button>
+      <ActionsMenu>
+        <MenuItem danger @select="onDeleteForm">
+          <Trash2 class="size-4" aria-hidden="true" />Delete form
+        </MenuItem>
+      </ActionsMenu>
     </PageHeader>
 
-    <p v-if="formError" class="mb-4 text-sm text-error">This form doesn’t exist.</p>
+    <p v-if="formError" class="text-sm text-error">This form doesn’t exist.</p>
 
-    <section v-if="form" class="mb-6 rounded-box border border-base-300 bg-base-100 p-4">
-      <h2 class="text-sm font-semibold">Endpoint</h2>
-      <div class="mt-2 flex items-center gap-2">
+    <Card v-if="form" title="Endpoint">
+      <div class="flex items-center gap-2">
         <code class="truncate text-sm" data-testid="form-endpoint">{{ form.endpoint }}</code>
         <CopyButton :text="form.endpoint" label="Copy endpoint" />
       </div>
-      <details class="mt-3">
+      <details>
         <summary class="cursor-pointer text-sm font-medium">HTML form</summary>
         <div class="mt-2 flex items-start gap-2">
           <pre tabindex="0" class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-xs">{{
@@ -264,7 +270,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
           from then.
         </p>
       </details>
-      <details class="mt-2">
+      <details>
         <summary class="cursor-pointer text-sm font-medium">Post from script</summary>
         <div class="mt-2 flex items-start gap-2">
           <pre tabindex="0" class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-xs">{{
@@ -273,75 +279,78 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
           <CopyButton :text="script" label="Copy script" />
         </div>
       </details>
-    </section>
+    </Card>
 
-    <div class="mb-3 flex items-center justify-between gap-2">
-      <h2 class="text-sm font-semibold">Submissions</h2>
-      <Select v-model="status" :options="statuses" label="Show" size="sm" name="status" />
-    </div>
-
-    <DataTable
-      :columns="columns"
-      :rows="submissions?.items"
-      :row-key="(s) => s.id"
-      :loading="isPending"
-      :error="error"
-      label="Submissions"
-      :empty="{
-        icon: status === 'spam' ? ShieldAlert : Inbox,
-        title: status === 'spam' ? 'No spam' : 'No submissions yet',
-        message:
-          status === 'spam'
-            ? 'Submissions that fail the bot check land here.'
-            : 'Post your site’s form to the endpoint above.',
-      }"
-    >
-      <template #cell-received="{ row }"
-        ><span class="text-sm whitespace-nowrap">{{ formatDate(row.created_at) }}</span></template
-      >
-      <template #cell-preview="{ row }"
-        ><span class="line-clamp-1 text-sm">{{ preview(row) || '(empty)' }}</span></template
-      >
-      <template #cell-reason="{ row }"
-        ><span class="badge badge-ghost badge-sm">{{ row.spam_reason ?? 'marked' }}</span></template
-      >
-      <template #cell-actions="{ row }">
-        <div class="flex justify-end gap-1">
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            :aria-label="`View submission from ${formatDate(row.created_at)}`"
-            @click="viewing = row"
-          >
-            <Eye class="size-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            :aria-label="row.status === 'spam' ? 'Move to inbox' : 'Mark as spam'"
-            @click="move(row, row.status === 'spam' ? 'inbox' : 'spam')"
-          >
-            <component
-              :is="row.status === 'spam' ? Inbox : ShieldAlert"
-              class="size-4"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            aria-label="Delete submission"
-            @click="removeSubmission(row)"
-          >
-            <Trash2 class="size-4" aria-hidden="true" />
-          </button>
-        </div>
+    <PageSection title="Submissions">
+      <template #actions>
+        <Select v-model="status" :options="statuses" label="Show" size="sm" name="status" />
       </template>
-    </DataTable>
 
-    <p v-if="submissions?.next_before" class="mt-2 text-sm text-base-content/80">
-      Showing the newest {{ SUBMISSIONS_SHOWN }}. Export CSV for the rest.
-    </p>
+      <DataTable
+        :columns="columns"
+        :rows="submissions?.items"
+        :row-key="(s) => s.id"
+        :loading="isPending"
+        :error="error"
+        label="Submissions"
+        :empty="{
+          icon: status === 'spam' ? ShieldAlert : Inbox,
+          title: status === 'spam' ? 'No spam' : 'No submissions yet',
+          message:
+            status === 'spam'
+              ? 'Submissions that fail the bot check land here.'
+              : 'Post your site’s form to the endpoint above.',
+        }"
+      >
+        <template #cell-received="{ row }"
+          ><span class="text-sm whitespace-nowrap">{{ formatDate(row.created_at) }}</span></template
+        >
+        <template #cell-preview="{ row }"
+          ><span class="line-clamp-1 text-sm">{{ preview(row) || '(empty)' }}</span></template
+        >
+        <template #cell-reason="{ row }"
+          ><span class="badge badge-ghost badge-sm">{{
+            row.spam_reason ?? 'marked'
+          }}</span></template
+        >
+        <template #cell-actions="{ row }">
+          <div class="flex justify-end gap-1">
+            <button
+              type="button"
+              class="btn btn-square btn-ghost btn-sm"
+              :aria-label="`View submission from ${formatDate(row.created_at)}`"
+              @click="viewing = row"
+            >
+              <Eye class="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="btn btn-square btn-ghost btn-sm"
+              :aria-label="row.status === 'spam' ? 'Move to inbox' : 'Mark as spam'"
+              @click="move(row, row.status === 'spam' ? 'inbox' : 'spam')"
+            >
+              <component
+                :is="row.status === 'spam' ? Inbox : ShieldAlert"
+                class="size-4"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="btn btn-square btn-ghost btn-sm"
+              aria-label="Delete submission"
+              @click="removeSubmission(row)"
+            >
+              <Trash2 class="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        </template>
+      </DataTable>
+
+      <p v-if="submissions?.next_before" class="text-sm text-base-content/80">
+        Showing the newest {{ SUBMISSIONS_SHOWN }}. Export CSV for the rest.
+      </p>
+    </PageSection>
 
     <EntitySections
       v-if="form"
@@ -447,5 +456,5 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
         <FieldsEditor v-model="settings.fields" />
       </Field>
     </FormPanel>
-  </div>
+  </Page>
 </template>

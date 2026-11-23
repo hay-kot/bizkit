@@ -3,16 +3,18 @@ import { UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 import InvitePanel from '@/components/InvitePanel.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import InvitationList from '@/components/team/InvitationList.vue'
 import MemberList from '@/components/team/MemberList.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PageSection from '@/components/ui/PageSection.vue'
 
 defineProps<{ workspaceId: string; workspaceName: string; isAdmin: boolean }>()
 const inviting = ref(false)
 </script>
 
 <template>
-  <div>
+  <Page>
     <PageHeader
       :section="workspaceName"
       title="Team"
@@ -28,18 +30,17 @@ const inviting = ref(false)
       </button>
     </PageHeader>
 
-    <section aria-labelledby="members-heading">
-      <h2 id="members-heading" class="mb-3 text-sm font-semibold">Members</h2>
+    <PageSection title="Members">
       <MemberList :workspace-id="workspaceId" :workspace-name="workspaceName" :is-admin="isAdmin" />
-    </section>
+    </PageSection>
 
-    <section v-if="isAdmin" class="mt-8" aria-labelledby="invitations-heading">
-      <h2 id="invitations-heading" class="mb-3 text-sm font-semibold">Pending invitations</h2>
-      <p class="mb-3 text-sm text-base-content/80">
-        Invitations last 7 days. Revoke one to cancel it.
-      </p>
+    <PageSection
+      v-if="isAdmin"
+      title="Pending invitations"
+      description="Invitations last 7 days. Revoke one to cancel it."
+    >
       <InvitationList :workspace-id="workspaceId" @invite="inviting = true" />
-    </section>
+    </PageSection>
 
     <InvitePanel
       v-if="isAdmin"
@@ -47,5 +48,5 @@ const inviting = ref(false)
       :open="inviting"
       @close="inviting = false"
     />
-  </div>
+  </Page>
 </template>
