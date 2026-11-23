@@ -68,7 +68,7 @@ function scriptPath(scriptId: string) {
       :empty="{
         icon: Code,
         title: 'No scripts',
-        message: `Add one to filter or forward this ${targetKind.noun}'s submissions.`,
+        message: `Add one to run your own code for this ${targetKind.noun}.`,
       }"
     >
       <template #cell-name="{ row }">

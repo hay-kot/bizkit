@@ -50,6 +50,9 @@ A feature module implements `bizkit_core::Module` in its own `crates/bizkit-<nam
 - Endpoints that third-party pages call (form ingest) go in `public_routes`, nested at `/m/<name>/public`. They sit outside authentication: no `Authn`, no cookies, no CSRF check. Escape anything they echo into HTML.
 - `seed_demo` adds the module's sample rows to the dev stack's demo workspace (`bizkit dev seed-demo`, run by the svx `seed` service). Keep it idempotent, put it behind the crate's own `test-hooks` feature, and extend it whenever the module gains a feature.
 - Module tables carry `workspace_id`, and every query filters on it.
+- Module config lives under `modules.<name>` in the config file, parsed into the module's own struct with `deny_unknown_fields`. Analytics reads `geoip_path` (a MaxMind-format country file; without it countries are unknown) and `raw_retention_days` (default 90, at least 7).
+- Public routes that need the visitor's address take the `ClientIp` extractor. It reads the peer address, or, when the top-level `trusted_proxies` is n, the nth `X-Forwarded-For` entry from the right. Set it to the number of proxies in front of bizkit that append the header (the dev stack has one, Vite); a higher number lets clients claim any address.
+- Analytics counts by UTC day. Ingest (the snippet, the beacon and server events) goes through `write::record`, the one write path. Reports read `analytics_daily` up to `rolled_through` and raw events after it, so a report gives the same numbers before and after the rollup job.
 - Migrations live in the module crate's `migrations/` and return from `Module::migrations` as `sqlx::migrate!()`. Versions must be unique across all crates; a test checks it.
 
 ## Hooks
@@ -94,7 +97,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 - Layout: `/` is the user home (workspaces, invitations, create). Inside a workspace, `layouts/WorkspaceLayout.vue` gives the sidebar: workspace switcher on top, then the project switcher with the selected project's pages, then the workspace meta pages, then the user menu. `/w/:workspaceId` lands on the current project's first page (the last project used, else the first), or on Projects when there are none.
 - A feature's UI is a web module: `web/src/modules/<name>.ts` calls `defineWebModule({ name, projectRoutes, workspaceRoutes, nav })` and is listed in `modules/index.ts`. The router and the sidebar read the list, so a module never edits the shell. Module data belongs to a project, so feature pages go in `projectRoutes` (mounted at `/w/:workspaceId/p/:projectId/`, params arrive as props) with nav items in `section: 'project'`; they show under the sidebar's project switcher. `section: 'workspace'` is for workspace meta (Team, API keys, Settings) pinned to the bottom. Sidebar `order` 0-99 is core's; modules start at 100; Settings stays last. A unit test checks that nav items point at registered routes of their section and nothing collides.
 - **Command palette.** A module adds rows with `palette: (cx) => rows` on `defineWebModule`. `PaletteRows` in the workspace layout calls it in a component setup (so query composables work) and calls it again when the workspace, project or admin flag changes. Nav items become rows on their own. Rows name the object or action (`Contact`, `New form`), never the path: `group` is the container (`Forms`), `kind` a muted type word (`form`), and verbs go in `keywords`. Objects use `scope: 'goto'` and ids like `forms.form:<id>`; actions keep the default scope. Return `[]` when the rows need a project or admin rights the user lacks. A page can add page-local rows with `usePaletteRows(rows)`; they go away with the page. A "New ..." action links to its list page with `?new=1`, and the page calls `useCreateIntent(openPanel)`.
-- Pages follow the archetypes in `web/DESIGN.md` (list, detail, settings): read it before you add or restyle a page. Detail and edit pages are one column.
+- Pages follow the archetypes in `web/DESIGN.md` (list, detail, settings, report): read it before you add or restyle a page. Detail and edit pages are one column.
 - Building blocks, and what ESLint enforces outside `src/components/ui`:
 
   | Need | Use | Enforced by |
@@ -109,6 +112,14 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | Waiting | `SubmitButton` `pending`, `SkeletonRows`, `Spinner` | DaisyUI `loading` classes are errors |
   | Confirm, run, report | `runAction({ confirm, run, success })` | Pages can't import `lib/confirm`; `alert`/`confirm`/`prompt` are errors |
   | A date | `formatDate`, `formatShortDate`, `isPast` from `lib/format.ts` | `toLocale*String` and `new Intl.*` are errors elsewhere |
+  | A number | `formatNumber`, `formatCompactNumber`, `formatPercent` from `lib/format.ts` | `toLocale*String` and `new Intl.*` are errors elsewhere |
+| A UTC day (analytics buckets) | `formatUtcDay`, `formatShortUtcDay` from `lib/format.ts`; the local-time formatters shift it a day west of UTC | |
+  | Tabs between a feature's pages | `Tabs` (route links) | |
+  | A report's date range | `DateRangePicker`, with `presetRange` and `previousPeriod` from `lib/range.ts`; `useReportRange` keeps the range and compare flag in the URL | |
+  | KPIs with a change | `StatTiles` | |
+  | Numbers over time | `TimeSeriesChart` (SVG, no chart library) | Inline styles and arbitrary values are errors |
+  | A ranked list with share bars | `BarList` (bars are `progress` elements) | Inline styles and arbitrary values are errors |
+  | Report panels side by side | `ReportGrid` | `grid-cols-*` is an error in `src/pages` |
   | API data | the composables in `src/queries` | Pages and layouts can't import `@pinia/colada` or `src/api/gen` |
   | A name with a slug | `useSlugFromName()` | |
   | A page or action reachable by keyboard | a module `palette` source, or `usePaletteRows` for page-local rows | |
@@ -118,7 +129,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 
 ## Dev stack
 
-`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`), the demo seed and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Sign in as `demo@bizkit.test` for the seeded demo workspace (any `@bizkit.test` email works) and open the link from the stack's Mailpit.
+`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`), the demo seed and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Open the app at `http://localhost:<ui port>`, not `127.0.0.1`: the API's base URL is the localhost one, so magic links and the CSRF Origin check use it, while every service still listens on 127.0.0.1. Sign in as `demo@bizkit.test` for the seeded demo workspace (any `@bizkit.test` email works; other emails get no mail, and a second request within a minute sends none) and open the link from the stack's Mailpit.
 
 ## Tests
 

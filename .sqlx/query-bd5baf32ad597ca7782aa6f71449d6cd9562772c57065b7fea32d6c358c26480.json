@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO analytics_conversions (workspace_id, goal_id, day, person)\n         VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "bd5baf32ad597ca7782aa6f71449d6cd9562772c57065b7fea32d6c358c26480"
+}

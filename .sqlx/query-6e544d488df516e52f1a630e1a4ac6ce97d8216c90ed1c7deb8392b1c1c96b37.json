@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_daily (workspace_id, project_id, dimension, day, value, visitors, pageviews, events)\n         SELECT ?, ?, ?, ?, value, COUNT(DISTINCT visitor), SUM(name = 'pageview'), SUM(name <> 'pageview')\n         FROM (\n           SELECT COALESCE(CASE ? WHEN 'page' THEN path WHEN 'referrer' THEN referrer_host\n                                  WHEN 'utm_source' THEN utm_source WHEN 'utm_medium' THEN utm_medium\n                                  WHEN 'utm_campaign' THEN utm_campaign WHEN 'country' THEN country\n                                  WHEN 'device' THEN device WHEN 'browser' THEN browser\n                                  WHEN 'os' THEN os WHEN 'event' THEN name END, '') AS value,\n                  visitor, name\n           FROM analytics_events\n           WHERE workspace_id = ? AND project_id = ? AND day = ?\n             AND CASE ? WHEN 'total' THEN 1 WHEN 'event' THEN name <> 'pageview' ELSE name = 'pageview' END)\n         GROUP BY value",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "6e544d488df516e52f1a630e1a4ac6ce97d8216c90ed1c7deb8392b1c1c96b37"
+}

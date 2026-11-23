@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT (ts - ?) / 3600000 AS \"hour!: i64\", COUNT(DISTINCT visitor) AS \"visitors!: i64\",\n                  SUM(name = 'pageview') AS \"pageviews!: i64\"\n           FROM analytics_events\n           WHERE workspace_id = ? AND project_id = ? AND day = ?\n           GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "hour!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "visitors!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "pageviews!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "c6c2ced4247b5ccbdb6036477d7d728950d44834825f669b53dff7ed29116786"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS found FROM analytics_goals\n         WHERE workspace_id = ? AND project_id = ? AND kind = ? AND match = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "found",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f02a7ac8f60a5417a358ed2f41358b6dc83d286387f95d15667709516334201b"
+}

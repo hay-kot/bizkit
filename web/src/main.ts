@@ -6,6 +6,8 @@ import { createApp } from 'vue'
 
 import { configureClient } from './api/client'
 import App from './App.vue'
+import { modules } from './modules'
+import { entitySectionsKey } from './modules/entitySections'
 import { router } from './router'
 
 // Until the first navigation resolves, currentRoute is the start location and
@@ -19,6 +21,10 @@ configureClient(async () => {
 })
 
 createApp(App)
+  .provide(
+    entitySectionsKey,
+    modules.flatMap((module) => module.entitySections ?? []),
+  )
   .use(createPinia())
   .use(PiniaColada, { queryOptions: { refetchOnWindowFocus: false } })
   .use(router)

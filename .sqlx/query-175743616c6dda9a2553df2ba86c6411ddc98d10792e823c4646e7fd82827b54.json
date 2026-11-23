@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT project_id AS \"project_id: ProjectId\", user_id, traits,\n                      first_seen AS \"first_seen: UnixMillis\", last_seen AS \"last_seen: UnixMillis\"\n               FROM analytics_people WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "traits",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "traits"
+          }
+        }
+      },
+      {
+        "name": "first_seen: UnixMillis",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "first_seen"
+          }
+        }
+      },
+      {
+        "name": "last_seen: UnixMillis",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "last_seen"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "175743616c6dda9a2553df2ba86c6411ddc98d10792e823c4646e7fd82827b54"
+}

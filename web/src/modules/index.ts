@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+import analytics from './analytics'
 import core from './core'
 import extensions from './extensions'
 import forms from './forms'
@@ -7,7 +8,7 @@ import type { NavItem, NavSection, WebModule } from './types'
 import webhooks from './webhooks'
 
 /** Every web module, in the order their routes register. */
-export const modules: WebModule[] = [core, forms, webhooks, extensions]
+export const modules: WebModule[] = [core, forms, analytics, webhooks, extensions]
 
 /** Every module's workspace routes, relative to `/w/:workspaceId/`. */
 export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) => m.workspaceRoutes ?? [])

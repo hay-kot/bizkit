@@ -13,9 +13,9 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     proxy: {
-      '/api': { target: api, changeOrigin: false },
-      '/mcp': { target: api, changeOrigin: false },
-      '/m/': { target: api, changeOrigin: false },
+      '/api': { target: api, changeOrigin: false, xfwd: true },
+      '/mcp': { target: api, changeOrigin: false, xfwd: true },
+      '/m/': { target: api, changeOrigin: false, xfwd: true },
     },
   },
   build: { outDir: 'dist', emptyOutDir: true },

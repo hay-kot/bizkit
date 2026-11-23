@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDate, formatDateTime, formatRelative, isPast } from './format'
+import {
+  formatCompactNumber,
+  formatDate,
+  formatDateTime,
+  formatNumber,
+  formatPercent,
+  formatRelative,
+  isPast,
+} from './format'
 
 describe('format', () => {
   it('formats dates and falls back when empty', () => {
@@ -27,5 +35,12 @@ describe('format', () => {
 
   it('formats a full timestamp', () => {
     expect(formatDateTime('2026-11-22T12:00:00Z')).toMatch(/2026/)
+  })
+
+  it('formats numbers, compact numbers and ratios', () => {
+    expect(formatNumber(1284)).toBe('1,284')
+    expect(formatCompactNumber(1284)).toBe('1.3K')
+    expect(formatPercent(0.037)).toBe('3.7%')
+    expect(formatPercent(1.2)).toBe('120%')
   })
 })

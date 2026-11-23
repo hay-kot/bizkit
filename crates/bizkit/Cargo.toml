@@ -13,14 +13,15 @@ categories.workspace = true
 publish.workspace = true
 
 [features]
-default = ["forms", "webhooks", "extensions"]
+default = ["forms", "webhooks", "extensions", "analytics"]
 # Feature modules. Each one compiles a module in.
 forms = ["dep:bizkit-forms"]
 extensions = ["dep:bizkit-extensions"]
 webhooks = ["dep:bizkit-webhooks"]
+analytics = ["dep:bizkit-analytics"]
 # Test-only routes, the `dev` subcommand and persona seeding. Release builds
 # leave it off.
-test-hooks = ["bizkit-core/test-hooks", "bizkit-forms?/test-hooks", "bizkit-extensions?/test-hooks", "bizkit-webhooks?/test-hooks"]
+test-hooks = ["bizkit-core/test-hooks", "bizkit-forms?/test-hooks", "bizkit-extensions?/test-hooks", "bizkit-webhooks?/test-hooks", "bizkit-analytics?/test-hooks"]
 
 [dependencies]
 anyhow.workspace = true
@@ -28,6 +29,7 @@ bizkit-core.workspace = true
 bizkit-extensions = { workspace = true, optional = true }
 bizkit-forms = { workspace = true, optional = true }
 bizkit-webhooks = { workspace = true, optional = true }
+bizkit-analytics = { workspace = true, optional = true }
 bizkit-web.workspace = true
 clap.workspace = true
 clap_complete.workspace = true

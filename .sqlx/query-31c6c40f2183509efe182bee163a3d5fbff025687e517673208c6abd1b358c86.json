@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE analytics_people SET traits = ? WHERE id = ? AND workspace_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "31c6c40f2183509efe182bee163a3d5fbff025687e517673208c6abd1b358c86"
+}

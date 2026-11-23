@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_aliases (workspace_id, project_id, anon_id, person_id) VALUES (?, ?, ?, ?)\n         ON CONFLICT (project_id, anon_id) DO UPDATE SET person_id = excluded.person_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "04f09784d5be824caf45fdfecf47a988eb2e1e557683aade2bf9f7044e831031"
+}

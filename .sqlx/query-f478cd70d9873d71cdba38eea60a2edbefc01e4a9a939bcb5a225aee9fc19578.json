@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: GoalId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", name, kind, match AS matches,\n                  created_at AS \"created_at: UnixMillis\"\n           FROM analytics_goals WHERE workspace_id = ? AND project_id = ?\n           ORDER BY name, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: GoalId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "matches",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "match"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f478cd70d9873d71cdba38eea60a2edbefc01e4a9a939bcb5a225aee9fc19578"
+}

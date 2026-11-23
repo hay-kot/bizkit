@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE analytics_sites SET hostnames = ?, identity_mode = ?, updated_at = ?\n         WHERE workspace_id = ? AND project_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "3286b23958e0338ccbde3075e900d49c22bfd582dcfc9bb129590bbf1022bdcb"
+}

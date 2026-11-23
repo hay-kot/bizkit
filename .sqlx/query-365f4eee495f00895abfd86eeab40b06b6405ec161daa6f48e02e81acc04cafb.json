@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT traits FROM analytics_people WHERE id = ? AND workspace_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "traits",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "traits"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "365f4eee495f00895abfd86eeab40b06b6405ec161daa6f48e02e81acc04cafb"
+}

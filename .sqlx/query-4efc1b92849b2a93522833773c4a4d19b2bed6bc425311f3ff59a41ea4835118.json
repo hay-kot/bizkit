@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT day, visitors, pageviews FROM analytics_daily\n             WHERE workspace_id = ? AND project_id = ? AND dimension = 'total' AND day >= ? AND day <= ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "day",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_daily",
+            "name": "day"
+          }
+        }
+      },
+      {
+        "name": "visitors",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_daily",
+            "name": "visitors"
+          }
+        }
+      },
+      {
+        "name": "pageviews",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_daily",
+            "name": "pageviews"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4efc1b92849b2a93522833773c4a4d19b2bed6bc425311f3ff59a41ea4835118"
+}

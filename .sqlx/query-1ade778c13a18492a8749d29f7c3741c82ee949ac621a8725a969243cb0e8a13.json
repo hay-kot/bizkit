@@ -1,0 +1,42 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT value AS \"value!: String\", SUM(visitors) AS \"visitors!: i64\",\n                      SUM(pageviews) AS \"pageviews!: i64\", SUM(events) AS \"events!: i64\"\n               FROM (\n                 SELECT day,\n                        COALESCE(CASE ? WHEN 'page' THEN path WHEN 'referrer' THEN referrer_host\n                                        WHEN 'utm_source' THEN utm_source WHEN 'utm_medium' THEN utm_medium\n                                        WHEN 'utm_campaign' THEN utm_campaign WHEN 'country' THEN country\n                                        WHEN 'device' THEN device WHEN 'browser' THEN browser\n                                        WHEN 'os' THEN os WHEN 'event' THEN name END, '') AS value,\n                        COUNT(DISTINCT visitor) AS visitors,\n                        SUM(name = 'pageview') AS pageviews,\n                        SUM(name <> 'pageview') AS events\n                 FROM analytics_events\n                 WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n                   AND CASE ? WHEN 'total' THEN 1 WHEN 'event' THEN name <> 'pageview' ELSE name = 'pageview' END\n                 GROUP BY day, value)\n               GROUP BY value",
+  "describe": {
+    "columns": [
+      {
+        "name": "value!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "name": "visitors!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "pageviews!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "events!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1ade778c13a18492a8749d29f7c3741c82ee949ac621a8725a969243cb0e8a13"
+}

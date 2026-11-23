@@ -96,6 +96,45 @@ export type BodyEncoding = 'utf8' | 'base64';
 export type BotCheck = 'honeypot' | 'challenge';
 
 /**
+ * A breakdown, most visitors first.
+ */
+export type Breakdown = {
+    /**
+     * The rows.
+     */
+    items: Array<BreakdownRow>;
+};
+
+/**
+ * One row of a breakdown.
+ */
+export type BreakdownRow = {
+    /**
+     * Conversions over unique visitors in the range, 0 to 1, for the goal
+     * dimension.
+     */
+    conversion_rate?: number | null;
+    /**
+     * Custom events.
+     */
+    events: number;
+    goal_id?: GoalId | null;
+    /**
+     * Pageviews.
+     */
+    pageviews: number;
+    /**
+     * The page, source, country, event name or goal name. Empty means
+     * direct traffic or unknown.
+     */
+    value: string;
+    /**
+     * Unique visitors, summed per day. For goals, the conversions.
+     */
+    visitors: number;
+};
+
+/**
  * What a script on a hook point can use besides plain JavaScript.
  */
 export type Capability = 'log' | 'secrets' | 'fetch' | 'mail';
@@ -157,6 +196,25 @@ export type Challenge = {
 };
 
 /**
+ * People first seen in one week, and who came back.
+ */
+export type Cohort = {
+    /**
+     * People first seen that week.
+     */
+    people: number;
+    /**
+     * The Monday the week starts, UTC.
+     */
+    week: Day;
+    /**
+     * For weeks 0 to 8 after: the share of the cohort with a return event
+     * that week, 0 to 1. Null for weeks that haven't begun.
+     */
+    weeks: Array<number | null>;
+};
+
+/**
  * A new key and its token.
  */
 export type CreatedApiKey = {
@@ -169,6 +227,8 @@ export type CreatedApiKey = {
      */
     token: string;
 };
+
+export type Day = string;
 
 /**
  * The latest time a request went to a URL, by forward or replay.
@@ -195,6 +255,11 @@ export type Delivery = {
      */
     url: string;
 };
+
+/**
+ * What a breakdown groups by.
+ */
+export type Dimension = 'page' | 'referrer' | 'utm_source' | 'utm_medium' | 'utm_campaign' | 'country' | 'device' | 'browser' | 'os' | 'event' | 'goal';
 
 /**
  * A public URL that stores every request it gets.
@@ -284,6 +349,112 @@ export type ErrorDetail = {
      * A human-readable message.
      */
     message: string;
+};
+
+/**
+ * One stored event.
+ */
+export type EventItem = {
+    /**
+     * The event's row ID; pass it as `before` for the next page.
+     */
+    id: number;
+    /**
+     * The event name.
+     */
+    name: string;
+    /**
+     * The page path, when it came with a URL.
+     */
+    path?: string | null;
+    person_id?: PersonId | null;
+    /**
+     * Event properties.
+     */
+    props: {
+        [key: string]: unknown;
+    };
+    /**
+     * `web` (the snippet) or `server`.
+     */
+    source: string;
+    /**
+     * When it arrived.
+     */
+    ts: Timestamp;
+    /**
+     * The person's user ID, if identified.
+     */
+    user_id?: string | null;
+};
+
+/**
+ * One event name seen in the range.
+ */
+export type EventName = {
+    /**
+     * Matching events with this name.
+     */
+    count: number;
+    /**
+     * The name.
+     */
+    name: string;
+    /**
+     * Distinct people (or daily visitors) who sent them.
+     */
+    users: number;
+};
+
+/**
+ * A page of events, newest first.
+ */
+export type EventPage = {
+    /**
+     * The events.
+     */
+    items: Array<EventItem>;
+    /**
+     * Pass as `before` for the next page; none on the last page.
+     */
+    next_before?: number | null;
+};
+
+/**
+ * Matching events per hour or day.
+ */
+export type EventPoint = {
+    /**
+     * Matching events.
+     */
+    count: number;
+    /**
+     * When the hour or day starts.
+     */
+    start: Timestamp;
+    /**
+     * Distinct people (or daily visitors) who sent them.
+     */
+    users: number;
+};
+
+/**
+ * The explorer's chart and name table.
+ */
+export type EventStats = {
+    /**
+     * What one point covers.
+     */
+    interval: Interval;
+    /**
+     * Custom event names in the range with the props filter applied, most
+     * sent first. Ignores the name filter, so it can fill a picker.
+     */
+    names: Array<EventName>;
+    /**
+     * Counts over time.
+     */
+    series: Array<EventPoint>;
 };
 
 /**
@@ -406,6 +577,113 @@ export type FormList = {
 };
 
 /**
+ * A saved funnel.
+ */
+export type Funnel = {
+    /**
+     * When it was made.
+     */
+    created_at: Timestamp;
+    /**
+     * The funnel ID.
+     */
+    id: FunnelId;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * The project.
+     */
+    project_id: ProjectId;
+    /**
+     * 2 to 8 steps, in order.
+     */
+    steps: Array<Step>;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+    /**
+     * Days after the first step in which the rest must happen.
+     */
+    window_days: number;
+};
+
+export type FunnelId = string;
+
+/**
+ * A project's funnels.
+ */
+export type FunnelList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Funnel>;
+};
+
+/**
+ * A funnel's results over a range.
+ */
+export type FunnelResults = {
+    /**
+     * The funnel.
+     */
+    funnel: Funnel;
+    /**
+     * One entry per step.
+     */
+    steps: Array<StepResult>;
+};
+
+/**
+ * A page or event that counts as a conversion.
+ */
+export type Goal = {
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * The goal ID.
+     */
+    id: GoalId;
+    /**
+     * What it matches.
+     */
+    kind: GoalKind;
+    /**
+     * The page path (`/signup/done`) or event name (`signup_completed`).
+     */
+    match: string;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+};
+
+export type GoalId = string;
+
+/**
+ * What a goal matches.
+ */
+export type GoalKind = 'page' | 'event';
+
+/**
+ * A project's goals.
+ */
+export type GoalList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Goal>;
+};
+
+/**
  * One request header.
  */
 export type Header = {
@@ -490,6 +768,26 @@ export type HookTargetKind = {
      */
     plural: string;
 };
+
+/**
+ * What the snippet may store in a visitor's browser.
+ */
+export type IdentityMode = 'cookieless' | 'after_identify' | 'always';
+
+/**
+ * How many events were recorded.
+ */
+export type Ingested = {
+    /**
+     * Events recorded, counting `$identify` calls.
+     */
+    accepted: number;
+};
+
+/**
+ * How long one chart point covers.
+ */
+export type Interval = 'hour' | 'day';
 
 /**
  * An invitation to a workspace.
@@ -670,6 +968,89 @@ export type MyInvitationList = {
 };
 
 /**
+ * A person, their traits and a page of their events, newest first.
+ */
+export type PersonDetail = {
+    /**
+     * Their events, newest first.
+     */
+    events: Array<EventItem>;
+    /**
+     * When their first event or identify arrived.
+     */
+    first_seen: Timestamp;
+    /**
+     * The person ID.
+     */
+    id: PersonId;
+    /**
+     * When their latest one arrived.
+     */
+    last_seen: Timestamp;
+    /**
+     * Pass as `before` for the next page; none on the last page.
+     */
+    next_before?: number | null;
+    /**
+     * The project.
+     */
+    project_id: ProjectId;
+    /**
+     * Traits from `identify`.
+     */
+    traits: {
+        [key: string]: unknown;
+    };
+    /**
+     * The site's ID for the user.
+     */
+    user_id: string;
+};
+
+export type PersonId = string;
+
+/**
+ * A page of people, newest first.
+ */
+export type PersonPage = {
+    /**
+     * The people.
+     */
+    items: Array<PersonSummary>;
+    next_before?: PersonId | null;
+};
+
+/**
+ * A known person, as a list row.
+ */
+export type PersonSummary = {
+    /**
+     * The `email` or `name` trait, when there is one.
+     */
+    display?: string | null;
+    /**
+     * Stored events under this person.
+     */
+    events: number;
+    /**
+     * When their first event or identify arrived.
+     */
+    first_seen: Timestamp;
+    /**
+     * The person ID.
+     */
+    id: PersonId;
+    /**
+     * When their latest one arrived.
+     */
+    last_seen: Timestamp;
+    /**
+     * The site's ID for the user.
+     */
+    user_id: string;
+};
+
+/**
  * A project.
  */
 export type Project = {
@@ -749,6 +1130,16 @@ export type RequestSummary = {
      * The body size in bytes.
      */
     size: number;
+};
+
+/**
+ * Weekly retention cohorts, oldest first.
+ */
+export type RetentionTable = {
+    /**
+     * The cohorts.
+     */
+    cohorts: Array<Cohort>;
 };
 
 /**
@@ -991,6 +1382,62 @@ export type SecretList = {
 };
 
 /**
+ * One chart point.
+ */
+export type SeriesPoint = {
+    /**
+     * Pageviews.
+     */
+    pageviews: number;
+    /**
+     * When the hour or day starts.
+     */
+    start: Timestamp;
+    /**
+     * Unique visitors.
+     */
+    visitors: number;
+};
+
+/**
+ * One event from a server.
+ */
+export type ServerEvent = {
+    /**
+     * The anonymous ID the snippet stored, to link browser events.
+     */
+    anon_id?: string | null;
+    /**
+     * A custom event name (1-64 letters, digits, or `_ . : -`),
+     * `pageview`, or `$identify` to record traits and link `anon_id` to
+     * `user_id`.
+     */
+    name: string;
+    /**
+     * Event properties: at most 20, with string (256 characters), number
+     * or boolean values.
+     */
+    props?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * User traits, for `$identify` only. Same limits as `props`.
+     */
+    traits?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * The page the event relates to; its path and UTM tags are kept.
+     */
+    url?: string | null;
+    /**
+     * Your ID for the user. Needed for `$identify`; one of `user_id` and
+     * `anon_id` is needed for every event.
+     */
+    user_id?: string | null;
+};
+
+/**
  * Request a sign-in link.
  */
 export type SignInBody = {
@@ -1002,6 +1449,81 @@ export type SignInBody = {
      * A path in the app to return to after signing in, such as `/invite/...`.
      */
     next?: string | null;
+};
+
+/**
+ * A project's analytics settings and snippet.
+ */
+export type Site = {
+    /**
+     * When analytics was turned on.
+     */
+    created_at: Timestamp;
+    /**
+     * Whether any event has arrived yet.
+     */
+    has_events: boolean;
+    /**
+     * Hostnames the snippet may send from, exact or `*.example.com`. Empty
+     * means any host.
+     */
+    hostnames: Array<string>;
+    /**
+     * What the snippet may store in a visitor's browser.
+     */
+    identity_mode: IdentityMode;
+    /**
+     * The public key in the snippet tag.
+     */
+    key: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * The `<script>` tag to add to every page.
+     */
+    snippet: string;
+    /**
+     * When its settings last changed.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * One funnel step.
+ */
+export type Step = {
+    /**
+     * A pageview or a custom event.
+     */
+    kind: GoalKind;
+    /**
+     * A page path (exact, or a prefix ending in `*`) or an event name.
+     */
+    match: string;
+};
+
+/**
+ * One step's result.
+ */
+export type StepResult = {
+    /**
+     * Share of the first step's people, 0 to 1.
+     */
+    from_first: number;
+    /**
+     * Share of the previous step's people, 0 to 1; 1 for the first step.
+     */
+    from_previous: number;
+    /**
+     * People who reached it.
+     */
+    people: number;
+    /**
+     * The step.
+     */
+    step: Step;
 };
 
 /**
@@ -1081,6 +1603,30 @@ export type SubmissionList = {
 export type SubmissionStatus = 'inbox' | 'spam';
 
 /**
+ * The Overview's tiles and chart.
+ */
+export type Summary = {
+    /**
+     * What one chart point covers: hours for a one-day range, else days.
+     * A one-day range past raw retention has one daily point.
+     */
+    interval: Interval;
+    previous?: Totals | null;
+    /**
+     * The same for the previous period, when asked.
+     */
+    previous_series?: Array<SeriesPoint> | null;
+    /**
+     * Visitors and pageviews over the range, one point per interval.
+     */
+    series: Array<SeriesPoint>;
+    /**
+     * Counts for the range.
+     */
+    totals: Totals;
+};
+
+/**
  * An entity scripts can target.
  */
 export type TargetEntity = {
@@ -1157,6 +1703,30 @@ export type TestResult = {
 };
 
 export type Timestamp = string;
+
+/**
+ * Counts over a date range. Visitors are summed over days, because the
+ * visitor hash changes every day.
+ */
+export type Totals = {
+    /**
+     * Goal conversions: unique visitors per day who reached a goal, over
+     * every goal.
+     */
+    conversions: number;
+    /**
+     * Custom events.
+     */
+    events: number;
+    /**
+     * Pageviews.
+     */
+    pageviews: number;
+    /**
+     * Unique visitors, summed per day.
+     */
+    visitors: number;
+};
 
 export type UserId = string;
 
@@ -1671,6 +2241,1183 @@ export type WorkspacesUpdateResponses = {
 };
 
 export type WorkspacesUpdateResponse = WorkspacesUpdateResponses[keyof WorkspacesUpdateResponses];
+
+export type AnalyticsEventsRecentData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * Events older than this one, from `next_before`.
+         */
+        before?: number | null;
+        /**
+         * The first day, UTC.
+         */
+        from: Day;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * Only this event name; default every event, pageviews included.
+         */
+        name?: string | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * Property filters, `key=value`; all must match.
+         */
+        props?: Array<string>;
+        /**
+         * The last day, UTC, inclusive.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/events';
+};
+
+export type AnalyticsEventsRecentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsEventsRecentError = AnalyticsEventsRecentErrors[keyof AnalyticsEventsRecentErrors];
+
+export type AnalyticsEventsRecentResponses = {
+    /**
+     * OK
+     */
+    200: EventPage;
+};
+
+export type AnalyticsEventsRecentResponse = AnalyticsEventsRecentResponses[keyof AnalyticsEventsRecentResponses];
+
+export type AnalyticsEventsIngestData = {
+    body: {
+        /**
+         * 1 to 100 events. They take the time they arrive.
+         */
+        events: Array<ServerEvent>;
+        /**
+         * The project whose site gets the events.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/events';
+};
+
+export type AnalyticsEventsIngestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsEventsIngestError = AnalyticsEventsIngestErrors[keyof AnalyticsEventsIngestErrors];
+
+export type AnalyticsEventsIngestResponses = {
+    /**
+     * OK
+     */
+    200: Ingested;
+};
+
+export type AnalyticsEventsIngestResponse = AnalyticsEventsIngestResponses[keyof AnalyticsEventsIngestResponses];
+
+export type AnalyticsEventsQueryData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The first day, UTC.
+         */
+        from: Day;
+        /**
+         * Only this event name (`pageview` included); default every custom event.
+         */
+        name?: string | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * Property filters, `key=value`; all must match.
+         */
+        props?: Array<string>;
+        /**
+         * The last day, UTC, inclusive.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/events/stats';
+};
+
+export type AnalyticsEventsQueryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsEventsQueryError = AnalyticsEventsQueryErrors[keyof AnalyticsEventsQueryErrors];
+
+export type AnalyticsEventsQueryResponses = {
+    /**
+     * OK
+     */
+    200: EventStats;
+};
+
+export type AnalyticsEventsQueryResponse = AnalyticsEventsQueryResponses[keyof AnalyticsEventsQueryResponses];
+
+export type AnalyticsFunnelsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels';
+};
+
+export type AnalyticsFunnelsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsListError = AnalyticsFunnelsListErrors[keyof AnalyticsFunnelsListErrors];
+
+export type AnalyticsFunnelsListResponses = {
+    /**
+     * OK
+     */
+    200: FunnelList;
+};
+
+export type AnalyticsFunnelsListResponse = AnalyticsFunnelsListResponses[keyof AnalyticsFunnelsListResponses];
+
+export type AnalyticsFunnelsCreateData = {
+    body: {
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * 2 to 8 steps, in order.
+         */
+        steps: Array<Step>;
+        /**
+         * Days after the first step in which the rest must happen, 1-90.
+         * Default 7.
+         */
+        window_days?: number | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels';
+};
+
+export type AnalyticsFunnelsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsCreateError = AnalyticsFunnelsCreateErrors[keyof AnalyticsFunnelsCreateErrors];
+
+export type AnalyticsFunnelsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Funnel;
+};
+
+export type AnalyticsFunnelsCreateResponse = AnalyticsFunnelsCreateResponses[keyof AnalyticsFunnelsCreateResponses];
+
+export type AnalyticsFunnelsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The funnel.
+         */
+        funnel_id: FunnelId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}';
+};
+
+export type AnalyticsFunnelsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsDeleteError = AnalyticsFunnelsDeleteErrors[keyof AnalyticsFunnelsDeleteErrors];
+
+export type AnalyticsFunnelsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AnalyticsFunnelsDeleteResponse = AnalyticsFunnelsDeleteResponses[keyof AnalyticsFunnelsDeleteResponses];
+
+export type AnalyticsFunnelsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The funnel.
+         */
+        funnel_id: FunnelId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}';
+};
+
+export type AnalyticsFunnelsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsGetError = AnalyticsFunnelsGetErrors[keyof AnalyticsFunnelsGetErrors];
+
+export type AnalyticsFunnelsGetResponses = {
+    /**
+     * OK
+     */
+    200: Funnel;
+};
+
+export type AnalyticsFunnelsGetResponse = AnalyticsFunnelsGetResponses[keyof AnalyticsFunnelsGetResponses];
+
+export type AnalyticsFunnelsUpdateData = {
+    body: {
+        /**
+         * The display name.
+         */
+        name?: string | null;
+        /**
+         * 2 to 8 steps, in order.
+         */
+        steps?: Array<Step> | null;
+        /**
+         * Days after the first step in which the rest must happen, 1-90.
+         */
+        window_days?: number | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The funnel.
+         */
+        funnel_id: FunnelId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}';
+};
+
+export type AnalyticsFunnelsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsUpdateError = AnalyticsFunnelsUpdateErrors[keyof AnalyticsFunnelsUpdateErrors];
+
+export type AnalyticsFunnelsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Funnel;
+};
+
+export type AnalyticsFunnelsUpdateResponse = AnalyticsFunnelsUpdateResponses[keyof AnalyticsFunnelsUpdateResponses];
+
+export type AnalyticsFunnelsResultsData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The funnel.
+         */
+        funnel_id: FunnelId;
+    };
+    query: {
+        /**
+         * The first day people may enter, UTC.
+         */
+        from: Day;
+        /**
+         * The last day people may enter, UTC, inclusive.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}/results';
+};
+
+export type AnalyticsFunnelsResultsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsResultsError = AnalyticsFunnelsResultsErrors[keyof AnalyticsFunnelsResultsErrors];
+
+export type AnalyticsFunnelsResultsResponses = {
+    /**
+     * OK
+     */
+    200: FunnelResults;
+};
+
+export type AnalyticsFunnelsResultsResponse = AnalyticsFunnelsResultsResponses[keyof AnalyticsFunnelsResultsResponses];
+
+export type AnalyticsGoalsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals';
+};
+
+export type AnalyticsGoalsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsGoalsListError = AnalyticsGoalsListErrors[keyof AnalyticsGoalsListErrors];
+
+export type AnalyticsGoalsListResponses = {
+    /**
+     * OK
+     */
+    200: GoalList;
+};
+
+export type AnalyticsGoalsListResponse = AnalyticsGoalsListResponses[keyof AnalyticsGoalsListResponses];
+
+export type AnalyticsGoalsCreateData = {
+    body: {
+        /**
+         * What it matches.
+         */
+        kind: GoalKind;
+        /**
+         * A page path starting with `/`, or an event name.
+         */
+        match: string;
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals';
+};
+
+export type AnalyticsGoalsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsGoalsCreateError = AnalyticsGoalsCreateErrors[keyof AnalyticsGoalsCreateErrors];
+
+export type AnalyticsGoalsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Goal;
+};
+
+export type AnalyticsGoalsCreateResponse = AnalyticsGoalsCreateResponses[keyof AnalyticsGoalsCreateResponses];
+
+export type AnalyticsGoalsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The goal.
+         */
+        goal_id: GoalId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/goals/{goal_id}';
+};
+
+export type AnalyticsGoalsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsGoalsDeleteError = AnalyticsGoalsDeleteErrors[keyof AnalyticsGoalsDeleteErrors];
+
+export type AnalyticsGoalsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AnalyticsGoalsDeleteResponse = AnalyticsGoalsDeleteResponses[keyof AnalyticsGoalsDeleteResponses];
+
+export type AnalyticsPeopleListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        before?: PersonId | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * Text to find in the user ID or traits.
+         */
+        q?: string | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/people';
+};
+
+export type AnalyticsPeopleListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsPeopleListError = AnalyticsPeopleListErrors[keyof AnalyticsPeopleListErrors];
+
+export type AnalyticsPeopleListResponses = {
+    /**
+     * OK
+     */
+    200: PersonPage;
+};
+
+export type AnalyticsPeopleListResponse = AnalyticsPeopleListResponses[keyof AnalyticsPeopleListResponses];
+
+export type AnalyticsPeopleGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The person.
+         */
+        person_id: PersonId;
+    };
+    query?: {
+        /**
+         * Events older than this one, from `next_before`.
+         */
+        before?: number | null;
+        /**
+         * At most this many events, 1-200. Default 50.
+         */
+        limit?: number | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/people/{person_id}';
+};
+
+export type AnalyticsPeopleGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsPeopleGetError = AnalyticsPeopleGetErrors[keyof AnalyticsPeopleGetErrors];
+
+export type AnalyticsPeopleGetResponses = {
+    /**
+     * OK
+     */
+    200: PersonDetail;
+};
+
+export type AnalyticsPeopleGetResponse = AnalyticsPeopleGetResponses[keyof AnalyticsPeopleGetResponses];
+
+export type AnalyticsRetentionData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The first day a cohort may start, UTC.
+         */
+        from: Day;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The event that counts as a return; default any event.
+         */
+        return_event?: string | null;
+        /**
+         * The last day a cohort may start, UTC, inclusive.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/retention';
+};
+
+export type AnalyticsRetentionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsRetentionError = AnalyticsRetentionErrors[keyof AnalyticsRetentionErrors];
+
+export type AnalyticsRetentionResponses = {
+    /**
+     * OK
+     */
+    200: RetentionTable;
+};
+
+export type AnalyticsRetentionResponse = AnalyticsRetentionResponses[keyof AnalyticsRetentionResponses];
+
+export type AnalyticsSiteGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site';
+};
+
+export type AnalyticsSiteGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSiteGetError = AnalyticsSiteGetErrors[keyof AnalyticsSiteGetErrors];
+
+export type AnalyticsSiteGetResponses = {
+    /**
+     * OK
+     */
+    200: Site;
+};
+
+export type AnalyticsSiteGetResponse = AnalyticsSiteGetResponses[keyof AnalyticsSiteGetResponses];
+
+export type AnalyticsSiteUpdateData = {
+    body: {
+        /**
+         * Hostnames the snippet may send from, exact or `*.example.com`; empty
+         * allows any host.
+         */
+        hostnames?: Array<string> | null;
+        identity_mode?: IdentityMode | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site';
+};
+
+export type AnalyticsSiteUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSiteUpdateError = AnalyticsSiteUpdateErrors[keyof AnalyticsSiteUpdateErrors];
+
+export type AnalyticsSiteUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Site;
+};
+
+export type AnalyticsSiteUpdateResponse = AnalyticsSiteUpdateResponses[keyof AnalyticsSiteUpdateResponses];
+
+export type AnalyticsSiteCreateData = {
+    body: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/site';
+};
+
+export type AnalyticsSiteCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSiteCreateError = AnalyticsSiteCreateErrors[keyof AnalyticsSiteCreateErrors];
+
+export type AnalyticsSiteCreateResponses = {
+    /**
+     * Created
+     */
+    201: Site;
+};
+
+export type AnalyticsSiteCreateResponse = AnalyticsSiteCreateResponses[keyof AnalyticsSiteCreateResponses];
+
+export type AnalyticsStatsBreakdownData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * What to group by.
+         */
+        dimension: Dimension;
+        /**
+         * The first day, UTC.
+         */
+        from: Day;
+        /**
+         * The most rows, 1 to 1000; default 10.
+         */
+        limit?: number | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The last day, UTC, inclusive. At most 400 days after `from`.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/stats/breakdown';
+};
+
+export type AnalyticsStatsBreakdownErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsStatsBreakdownError = AnalyticsStatsBreakdownErrors[keyof AnalyticsStatsBreakdownErrors];
+
+export type AnalyticsStatsBreakdownResponses = {
+    /**
+     * OK
+     */
+    200: Breakdown;
+};
+
+export type AnalyticsStatsBreakdownResponse = AnalyticsStatsBreakdownResponses[keyof AnalyticsStatsBreakdownResponses];
+
+export type AnalyticsStatsSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * Also count the previous period of the same length.
+         */
+        compare?: boolean;
+        /**
+         * The first day, UTC.
+         */
+        from: Day;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The last day, UTC, inclusive. At most 400 days after `from`.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/stats/summary';
+};
+
+export type AnalyticsStatsSummaryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsStatsSummaryError = AnalyticsStatsSummaryErrors[keyof AnalyticsStatsSummaryErrors];
+
+export type AnalyticsStatsSummaryResponses = {
+    /**
+     * OK
+     */
+    200: Summary;
+};
+
+export type AnalyticsStatsSummaryResponse = AnalyticsStatsSummaryResponses[keyof AnalyticsStatsSummaryResponses];
 
 export type ApiKeysListData = {
     body?: never;
@@ -4110,6 +5857,48 @@ export type WebhooksRequestsReplayResponses = {
 };
 
 export type WebhooksRequestsReplayResponse = WebhooksRequestsReplayResponses[keyof WebhooksRequestsReplayResponses];
+
+export type AnalyticsPublicCollectData = {
+    body: string;
+    path?: never;
+    query?: never;
+    url: '/m/analytics/public/e';
+};
+
+export type AnalyticsPublicCollectResponses = {
+    /**
+     * Received
+     */
+    202: unknown;
+};
+
+export type AnalyticsPublicScriptData = {
+    body?: never;
+    path: {
+        /**
+         * The site key and `.js`
+         */
+        file: string;
+    };
+    query?: never;
+    url: '/m/analytics/public/s/{file}';
+};
+
+export type AnalyticsPublicScriptErrors = {
+    /**
+     * No site has this key
+     */
+    404: unknown;
+};
+
+export type AnalyticsPublicScriptResponses = {
+    /**
+     * The snippet
+     */
+    200: Blob | File;
+};
+
+export type AnalyticsPublicScriptResponse = AnalyticsPublicScriptResponses[keyof AnalyticsPublicScriptResponses];
 
 export type FormsPublicSubmitData = {
     body: {

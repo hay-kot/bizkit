@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE analytics_sites SET last_event_day = ?\n         WHERE workspace_id = ? AND project_id = ? AND (last_event_day IS NULL OR last_event_day < ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8a3d5969499627cdc7529484c1e1224c1386f69762f971534a6a2f68696771e1"
+}

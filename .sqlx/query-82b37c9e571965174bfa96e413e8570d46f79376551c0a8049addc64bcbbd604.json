@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE OR IGNORE analytics_conversions SET person = ? WHERE workspace_id = ? AND person = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "82b37c9e571965174bfa96e413e8570d46f79376551c0a8049addc64bcbbd604"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE analytics_sites SET rolled_through = ?\n         WHERE workspace_id = ? AND project_id = ? AND (rolled_through IS NULL OR rolled_through < ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "11362aa9ff3d5514d9c6517d27a362f4b7d772f931a755f498f934e3799a8c25"
+}

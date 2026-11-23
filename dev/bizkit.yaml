@@ -3,6 +3,8 @@
 # stack's Mailpit through --smtp-url.
 log_level: debug
 server:
+  # Vite's proxy sets X-Forwarded-For (xfwd), so the API sees real client IPs.
+  trusted_proxies: 1
   mail:
     from: "bizkit dev <noreply@bizkit.test>"
   auth:

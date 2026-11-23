@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT e.id AS \"id!: i64\", e.ts AS \"ts: UnixMillis\", e.name, e.path, e.props, e.source,\n                      p.id AS \"person_id?: PersonId\", p.user_id AS \"user_id?\"\n               FROM analytics_events e\n               LEFT JOIN analytics_people p ON p.id = substr(e.person, 3) AND substr(e.person, 1, 2) = 'p:'\n               WHERE e.workspace_id = ? AND e.project_id = ? AND e.day >= ? AND e.day <= ? AND e.id < ?\n                 AND (? IS NULL OR e.name = ?)\n                 AND NOT EXISTS (\n                   SELECT 1 FROM json_each(?) f\n                   WHERE NOT EXISTS (\n                     SELECT 1 FROM json_each(COALESCE(e.props, '{}')) pr\n                     WHERE pr.key = json_extract(f.value, '$.k')\n                       AND CASE pr.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                                        ELSE CAST(pr.atom AS TEXT) END = json_extract(f.value, '$.v')))\n               ORDER BY e.id DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "ts: UnixMillis",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "path",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "path"
+          }
+        }
+      },
+      {
+        "name": "props",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "props"
+          }
+        }
+      },
+      {
+        "name": "source",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "person_id?: PersonId",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id?",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "user_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4a861b703fcce204397c4a8330c49407af0e5f4ca8c9514aea0396b373233d22"
+}

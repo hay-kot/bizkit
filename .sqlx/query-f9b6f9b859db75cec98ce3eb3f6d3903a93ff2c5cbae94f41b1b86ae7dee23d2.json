@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT min(day) FROM analytics_events WHERE workspace_id = ? AND project_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "min(day)",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "f9b6f9b859db75cec98ce3eb3f6d3903a93ff2c5cbae94f41b1b86ae7dee23d2"
+}

@@ -24,6 +24,7 @@ publish = false
 bizkit-core = { path = "crates/bizkit-core" }
 bizkit-extensions = { path = "crates/bizkit-extensions" }
 bizkit-forms = { path = "crates/bizkit-forms" }
+bizkit-analytics = { path = "crates/bizkit-analytics" }
 bizkit-webhooks = { path = "crates/bizkit-webhooks" }
 bizkit-testkit = { path = "crates/bizkit-testkit" }
 bizkit-web = { path = "crates/bizkit-web" }
@@ -46,6 +47,7 @@ http = "1.5.0"
 insta = { version = "1.49.0", features = ["filters", "json", "redactions"] }
 jsonschema = { version = "=0.61.2", default-features = false }
 lettre = { version = "=0.11.24", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
+maxminddb = "=0.33.0"
 mime_guess = "2.0.5"
 proptest = "1.12.0"
 rand = "0.10.4"

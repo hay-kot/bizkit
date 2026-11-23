@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT e.person, e.ts AS \"ts!: i64\", e.name, e.path FROM analytics_events AS e\n           WHERE e.workspace_id = ? AND e.project_id = ? AND e.day >= ? AND e.day <= ?\n             AND e.name IN (SELECT value FROM json_each(?))\n             AND (e.name <> 'pageview' OR EXISTS (\n               SELECT 1 FROM json_each(?) AS step\n               WHERE e.path = step.value\n                  OR (substr(step.value, -1) = '*'\n                      AND substr(e.path, 1, length(step.value) - 1) = substr(step.value, 1, length(step.value) - 1))))\n           ORDER BY e.person, e.ts, e.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "person",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "person"
+          }
+        }
+      },
+      {
+        "name": "ts!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "path",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "path"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e5681c21576a0f0b64f1710812996bd06938243a840ec8af85eab5ff47c82ae9"
+}

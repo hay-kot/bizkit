@@ -39,6 +39,7 @@ server:
   listen: 127.0.0.1:8484            # --listen / BIZKIT_LISTEN
   base_url: https://hub.example.com # --base-url / BIZKIT_BASE_URL; http only on loopback
   data_dir: ~/.local/share/bizkit   # --data-dir / BIZKIT_DATA_DIR
+  trusted_proxies: 0                # proxies in front that append to X-Forwarded-For
   mail:
     from: "bizkit <noreply@example.com>"
     smtp_url: smtps://user@mail.example.com:465  # --smtp-url / BIZKIT_SMTP_URL

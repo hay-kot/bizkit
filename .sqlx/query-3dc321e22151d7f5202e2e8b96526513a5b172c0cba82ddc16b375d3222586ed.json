@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_people (id, workspace_id, project_id, user_id, first_seen, last_seen)\n           VALUES (?, ?, ?, ?, ?, ?)\n           ON CONFLICT (project_id, user_id) DO UPDATE SET last_seen = max(last_seen, excluded.last_seen)\n           RETURNING id AS \"id!: PersonId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: PersonId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3dc321e22151d7f5202e2e8b96526513a5b172c0cba82ddc16b375d3222586ed"
+}
