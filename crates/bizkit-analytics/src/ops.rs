@@ -337,11 +337,16 @@ impl Operation for GoalsCreate {
             project_id: input.project_id,
             name: input.name.trim().to_owned(),
             kind: input.kind.as_str().to_owned(),
-            matches: input.matches.trim().to_owned(),
+            matches: match input.kind {
+                GoalKind::Page => names::stored_path(input.matches.trim()),
+                GoalKind::Event => input.matches.trim().to_owned(),
+            },
             created_at: cx.now(),
         };
         let mut tx = cx.write().await?;
-        if store::goal_exists(&mut *tx, row.project_id, &row.kind, &row.matches).await? {
+        if store::goal_exists(&mut *tx, row.workspace_id, row.project_id, &row.kind, &row.matches)
+            .await?
+        {
             return Err(ApiError::Conflict("a goal already matches this".to_owned()));
         }
         store::insert_goal(&mut *tx, &row).await?;

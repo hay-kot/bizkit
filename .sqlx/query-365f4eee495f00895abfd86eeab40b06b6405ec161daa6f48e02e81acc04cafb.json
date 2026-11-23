@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT traits FROM analytics_people WHERE id = ?",
+  "query": "SELECT traits FROM analytics_people WHERE id = ? AND workspace_id = ?",
   "describe": {
     "columns": [
       {
@@ -16,11 +16,11 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false
     ]
   },
-  "hash": "9cce553ae0611fa3fcec07a337fc143cbbf13d1a31dae31e4313226ac5c75f1a"
+  "hash": "365f4eee495f00895abfd86eeab40b06b6405ec161daa6f48e02e81acc04cafb"
 }

@@ -239,11 +239,13 @@ impl Operation for PeopleGet {
         let key = format!("p:{}", input.person_id);
         let before = input.before.unwrap_or(i64::MAX);
         let fetch = i64::from(limit) + 1;
+        // The cursor is the row ID, so the order must be too: concurrent
+        // ingests can commit a later ts under a lower ID.
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: i64", ts AS "ts: UnixMillis", name, path, props, source
                FROM analytics_events
                WHERE workspace_id = ? AND project_id = ? AND person = ? AND id < ?
-               ORDER BY ts DESC, id DESC LIMIT ?"#,
+               ORDER BY id DESC LIMIT ?"#,
             input.workspace_id,
             person.project_id,
             key,
@@ -371,8 +373,24 @@ impl Operation for Retention {
         )
         .fetch_all(db.read())
         .await?;
+        // A person active before the window isn't new in it, though the
+        // window's rows alone would make their first day look like it.
+        let seen_before: HashSet<String> = sqlx::query_scalar!(
+            r#"SELECT DISTINCT person AS "person!: String"
+               FROM analytics_events
+               WHERE workspace_id = ? AND project_id = ? AND day < ?
+                 AND substr(person, 1, 2) <> 'v:'"#,
+            scope.workspace_id,
+            scope.project_id,
+            from,
+        )
+        .fetch_all(db.read())
+        .await?
+        .into_iter()
+        .collect();
         let days: Vec<(String, Day, bool)> = rows
             .into_iter()
+            .filter(|row| !seen_before.contains(&row.person))
             .filter_map(|row| Some((row.person, row.day.parse().ok()?, row.returned)))
             .collect();
         Ok(RetentionTable { cohorts: cohorts(&days, input.from, input.to, today) })
@@ -388,7 +406,7 @@ pub(crate) fn monday(day: Day) -> Day {
 
 /// Builds cohorts from each person's active days. A person joins the cohort
 /// of the week of their first day in the data, when that day is in
-/// `from..=to`.
+/// `from..=to`. `days` must leave out people active before the data starts.
 pub(crate) fn cohorts(days: &[(String, Day, bool)], from: Day, to: Day, today: Day) -> Vec<Cohort> {
     let mut first: HashMap<&str, Day> = HashMap::new();
     for (person, day, _) in days {

@@ -123,16 +123,16 @@ impl Operation for StatsSummary {
         let (scope, rolled) = site_scope(db, input.workspace_id, input.project_id).await?;
         let (from, to) = (input.from, input.to);
         let current = totals(db, scope, report::split(from, to, rolled)).await?;
-        let points = series(db, scope, from, to, rolled).await?;
+        let (interval, points) = series(db, scope, from, to, rolled).await?;
         let (previous, previous_series) = if input.compare {
             let days = from.days_until(to) + 1;
             let (prev_from, prev_to) = (from.plus_days(-days), from.previous());
             let prev_totals = totals(db, scope, report::split(prev_from, prev_to, rolled)).await?;
-            (Some(prev_totals), Some(series(db, scope, prev_from, prev_to, rolled).await?))
+            let (_, prev_points) = series(db, scope, prev_from, prev_to, rolled).await?;
+            (Some(prev_totals), Some(prev_points))
         } else {
             (None, None)
         };
-        let interval = if from == to { Interval::Hour } else { Interval::Day };
         Ok(Summary { totals: current, previous, interval, series: points, previous_series })
     }
 }
@@ -150,23 +150,28 @@ async fn totals(db: &Db, scope: Scope, split: Split) -> Result<Totals, ApiError>
 }
 
 /// One point per hour for a one-day range, else one per day; days and
-/// hours with no events are zero.
+/// hours with no events are zero. A rolled-up day whose raw events were
+/// pruned has no hours, so it gets one daily point.
 async fn series(
     db: &Db,
     scope: Scope,
     from: Day,
     to: Day,
     rolled: Option<Day>,
-) -> Result<Vec<SeriesPoint>, ApiError> {
+) -> Result<(Interval, Vec<SeriesPoint>), ApiError> {
     if from == to {
         let hours = report::hourly(db.read(), scope, from).await?;
-        return Ok((0..24)
-            .map(|hour| {
-                let (visitors, pageviews) = hours.get(&hour).copied().unwrap_or_default();
-                let start = UnixMillis(from.start().0 + hour * HOUR_MS);
-                SeriesPoint { start, visitors, pageviews }
-            })
-            .collect());
+        let pruned = hours.is_empty() && rolled.is_some_and(|rolled| from <= rolled);
+        if !pruned {
+            let points = (0..24)
+                .map(|hour| {
+                    let (visitors, pageviews) = hours.get(&hour).copied().unwrap_or_default();
+                    let start = UnixMillis(from.start().0 + hour * HOUR_MS);
+                    SeriesPoint { start, visitors, pageviews }
+                })
+                .collect();
+            return Ok((Interval::Hour, points));
+        }
     }
     let days = report::daily(db.read(), scope, report::split(from, to, rolled)).await?;
     let mut points = Vec::new();
@@ -176,7 +181,7 @@ async fn series(
         points.push(SeriesPoint { start: day.start(), visitors, pageviews });
         day = day.next();
     }
-    Ok(points)
+    Ok((Interval::Day, points))
 }
 
 struct StatsBreakdown;

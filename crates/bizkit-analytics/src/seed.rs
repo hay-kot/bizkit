@@ -462,7 +462,14 @@ async fn seed_website(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow
             store::insert_event(&mut *tx, event).await?;
             for goal in [&signup, &pricing] {
                 if crate::write::converts(goal, event) {
-                    store::insert_conversion(&mut *tx, goal.id, &event.day, &event.person).await?;
+                    store::insert_conversion(
+                        &mut *tx,
+                        event.workspace_id,
+                        goal.id,
+                        &event.day,
+                        &event.person,
+                    )
+                    .await?;
                 }
             }
         }
@@ -483,7 +490,7 @@ async fn identify(
     let Some((user_id, traits)) = visit.signed_up.take() else { return Ok(None) };
     let Some(at) = visit.events.last().map(|event| event.ts) else { return Ok(None) };
     let id = store::upsert_person(&mut **tx, seed.workspace_id, project_id, &user_id, at).await?;
-    store::set_person_traits(&mut **tx, id, &traits.to_string()).await?;
+    store::set_person_traits(&mut **tx, seed.workspace_id, id, &traits.to_string()).await?;
     let anon_id = format!("anon-{:x}", rng.next());
     store::set_alias(&mut **tx, seed.workspace_id, project_id, &anon_id, id).await?;
     for event in &mut visit.events {

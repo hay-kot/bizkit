@@ -13,6 +13,7 @@ use bizkit_core::ops::{
 };
 use bizkit_core::time::UnixMillis;
 use bizkit_core::validate::{FieldErrors, Validate, check_name};
+use futures::{Stream, TryStreamExt as _};
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
 use utoipa::ToSchema;
@@ -317,7 +318,17 @@ pub(crate) async fn save(exec: impl SqliteExecutor<'_>, row: &FunnelRow) -> sqlx
 }
 
 fn encode_steps(steps: &[Step]) -> Result<String, ApiError> {
-    Ok(serde_json::to_string(steps).map_err(anyhow::Error::from)?)
+    let stored: Vec<Step> = steps
+        .iter()
+        .map(|step| Step {
+            kind: step.kind,
+            matches: match step.kind {
+                GoalKind::Page => names::stored_path(&step.matches),
+                GoalKind::Event => step.matches.clone(),
+            },
+        })
+        .collect();
+    Ok(serde_json::to_string(&stored).map_err(anyhow::Error::from)?)
 }
 
 // ---------------------------------------------------------------- ops
@@ -470,10 +481,20 @@ impl Operation for FunnelsResults {
         let funnel = to_api(find(db.read(), input.workspace_id, input.funnel_id).await?)?;
         let scope = Scope { workspace_id: input.workspace_id, project_id: funnel.project_id };
         let last = input.to.plus_days(funnel.window_days);
-        let events = step_events(db.read(), scope, input.from, last, &funnel.steps).await?;
         let entry_end = input.to.next().start().0;
-        let reached = reached(&funnel.steps, &events, entry_end, funnel.window_days * DAY_MS);
-        let steps = results(&funnel.steps, &reached);
+        let window = funnel.window_days * DAY_MS;
+        let mut counts = vec![0_i64; funnel.steps.len()];
+        let mut person: Vec<StepEvent> = Vec::new();
+        let mut rows = step_events(db.read(), scope, input.from, last, &funnel.steps);
+        while let Some(event) = rows.try_next().await? {
+            if person.last().is_some_and(|previous| previous.person != event.person) {
+                count_person(&mut counts, &funnel.steps, &person, entry_end, window);
+                person.clear();
+            }
+            person.push(event);
+        }
+        count_person(&mut counts, &funnel.steps, &person, entry_end, window);
+        let steps = results(&funnel.steps, &counts);
         Ok(FunnelResults { funnel, steps })
     }
 }
@@ -488,14 +509,15 @@ pub(crate) struct StepEvent {
 }
 
 /// Events from `from` through `to` that could match a step, by person and
-/// time. Only names the steps use are read.
-async fn step_events(
-    exec: impl SqliteExecutor<'_>,
+/// time, as a stream: a busy site has too many to hold at once. Only the
+/// names the steps use are read, and pageviews only on the steps' paths.
+fn step_events<'e>(
+    exec: impl SqliteExecutor<'e> + 'e,
     scope: Scope,
     from: Day,
     to: Day,
     steps: &[Step],
-) -> sqlx::Result<Vec<StepEvent>> {
+) -> impl Stream<Item = sqlx::Result<StepEvent>> + 'e {
     let names: Vec<&str> = steps
         .iter()
         .map(|step| match step.kind {
@@ -503,40 +525,47 @@ async fn step_events(
             GoalKind::Event => step.matches.as_str(),
         })
         .collect();
+    let paths: Vec<&str> = steps
+        .iter()
+        .filter(|step| step.kind == GoalKind::Page)
+        .map(|step| step.matches.as_str())
+        .collect();
     let names = serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_owned());
+    let paths = serde_json::to_string(&paths).unwrap_or_else(|_| "[]".to_owned());
     let (from, to) = (from.to_string(), to.to_string());
     sqlx::query_as!(
         StepEvent,
-        r#"SELECT person, ts AS "ts!: i64", name, path FROM analytics_events
-           WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?
-             AND name IN (SELECT value FROM json_each(?))
-           ORDER BY person, ts, id"#,
+        r#"SELECT e.person, e.ts AS "ts!: i64", e.name, e.path FROM analytics_events AS e
+           WHERE e.workspace_id = ? AND e.project_id = ? AND e.day >= ? AND e.day <= ?
+             AND e.name IN (SELECT value FROM json_each(?))
+             AND (e.name <> 'pageview' OR EXISTS (
+               SELECT 1 FROM json_each(?) AS step
+               WHERE e.path = step.value
+                  OR (substr(step.value, -1) = '*'
+                      AND substr(e.path, 1, length(step.value) - 1) = substr(step.value, 1, length(step.value) - 1))))
+           ORDER BY e.person, e.ts, e.id"#,
         scope.workspace_id,
         scope.project_id,
         from,
         to,
         names,
+        paths,
     )
-    .fetch_all(exec)
-    .await
+    .fetch(exec)
 }
 
-/// How many people reached each step. `events` are sorted by person and
-/// time; people enter on their first step-1 event before `entry_end`.
-pub(crate) fn reached(
+/// Adds one person's events, sorted by time, to the step counts.
+fn count_person(
+    counts: &mut [i64],
     steps: &[Step],
     events: &[StepEvent],
     entry_end: i64,
     window: i64,
-) -> Vec<i64> {
-    let mut counts = vec![0_i64; steps.len()];
-    for person in events.chunk_by(|a, b| a.person == b.person) {
-        let depth = depth(steps, person, entry_end, window);
-        for count in counts.iter_mut().take(depth) {
-            *count += 1;
-        }
+) {
+    let depth = depth(steps, events, entry_end, window);
+    for count in counts.iter_mut().take(depth) {
+        *count += 1;
     }
-    counts
 }
 
 /// The number of steps one person reached.
@@ -590,6 +619,16 @@ fn results(steps: &[Step], reached: &[i64]) -> Vec<StepResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// How many people reached each step. `events` are sorted by person and
+    /// time; people enter on their first step-1 event before `entry_end`.
+    fn reached(steps: &[Step], events: &[StepEvent], entry_end: i64, window: i64) -> Vec<i64> {
+        let mut counts = vec![0_i64; steps.len()];
+        for person in events.chunk_by(|a, b| a.person == b.person) {
+            count_person(&mut counts, steps, person, entry_end, window);
+        }
+        counts
+    }
 
     fn page(path: &str) -> Step {
         Step { kind: GoalKind::Page, matches: path.to_owned() }

@@ -16,13 +16,22 @@ pub fn is_event_name(name: &str) -> bool {
 }
 
 /// Whether `path` can be a page goal: starts with `/`, no wildcard, query
-/// or fragment, at most [`MAX_PATH`] bytes.
+/// or fragment, at most [`MAX_PATH`] bytes once stored.
 #[must_use]
 pub fn is_goal_path(path: &str) -> bool {
     path.starts_with('/')
-        && path.len() <= MAX_PATH
         && !path.contains(['*', '?', '#'])
         && !path.chars().any(char::is_whitespace)
+        && stored_path(path).len() <= MAX_PATH
+}
+
+/// `path` as ingest stores page paths: percent-encoded the way a browser
+/// sends it, so `/über` matches events from `https://site/über`. Goals and
+/// funnel steps store this form.
+#[must_use]
+pub fn stored_path(path: &str) -> String {
+    url::Url::parse(&format!("http://h{path}"))
+        .map_or_else(|_| path.to_owned(), |url| url.path().to_owned())
 }
 
 /// Whether `pattern` is a hostname (`example.com`) or a suffix pattern
@@ -78,6 +87,14 @@ mod tests {
         for bad in ["signup", "/blog/*", "/a?b=1", "/a#x", "/a b"] {
             assert!(!is_goal_path(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn stored_paths_match_what_ingest_stores() {
+        assert_eq!(stored_path("/über-uns"), "/%C3%BCber-uns");
+        assert_eq!(stored_path("/%C3%BCber-uns"), "/%C3%BCber-uns", "already encoded");
+        assert_eq!(stored_path("/blog/*"), "/blog/*");
+        assert_eq!(stored_path("/pricing"), "/pricing");
     }
 
     #[test]

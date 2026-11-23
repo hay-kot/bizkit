@@ -3,6 +3,8 @@
 //! (parsing, lookups, hashing, the country lookup) has; the transaction holds only the
 //! inserts and updates, because one writer connection serves the whole app.
 
+use std::time::Duration;
+
 use anyhow::Context as _;
 use bizkit_core::Platform;
 use bizkit_core::db::WriteTx;
@@ -15,9 +17,16 @@ use crate::beacon::{MAX_PROPS, Name};
 use crate::cache::{CachedSite, Sites};
 use crate::enrich::Attribution;
 use crate::hooks::GoalConverted;
+use crate::report::Scope;
 use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow};
 use crate::ua::Agent;
+
+/// How far back identify moves a snippet visitor's anonymous events. The
+/// visitor hash is only address and browser, so people behind one NAT with
+/// the same browser share it; a short window keeps one person's identify
+/// from taking another's day.
+const VISITOR_BACKFILL: Duration = Duration::from_mins(30);
 
 /// Where an event came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,7 +105,7 @@ async fn record_one(
     let visitor_key = format!("v:{day}:{}", event.visitor);
     if event.name == Name::Identify {
         if let Some(person) = person {
-            identify(tx, site, event, person, &visitor_key).await?;
+            identify(tx, site, event, person, now).await?;
         }
         return Ok(());
     }
@@ -125,34 +134,39 @@ async fn resolve_person(
         return Ok(Some(id));
     }
     let Some(anon_id) = &event.anon_id else { return Ok(None) };
-    Ok(store::aliased_person(&mut **tx, project_id, anon_id).await?)
+    Ok(store::aliased_person(&mut **tx, workspace_id, project_id, anon_id).await?)
 }
 
 /// Merges traits, links the anonymous ID and moves this browser's earlier
-/// anonymous events to the person: those under the anonymous ID and, for
-/// the snippet, today's under the visitor hash. Events already under a
-/// person never move.
+/// anonymous events and conversions to the person: those under the
+/// anonymous ID and, for the snippet, the last [`VISITOR_BACKFILL`] under
+/// the visitor hash. Events already under a person never move.
 async fn identify(
     tx: &mut WriteTx,
     site: &CachedSite,
     event: &Incoming,
     person: PersonId,
-    visitor_key: &str,
+    now: UnixMillis,
 ) -> anyhow::Result<()> {
     let (workspace_id, project_id) = (site.row.workspace_id, site.row.project_id);
+    let scope = Scope { workspace_id, project_id };
     if let Some(traits) = event.traits.as_ref().filter(|traits| !traits.is_empty()) {
-        let stored = store::person_traits(&mut **tx, person).await?;
+        let stored = store::person_traits(&mut **tx, workspace_id, person).await?;
         let merged = merge_traits(&stored, traits);
-        store::set_person_traits(&mut **tx, person, &merged).await?;
+        store::set_person_traits(&mut **tx, workspace_id, person, &merged).await?;
     }
     let to = person_key(person);
     if let Some(anon_id) = &event.anon_id {
+        let from = format!("a:{anon_id}");
         store::set_alias(&mut **tx, workspace_id, project_id, anon_id, person).await?;
-        store::rekey_events(&mut **tx, workspace_id, project_id, &format!("a:{anon_id}"), &to)
-            .await?;
+        store::rekey_events(&mut **tx, scope, &from, &to, UnixMillis(0)).await?;
+        store::rekey_conversions(&mut **tx, workspace_id, &from, &to).await?;
     }
     if event.origin == Origin::Web {
-        store::rekey_events(&mut **tx, workspace_id, project_id, visitor_key, &to).await?;
+        let from = format!("v:{}:{}", Day::of(now), event.visitor);
+        let since = now.minus(VISITOR_BACKFILL);
+        store::rekey_events(&mut **tx, scope, &from, &to, since).await?;
+        store::rekey_conversions(&mut **tx, workspace_id, &from, &to).await?;
     }
     Ok(())
 }
@@ -215,7 +229,9 @@ async fn insert(
 ) -> anyhow::Result<()> {
     let event_id = store::insert_event(&mut **tx, row).await.context("inserting an event")?;
     for goal in site.goals.iter().filter(|goal| converts(goal, row)) {
-        if store::insert_conversion(&mut **tx, goal.id, &row.day, &row.person).await? {
+        if store::insert_conversion(&mut **tx, row.workspace_id, goal.id, &row.day, &row.person)
+            .await?
+        {
             let converted = GoalConverted {
                 workspace_id: row.workspace_id,
                 project_id: row.project_id,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE analytics_events SET person = ?\n         WHERE project_id = ? AND person = ? AND ts >= ? AND workspace_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "149c26c969b1019c2e29a7b1f34d831517641d7ff16696ab4ae11b8547af56c9"
+}

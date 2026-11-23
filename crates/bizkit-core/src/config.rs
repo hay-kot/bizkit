@@ -26,10 +26,12 @@ pub struct Config {
     pub mail: MailConfig,
     /// Sign-in and sessions.
     pub auth: AuthConfig,
-    /// Take the client address from the rightmost `X-Forwarded-For` entry.
-    /// Turn it on only behind a reverse proxy that sets that header, or
-    /// clients can claim any address.
-    pub trust_proxy_headers: bool,
+    /// How many reverse proxies in front of bizkit append to
+    /// `X-Forwarded-For`. With 0 the header is ignored; with n the client
+    /// address is the nth entry from the right (1 behind one proxy, 2 behind
+    /// a CDN and a load balancer). Set more than you have, and clients can
+    /// claim any address.
+    pub trusted_proxies: u8,
     /// Each module's own section, keyed by module name.
     pub modules: BTreeMap<String, serde_json::Value>,
 }

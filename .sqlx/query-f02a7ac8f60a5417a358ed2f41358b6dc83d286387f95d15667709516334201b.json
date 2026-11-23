@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT 1 AS found FROM analytics_goals WHERE project_id = ? AND kind = ? AND match = ?",
+  "query": "SELECT 1 AS found FROM analytics_goals\n         WHERE workspace_id = ? AND project_id = ? AND kind = ? AND match = ?",
   "describe": {
     "columns": [
       {
@@ -11,11 +11,11 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false
     ]
   },
-  "hash": "c4411c3fd957b436d54b1fb2369f625424c58f7465feb0c589cab762f4b89588"
+  "hash": "f02a7ac8f60a5417a358ed2f41358b6dc83d286387f95d15667709516334201b"
 }

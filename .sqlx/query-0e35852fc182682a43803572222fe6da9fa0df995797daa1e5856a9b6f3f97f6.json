@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: i64\", ts AS \"ts: UnixMillis\", name, path, props, source\n               FROM analytics_events\n               WHERE workspace_id = ? AND project_id = ? AND person = ? AND id < ?\n               ORDER BY ts DESC, id DESC LIMIT ?",
+  "query": "SELECT id AS \"id!: i64\", ts AS \"ts: UnixMillis\", name, path, props, source\n               FROM analytics_events\n               WHERE workspace_id = ? AND project_id = ? AND person = ? AND id < ?\n               ORDER BY id DESC LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "dd31e6b22542c5ba0f8f49040938638927a9dca3a6bd36d720f798274f6d4906"
+  "hash": "0e35852fc182682a43803572222fe6da9fa0df995797daa1e5856a9b6f3f97f6"
 }

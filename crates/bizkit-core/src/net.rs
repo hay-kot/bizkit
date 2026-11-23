@@ -140,9 +140,9 @@ impl reqwest::dns::Resolve for PublicOnlyResolver {
     }
 }
 
-/// The address a request came from. With `trust_proxy_headers` on, the
-/// rightmost `X-Forwarded-For` entry; else the socket peer. `None` when
-/// neither is known, as with axum-test's in-memory transport.
+/// The address a request came from: with `trusted_proxies` set to n, the
+/// nth `X-Forwarded-For` entry from the right; else the socket peer. `None`
+/// when neither is known, as with axum-test's in-memory transport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClientIp(pub Option<IpAddr>);
 
@@ -153,33 +153,38 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
         parts: &mut Parts,
         _state: &S,
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-        let trust = parts
+        let proxies = parts
             .extensions
             .get::<Platform>()
-            .is_some_and(|platform| platform.config().trust_proxy_headers);
+            .map_or(0, |platform| platform.config().trusted_proxies);
         let peer = parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
-        std::future::ready(Ok(Self(client_ip(&parts.headers, peer, trust))))
+        std::future::ready(Ok(Self(client_ip(&parts.headers, peer, proxies))))
     }
 }
 
-/// See [`ClientIp`]. Proxies append to `X-Forwarded-For`, so only the
-/// rightmost entry comes from the proxy in front of us; the entries to its
-/// left are whatever the client sent.
+/// See [`ClientIp`].
+///
+/// Each proxy appends the address it got the request from, so with
+/// `trusted_proxies` proxies in front of us the client is that many entries
+/// from the right; entries further left are whatever the client sent. A
+/// header with fewer entries didn't come through every proxy, so the peer
+/// is used.
 #[must_use]
-pub fn client_ip(
-    headers: &HeaderMap,
-    peer: Option<IpAddr>,
-    trust_proxy_headers: bool,
-) -> Option<IpAddr> {
-    if trust_proxy_headers {
-        let forwarded = headers
+pub fn client_ip(headers: &HeaderMap, peer: Option<IpAddr>, trusted_proxies: u8) -> Option<IpAddr> {
+    if trusted_proxies > 0 {
+        let entries: Vec<&str> = headers
             .get_all("x-forwarded-for")
             .iter()
             .filter_map(|value| value.to_str().ok())
             .flat_map(|value| value.split(','))
             .map(str::trim)
-            .rfind(|entry| !entry.is_empty())
-            .and_then(parse_forwarded);
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        let forwarded = entries
+            .len()
+            .checked_sub(usize::from(trusted_proxies))
+            .and_then(|at| entries.get(at))
+            .and_then(|entry| parse_forwarded(entry));
         if forwarded.is_some() {
             return forwarded;
         }
@@ -304,9 +309,10 @@ mod tests {
     fn client_ip_takes_the_peer_unless_proxy_headers_are_trusted() {
         let peer = Some("203.0.113.9".parse().unwrap());
         let headers = forwarded(&["198.51.100.1"]);
-        assert_eq!(client_ip(&headers, peer, false), peer, "untrusted header ignored");
-        assert_eq!(client_ip(&HeaderMap::new(), peer, true), peer, "no header, peer");
-        assert_eq!(client_ip(&HeaderMap::new(), None, true), None);
+        assert_eq!(client_ip(&headers, peer, 0), peer, "untrusted header ignored");
+        assert_eq!(client_ip(&HeaderMap::new(), peer, 1), peer, "no header, peer");
+        assert_eq!(client_ip(&HeaderMap::new(), None, 1), None);
+        assert_eq!(client_ip(&headers, peer, 2), peer, "fewer entries than proxies");
     }
 
     #[test]
@@ -318,14 +324,20 @@ mod tests {
             (&["2001:db8::1"], "2001:db8::1"),
         ];
         for (values, want) in cases {
-            let got = client_ip(&forwarded(values), None, true);
+            let got = client_ip(&forwarded(values), None, 1);
             assert_eq!(got, Some(want.parse().unwrap()), "{values:?}");
         }
     }
 
     #[test]
+    fn client_ip_skips_one_entry_per_extra_proxy() {
+        let headers = forwarded(&["6.6.6.6, 198.51.100.7", "104.16.0.1"]);
+        assert_eq!(client_ip(&headers, None, 2), Some("198.51.100.7".parse().unwrap()));
+    }
+
+    #[test]
     fn client_ip_falls_back_to_the_peer_on_junk() {
         let peer = Some("203.0.113.9".parse().unwrap());
-        assert_eq!(client_ip(&forwarded(&["1.1.1.1, not-an-ip"]), peer, true), peer);
+        assert_eq!(client_ip(&forwarded(&["1.1.1.1, not-an-ip"]), peer, 1), peer);
     }
 }

@@ -7,6 +7,7 @@ use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
 
 use crate::api::{GoalId, PersonId};
+use crate::report::Scope;
 
 /// An `analytics_sites` row. `hostnames` stays JSON text here.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,12 +130,15 @@ pub(crate) async fn list_goals(
 
 pub(crate) async fn goal_exists(
     exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
     project_id: ProjectId,
     kind: &str,
     matches: &str,
 ) -> sqlx::Result<bool> {
     let found = sqlx::query_scalar!(
-        "SELECT 1 AS found FROM analytics_goals WHERE project_id = ? AND kind = ? AND match = ?",
+        "SELECT 1 AS found FROM analytics_goals
+         WHERE workspace_id = ? AND project_id = ? AND kind = ? AND match = ?",
+        workspace_id,
         project_id,
         kind,
         matches,
@@ -361,33 +365,46 @@ pub(crate) async fn upsert_person(
 
 pub(crate) async fn person_traits(
     exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
     person_id: PersonId,
 ) -> sqlx::Result<String> {
-    sqlx::query_scalar!("SELECT traits FROM analytics_people WHERE id = ?", person_id)
-        .fetch_one(exec)
-        .await
+    sqlx::query_scalar!(
+        "SELECT traits FROM analytics_people WHERE id = ? AND workspace_id = ?",
+        person_id,
+        workspace_id,
+    )
+    .fetch_one(exec)
+    .await
 }
 
 pub(crate) async fn set_person_traits(
     exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
     person_id: PersonId,
     traits: &str,
 ) -> sqlx::Result<()> {
-    sqlx::query!("UPDATE analytics_people SET traits = ? WHERE id = ?", traits, person_id)
-        .execute(exec)
-        .await?;
+    sqlx::query!(
+        "UPDATE analytics_people SET traits = ? WHERE id = ? AND workspace_id = ?",
+        traits,
+        person_id,
+        workspace_id,
+    )
+    .execute(exec)
+    .await?;
     Ok(())
 }
 
 /// The person an anonymous ID was linked to by `identify`.
 pub(crate) async fn aliased_person(
     exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
     project_id: ProjectId,
     anon_id: &str,
 ) -> sqlx::Result<Option<PersonId>> {
     sqlx::query_scalar!(
         r#"SELECT person_id AS "person_id: PersonId" FROM analytics_aliases
-           WHERE project_id = ? AND anon_id = ?"#,
+           WHERE workspace_id = ? AND project_id = ? AND anon_id = ?"#,
+        workspace_id,
         project_id,
         anon_id,
     )
@@ -419,33 +436,58 @@ pub(crate) async fn set_alias(
 /// Moves a project's events from person key `from` to `to`.
 pub(crate) async fn rekey_events(
     exec: impl SqliteExecutor<'_>,
-    workspace_id: WorkspaceId,
-    project_id: ProjectId,
+    scope: Scope,
     from: &str,
     to: &str,
+    since: UnixMillis,
 ) -> sqlx::Result<u64> {
     let result = sqlx::query!(
-        "UPDATE analytics_events SET person = ? WHERE project_id = ? AND person = ? AND workspace_id = ?",
+        "UPDATE analytics_events SET person = ?
+         WHERE project_id = ? AND person = ? AND ts >= ? AND workspace_id = ?",
         to,
-        project_id,
+        scope.project_id,
         from,
-        workspace_id,
+        since,
+        scope.workspace_id,
     )
     .execute(exec)
     .await?;
     Ok(result.rows_affected())
 }
 
+/// Moves conversions to a person key, so the person's later conversions
+/// that day don't count as first ones. A conversion the person already has
+/// stays under the old key.
+pub(crate) async fn rekey_conversions(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    from: &str,
+    to: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE OR IGNORE analytics_conversions SET person = ? WHERE workspace_id = ? AND person = ?",
+        to,
+        workspace_id,
+        from,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
 /// Records a goal conversion. True when it is the first for the goal, day
 /// and person.
 pub(crate) async fn insert_conversion(
     exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
     goal_id: GoalId,
     day: &str,
     person: &str,
 ) -> sqlx::Result<bool> {
     let result = sqlx::query!(
-        "INSERT OR IGNORE INTO analytics_conversions (goal_id, day, person) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO analytics_conversions (workspace_id, goal_id, day, person)
+         VALUES (?, ?, ?, ?)",
+        workspace_id,
         goal_id,
         day,
         person,
@@ -582,8 +624,9 @@ pub(crate) async fn prune_conversions(
     before: &str,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "DELETE FROM analytics_conversions WHERE day < ? AND goal_id IN (
+        "DELETE FROM analytics_conversions WHERE workspace_id = ? AND day < ? AND goal_id IN (
            SELECT id FROM analytics_goals WHERE workspace_id = ? AND project_id = ?)",
+        workspace_id,
         before,
         workspace_id,
         project_id,

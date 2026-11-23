@@ -321,7 +321,7 @@ pub struct Totals {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Interval {
-    /// One hour, for a one-day range.
+    /// One hour, for a one-day range that still has raw events.
     Hour,
     /// One UTC day.
     Day,
@@ -346,6 +346,7 @@ pub struct Summary {
     /// Counts for the previous period of the same length, when asked.
     pub previous: Option<Totals>,
     /// What one chart point covers: hours for a one-day range, else days.
+    /// A one-day range past raw retention has one daily point.
     pub interval: Interval,
     /// Visitors and pageviews over the range, one point per interval.
     pub series: Vec<SeriesPoint>,

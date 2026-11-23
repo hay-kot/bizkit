@@ -14,14 +14,14 @@ publish.workspace = true
 
 [features]
 # The demo seed for the dev stack; needs core's dev helpers.
-test-hooks = ["bizkit-core/test-hooks", "dep:futures"]
+test-hooks = ["bizkit-core/test-hooks"]
 
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
 axum.workspace = true
 bizkit-core.workspace = true
-futures = { workspace = true, optional = true }
+futures.workspace = true
 http.workspace = true
 maxminddb.workspace = true
 rand.workspace = true

@@ -1608,6 +1608,7 @@ export type SubmissionStatus = 'inbox' | 'spam';
 export type Summary = {
     /**
      * What one chart point covers: hours for a one-day range, else days.
+     * A one-day range past raw retention has one daily point.
      */
     interval: Interval;
     previous?: Totals | null;

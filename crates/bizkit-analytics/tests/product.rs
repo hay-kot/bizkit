@@ -215,5 +215,10 @@ mod product {
             ))
             .await;
         assert_eq!(signups["cohorts"][0]["weeks"][1].as_f64().unwrap(), 1.0 / 3.0);
+
+        let later = s
+            .get(&format!("retention?project_id={}&from=2026-01-08&to=2026-01-08", s.project()))
+            .await;
+        assert_eq!(later["cohorts"], json!([]), "Ada and Cy were seen in an earlier week");
     }
 }

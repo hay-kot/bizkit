@@ -26,7 +26,7 @@ mod reports {
         let app = TestApp::builder()
             .module(Analytics)
             .config(move |c| {
-                c.trust_proxy_headers = true;
+                c.trusted_proxies = 1;
                 c.modules.insert("analytics".to_owned(), config);
             })
             .build()
@@ -281,11 +281,10 @@ mod reports {
             .await
             .unwrap();
         assert_eq!(raw, 1, "only today's event is left");
-        assert_eq!(
-            s.summary(DAY1, DAY1, false).await["totals"]["pageviews"],
-            4,
-            "rollups keep day one"
-        );
+        let pruned = s.summary(DAY1, DAY1, false).await;
+        assert_eq!(pruned["totals"]["pageviews"], 4, "rollups keep day one");
+        assert_eq!(pruned["interval"], "day", "no hours left for a pruned day");
+        assert_eq!(pruned["series"][0]["pageviews"], 4);
     }
 
     #[tokio::test]

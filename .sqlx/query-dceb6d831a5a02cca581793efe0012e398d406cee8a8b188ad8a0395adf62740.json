@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT person AS \"person!: String\"\n               FROM analytics_events\n               WHERE workspace_id = ? AND project_id = ? AND day < ?\n                 AND substr(person, 1, 2) <> 'v:'",
+  "describe": {
+    "columns": [
+      {
+        "name": "person!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "person"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "dceb6d831a5a02cca581793efe0012e398d406cee8a8b188ad8a0395adf62740"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT person_id AS \"person_id: PersonId\" FROM analytics_aliases\n           WHERE project_id = ? AND anon_id = ?",
+  "query": "SELECT person_id AS \"person_id: PersonId\" FROM analytics_aliases\n           WHERE workspace_id = ? AND project_id = ? AND anon_id = ?",
   "describe": {
     "columns": [
       {
@@ -16,11 +16,11 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 3
     },
     "nullable": [
       false
     ]
   },
-  "hash": "f21cbc6143f7629113326569c5493a085b3aa7613c8098de8619ee252d0a2341"
+  "hash": "7158b5d81ec7f96dd39977f50513caba01984357c8aa8be249ef1848e0777b46"
 }

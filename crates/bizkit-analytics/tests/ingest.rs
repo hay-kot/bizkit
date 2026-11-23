@@ -44,7 +44,7 @@ mod ingest {
         let app = TestApp::builder()
             .module(Analytics)
             .hook_runner(hooks.clone())
-            .config(|config| config.trust_proxy_headers = true)
+            .config(|config| config.trusted_proxies = 1)
             .build()
             .await;
         let team = app.seed(Persona::Team, "analytics").await;
@@ -334,6 +334,38 @@ mod ingest {
         s.app.clock.advance(Duration::from_hours(24));
         s.send(done, "203.0.113.1").await;
         assert_eq!(s.count("SELECT count(*) FROM analytics_conversions").await, 4, "a new day");
+    }
+
+    #[tokio::test]
+    async fn identify_takes_only_recent_visitor_rows() {
+        let s = setup("after_identify").await;
+        let ip = "203.0.113.1";
+        s.send(json!({"n": "pageview", "u": "https://example.com/coworker"}), ip).await;
+        s.app.clock.advance(Duration::from_mins(31));
+        s.send(json!({"n": "pageview", "u": "https://example.com/pricing"}), ip).await;
+        s.send(json!({"n": "$identify", "a": "anon-1", "i": "user_1"}), ip).await;
+
+        let events = s.events().await;
+        assert!(events[0].person.starts_with("v:"), "older rows on the hash stay anonymous");
+        assert!(events[1].person.starts_with("p:"), "{}", events[1].person);
+    }
+
+    #[tokio::test]
+    async fn a_conversion_before_identify_counts_for_the_person() {
+        let s = setup("after_identify").await;
+        s.admin
+            .post(
+                &s.path("goals"),
+                &s.body(&json!({"name": "Signup", "kind": "event", "match": "signup"})),
+            )
+            .await
+            .expect(StatusCode::CREATED);
+        let ip = "203.0.113.1";
+        s.send(json!({"n": "signup"}), ip).await;
+        s.send(json!({"n": "$identify", "a": "anon-1", "i": "user_1"}), ip).await;
+        s.send(json!({"n": "signup", "a": "anon-1", "i": "user_1"}), ip).await;
+        s.app.drain_jobs().await;
+        assert_eq!(s.hooks.dispatches().len(), 1, "{:?}", s.hooks.dispatches());
     }
 
     #[tokio::test]
