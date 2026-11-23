@@ -46,6 +46,7 @@ pub const PRE_VALIDATE: HookPoint = HookPoint {
     summary: "Before field validation, for submissions that passed the bot checks. Return nothing or {action: 'accept'}, {action: 'reject', errors: {field: ['message']}}, or {action: 'spam', reason}.",
     sample: pre_validate_sample,
     kind: HookKind::Sync { budget: Duration::from_millis(50), output: check_verdict },
+    target: None,
 };
 
 /// Runs as a job after each inbox submission is stored.
@@ -54,6 +55,7 @@ pub const SUBMISSION_CREATED: HookPoint = HookPoint {
     summary: "After each inbox submission is stored, such as to post it to a chat channel.",
     sample: submission_created_sample,
     kind: HookKind::Async { event: SubmissionCreated::NAME },
+    target: None,
 };
 
 fn form_json(form: &FormRow) -> Value {
@@ -171,6 +173,7 @@ impl HookSource<SubmissionCreated> for FormsHookSource {
         Ok(form.map(|form| HookTarget {
             workspace_id: form.workspace_id,
             project_id: form.project_id,
+            entity: None,
         }))
     }
 

@@ -52,13 +52,53 @@ pub struct HookPoint {
     pub sample: fn() -> serde_json::Value,
     /// When the point runs.
     pub kind: HookKind,
+    /// The entity kind a script on this point can bind to. `None`: scripts
+    /// on it are project-wide.
+    pub target: Option<&'static TargetKind>,
+}
+
+/// A kind of entity scripts can bind to, such as a form. The module that
+/// owns the entities declares it with
+/// [`ModuleContext::hook_target_kind`](crate::module::ModuleContext::hook_target_kind).
+#[derive(Debug)]
+pub struct TargetKind {
+    /// Owned like a point ID: `<module>.<name>`, such as `forms.form`.
+    pub id: &'static str,
+    /// The UI noun, such as `form`.
+    pub noun: &'static str,
+    /// Its plural, such as `forms`.
+    pub plural: &'static str,
+}
+
+/// One entity a script can bind to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetEntity {
+    /// The canonical ID: what [`HookTarget::entity`] carries for it.
+    pub id: String,
+    /// Its project.
+    pub project_id: ProjectId,
+    /// A display name, such as the form's name.
+    pub label: String,
+}
+
+/// Looks up entities of one [`TargetKind`].
+#[async_trait]
+pub trait TargetResolver: Send + Sync + fmt::Debug + 'static {
+    /// The entities among `ids` that exist in the workspace, with canonical
+    /// IDs. IDs that don't parse or don't exist are left out.
+    async fn find(
+        &self,
+        platform: &Platform,
+        workspace_id: WorkspaceId,
+        ids: &[String],
+    ) -> anyhow::Result<Vec<TargetEntity>>;
 }
 
 /// When a hook point runs.
 #[derive(Debug, Clone, Copy)]
 pub enum HookKind {
-    /// Runs in the request and fails open. At most one script per project
-    /// and point.
+    /// Runs in the request and fails open. At most one script per point
+    /// for each entity, plus one project-wide; the entity's script wins.
     Sync {
         /// The script's time budget, at most [`MAX_SYNC_BUDGET`].
         budget: Duration,
@@ -66,8 +106,8 @@ pub enum HookKind {
         /// [`RunStatus::InvalidOutput`].
         output: fn(&serde_json::Value) -> Result<(), String>,
     },
-    /// Runs as a job for each `event`. Any number of scripts per project and
-    /// point.
+    /// Runs as a job for each `event`. Any number of scripts per point; the
+    /// entity's scripts and the project-wide ones all run.
     Async {
         /// The event name, [`Event::NAME`].
         event: &'static str,
@@ -119,12 +159,28 @@ impl fmt::Display for RunStatus {
 }
 
 /// Whose scripts a hook call runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HookTarget {
     /// The workspace.
     pub workspace_id: WorkspaceId,
     /// The project inside it.
     pub project_id: ProjectId,
+    /// The entity the call is for, as its kind's resolver spells the ID.
+    /// Expected when the point has a target kind; without it only
+    /// project-wide scripts run.
+    pub entity: Option<String>,
+}
+
+impl HookTarget {
+    /// Warns when a point with a target kind gets no entity, which would
+    /// silently skip every bound script.
+    pub(crate) fn check_entity(&self, point: &HookPoint) {
+        if let Some(kind) = point.target
+            && self.entity.is_none()
+        {
+            tracing::warn!(point = point.id, kind = kind.id, "hook call without an entity");
+        }
+    }
 }
 
 /// What a runner reports for a sync call.
@@ -270,6 +326,7 @@ impl<E: Event, S: HookSource<E>> Subscriber<E> for HookFanout<E, S> {
         let source = Arc::clone(&self.source);
         async move {
             let Some(target) = source.target(&cx, &event).await? else { return Ok(()) };
+            target.check_entity(&point);
             let raw = serde_json::to_value(&event)
                 .with_context(|| format!("encoding a {} event", E::NAME))?;
             cx.platform.hooks().runner.dispatch(&cx.platform, &point, target, &raw).await
@@ -282,10 +339,25 @@ impl<E: Event, S: HookSource<E>> Subscriber<E> for HookFanout<E, S> {
 pub(crate) struct HookRegistry {
     points: Vec<HookPoint>,
     sources: BTreeMap<&'static str, Arc<dyn ErasedSource>>,
+    kinds: Kinds,
     runner: Option<Arc<dyn HookRunner>>,
 }
 
+type Kinds = BTreeMap<&'static str, (&'static TargetKind, Arc<dyn TargetResolver>)>;
+
 impl HookRegistry {
+    pub(crate) fn has_kind(&self, id: &str) -> bool {
+        self.kinds.contains_key(id)
+    }
+
+    pub(crate) fn add_kind(
+        &mut self,
+        kind: &'static TargetKind,
+        resolver: Arc<dyn TargetResolver>,
+    ) {
+        self.kinds.insert(kind.id, (kind, resolver));
+    }
+
     pub(crate) fn has_point(&self, id: &str) -> bool {
         self.points.iter().any(|point| point.id == id)
     }
@@ -326,6 +398,7 @@ impl HookRegistry {
         Hooks {
             points: self.points,
             sources: self.sources,
+            kinds: self.kinds,
             runner: self.runner.unwrap_or_else(|| Arc::new(NoHooks)),
         }
     }
@@ -336,6 +409,7 @@ impl HookRegistry {
 pub(crate) struct Hooks {
     pub(crate) points: Vec<HookPoint>,
     sources: BTreeMap<&'static str, Arc<dyn ErasedSource>>,
+    kinds: Kinds,
     pub(crate) runner: Arc<dyn HookRunner>,
 }
 
@@ -352,6 +426,13 @@ impl Platform {
         self.hooks().points.iter().find(|point| point.id == id)
     }
 
+    /// The target kind with this ID and its resolver, if a compiled-in
+    /// module declares it.
+    #[must_use]
+    pub fn hook_target_kind(&self, id: &str) -> Option<(&'static TargetKind, &dyn TargetResolver)> {
+        self.hooks().kinds.get(id).map(|(kind, resolver)| (*kind, resolver.as_ref()))
+    }
+
     /// Runs a sync point's script for `target`. Sync hooks fail open: no
     /// script, a failed run, a value the point's output check refuses, a
     /// runner that takes longer than the budget plus [`SYNC_GRACE`], and an
@@ -366,6 +447,7 @@ impl Platform {
             tracing::warn!(point = point.id, "call_sync_hook on an async hook point");
             return HookResult::Continue;
         };
+        target.check_entity(point);
         let run = self.hooks().runner.run_sync(self, point, target, input);
         let Ok(outcome) = tokio::time::timeout(budget + SYNC_GRACE, run).await else {
             tracing::warn!(point = point.id, "the hook runner missed its deadline; continuing");
@@ -470,11 +552,17 @@ mod tests {
     }
 
     const fn sync_point(id: &'static str, budget: Duration) -> HookPoint {
-        HookPoint { id, summary: "", sample, kind: HookKind::Sync { budget, output: any_output } }
+        HookPoint {
+            id,
+            summary: "",
+            sample,
+            kind: HookKind::Sync { budget, output: any_output },
+            target: None,
+        }
     }
 
     const fn async_point(id: &'static str, event: &'static str) -> HookPoint {
-        HookPoint { id, summary: "", sample, kind: HookKind::Async { event } }
+        HookPoint { id, summary: "", sample, kind: HookKind::Async { event }, target: None }
     }
 
     const SYNC: HookPoint = sync_point("demo.check", Duration::from_millis(50));
@@ -568,6 +656,50 @@ mod tests {
             cx.async_hook::<Happened, _>(async_point("demo.again", Happened::NAME), Source)
         })]);
         assert!(err.contains("already has async hook point demo.after"), "{err}");
+    }
+
+    #[derive(Debug)]
+    struct NoTargets;
+
+    #[async_trait]
+    impl TargetResolver for NoTargets {
+        async fn find(
+            &self,
+            _platform: &Platform,
+            _workspace_id: WorkspaceId,
+            _ids: &[String],
+        ) -> anyhow::Result<Vec<TargetEntity>> {
+            Ok(Vec::new())
+        }
+    }
+
+    static THING: TargetKind = TargetKind { id: "demo.thing", noun: "thing", plural: "things" };
+    const TARGETED: HookPoint = HookPoint { target: Some(&THING), ..SYNC };
+
+    #[test]
+    fn target_kinds_come_before_their_points() {
+        let hooks = register(vec![Demo("demo", |cx| {
+            cx.hook_target_kind(&THING, NoTargets)?;
+            cx.sync_hook(TARGETED)
+        })])
+        .unwrap();
+        assert!(hooks.has_kind("demo.thing"), "kind registered");
+        let undeclared = error(vec![Demo("demo", |cx| cx.sync_hook(TARGETED))]);
+        assert!(
+            undeclared.contains("targets demo.thing, which isn't declared yet"),
+            "{undeclared}"
+        );
+    }
+
+    #[test]
+    fn target_kinds_are_owned_and_unique() {
+        let foreign = error(vec![Demo("other", |cx| cx.hook_target_kind(&THING, NoTargets))]);
+        assert!(foreign.contains("must start with the module name"), "{foreign}");
+        let twice = error(vec![Demo("demo", |cx| {
+            cx.hook_target_kind(&THING, NoTargets)?;
+            cx.hook_target_kind(&THING, NoTargets)
+        })]);
+        assert!(twice.contains("target kind demo.thing is already declared"), "{twice}");
     }
 
     #[test]

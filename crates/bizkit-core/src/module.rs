@@ -14,6 +14,7 @@ use futures::future::BoxFuture;
 use crate::db::Db;
 use crate::hooks::{
     HOOKS_SUBSCRIBER, HookKind, HookPoint, HookRegistry, HookRunner, HookSource, MAX_SYNC_BUDGET,
+    TargetKind, TargetResolver,
 };
 use crate::ids::{ProjectId, UserId, WorkspaceId};
 use crate::jobs::{Event, Handlers, Job, JobHandler, Subscriber};
@@ -53,7 +54,7 @@ pub trait Module: Send + Sync + fmt::Debug + 'static {
     fn seed_demo<'a>(
         &'a self,
         _db: &'a Db,
-        _seed: &'a DemoSeed,
+        _seed: &'a mut DemoSeed,
     ) -> BoxFuture<'a, anyhow::Result<()>> {
         Box::pin(async { Ok(()) })
     }
@@ -70,6 +71,10 @@ pub struct DemoSeed {
     pub user_id: UserId,
     /// The seed time.
     pub now: UnixMillis,
+    /// Entities modules seeded, by (target kind ID, label), such as
+    /// `("forms.form", "Contact")`, so later modules can refer to them
+    /// without depending on the module that made them.
+    pub entities: BTreeMap<(String, String), String>,
 }
 
 /// What modules register into.
@@ -334,6 +339,40 @@ impl<'a> ModuleContext<'a> {
         if self.registration.hooks.has_point(point.id) {
             bail!("hook point {} is already declared", point.id);
         }
+        if let Some(kind) = point.target
+            && !self.registration.hooks.has_kind(kind.id)
+        {
+            bail!(
+                "hook point {} targets {}, which isn't declared yet; call hook_target_kind first",
+                point.id,
+                kind.id
+            );
+        }
+        Ok(())
+    }
+
+    /// Declares a kind of entity that scripts on this module's hook points
+    /// can bind to. Declare it before the points that target it.
+    ///
+    /// # Errors
+    ///
+    /// When the kind's ID is taken or doesn't start with the module name.
+    pub fn hook_target_kind(
+        &mut self,
+        kind: &'static TargetKind,
+        resolver: impl TargetResolver,
+    ) -> anyhow::Result<()> {
+        if !self.owns(kind.id) {
+            bail!(
+                "module {} can't declare target kind {}: IDs must start with the module name",
+                self.module,
+                kind.id
+            );
+        }
+        if self.registration.hooks.has_kind(kind.id) {
+            bail!("target kind {} is already declared", kind.id);
+        }
+        self.registration.hooks.add_kind(kind, Arc::new(resolver));
         Ok(())
     }
 

@@ -45,7 +45,7 @@ impl Module for Forms {
     fn seed_demo<'a>(
         &'a self,
         db: &'a bizkit_core::db::Db,
-        seed: &'a DemoSeed,
+        seed: &'a mut DemoSeed,
     ) -> BoxFuture<'a, anyhow::Result<()>> {
         Box::pin(seed::seed(db, seed))
     }

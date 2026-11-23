@@ -326,7 +326,11 @@ async fn decide(platform: &Platform, form: &FormRow, raw: RawFields) -> Result<D
         }
     }
     if spam.is_none() {
-        let target = HookTarget { workspace_id: form.workspace_id, project_id: form.project_id };
+        let target = HookTarget {
+            workspace_id: form.workspace_id,
+            project_id: form.project_id,
+            entity: None,
+        };
         let input = hooks::pre_validate_input(form, &raw);
         if let HookResult::Returned(value) =
             platform.call_sync_hook(&PRE_VALIDATE, target, &input).await

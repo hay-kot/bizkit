@@ -36,6 +36,7 @@ mod hooks {
             std::future::ready(Ok((!event.skip).then_some(HookTarget {
                 workspace_id: event.workspace_id,
                 project_id: event.project_id,
+                entity: None,
             })))
         }
 
@@ -61,6 +62,7 @@ mod hooks {
         summary: "Checks a thing",
         sample,
         kind: HookKind::Sync { budget: Duration::from_millis(20), output: needs_ok },
+        target: None,
     };
 
     const AFTER: HookPoint = HookPoint {
@@ -68,6 +70,7 @@ mod hooks {
         summary: "After a thing",
         sample,
         kind: HookKind::Async { event: Happened::NAME },
+        target: None,
     };
 
     #[derive(Debug)]
@@ -85,7 +88,7 @@ mod hooks {
     }
 
     fn target() -> HookTarget {
-        HookTarget { workspace_id: WorkspaceId::new(), project_id: ProjectId::new() }
+        HookTarget { workspace_id: WorkspaceId::new(), project_id: ProjectId::new(), entity: None }
     }
 
     async fn app(hooks: &FakeHooks) -> TestApp {
@@ -108,7 +111,8 @@ mod hooks {
         hooks.answer(CHECK.id, SyncOutcome::Returned(json!({ "ok": true })));
         let app = app(&hooks).await;
         let target = target();
-        let result = app.app().platform().call_sync_hook(&CHECK, target, &json!({ "a": 1 })).await;
+        let result =
+            app.app().platform().call_sync_hook(&CHECK, target.clone(), &json!({ "a": 1 })).await;
         assert_eq!(result, HookResult::Returned(json!({ "ok": true })), "returned");
         assert_eq!(
             hooks.calls(),
@@ -177,7 +181,7 @@ mod hooks {
 
         let dispatches = hooks.dispatches();
         assert_eq!(dispatches.len(), 1, "the skipped event never reached the runner");
-        assert_eq!((dispatches[0].point, dispatches[0].target), (AFTER.id, target), "routed");
+        assert_eq!((dispatches[0].point, &dispatches[0].target), (AFTER.id, &target), "routed");
 
         let platform = app.app().platform();
         let cx = JobCtx { platform: platform.clone(), job_id: 0, attempt: 1, request_id: None };
