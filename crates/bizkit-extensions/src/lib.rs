@@ -6,6 +6,7 @@
 pub mod api;
 mod ops;
 mod redact;
+mod reference;
 pub mod runner;
 pub mod sandbox;
 #[cfg(feature = "test-hooks")]

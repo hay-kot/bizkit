@@ -15,6 +15,32 @@ export type Accepted = {
 };
 
 /**
+ * One function or object a script can use.
+ */
+export type ApiEntry = {
+    /**
+     * When it throws, one case per item.
+     */
+    errors: Array<string>;
+    /**
+     * A short example.
+     */
+    example: string;
+    /**
+     * How scripts reach it, such as `crypto.hmac` or `ctx.fetch`.
+     */
+    name: string;
+    /**
+     * Its call shape, TypeScript-style.
+     */
+    signature: string;
+    /**
+     * What it does and its limits.
+     */
+    summary: string;
+};
+
+/**
  * An API key. The secret is shown once, at creation.
  */
 export type ApiKey = {
@@ -72,7 +98,7 @@ export type BotCheck = 'honeypot' | 'challenge';
 /**
  * What a script on a hook point can use besides plain JavaScript.
  */
-export type Capability = 'log' | 'secrets' | 'fetch';
+export type Capability = 'log' | 'secrets' | 'fetch' | 'mail';
 
 /**
  * A request was stored.
@@ -397,6 +423,11 @@ export type Header = {
  * A hook point a compiled-in module declares.
  */
 export type Hook = {
+    /**
+     * What scripts on it can call: the globals, then the `ctx` members
+     * its capabilities grant.
+     */
+    api: Array<ApiEntry>;
     /**
      * The script's time budget, in milliseconds.
      */

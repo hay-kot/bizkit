@@ -279,6 +279,28 @@ async fn globals_cannot_be_replaced() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn every_reference_entry_exists() {
+    use crate::api::Capability;
+    let names: Vec<String> =
+        crate::reference::entries(&[Capability::Log, Capability::Secrets, Capability::Fetch])
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+    let mut req = request(&format!(
+        "export default (input, ctx) => {}.filter((name) => name.split('.').reduce((at, key) => at?.[key], {{ ...globalThis, crypto, encoding, URL, URLSearchParams, ctx }}) === undefined)",
+        json!(names)
+    ));
+    req.secrets = Some(BTreeMap::new());
+    req.fetch = Some(FetchBridge::new(
+        Arc::new(FakeHttp::default()),
+        tokio::runtime::Handle::current(),
+        Instant::now() + req.budget,
+    ));
+    let report = pool(1, LIMITS).run(req).await;
+    assert_eq!(report.output, Some(json!([])), "missing from a run: {report:?}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn secrets_and_fetch_when_granted() {
     let http = FakeHttp::default();
     http.respond(Method::POST, "https://hooks.example.com/", StatusCode::OK, r#"{"ok":true}"#);
