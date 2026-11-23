@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE webhook_endpoints SET name = ?, enabled = ?, forward_url = ?, updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "362c2587347c8f53ea2640fff23627e1e3e341a26d6ecbb3a20a276ed64d711c"
+}

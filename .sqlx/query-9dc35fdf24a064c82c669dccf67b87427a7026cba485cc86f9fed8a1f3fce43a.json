@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: RequestId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  endpoint_id AS \"endpoint_id: EndpointId\", method, query, headers, content_type,\n                  body, delivery, received_at AS \"received_at: UnixMillis\"\n           FROM webhook_requests WHERE workspace_id = ? AND endpoint_id = ? AND id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: RequestId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "endpoint_id: EndpointId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "endpoint_id"
+          }
+        }
+      },
+      {
+        "name": "method",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "method"
+          }
+        }
+      },
+      {
+        "name": "query",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "query"
+          }
+        }
+      },
+      {
+        "name": "headers",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "headers"
+          }
+        }
+      },
+      {
+        "name": "content_type",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "content_type"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 7,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "name": "delivery",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "delivery"
+          }
+        }
+      },
+      {
+        "name": "received_at: UnixMillis",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "received_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "9dc35fdf24a064c82c669dccf67b87427a7026cba485cc86f9fed8a1f3fce43a"
+}

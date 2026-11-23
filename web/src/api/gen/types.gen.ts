@@ -60,6 +60,11 @@ export type ApiKeyList = {
 };
 
 /**
+ * How a request body is given.
+ */
+export type BodyEncoding = 'utf8' | 'base64';
+
+/**
  * How a form tells people from bots.
  */
 export type BotCheck = 'honeypot' | 'challenge';
@@ -68,6 +73,35 @@ export type BotCheck = 'honeypot' | 'challenge';
  * What a script on a hook point can use besides plain JavaScript.
  */
 export type Capability = 'log' | 'secrets' | 'fetch';
+
+/**
+ * A request was stored.
+ */
+export type Captured = {
+    /**
+     * Always true.
+     */
+    ok: boolean;
+};
+
+/**
+ * A captured request in full.
+ */
+export type CapturedRequest = RequestSummary & {
+    /**
+     * The body, encoded as `body_encoding` says.
+     */
+    body: string;
+    /**
+     * How `body` is encoded.
+     */
+    body_encoding: BodyEncoding;
+    /**
+     * The headers in arrival order, without `Authorization`, `Cookie`,
+     * `Proxy-Authorization`, hop-by-hop headers and `X-Request-Id`.
+     */
+    headers: Array<Header>;
+};
 
 /**
  * An ALTCHA v1 challenge.
@@ -107,6 +141,87 @@ export type CreatedApiKey = {
      * The bearer token, `bk_...`. Shown only now.
      */
     token: string;
+};
+
+/**
+ * The latest time a request went to a URL, by forward or replay.
+ */
+export type Delivery = {
+    /**
+     * When it was sent.
+     */
+    at: Timestamp;
+    /**
+     * Why it failed to get an answer, or why the answer counts as a failure.
+     */
+    error?: string | null;
+    /**
+     * The answer's status, when one came.
+     */
+    status?: number | null;
+    /**
+     * How long it took.
+     */
+    took_ms: number;
+    /**
+     * Where it went.
+     */
+    url: string;
+};
+
+/**
+ * A public URL that stores every request it gets.
+ */
+export type Endpoint = {
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * Disabled endpoints answer 404 and store nothing.
+     */
+    enabled: boolean;
+    /**
+     * Where each captured request is sent on, if anywhere.
+     */
+    forward_url?: string | null;
+    /**
+     * The endpoint ID, also its public address.
+     */
+    id: EndpointId;
+    last_received_at?: Timestamp | null;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * Stored requests. The newest 500 are kept.
+     */
+    request_count: number;
+    /**
+     * When its settings last changed.
+     */
+    updated_at: Timestamp;
+    /**
+     * The URL senders post to.
+     */
+    url: string;
+};
+
+export type EndpointId = string;
+
+/**
+ * Endpoints of a workspace.
+ */
+export type EndpointList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Endpoint>;
 };
 
 /**
@@ -261,6 +376,20 @@ export type FormList = {
      * Sorted by name.
      */
     items: Array<Form>;
+};
+
+/**
+ * One request header.
+ */
+export type Header = {
+    /**
+     * The lowercase name.
+     */
+    name: string;
+    /**
+     * The value. Values over 4096 bytes are not stored.
+     */
+    value: string;
 };
 
 /**
@@ -544,6 +673,50 @@ export type ProjectList = {
      * Sorted by name.
      */
     items: Array<Project>;
+};
+
+export type RequestId = string;
+
+/**
+ * A page of requests, newest first.
+ */
+export type RequestList = {
+    /**
+     * The requests.
+     */
+    items: Array<RequestSummary>;
+    next_before?: RequestId | null;
+};
+
+/**
+ * A captured request without its headers and body.
+ */
+export type RequestSummary = {
+    /**
+     * The `Content-Type` header, if any.
+     */
+    content_type?: string | null;
+    delivery?: Delivery | null;
+    /**
+     * The request ID.
+     */
+    id: RequestId;
+    /**
+     * The HTTP method.
+     */
+    method: string;
+    /**
+     * The query string without the `?`, if any.
+     */
+    query?: string | null;
+    /**
+     * When it arrived.
+     */
+    received_at: Timestamp;
+    /**
+     * The body size in bytes.
+     */
+    size: number;
 };
 
 /**
@@ -3463,6 +3636,449 @@ export type ProjectsUpdateResponses = {
 
 export type ProjectsUpdateResponse = ProjectsUpdateResponses[keyof ProjectsUpdateResponses];
 
+export type WebhooksEndpointsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        project_id?: ProjectId | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/webhooks';
+};
+
+export type WebhooksEndpointsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksEndpointsListError = WebhooksEndpointsListErrors[keyof WebhooksEndpointsListErrors];
+
+export type WebhooksEndpointsListResponses = {
+    /**
+     * OK
+     */
+    200: EndpointList;
+};
+
+export type WebhooksEndpointsListResponse = WebhooksEndpointsListResponses[keyof WebhooksEndpointsListResponses];
+
+export type WebhooksEndpointsCreateData = {
+    body: {
+        /**
+         * Where to send each captured request on, a public http or https URL.
+         */
+        forward_url?: string | null;
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project it belongs to.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/webhooks';
+};
+
+export type WebhooksEndpointsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksEndpointsCreateError = WebhooksEndpointsCreateErrors[keyof WebhooksEndpointsCreateErrors];
+
+export type WebhooksEndpointsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Endpoint;
+};
+
+export type WebhooksEndpointsCreateResponse = WebhooksEndpointsCreateResponses[keyof WebhooksEndpointsCreateResponses];
+
+export type WebhooksEndpointsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The endpoint.
+         */
+        endpoint_id: EndpointId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}';
+};
+
+export type WebhooksEndpointsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksEndpointsDeleteError = WebhooksEndpointsDeleteErrors[keyof WebhooksEndpointsDeleteErrors];
+
+export type WebhooksEndpointsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type WebhooksEndpointsDeleteResponse = WebhooksEndpointsDeleteResponses[keyof WebhooksEndpointsDeleteResponses];
+
+export type WebhooksEndpointsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The endpoint.
+         */
+        endpoint_id: EndpointId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}';
+};
+
+export type WebhooksEndpointsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksEndpointsGetError = WebhooksEndpointsGetErrors[keyof WebhooksEndpointsGetErrors];
+
+export type WebhooksEndpointsGetResponses = {
+    /**
+     * OK
+     */
+    200: Endpoint;
+};
+
+export type WebhooksEndpointsGetResponse = WebhooksEndpointsGetResponses[keyof WebhooksEndpointsGetResponses];
+
+export type WebhooksEndpointsUpdateData = {
+    body: {
+        /**
+         * Disabled endpoints answer 404 and store nothing.
+         */
+        enabled?: boolean | null;
+        /**
+         * Where to send each captured request on; `null` stops forwarding.
+         */
+        forward_url?: string | null;
+        /**
+         * The display name.
+         */
+        name?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The endpoint.
+         */
+        endpoint_id: EndpointId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}';
+};
+
+export type WebhooksEndpointsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksEndpointsUpdateError = WebhooksEndpointsUpdateErrors[keyof WebhooksEndpointsUpdateErrors];
+
+export type WebhooksEndpointsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Endpoint;
+};
+
+export type WebhooksEndpointsUpdateResponse = WebhooksEndpointsUpdateResponses[keyof WebhooksEndpointsUpdateResponses];
+
+export type WebhooksRequestsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The endpoint.
+         */
+        endpoint_id: EndpointId;
+    };
+    query?: {
+        before?: RequestId | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/requests';
+};
+
+export type WebhooksRequestsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksRequestsListError = WebhooksRequestsListErrors[keyof WebhooksRequestsListErrors];
+
+export type WebhooksRequestsListResponses = {
+    /**
+     * OK
+     */
+    200: RequestList;
+};
+
+export type WebhooksRequestsListResponse = WebhooksRequestsListResponses[keyof WebhooksRequestsListResponses];
+
+export type WebhooksRequestsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The endpoint.
+         */
+        endpoint_id: EndpointId;
+        /**
+         * The request.
+         */
+        request_id: RequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/requests/{request_id}';
+};
+
+export type WebhooksRequestsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksRequestsGetError = WebhooksRequestsGetErrors[keyof WebhooksRequestsGetErrors];
+
+export type WebhooksRequestsGetResponses = {
+    /**
+     * OK
+     */
+    200: CapturedRequest;
+};
+
+export type WebhooksRequestsGetResponse = WebhooksRequestsGetResponses[keyof WebhooksRequestsGetResponses];
+
+export type WebhooksRequestsReplayData = {
+    body: {
+        /**
+         * A public http or https URL. Default the endpoint's forward URL.
+         */
+        url?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The endpoint.
+         */
+        endpoint_id: EndpointId;
+        /**
+         * The request.
+         */
+        request_id: RequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/requests/{request_id}/replay';
+};
+
+export type WebhooksRequestsReplayErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WebhooksRequestsReplayError = WebhooksRequestsReplayErrors[keyof WebhooksRequestsReplayErrors];
+
+export type WebhooksRequestsReplayResponses = {
+    /**
+     * OK
+     */
+    200: Delivery;
+};
+
+export type WebhooksRequestsReplayResponse = WebhooksRequestsReplayResponses[keyof WebhooksRequestsReplayResponses];
+
 export type FormsPublicSubmitData = {
     body: {
         [key: string]: unknown;
@@ -3540,3 +4156,208 @@ export type FormsPublicChallengeResponses = {
 };
 
 export type FormsPublicChallengeResponse = FormsPublicChallengeResponses[keyof FormsPublicChallengeResponses];
+
+export type WebhooksPublicCaptureDeleteData = {
+    /**
+     * Any body
+     */
+    body: string;
+    path: {
+        /**
+         * The endpoint ID
+         */
+        endpoint_id: string;
+    };
+    query?: never;
+    url: '/m/webhooks/public/{endpoint_id}';
+};
+
+export type WebhooksPublicCaptureDeleteErrors = {
+    /**
+     * No enabled endpoint has this ID
+     */
+    404: ErrorBody;
+    /**
+     * The body is over 256 KiB
+     */
+    413: unknown;
+    /**
+     * The endpoint stored 300 requests in the past hour; retry after a minute
+     */
+    429: ErrorBody;
+};
+
+export type WebhooksPublicCaptureDeleteError = WebhooksPublicCaptureDeleteErrors[keyof WebhooksPublicCaptureDeleteErrors];
+
+export type WebhooksPublicCaptureDeleteResponses = {
+    /**
+     * Stored
+     */
+    200: Captured;
+};
+
+export type WebhooksPublicCaptureDeleteResponse = WebhooksPublicCaptureDeleteResponses[keyof WebhooksPublicCaptureDeleteResponses];
+
+export type WebhooksPublicCaptureGetData = {
+    /**
+     * Any body
+     */
+    body: string;
+    path: {
+        /**
+         * The endpoint ID
+         */
+        endpoint_id: string;
+    };
+    query?: never;
+    url: '/m/webhooks/public/{endpoint_id}';
+};
+
+export type WebhooksPublicCaptureGetErrors = {
+    /**
+     * No enabled endpoint has this ID
+     */
+    404: ErrorBody;
+    /**
+     * The body is over 256 KiB
+     */
+    413: unknown;
+    /**
+     * The endpoint stored 300 requests in the past hour; retry after a minute
+     */
+    429: ErrorBody;
+};
+
+export type WebhooksPublicCaptureGetError = WebhooksPublicCaptureGetErrors[keyof WebhooksPublicCaptureGetErrors];
+
+export type WebhooksPublicCaptureGetResponses = {
+    /**
+     * Stored
+     */
+    200: Captured;
+};
+
+export type WebhooksPublicCaptureGetResponse = WebhooksPublicCaptureGetResponses[keyof WebhooksPublicCaptureGetResponses];
+
+export type WebhooksPublicCapturePatchData = {
+    /**
+     * Any body
+     */
+    body: string;
+    path: {
+        /**
+         * The endpoint ID
+         */
+        endpoint_id: string;
+    };
+    query?: never;
+    url: '/m/webhooks/public/{endpoint_id}';
+};
+
+export type WebhooksPublicCapturePatchErrors = {
+    /**
+     * No enabled endpoint has this ID
+     */
+    404: ErrorBody;
+    /**
+     * The body is over 256 KiB
+     */
+    413: unknown;
+    /**
+     * The endpoint stored 300 requests in the past hour; retry after a minute
+     */
+    429: ErrorBody;
+};
+
+export type WebhooksPublicCapturePatchError = WebhooksPublicCapturePatchErrors[keyof WebhooksPublicCapturePatchErrors];
+
+export type WebhooksPublicCapturePatchResponses = {
+    /**
+     * Stored
+     */
+    200: Captured;
+};
+
+export type WebhooksPublicCapturePatchResponse = WebhooksPublicCapturePatchResponses[keyof WebhooksPublicCapturePatchResponses];
+
+export type WebhooksPublicCapturePostData = {
+    /**
+     * Any body
+     */
+    body: string;
+    path: {
+        /**
+         * The endpoint ID
+         */
+        endpoint_id: string;
+    };
+    query?: never;
+    url: '/m/webhooks/public/{endpoint_id}';
+};
+
+export type WebhooksPublicCapturePostErrors = {
+    /**
+     * No enabled endpoint has this ID
+     */
+    404: ErrorBody;
+    /**
+     * The body is over 256 KiB
+     */
+    413: unknown;
+    /**
+     * The endpoint stored 300 requests in the past hour; retry after a minute
+     */
+    429: ErrorBody;
+};
+
+export type WebhooksPublicCapturePostError = WebhooksPublicCapturePostErrors[keyof WebhooksPublicCapturePostErrors];
+
+export type WebhooksPublicCapturePostResponses = {
+    /**
+     * Stored
+     */
+    200: Captured;
+};
+
+export type WebhooksPublicCapturePostResponse = WebhooksPublicCapturePostResponses[keyof WebhooksPublicCapturePostResponses];
+
+export type WebhooksPublicCapturePutData = {
+    /**
+     * Any body
+     */
+    body: string;
+    path: {
+        /**
+         * The endpoint ID
+         */
+        endpoint_id: string;
+    };
+    query?: never;
+    url: '/m/webhooks/public/{endpoint_id}';
+};
+
+export type WebhooksPublicCapturePutErrors = {
+    /**
+     * No enabled endpoint has this ID
+     */
+    404: ErrorBody;
+    /**
+     * The body is over 256 KiB
+     */
+    413: unknown;
+    /**
+     * The endpoint stored 300 requests in the past hour; retry after a minute
+     */
+    429: ErrorBody;
+};
+
+export type WebhooksPublicCapturePutError = WebhooksPublicCapturePutErrors[keyof WebhooksPublicCapturePutErrors];
+
+export type WebhooksPublicCapturePutResponses = {
+    /**
+     * Stored
+     */
+    200: Captured;
+};
+
+export type WebhooksPublicCapturePutResponse = WebhooksPublicCapturePutResponses[keyof WebhooksPublicCapturePutResponses];

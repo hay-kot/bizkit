@@ -111,6 +111,7 @@ struct Canned {
 pub struct FakeHttp {
     canned: Arc<Mutex<Vec<Canned>>>,
     requests: Arc<Mutex<Vec<(Method, String, Bytes)>>>,
+    headers: Arc<Mutex<Vec<HeaderMap>>>,
 }
 
 impl FakeHttp {
@@ -137,6 +138,12 @@ impl FakeHttp {
     pub fn requests(&self) -> Vec<(Method, String, Bytes)> {
         lock(&self.requests).clone()
     }
+
+    /// The headers of every request so far, in the order of [`Self::requests`].
+    #[must_use]
+    pub fn request_headers(&self) -> Vec<HeaderMap> {
+        lock(&self.headers).clone()
+    }
 }
 
 #[async_trait]
@@ -144,6 +151,7 @@ impl HttpClient for FakeHttp {
     async fn send(&self, req: http::Request<Bytes>) -> anyhow::Result<http::Response<Bytes>> {
         let url = req.uri().to_string();
         lock(&self.requests).push((req.method().clone(), url.clone(), req.body().clone()));
+        lock(&self.headers).push(req.headers().clone());
         let canned = lock(&self.canned)
             .iter()
             .rev()

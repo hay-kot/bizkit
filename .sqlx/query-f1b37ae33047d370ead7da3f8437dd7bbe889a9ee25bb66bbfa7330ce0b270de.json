@@ -1,0 +1,124 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT e.id AS \"id: EndpointId\", e.workspace_id AS \"workspace_id: WorkspaceId\",\n                  e.project_id AS \"project_id: ProjectId\", e.name, e.enabled AS \"enabled: bool\",\n                  e.forward_url, e.created_at AS \"created_at: UnixMillis\",\n                  e.updated_at AS \"updated_at: UnixMillis\",\n                  (SELECT COUNT(*) FROM webhook_requests r\n                   WHERE r.workspace_id = e.workspace_id AND r.endpoint_id = e.id)\n                    AS \"request_count!: i64\",\n                  (SELECT MAX(r.received_at) FROM webhook_requests r\n                   WHERE r.workspace_id = e.workspace_id AND r.endpoint_id = e.id)\n                    AS \"last_received_at: UnixMillis\"\n           FROM webhook_endpoints e\n           WHERE e.workspace_id = ? AND (?2 IS NULL OR e.project_id = ?2)\n           ORDER BY e.name, e.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: EndpointId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "forward_url",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "forward_url"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "request_count!: i64",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "last_received_at: UnixMillis",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f1b37ae33047d370ead7da3f8437dd7bbe889a9ee25bb66bbfa7330ce0b270de"
+}

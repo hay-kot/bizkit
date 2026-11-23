@@ -100,6 +100,20 @@ pub fn check_name(errors: &mut FieldErrors, field: &str, name: &str) {
     }
 }
 
+/// Deserializes a field that tells an explicit `null` (`Some(None)`) from
+/// an absent one (`None`). Use with `#[serde(default, deserialize_with = "present")]`
+/// on an `Option<Option<T>>` update field.
+///
+/// # Errors
+///
+/// When the value doesn't deserialize as `T` or null.
+#[expect(clippy::option_option, reason = "absent keeps the value, null removes it")]
+pub fn present<'de, D: serde::Deserializer<'de>, T: serde::Deserialize<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<T>>, D::Error> {
+    <Option<T> as serde::Deserialize>::deserialize(deserializer).map(Some)
+}
+
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;

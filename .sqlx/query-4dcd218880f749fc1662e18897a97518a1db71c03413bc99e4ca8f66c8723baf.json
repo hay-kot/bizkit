@@ -1,0 +1,93 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: RequestId\", method, query, content_type,\n                  LENGTH(body) AS \"size!: i64\", delivery, received_at AS \"received_at: UnixMillis\"\n           FROM webhook_requests\n           WHERE workspace_id = ?1 AND endpoint_id = ?2 AND (?3 IS NULL OR id < ?3)\n           ORDER BY id DESC LIMIT ?4",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: RequestId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "method",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "method"
+          }
+        }
+      },
+      {
+        "name": "query",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "query"
+          }
+        }
+      },
+      {
+        "name": "content_type",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "content_type"
+          }
+        }
+      },
+      {
+        "name": "size!: i64",
+        "ordinal": 4,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "delivery",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "delivery"
+          }
+        }
+      },
+      {
+        "name": "received_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_requests",
+            "name": "received_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      null,
+      true,
+      false
+    ]
+  },
+  "hash": "4dcd218880f749fc1662e18897a97518a1db71c03413bc99e4ca8f66c8723baf"
+}

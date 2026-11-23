@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO webhook_requests (id, workspace_id, endpoint_id, method, query, headers,\n                                       content_type, body, delivery, received_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "a927f9af9c451265e0b8bf3f16fd9e9f52e49ad74b3d8f77c7d4e3729b05ff5f"
+}
