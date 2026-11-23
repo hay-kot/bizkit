@@ -49,3 +49,10 @@ Workspace settings.
 - **Destructive actions.** Always confirm with `runAction({ confirm })` and name the thing. Never a primary-colored destructive button outside the confirm dialog. On detail pages, Delete lives in the `DetailActions` menu.
 - **Loading.** Skeletons on first load (`SkeletonRows`, `DataTable` handles its own), `SubmitButton`'s `pending` while saving.
 - **Grids.** A page that needs a grid (the workspace cards on Home) puts it in a component, so the page itself stays one column.
+
+## Command palette
+
+- Cmd/Ctrl+K, or Search at the top of the sidebar, opens it anywhere in a workspace. Everything a user can reach from the sidebar or a list page should also be a palette row.
+- A row's title is the thing itself ("Contact", "New form"). The palette draws `Forms ›` in front of it in search results, and uses the group as a section header on the empty view, so titles never repeat their container.
+- Scopes filter the one list: All, Go to (`@`) for pages and objects, Actions (`>`) for things that do something. Tab cycles them.
+- A "New ..." row opens the list page with its create panel (`?new=1`). Create forms stay on their pages, not in the palette.

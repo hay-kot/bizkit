@@ -1,6 +1,8 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
 
+import type { PaletteSource } from '@/palette/types'
+
 /**
  * Where a sidebar entry sits. `project` entries are the selected project's
  * content and render under the project switcher; `workspace` entries are
@@ -58,6 +60,11 @@ export interface WebModule {
   nav: NavItem[]
   /** Blocks for other modules' entity pages. */
   entitySections?: EntitySection[]
+  /**
+   * Command palette rows: the module's objects (`scope: 'goto'`) and
+   * actions. Nav items become palette rows on their own.
+   */
+  palette?: PaletteSource
 }
 
 /** Typed identity, so module files get checked against `WebModule`. */

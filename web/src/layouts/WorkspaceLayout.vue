@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { FolderX, Menu as MenuIcon, X } from 'lucide-vue-next'
+import { onKeyStroke } from '@vueuse/core'
+import { FolderX, Menu as MenuIcon, Search, X } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import PaletteRows from '@/components/PaletteRows.vue'
 import ProjectSwitcher from '@/components/ProjectSwitcher.vue'
 import SidebarLink from '@/components/SidebarLink.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
+import CommandPalette from '@/components/ui/CommandPalette.vue'
 import { useCurrentProject } from '@/composables/useCurrentProject'
 import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
 import { useIsAdmin } from '@/composables/useIsAdmin'
+import { closePalette, openPalette, paletteOpen } from '@/palette/state'
 import { useWorkspace } from '@/queries/workspaces'
 
 const props = defineProps<{ workspaceId: string }>()
@@ -28,6 +32,20 @@ const {
   error: projectsError,
 } = useCurrentProject(() => props.workspaceId)
 const mobileOpen = ref(false)
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+
+onKeyStroke(
+  // Chrome autofill sends keydown events without a `key`.
+  (event) =>
+    typeof event.key === 'string' &&
+    event.key.toLowerCase() === 'k' &&
+    (event.metaKey || event.ctrlKey),
+  (event) => {
+    event.preventDefault()
+    if (paletteOpen.value) closePalette()
+    else openPalette()
+  },
+)
 watch(
   () => route.fullPath,
   () => (mobileOpen.value = false),
@@ -70,6 +88,19 @@ watch(
             @click="mobileOpen = false"
           >
             <X class="size-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div class="px-2 pt-2">
+          <button
+            type="button"
+            class="flex w-full items-center gap-2.5 rounded-field border border-base-300 bg-base-100 px-2.5 py-1.5 text-sm text-base-content/70 transition-colors hover:bg-base-300"
+            aria-keyshortcuts="Meta+K Control+K"
+            data-testid="open-palette"
+            @click="openPalette()"
+          >
+            <Search class="size-4 shrink-0" aria-hidden="true" />
+            <span class="flex-1 text-left">Search…</span>
+            <kbd class="font-sans text-xs">{{ isMac ? '⌘K' : 'Ctrl K' }}</kbd>
           </button>
         </div>
         <nav class="flex-1 overflow-y-auto p-2" aria-label="Project">
@@ -149,5 +180,14 @@ watch(
         </div>
       </main>
     </div>
+    <PaletteRows
+      :key="`${workspaceId}:${project?.id}:${isAdmin}`"
+      :workspace-id="workspaceId"
+      :project-id="project?.id"
+      :project-name="project?.name ?? ''"
+      :workspace-name="workspace?.name ?? 'Workspace'"
+      :is-admin="isAdmin"
+    />
+    <CommandPalette />
   </div>
 </template>

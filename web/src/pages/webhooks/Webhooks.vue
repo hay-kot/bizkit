@@ -9,6 +9,7 @@ import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatRelative } from '@/lib/format'
 import { useCreateEndpoint, useEndpoints } from '@/queries/webhooks'
 
@@ -24,6 +25,7 @@ const {
 )
 const create = useCreateEndpoint()
 const panelOpen = ref(false)
+useCreateIntent(openPanel)
 const name = ref('')
 const forwardUrl = ref('')
 const columns = [

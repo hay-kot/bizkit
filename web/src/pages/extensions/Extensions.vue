@@ -9,6 +9,7 @@ import FormPanel from '@/components/ui/FormPanel.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
+import { useCreateIntent } from '@/composables/useCreateIntent'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
@@ -101,6 +102,7 @@ const secretColumns = [
 ]
 
 const panelOpen = ref(false)
+useCreateIntent(() => (panelOpen.value = true))
 
 function scriptPath(scriptId: string) {
   return `/w/${props.workspaceId}/p/${props.projectId}/extensions/${scriptId}`

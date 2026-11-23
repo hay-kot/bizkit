@@ -7,6 +7,7 @@ import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useCreateIntent } from '@/composables/useCreateIntent'
 import { useSlugFromName } from '@/composables/useSlugFromName'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
@@ -20,6 +21,7 @@ const create = useCreateProject()
 const remove = useDeleteProject()
 const form = useSlugFromName()
 const panelOpen = ref(false)
+useCreateIntent(openPanel)
 const columns = [
   { key: 'name', label: 'Name' },
   { key: 'slug', label: 'Slug' },
