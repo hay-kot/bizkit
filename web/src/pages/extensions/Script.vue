@@ -31,7 +31,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { runAction } from '@/lib/action'
 import { errorMessage } from '@/lib/errors'
-import { formatDate } from '@/lib/format'
+import { formatDateTime, formatRelative } from '@/lib/format'
 import type { Run, RunStatus, TestCase, TestOutcome, TestResult } from '@/queries/extensions'
 import {
   useDeleteScript,
@@ -515,9 +515,10 @@ function summaryOf(run: Run): string {
           <button
             type="button"
             class="link text-sm whitespace-nowrap link-hover"
+            :title="formatDateTime(row.created_at)"
             @click="viewing = row"
           >
-            {{ formatDate(row.created_at) }}
+            {{ formatRelative(row.created_at) }}
           </button>
         </template>
         <template #cell-cause="{ row }">
@@ -542,7 +543,7 @@ function summaryOf(run: Run): string {
 
       <DetailPanel
         :open="viewing !== null"
-        :title="viewing ? `Run ${formatDate(viewing.created_at)}` : ''"
+        :title="viewing ? `Run ${formatDateTime(viewing.created_at)}` : ''"
         @close="viewing = null"
       >
         <template v-if="viewing">

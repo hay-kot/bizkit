@@ -49,8 +49,11 @@ watch(
         @click="mobileOpen = false"
       ></div>
     </Transition>
+    <!-- The column paints the sidebar's background down the whole page; the
+    sticky aside inside it stays in view while the content scrolls. -->
+    <div class="contents lg:block lg:w-64 lg:shrink-0 lg:border-r lg:border-base-300 lg:bg-base-200">
     <aside
-      class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-base-300 bg-base-200 transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0"
+      class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-base-300 bg-base-200 transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:border-r-0"
       :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
       aria-label="Workspace"
     >
@@ -96,6 +99,7 @@ watch(
       </nav>
       <div class="border-t border-base-300 p-2"><UserMenu placement="above" /></div>
     </aside>
+    </div>
 
     <div class="flex min-w-0 flex-1 flex-col">
       <header class="flex h-14 items-center gap-2 border-b border-base-300 px-4 lg:hidden">

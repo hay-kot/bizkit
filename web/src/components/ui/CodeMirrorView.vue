@@ -38,7 +38,10 @@ const LINE_HEIGHT_EM = 1.5
 
 function theme() {
   return EditorView.theme({
+    // Long lines scroll sideways in both editors rather than wrap: code and
+    // JSON keep their shape, and the editor never grows past its container.
     '&': {
+      maxWidth: '100%',
       backgroundColor: 'var(--color-base-100)',
       color: 'var(--color-base-content)',
       border: 'var(--border) solid var(--color-base-300)',
@@ -106,5 +109,5 @@ onBeforeUnmount(() => view?.destroy())
 </script>
 
 <template>
-  <div ref="host" class="font-mono text-xs"></div>
+  <div ref="host" class="min-w-0 font-mono text-xs"></div>
 </template>
