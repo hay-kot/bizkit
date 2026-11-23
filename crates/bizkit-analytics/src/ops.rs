@@ -21,7 +21,7 @@ const ADMIN: Access = Access::Workspace(Scope::new("analytics", Level::Admin));
 const TAGS: &[&str] = &["analytics"];
 /// Allowed hostnames per site.
 pub const MAX_HOSTNAMES: usize = 20;
-const SITE_KEY_LEN: usize = 24;
+pub(crate) const SITE_KEY_LEN: usize = 24;
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>, ingest: &Arc<Ingest>) -> anyhow::Result<()> {
     cx.scope_area("analytics", "Web analytics and product events")?;

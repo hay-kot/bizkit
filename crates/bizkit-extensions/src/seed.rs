@@ -71,6 +71,24 @@ export default function (input, ctx) {
 }
 ";
 
+const WELCOME_SIGNUPS: &str = r"// Emails the team about each new signup. Visitors who never called
+// identify have no person, so the script skips them.
+export default function (input, ctx) {
+  const { goal, event, person } = input
+  if (!person) {
+    ctx.log(`Anonymous ${goal.name} conversion on ${event.path ?? event.name}`)
+    return { sent: 0 }
+  }
+  const who = person.traits.email ?? person.user_id
+  ctx.mail.send({
+    to: 'demo@bizkit.test',
+    subject: `New ${goal.name}: ${who}`.slice(0, 200),
+    text: `${who} reached ${goal.name} (plan: ${event.props.plan ?? 'unknown'}).`,
+  })
+  return { sent: 1 }
+}
+";
+
 fn case(name: &str, input: serde_json::Value, expect: Option<serde_json::Value>) -> TestCase {
     TestCase { name: name.to_owned(), input, expect }
 }
@@ -117,6 +135,29 @@ fn stripe_tests() -> Vec<TestCase> {
     vec![case("Logs the event type", input, Some(json!({ "type": "payment_intent.succeeded" })))]
 }
 
+fn signup_tests() -> Vec<TestCase> {
+    let input = |person: serde_json::Value| {
+        json!({
+            "goal": { "id": "0190a5f0-0000-7000-8000-000000000006", "name": "Signup" },
+            "event": { "name": "signup_completed", "path": "/signup", "props": { "plan": "pro" },
+                       "ts": "2026-01-01T00:00:00Z" },
+            "person": person,
+        })
+    };
+    vec![
+        case(
+            "Emails a known person",
+            input(json!({ "user_id": "user_1", "traits": { "email": "ada@example.com" } })),
+            Some(json!({ "sent": 1 })),
+        ),
+        case(
+            "Skips anonymous visitors",
+            input(serde_json::Value::Null),
+            Some(json!({ "sent": 0 })),
+        ),
+    ]
+}
+
 fn casino_tests() -> Vec<TestCase> {
     let fields = |message: &str| json!({ "form": form(), "fields": { "email": ["ada@example.com"], "message": [message] } });
     vec![
@@ -137,13 +178,15 @@ fn casino_tests() -> Vec<TestCase> {
 /// "Block casino spam" (before validation, for the Contact form when the
 /// forms seed made one), "Email new leads" (after each Contact
 /// submission) and "Log Stripe events" (for the Stripe endpoint,
-/// only when the webhooks seed made one) in the `website` project. A script
+/// only when the webhooks seed made one) and "Welcome new signups" (for the
+/// Signup goal, only when the analytics seed made one) in the `website` project. A script
 /// that already exists by name is left alone, and so is a sync point whose
 /// slot another script holds.
 pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let contact = seed.entities.get(&("forms.form".to_owned(), "Contact".to_owned()));
     let stripe = seed.entities.get(&("webhooks.endpoint".to_owned(), "Stripe".to_owned()));
+    let signup = seed.entities.get(&("analytics.goal".to_owned(), "Signup".to_owned()));
     let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id))
         .await
         .context("listing the demo scripts")?;
@@ -166,13 +209,23 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             stripe,
             stripe_tests(),
         ),
+        (
+            "Welcome new signups",
+            "analytics.goal_converted",
+            false,
+            WELCOME_SIGNUPS,
+            signup,
+            signup_tests(),
+        ),
     ];
     let mut tx = db.write().await.context("starting the seed transaction")?;
     for (name, hook, sync, source, target, tests) in scripts {
-        // Without the endpoint, or the Contact form for the leads mail, the
-        // script would run for nothing, or for every form.
-        let missing_target =
-            (hook.starts_with("webhooks.") || name == "Email new leads") && target.is_none();
+        // Without the endpoint, the goal, or the Contact form for the leads
+        // mail, the script would run for nothing, or for every form.
+        let missing_target = (hook.starts_with("webhooks.")
+            || hook.starts_with("analytics.")
+            || name == "Email new leads")
+            && target.is_none();
         if missing_target || existing.iter().any(|script| script.name == name) {
             continue;
         }

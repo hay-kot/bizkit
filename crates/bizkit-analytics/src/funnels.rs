@@ -253,15 +253,15 @@ impl Validate for FunnelRange {
 // ---------------------------------------------------------------- store
 
 #[derive(Debug, Clone)]
-struct FunnelRow {
-    id: FunnelId,
-    workspace_id: WorkspaceId,
-    project_id: ProjectId,
-    name: String,
-    steps: String,
-    window_days: i64,
-    created_at: UnixMillis,
-    updated_at: UnixMillis,
+pub(crate) struct FunnelRow {
+    pub(crate) id: FunnelId,
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) project_id: ProjectId,
+    pub(crate) name: String,
+    pub(crate) steps: String,
+    pub(crate) window_days: i64,
+    pub(crate) created_at: UnixMillis,
+    pub(crate) updated_at: UnixMillis,
 }
 
 fn to_api(row: FunnelRow) -> Result<Funnel, ApiError> {
@@ -296,7 +296,7 @@ async fn find(
     .ok_or(ApiError::NotFound)
 }
 
-async fn save(exec: impl SqliteExecutor<'_>, row: &FunnelRow) -> sqlx::Result<()> {
+pub(crate) async fn save(exec: impl SqliteExecutor<'_>, row: &FunnelRow) -> sqlx::Result<()> {
     sqlx::query!(
         "INSERT INTO analytics_funnels (id, workspace_id, project_id, name, steps, window_days, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)

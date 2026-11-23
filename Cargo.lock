@@ -359,6 +359,7 @@ dependencies = [
  "bizkit-core",
  "bizkit-testkit",
  "bolero",
+ "futures",
  "http",
  "maxminddb",
  "rand 0.10.4",

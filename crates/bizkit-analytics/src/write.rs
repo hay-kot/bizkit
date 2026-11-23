@@ -228,7 +228,7 @@ async fn insert(
     Ok(())
 }
 
-fn converts(goal: &store::GoalRow, row: &EventRow) -> bool {
+pub(crate) fn converts(goal: &store::GoalRow, row: &EventRow) -> bool {
     match goal.kind.as_str() {
         "page" => row.name == crate::beacon::PAGEVIEW && row.path.as_deref() == Some(&goal.matches),
         _ => row.name == goal.matches,

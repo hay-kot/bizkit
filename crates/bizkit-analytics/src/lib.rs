@@ -16,6 +16,8 @@ mod ops;
 mod people;
 mod report;
 mod rollup;
+#[cfg(feature = "test-hooks")]
+mod seed;
 mod server;
 mod stats;
 mod store;
@@ -25,7 +27,11 @@ mod write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[cfg(feature = "test-hooks")]
+use bizkit_core::DemoSeed;
 use bizkit_core::{Module, ModuleContext};
+#[cfg(feature = "test-hooks")]
+use futures::future::BoxFuture;
 use serde::Deserialize;
 use utoipa::OpenApi as _;
 
@@ -73,5 +79,14 @@ impl Module for Analytics {
         cx.hook_target_kind(&hooks::GOAL, hooks::GoalTargets)?;
         cx.async_hook::<hooks::GoalConverted, _>(hooks::GOAL_CONVERTED, hooks::GoalHookSource)?;
         cx.public_routes(ingest::router(ingest), ingest::IngestDocs::openapi())
+    }
+
+    #[cfg(feature = "test-hooks")]
+    fn seed_demo<'a>(
+        &'a self,
+        db: &'a bizkit_core::db::Db,
+        seed: &'a mut DemoSeed,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(seed::seed(db, seed))
     }
 }
