@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 use bizkit_core::hooks::RunStatus;
 use tokio::sync::oneshot;
 
-pub use self::fetch::{FETCH_TIMEOUT, FetchBridge, MAX_FETCHES};
+pub use self::fetch::{FETCH_TIMEOUT, FetchBridge, MAX_FETCHES, MAX_RESPONSE_BYTES};
 
 /// The OS stack of each sandbox thread. QuickJS checks its own, smaller JS
 /// stack limit first.

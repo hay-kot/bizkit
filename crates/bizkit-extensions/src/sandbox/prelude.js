@@ -233,8 +233,29 @@
 
   const ctx = { log };
   if (host.fetch !== undefined) {
+    // Turns the json and form options into a body and a default
+    // content-type, so the host only ever sees a string body.
+    const request = (init) => {
+      const { json, form, ...rest } = init ?? {};
+      const given = [rest.body, json, form].filter((value) => value !== undefined).length;
+      if (given > 1) throw new TypeError('fetch takes one of body, json and form');
+      const headers = Object.fromEntries(
+        Object.entries(rest.headers ?? {}).map(([name, value]) => [name.toLowerCase(), String(value)]),
+      );
+      let body = rest.body === undefined ? undefined : String(rest.body);
+      let type;
+      if (json !== undefined) {
+        body = JSON.stringify(json);
+        type = 'application/json';
+      } else if (form !== undefined) {
+        body = new URLSearchParams(form).toString();
+        type = 'application/x-www-form-urlencoded';
+      }
+      if (type !== undefined && headers['content-type'] === undefined) headers['content-type'] = type;
+      return { method: rest.method, headers, body, timeoutMs: rest.timeoutMs };
+    };
     ctx.fetch = async (url, init) => {
-      const reply = JSON.parse(host.fetch(String(url), JSON.stringify(init ?? {})));
+      const reply = JSON.parse(host.fetch(String(url), JSON.stringify(request(init))));
       if (reply.error !== undefined) throw new Error(reply.error);
       const body = reply.body;
       return Object.freeze({

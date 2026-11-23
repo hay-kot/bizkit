@@ -329,6 +329,47 @@ async fn fetch_refuses_private_addresses_and_counts_calls() {
     assert_eq!(http.requests().len(), 2, "blocked fetches never reached the client");
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn fetch_encodes_json_and_form_bodies_and_caps_responses() {
+    let http = FakeHttp::default();
+    http.respond(Method::POST, "https://api.example.com/json", StatusCode::CREATED, "{}");
+    http.respond(Method::POST, "https://api.example.com/form", StatusCode::OK, "");
+    http.respond(
+        Method::GET,
+        "https://api.example.com/big",
+        StatusCode::OK,
+        "x".repeat(MAX_RESPONSE_BYTES + 1),
+    );
+    let mut req = request(
+        "export default async (input, ctx) => { const out = []; out.push((await ctx.fetch('https://api.example.com/json', { method: 'POST', json: { who: input.name } })).status); out.push((await ctx.fetch('https://api.example.com/form', { method: 'POST', headers: { 'Content-Type': 'text/x-custom' }, form: { a: '1 2' } })).ok); for (const init of [{ body: 'x', json: {} }, { timeoutMs: 0 }, {}]) { try { await ctx.fetch('https://api.example.com/big', init); out.push('ok') } catch (e) { out.push(e.message) } } return out }",
+    );
+    req.budget = Duration::from_secs(2);
+    req.hard = Duration::from_secs(3);
+    req.fetch = Some(FetchBridge::new(
+        Arc::new(http.clone()),
+        tokio::runtime::Handle::current(),
+        Instant::now() + req.budget,
+    ));
+    let report = pool(1, LIMITS).run(req).await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            201,
+            true,
+            "fetch takes one of body, json and form",
+            "GET api.example.com: timeoutMs must be above 0",
+            "GET api.example.com: the response body is over 256 KiB",
+        ])),
+        "{report:?}"
+    );
+    let requests = http.requests();
+    assert_eq!(requests[0].2, r#"{"who":"Ada"}"#, "json body");
+    assert_eq!(requests[1].2, "a=1+2", "form body");
+    let headers = http.request_headers();
+    assert_eq!(headers[0]["content-type"], "application/json", "json content type");
+    assert_eq!(headers[1]["content-type"], "text/x-custom", "a given content type wins");
+}
+
 #[tokio::test]
 #[ignore = "measures the overrun; run with --ignored --nocapture"]
 async fn measure_native_overrun() {
