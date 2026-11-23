@@ -11,7 +11,10 @@ mod ingest;
 pub mod limit;
 pub mod names;
 mod ops;
+mod report;
+mod rollup;
 mod server;
+mod stats;
 mod store;
 pub mod ua;
 mod write;
@@ -54,7 +57,13 @@ impl Module for Analytics {
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
         let config: AnalyticsConfig = cx.config()?;
         let ingest = Arc::new(ingest::Ingest::new(geo::Geo::new(config.geoip_path)));
+        let retention_days = config
+            .raw_retention_days
+            .unwrap_or(rollup::DEFAULT_RETENTION_DAYS)
+            .max(rollup::MIN_RETENTION_DAYS);
+        cx.job::<rollup::Rollup, _>(rollup::RollupHandler { retention_days })?;
         ops::register(cx, &ingest)?;
+        stats::register(cx)?;
         cx.public_routes(ingest::router(ingest), ingest::IngestDocs::openapi())
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_conversions WHERE day < ? AND goal_id IN (\n           SELECT id FROM analytics_goals WHERE workspace_id = ? AND project_id = ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "79cd9dd77e924f925633697bcc75248bde92d5180e80318e1d09d5221aa8e85e"
+}

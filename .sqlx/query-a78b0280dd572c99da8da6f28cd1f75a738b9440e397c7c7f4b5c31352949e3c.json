@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_daily WHERE workspace_id = ? AND project_id = ? AND day = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "a78b0280dd572c99da8da6f28cd1f75a738b9440e397c7c7f4b5c31352949e3c"
+}

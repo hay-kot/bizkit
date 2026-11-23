@@ -1623,6 +1623,273 @@
         "x-bizkit-scope": "analytics:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/analytics/stats/breakdown": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Rank pages, sources, countries, devices, events or goals over a date range",
+        "operationId": "analytics.stats.breakdown",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "dimension",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Dimension",
+              "description": "What to group by."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day, UTC."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The most rows, 1 to 1000; default 10.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day, UTC, inclusive. At most 400 days after `from`."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Breakdown"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/stats/summary": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Count visitors, pageviews, custom events and conversions over a date range",
+        "operationId": "analytics.stats.summary",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "compare",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also count the previous period of the same length."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day, UTC."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day, UTC, inclusive. At most 400 days after `from`."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/api-keys": {
       "get": {
         "tags": [
@@ -7362,6 +7629,72 @@
           "challenge"
         ]
       },
+      "Breakdown": {
+        "type": "object",
+        "description": "A breakdown, most visitors first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BreakdownRow"
+            },
+            "description": "The rows."
+          }
+        }
+      },
+      "BreakdownRow": {
+        "type": "object",
+        "description": "One row of a breakdown.",
+        "required": [
+          "value",
+          "visitors",
+          "pageviews",
+          "events"
+        ],
+        "properties": {
+          "conversion_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Conversions over unique visitors in the range, 0 to 1, for the goal\ndimension."
+          },
+          "events": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Custom events."
+          },
+          "goal_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoalId",
+                "description": "The goal, for the goal dimension."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pageviews": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pageviews."
+          },
+          "value": {
+            "type": "string",
+            "description": "The page, source, country, event name or goal name. Empty means\ndirect traffic or unknown."
+          },
+          "visitors": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unique visitors, summed per day. For goals, the conversions."
+          }
+        }
+      },
       "Capability": {
         "type": "string",
         "description": "What a script on a hook point can use besides plain JavaScript.",
@@ -7472,6 +7805,10 @@
           }
         }
       },
+      "Day": {
+        "type": "string",
+        "format": "date"
+      },
       "Delivery": {
         "type": "object",
         "description": "The latest time a request went to a URL, by forward or replay.",
@@ -7512,6 +7849,23 @@
             "description": "Where it went."
           }
         }
+      },
+      "Dimension": {
+        "type": "string",
+        "description": "What a breakdown groups by.",
+        "enum": [
+          "page",
+          "referrer",
+          "utm_source",
+          "utm_medium",
+          "utm_campaign",
+          "country",
+          "device",
+          "browser",
+          "os",
+          "event",
+          "goal"
+        ]
       },
       "Endpoint": {
         "type": "object",
@@ -8077,6 +8431,14 @@
             "minimum": 0
           }
         }
+      },
+      "Interval": {
+        "type": "string",
+        "description": "How long one chart point covers.",
+        "enum": [
+          "hour",
+          "day"
+        ]
       },
       "Invitation": {
         "type": "object",
@@ -8822,6 +9184,31 @@
           }
         }
       },
+      "SeriesPoint": {
+        "type": "object",
+        "description": "One chart point.",
+        "required": [
+          "start",
+          "visitors",
+          "pageviews"
+        ],
+        "properties": {
+          "pageviews": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pageviews."
+          },
+          "start": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the hour or day starts."
+          },
+          "visitors": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unique visitors."
+          }
+        }
+      },
       "ServerEvent": {
         "type": "object",
         "description": "One event from a server.",
@@ -9065,6 +9452,53 @@
           "spam"
         ]
       },
+      "Summary": {
+        "type": "object",
+        "description": "The Overview's tiles and chart.",
+        "required": [
+          "totals",
+          "interval",
+          "series"
+        ],
+        "properties": {
+          "interval": {
+            "$ref": "#/components/schemas/Interval",
+            "description": "What one chart point covers: hours for a one-day range, else days."
+          },
+          "previous": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Totals",
+                "description": "Counts for the previous period of the same length, when asked."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_series": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SeriesPoint"
+            },
+            "description": "The same for the previous period, when asked."
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeriesPoint"
+            },
+            "description": "Visitors and pageviews over the range, one point per interval."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals",
+            "description": "Counts for the range."
+          }
+        }
+      },
       "TargetEntity": {
         "type": "object",
         "description": "An entity scripts can target.",
@@ -9195,6 +9629,38 @@
       "Timestamp": {
         "type": "string",
         "format": "date-time"
+      },
+      "Totals": {
+        "type": "object",
+        "description": "Counts over a date range. Visitors are summed over days, because the\nvisitor hash changes every day.",
+        "required": [
+          "visitors",
+          "pageviews",
+          "events",
+          "conversions"
+        ],
+        "properties": {
+          "conversions": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Goal conversions: unique visitors per day who reached a goal, over\nevery goal."
+          },
+          "events": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Custom events."
+          },
+          "pageviews": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pageviews."
+          },
+          "visitors": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unique visitors, summed per day."
+          }
+        }
       },
       "UserId": {
         "type": "string",

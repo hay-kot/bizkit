@@ -1,0 +1,40 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT day, COUNT(DISTINCT visitor) AS \"visitors!: i64\",\n                      SUM(name = 'pageview') AS \"pageviews!: i64\"\n               FROM analytics_events\n               WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n               GROUP BY day",
+  "describe": {
+    "columns": [
+      {
+        "name": "day",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "day"
+          }
+        }
+      },
+      {
+        "name": "visitors!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "pageviews!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7928cd9aa0a7e455f1c9de0487d229d7ad92170d73aa19f23cc5cc1b99cd7a08"
+}

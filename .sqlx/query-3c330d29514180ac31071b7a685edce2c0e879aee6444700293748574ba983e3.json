@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_events WHERE id IN (\n           SELECT id FROM analytics_events\n           WHERE workspace_id = ? AND project_id = ? AND day < ? LIMIT ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "3c330d29514180ac31071b7a685edce2c0e879aee6444700293748574ba983e3"
+}

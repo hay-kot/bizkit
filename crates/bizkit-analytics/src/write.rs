@@ -6,6 +6,7 @@
 use anyhow::Context as _;
 use bizkit_core::Platform;
 use bizkit_core::db::WriteTx;
+use bizkit_core::jobs::Enqueue;
 use bizkit_core::time::UnixMillis;
 use serde_json::{Map, Value};
 
@@ -14,6 +15,7 @@ use crate::beacon::{MAX_PROPS, Name};
 use crate::cache::{CachedSite, Sites};
 use crate::enrich::Attribution;
 use crate::hooks::GoalConverted;
+use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow};
 use crate::ua::Agent;
 
@@ -70,6 +72,11 @@ pub(crate) async fn record(
     let advanced = site.row.last_event_day.as_deref() != Some(day.as_str())
         && store::advance_event_day(&mut *tx, site.row.workspace_id, site.row.project_id, &day)
             .await?;
+    if advanced {
+        let job = Rollup { workspace_id: site.row.workspace_id, project_id: site.row.project_id };
+        let opts = Enqueue { run_at: Some(now.plus(rollup::DELAY)) };
+        platform.bus().enqueue(&mut tx, &job, opts).await?;
+    }
     tx.commit().await?;
     if advanced {
         sites.clear();

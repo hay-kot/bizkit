@@ -397,3 +397,141 @@ pub(crate) async fn insert_conversion(
     .await?;
     Ok(result.rows_affected() == 1)
 }
+
+pub(crate) async fn delete_salts_before(
+    exec: impl SqliteExecutor<'_>,
+    day: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!("DELETE FROM analytics_salts WHERE day < ?", day).execute(exec).await?;
+    Ok(())
+}
+
+/// The earliest day with a raw event.
+pub(crate) async fn first_event_day(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+) -> sqlx::Result<Option<String>> {
+    sqlx::query_scalar!(
+        "SELECT min(day) FROM analytics_events WHERE workspace_id = ? AND project_id = ?",
+        workspace_id,
+        project_id,
+    )
+    .fetch_one(exec)
+    .await
+}
+
+pub(crate) async fn delete_daily(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    day: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM analytics_daily WHERE workspace_id = ? AND project_id = ? AND day = ?",
+        workspace_id,
+        project_id,
+        day,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Aggregates one day's raw events into `analytics_daily` rows for
+/// `dimension` (`total`, or a [`crate::api::Dimension`] the rollup stores).
+/// The value `CASE` matches the raw aggregate in `report`.
+pub(crate) async fn insert_daily(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    dimension: &str,
+    day: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO analytics_daily (workspace_id, project_id, dimension, day, value, visitors, pageviews, events)
+         SELECT ?, ?, ?, ?, value, COUNT(DISTINCT visitor), SUM(name = 'pageview'), SUM(name <> 'pageview')
+         FROM (
+           SELECT COALESCE(CASE ? WHEN 'page' THEN path WHEN 'referrer' THEN referrer_host
+                                  WHEN 'utm_source' THEN utm_source WHEN 'utm_medium' THEN utm_medium
+                                  WHEN 'utm_campaign' THEN utm_campaign WHEN 'country' THEN country
+                                  WHEN 'device' THEN device WHEN 'browser' THEN browser
+                                  WHEN 'os' THEN os WHEN 'event' THEN name END, '') AS value,
+                  visitor, name
+           FROM analytics_events
+           WHERE workspace_id = ? AND project_id = ? AND day = ?
+             AND CASE ? WHEN 'total' THEN 1 WHEN 'event' THEN name <> 'pageview' ELSE name = 'pageview' END)
+         GROUP BY value",
+        workspace_id,
+        project_id,
+        dimension,
+        day,
+        dimension,
+        workspace_id,
+        project_id,
+        day,
+        dimension,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn set_rolled_through(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    day: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE analytics_sites SET rolled_through = ?
+         WHERE workspace_id = ? AND project_id = ? AND (rolled_through IS NULL OR rolled_through < ?)",
+        day,
+        workspace_id,
+        project_id,
+        day,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Deletes up to `limit` raw events from days before `before`.
+pub(crate) async fn prune_events(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    before: &str,
+    limit: i64,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "DELETE FROM analytics_events WHERE id IN (
+           SELECT id FROM analytics_events
+           WHERE workspace_id = ? AND project_id = ? AND day < ? LIMIT ?)",
+        workspace_id,
+        project_id,
+        before,
+        limit,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+pub(crate) async fn prune_conversions(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    before: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM analytics_conversions WHERE day < ? AND goal_id IN (
+           SELECT id FROM analytics_goals WHERE workspace_id = ? AND project_id = ?)",
+        before,
+        workspace_id,
+        project_id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}

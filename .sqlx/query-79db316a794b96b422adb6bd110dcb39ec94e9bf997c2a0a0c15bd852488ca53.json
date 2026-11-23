@@ -1,0 +1,47 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT value, SUM(visitors) AS \"visitors!: i64\", SUM(pageviews) AS \"pageviews!: i64\",\n                      SUM(events) AS \"events!: i64\"\n               FROM analytics_daily\n               WHERE workspace_id = ? AND project_id = ? AND dimension = ? AND day >= ? AND day <= ?\n               GROUP BY value",
+  "describe": {
+    "columns": [
+      {
+        "name": "value",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_daily",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "name": "visitors!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "pageviews!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "events!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "79db316a794b96b422adb6bd110dcb39ec94e9bf997c2a0a0c15bd852488ca53"
+}

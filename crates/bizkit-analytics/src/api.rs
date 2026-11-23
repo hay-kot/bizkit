@@ -239,6 +239,146 @@ pub struct GoalList {
     pub items: Vec<Goal>,
 }
 
+/// What a breakdown groups by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Dimension {
+    /// Page path. Pageviews only.
+    Page,
+    /// The linking site; empty for direct traffic. Pageviews only.
+    Referrer,
+    /// `utm_source` (or `ref`). Pageviews only.
+    UtmSource,
+    /// `utm_medium`. Pageviews only.
+    UtmMedium,
+    /// `utm_campaign`. Pageviews only.
+    UtmCampaign,
+    /// ISO country code; empty when unknown. Pageviews only.
+    Country,
+    /// `desktop`, `mobile` or `tablet`. Pageviews only.
+    Device,
+    /// Browser family. Pageviews only.
+    Browser,
+    /// OS family. Pageviews only.
+    Os,
+    /// Custom event name. Custom events only.
+    Event,
+    /// Each goal, with conversions and conversion rate.
+    Goal,
+}
+
+impl Dimension {
+    /// Every dimension the daily rollup stores. Goals read the page and
+    /// event rows.
+    pub const ROLLED: [Self; 10] = [
+        Self::Page,
+        Self::Referrer,
+        Self::UtmSource,
+        Self::UtmMedium,
+        Self::UtmCampaign,
+        Self::Country,
+        Self::Device,
+        Self::Browser,
+        Self::Os,
+        Self::Event,
+    ];
+
+    /// The stored text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Page => "page",
+            Self::Referrer => "referrer",
+            Self::UtmSource => "utm_source",
+            Self::UtmMedium => "utm_medium",
+            Self::UtmCampaign => "utm_campaign",
+            Self::Country => "country",
+            Self::Device => "device",
+            Self::Browser => "browser",
+            Self::Os => "os",
+            Self::Event => "event",
+            Self::Goal => "goal",
+        }
+    }
+}
+
+/// Counts over a date range. Visitors are summed over days, because the
+/// visitor hash changes every day.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Totals {
+    /// Unique visitors, summed per day.
+    pub visitors: i64,
+    /// Pageviews.
+    pub pageviews: i64,
+    /// Custom events.
+    pub events: i64,
+    /// Goal conversions: unique visitors per day who reached a goal, over
+    /// every goal.
+    pub conversions: i64,
+}
+
+/// How long one chart point covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Interval {
+    /// One hour, for a one-day range.
+    Hour,
+    /// One UTC day.
+    Day,
+}
+
+/// One chart point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SeriesPoint {
+    /// When the hour or day starts.
+    pub start: UnixMillis,
+    /// Unique visitors.
+    pub visitors: i64,
+    /// Pageviews.
+    pub pageviews: i64,
+}
+
+/// The Overview's tiles and chart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Summary {
+    /// Counts for the range.
+    pub totals: Totals,
+    /// Counts for the previous period of the same length, when asked.
+    pub previous: Option<Totals>,
+    /// What one chart point covers: hours for a one-day range, else days.
+    pub interval: Interval,
+    /// Visitors and pageviews over the range, one point per interval.
+    pub series: Vec<SeriesPoint>,
+    /// The same for the previous period, when asked.
+    pub previous_series: Option<Vec<SeriesPoint>>,
+}
+
+/// One row of a breakdown.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct BreakdownRow {
+    /// The page, source, country, event name or goal name. Empty means
+    /// direct traffic or unknown.
+    pub value: String,
+    /// Unique visitors, summed per day. For goals, the conversions.
+    pub visitors: i64,
+    /// Pageviews.
+    pub pageviews: i64,
+    /// Custom events.
+    pub events: i64,
+    /// The goal, for the goal dimension.
+    pub goal_id: Option<GoalId>,
+    /// Conversions over unique visitors in the range, 0 to 1, for the goal
+    /// dimension.
+    pub conversion_rate: Option<f64>,
+}
+
+/// A breakdown, most visitors first.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Breakdown {
+    /// The rows.
+    pub items: Vec<BreakdownRow>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

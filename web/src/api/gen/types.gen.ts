@@ -96,6 +96,45 @@ export type BodyEncoding = 'utf8' | 'base64';
 export type BotCheck = 'honeypot' | 'challenge';
 
 /**
+ * A breakdown, most visitors first.
+ */
+export type Breakdown = {
+    /**
+     * The rows.
+     */
+    items: Array<BreakdownRow>;
+};
+
+/**
+ * One row of a breakdown.
+ */
+export type BreakdownRow = {
+    /**
+     * Conversions over unique visitors in the range, 0 to 1, for the goal
+     * dimension.
+     */
+    conversion_rate?: number | null;
+    /**
+     * Custom events.
+     */
+    events: number;
+    goal_id?: GoalId | null;
+    /**
+     * Pageviews.
+     */
+    pageviews: number;
+    /**
+     * The page, source, country, event name or goal name. Empty means
+     * direct traffic or unknown.
+     */
+    value: string;
+    /**
+     * Unique visitors, summed per day. For goals, the conversions.
+     */
+    visitors: number;
+};
+
+/**
  * What a script on a hook point can use besides plain JavaScript.
  */
 export type Capability = 'log' | 'secrets' | 'fetch' | 'mail';
@@ -170,6 +209,8 @@ export type CreatedApiKey = {
     token: string;
 };
 
+export type Day = string;
+
 /**
  * The latest time a request went to a URL, by forward or replay.
  */
@@ -195,6 +236,11 @@ export type Delivery = {
      */
     url: string;
 };
+
+/**
+ * What a breakdown groups by.
+ */
+export type Dimension = 'page' | 'referrer' | 'utm_source' | 'utm_medium' | 'utm_campaign' | 'country' | 'device' | 'browser' | 'os' | 'event' | 'goal';
 
 /**
  * A public URL that stores every request it gets.
@@ -552,6 +598,11 @@ export type Ingested = {
      */
     accepted: number;
 };
+
+/**
+ * How long one chart point covers.
+ */
+export type Interval = 'hour' | 'day';
 
 /**
  * An invitation to a workspace.
@@ -1053,6 +1104,24 @@ export type SecretList = {
 };
 
 /**
+ * One chart point.
+ */
+export type SeriesPoint = {
+    /**
+     * Pageviews.
+     */
+    pageviews: number;
+    /**
+     * When the hour or day starts.
+     */
+    start: Timestamp;
+    /**
+     * Unique visitors.
+     */
+    visitors: number;
+};
+
+/**
  * One event from a server.
  */
 export type ServerEvent = {
@@ -1220,6 +1289,29 @@ export type SubmissionList = {
 export type SubmissionStatus = 'inbox' | 'spam';
 
 /**
+ * The Overview's tiles and chart.
+ */
+export type Summary = {
+    /**
+     * What one chart point covers: hours for a one-day range, else days.
+     */
+    interval: Interval;
+    previous?: Totals | null;
+    /**
+     * The same for the previous period, when asked.
+     */
+    previous_series?: Array<SeriesPoint> | null;
+    /**
+     * Visitors and pageviews over the range, one point per interval.
+     */
+    series: Array<SeriesPoint>;
+    /**
+     * Counts for the range.
+     */
+    totals: Totals;
+};
+
+/**
  * An entity scripts can target.
  */
 export type TargetEntity = {
@@ -1296,6 +1388,30 @@ export type TestResult = {
 };
 
 export type Timestamp = string;
+
+/**
+ * Counts over a date range. Visitors are summed over days, because the
+ * visitor hash changes every day.
+ */
+export type Totals = {
+    /**
+     * Goal conversions: unique visitors per day who reached a goal, over
+     * every goal.
+     */
+    conversions: number;
+    /**
+     * Custom events.
+     */
+    events: number;
+    /**
+     * Pageviews.
+     */
+    pageviews: number;
+    /**
+     * Unique visitors, summed per day.
+     */
+    visitors: number;
+};
 
 export type UserId = string;
 
@@ -2196,6 +2312,136 @@ export type AnalyticsSiteCreateResponses = {
 };
 
 export type AnalyticsSiteCreateResponse = AnalyticsSiteCreateResponses[keyof AnalyticsSiteCreateResponses];
+
+export type AnalyticsStatsBreakdownData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * What to group by.
+         */
+        dimension: Dimension;
+        /**
+         * The first day, UTC.
+         */
+        from: Day;
+        /**
+         * The most rows, 1 to 1000; default 10.
+         */
+        limit?: number | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The last day, UTC, inclusive. At most 400 days after `from`.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/stats/breakdown';
+};
+
+export type AnalyticsStatsBreakdownErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsStatsBreakdownError = AnalyticsStatsBreakdownErrors[keyof AnalyticsStatsBreakdownErrors];
+
+export type AnalyticsStatsBreakdownResponses = {
+    /**
+     * OK
+     */
+    200: Breakdown;
+};
+
+export type AnalyticsStatsBreakdownResponse = AnalyticsStatsBreakdownResponses[keyof AnalyticsStatsBreakdownResponses];
+
+export type AnalyticsStatsSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * Also count the previous period of the same length.
+         */
+        compare?: boolean;
+        /**
+         * The first day, UTC.
+         */
+        from: Day;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * The last day, UTC, inclusive. At most 400 days after `from`.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/stats/summary';
+};
+
+export type AnalyticsStatsSummaryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsStatsSummaryError = AnalyticsStatsSummaryErrors[keyof AnalyticsStatsSummaryErrors];
+
+export type AnalyticsStatsSummaryResponses = {
+    /**
+     * OK
+     */
+    200: Summary;
+};
+
+export type AnalyticsStatsSummaryResponse = AnalyticsStatsSummaryResponses[keyof AnalyticsStatsSummaryResponses];
 
 export type ApiKeysListData = {
     body?: never;

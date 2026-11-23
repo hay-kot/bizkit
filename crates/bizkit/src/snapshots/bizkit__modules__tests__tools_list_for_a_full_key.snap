@@ -313,6 +313,124 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Rank pages, sources, countries, devices, events or goals over a date range",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "Dimension": {
+            "description": "What a breakdown groups by.",
+            "enum": [
+              "page",
+              "referrer",
+              "utm_source",
+              "utm_medium",
+              "utm_campaign",
+              "country",
+              "device",
+              "browser",
+              "os",
+              "event",
+              "goal"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A ranked breakdown for a range.",
+        "properties": {
+          "dimension": {
+            "$ref": "#/$defs/Dimension",
+            "description": "What to group by."
+          },
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day, UTC."
+          },
+          "limit": {
+            "description": "The most rows, 1 to 1000; default 10.",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day, UTC, inclusive. At most 400 days after `from`."
+          }
+        },
+        "required": [
+          "project_id",
+          "from",
+          "to",
+          "dimension"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_stats_breakdown"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Count visitors, pageviews, custom events and conversions over a date range",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Overview's numbers for a range.",
+        "properties": {
+          "compare": {
+            "description": "Also count the previous period of the same length.",
+            "type": "boolean"
+          },
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day, UTC."
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day, UTC, inclusive. At most 400 days after `from`."
+          }
+        },
+        "required": [
+          "project_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_stats_summary"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": false
       },
       "description": "Create an API key; the token is shown once",

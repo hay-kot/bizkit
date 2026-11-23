@@ -1,0 +1,33 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT g.id AS \"id!: GoalId\", COUNT(DISTINCT e.day || ':' || e.visitor) AS \"visitors!: i64\"\n               FROM analytics_goals g\n               JOIN analytics_events e\n                 ON e.project_id = g.project_id AND e.day >= ? AND e.day <= ?\n                AND ((g.kind = 'page' AND e.name = 'pageview' AND e.path = g.match)\n                  OR (g.kind = 'event' AND e.name = g.match))\n               WHERE g.workspace_id = ? AND g.project_id = ?\n               GROUP BY g.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: GoalId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "visitors!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e319ea1c11fc8adc76a524c0f68ad74dbcc88a05c5931d30620d2c07919df4ec"
+}

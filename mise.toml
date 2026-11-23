@@ -51,6 +51,10 @@ for target in beacon::tests::fuzz_parse ua::tests::fuzz_parse enrich::tests::fuz
 done
 """
 
+[tasks."analytics:perf"]
+description = "Time analytics reports over 1M events in 90 days (release build)"
+run = "cargo test --release -p bizkit-analytics --test perf -- --ignored --nocapture"
+
 [tasks.coverage]
 description = "Run tests with coverage and write lcov.info"
 run = "cargo llvm-cov --locked --workspace --all-features --lcov --output-path lcov.info"
