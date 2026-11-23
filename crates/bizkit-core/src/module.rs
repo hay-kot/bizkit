@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 use anyhow::{Context as _, bail};
 use serde::de::DeserializeOwned;
@@ -11,6 +12,9 @@ use sqlx::migrate::Migrator;
 use futures::future::BoxFuture;
 
 use crate::db::Db;
+use crate::hooks::{
+    HOOKS_SUBSCRIBER, HookKind, HookPoint, HookRegistry, HookRunner, HookSource, MAX_SYNC_BUDGET,
+};
 use crate::ids::{ProjectId, UserId, WorkspaceId};
 use crate::jobs::{Event, Handlers, Job, JobHandler, Subscriber};
 use crate::ops::{Access, Operation, Registry};
@@ -74,6 +78,7 @@ pub(crate) struct Registration {
     pub(crate) registry: Registry,
     pub(crate) handlers: Handlers,
     pub(crate) routes: Vec<ModuleRoutes>,
+    pub(crate) hooks: HookRegistry,
 }
 
 /// A module's raw routes and their docs.
@@ -259,7 +264,91 @@ impl<'a> ModuleContext<'a> {
     ///
     /// When the subscriber is already registered for the event.
     pub fn subscribe<E: Event, S: Subscriber<E>>(&mut self, subscriber: S) -> anyhow::Result<()> {
+        if !self.is_core && S::NAME == HOOKS_SUBSCRIBER {
+            bail!(
+                "module {} can't subscribe to {} as {HOOKS_SUBSCRIBER}: core reserves that name",
+                self.module,
+                E::NAME
+            );
+        }
         self.registration.handlers.add_subscriber::<E, S>(subscriber)
+    }
+
+    /// Declares a sync hook point. Its ID starts with the module name, and
+    /// its budget is above zero and at most [`MAX_SYNC_BUDGET`].
+    ///
+    /// # Errors
+    ///
+    /// When the point is async, its ID is taken or outside the module, or its budget is out of range.
+    pub fn sync_hook(&mut self, point: HookPoint) -> anyhow::Result<()> {
+        let HookKind::Sync { budget, .. } = point.kind else {
+            bail!("hook point {} is async; declare it with async_hook", point.id);
+        };
+        if budget.is_zero() || budget > MAX_SYNC_BUDGET {
+            bail!(
+                "hook point {} has budget {budget:?}; it must be above zero and at most {MAX_SYNC_BUDGET:?}",
+                point.id
+            );
+        }
+        self.check_point(&point)?;
+        self.registration.hooks.add_point(point);
+        Ok(())
+    }
+
+    /// Declares an async hook point on event `E`. Core subscribes to `E` and,
+    /// for each event, asks `source` for the target and hands the event to
+    /// the runner. Runs rebuild their input through `source` too.
+    ///
+    /// # Errors
+    ///
+    /// When the point is sync, its event isn't `E`, `E` already has an async point, or its ID is taken or outside the module.
+    pub fn async_hook<E: Event, S: HookSource<E>>(
+        &mut self,
+        point: HookPoint,
+        source: S,
+    ) -> anyhow::Result<()> {
+        let HookKind::Async { event } = point.kind else {
+            bail!("hook point {} is sync; declare it with sync_hook", point.id);
+        };
+        if event != E::NAME {
+            bail!("hook point {} names event {event} but subscribes to {}", point.id, E::NAME);
+        }
+        if let Some(other) = self.registration.hooks.async_point_for(event) {
+            bail!("event {event} already has async hook point {}", other.id);
+        }
+        self.check_point(&point)?;
+        let fanout = self.registration.hooks.add_source::<E, S>(point, source);
+        self.registration.handlers.add_subscriber::<E, _>(fanout)?;
+        self.registration.hooks.add_point(point);
+        Ok(())
+    }
+
+    fn check_point(&self, point: &HookPoint) -> anyhow::Result<()> {
+        if !self.owns(point.id) {
+            bail!(
+                "module {} can't declare hook point {}: IDs must start with the module name",
+                self.module,
+                point.id
+            );
+        }
+        if self.registration.hooks.has_point(point.id) {
+            bail!("hook point {} is already declared", point.id);
+        }
+        Ok(())
+    }
+
+    /// Provides the runner that runs scripts for every hook point. Only one
+    /// module may.
+    ///
+    /// # Errors
+    ///
+    /// When another module already provided one.
+    pub fn hook_runner(&mut self, runner: impl HookRunner) -> anyhow::Result<()> {
+        if self.registration.hooks.has_runner() {
+            bail!("module {} provides a hook runner, but one is already registered", self.module);
+        }
+        self.registration.hooks.set_runner(Arc::new(runner));
+        Ok(())
     }
 }
 

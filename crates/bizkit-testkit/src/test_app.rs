@@ -11,12 +11,12 @@ use bizkit_core::deps::Clock as _;
 use bizkit_core::dev::personas::{self, Manifest, Persona, SeedOptions};
 use bizkit_core::ids::WorkspaceId;
 use bizkit_core::jobs::RunStats;
-use bizkit_core::{App, Config, Deps, Module};
+use bizkit_core::{App, Config, Deps, Module, ModuleContext};
 use http::StatusCode;
 use serde_json::json;
 use tempfile::TempDir;
 
-use crate::fakes::{FakeClock, FakeHttp, FakeMailer, MemBlobs};
+use crate::fakes::{FakeClock, FakeHooks, FakeHttp, FakeMailer, MemBlobs};
 use crate::mcp_client::McpClient;
 use crate::spec_client::{SpecChecker, SpecClient, session_from};
 
@@ -39,6 +39,19 @@ pub struct TestApp {
     server: Arc<TestServer>,
     checker: Arc<SpecChecker>,
     dir: TempDir,
+}
+
+#[derive(Debug)]
+struct FakeHooksModule(FakeHooks);
+
+impl Module for FakeHooksModule {
+    fn name(&self) -> &'static str {
+        "fake_hooks"
+    }
+
+    fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
+        cx.hook_runner(self.0.clone())
+    }
 }
 
 /// Configures a [`TestApp`].
@@ -68,6 +81,13 @@ impl TestAppBuilder {
     pub fn boxed_module(mut self, module: Box<dyn Module>) -> Self {
         self.modules.push(module);
         self
+    }
+
+    /// Runs hook points through `hooks` instead of the inert default. It
+    /// registers a small module, `fake_hooks`, that provides the runner.
+    #[must_use]
+    pub fn hook_runner(self, hooks: FakeHooks) -> Self {
+        self.module(FakeHooksModule(hooks))
     }
 
     /// Builds and starts the app.
