@@ -10,6 +10,8 @@
 //! how long that takes.
 
 mod fetch;
+mod mail;
+mod stdlib;
 mod thread;
 
 use std::collections::BTreeMap;
@@ -21,7 +23,11 @@ use std::time::{Duration, Instant};
 use bizkit_core::hooks::RunStatus;
 use tokio::sync::oneshot;
 
-pub use self::fetch::{FETCH_TIMEOUT, FetchBridge, MAX_FETCHES};
+pub use self::fetch::{FETCH_TIMEOUT, FetchBridge, MAX_FETCHES, MAX_RESPONSE_BYTES};
+pub use self::mail::{
+    MAX_MAIL_BODY_BYTES, MAX_MAILS_PER_HOUR, MAX_MAILS_PER_RUN, MAX_SUBJECT_CHARS,
+    MAX_WORKSPACE_MAILS_PER_HOUR, MailBridge,
+};
 
 /// The OS stack of each sandbox thread. QuickJS checks its own, smaller JS
 /// stack limit first.
@@ -67,6 +73,8 @@ pub struct RunRequest {
     pub secrets: Option<BTreeMap<String, String>>,
     /// `ctx.fetch`; absent when `None`.
     pub fetch: Option<FetchBridge>,
+    /// `ctx.mail`; absent when `None`.
+    pub mail: Option<MailBridge>,
 }
 
 /// How a run ended.
@@ -98,7 +106,7 @@ impl RunReport {
 
 #[derive(Debug)]
 enum Work {
-    Run(RunRequest),
+    Run(Box<RunRequest>),
     Check(Arc<str>),
 }
 
@@ -199,7 +207,7 @@ impl SandboxPool {
     pub async fn run(&self, req: RunRequest) -> RunReport {
         let hard = req.hard;
         let start = Instant::now();
-        let mut report = self.submit(Work::Run(req), hard).await;
+        let mut report = self.submit(Work::Run(Box::new(req)), hard).await;
         report.duration = start.elapsed();
         report
     }

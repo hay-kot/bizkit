@@ -59,7 +59,7 @@ fn hook_to_api(point: &HookPoint) -> Hook {
             HookKindName::Async,
             ASYNC_BUDGET,
             Some(event.to_owned()),
-            vec![Capability::Log, Capability::Secrets, Capability::Fetch],
+            vec![Capability::Log, Capability::Secrets, Capability::Fetch, Capability::Mail],
         ),
     };
     Hook {
@@ -68,13 +68,14 @@ fn hook_to_api(point: &HookPoint) -> Hook {
         kind,
         budget_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
         event,
-        capabilities,
         target: point.target.map(|target| HookTargetKind {
             id: target.id.to_owned(),
             noun: target.noun.to_owned(),
             plural: target.plural.to_owned(),
         }),
         sample: (point.sample)(),
+        api: crate::reference::entries(&capabilities),
+        capabilities,
     }
 }
 

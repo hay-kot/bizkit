@@ -25,6 +25,7 @@ fn request(source: &str) -> RunRequest {
         hard: HARD,
         secrets: None,
         fetch: None,
+        mail: None,
     }
 }
 
@@ -172,12 +173,12 @@ async fn logs_and_output_are_capped() {
 #[tokio::test]
 async fn code_generation_and_capabilities_are_gone() {
     let report = run(
-        "export default (input, ctx) => [typeof eval, typeof Function, typeof ctx.fetch, typeof ctx.secrets, typeof Proxy, typeof Uint8Array, typeof WeakRef, typeof setTimeout]",
+        "export default (input, ctx) => [typeof eval, typeof Function, typeof ctx.fetch, typeof ctx.secrets, typeof ctx.mail, typeof Proxy, typeof Uint8Array, typeof WeakRef, typeof setTimeout]",
     )
     .await;
     assert_eq!(
         report.output,
-        Some(json!(vec!["undefined"; 8])),
+        Some(json!(vec!["undefined"; 9])),
         "nothing but the granted ctx: {report:?}"
     );
 }
@@ -201,6 +202,116 @@ async fn check_refuses_bad_scripts() {
     assert!(missing.contains("default function"), "{missing}");
     let thrown = pool.check(Arc::from("throw new Error('boom'); export default () => 1")).await;
     assert!(thrown.unwrap_err().contains("boom"), "top-level throw");
+}
+
+#[tokio::test]
+async fn crypto_and_encoding_globals_work_without_capabilities() {
+    let report = run(
+        "export default () => [crypto.hmac('sha256', 'Jefe', 'what do ya want for nothing?'), crypto.digest('sha1', 'abc', { encoding: 'base64' }), crypto.hmac('sha1', encoding.hexEncode('Jefe'), 'what do ya want for nothing?', { keyEncoding: 'hex', encoding: 'base64' }), crypto.timingSafeEqual('a', 'a'), crypto.timingSafeEqual('a', 'b'), crypto.randomUUID().length, encoding.base64Encode('héllo'), encoding.base64Decode(encoding.base64Encode('héllo', { url: true }), { url: true }), encoding.hexDecode('6869')]",
+    )
+    .await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
+            "qZk+NkcGgWq6PiVxeFDCbJzQ2J0=",
+            "7/zfauXrL6LSdBbV8YTfnCWafHk=",
+            true,
+            false,
+            36,
+            "aMOpbGxv",
+            "héllo",
+            "hi",
+        ])),
+        "{report:?}"
+    );
+}
+
+#[tokio::test]
+async fn helper_errors_are_catchable_errors() {
+    let report = run(
+        "export default () => [() => crypto.digest('md5', 'x'), () => encoding.base64Decode('//4='), () => new URL('nope'), () => new URL('https://a.example/').host = 'b'].map((f) => { try { f(); return 'no error' } catch (e) { return [e instanceof Error, e.message.split(':')[0]] } })",
+    )
+    .await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            [true, "unknown algorithm \"md5\"; use \"sha256\" or \"sha1\""],
+            [true, "the decoded bytes are not UTF-8 text; scripts work on text only"],
+            [true, "invalid URL"],
+            [true, "no setter for property"],
+        ])),
+        "{report:?}"
+    );
+}
+
+#[tokio::test]
+async fn url_and_search_params() {
+    let report = run(
+        "export default () => { const u = new URL('/hooks/1?a=1&b=2#x', 'https://Example.com:8443'); u.searchParams.set('a', 'one two'); u.searchParams.append('c', '&'); u.searchParams.delete('b'); u.hash = ''; const p = new URLSearchParams({ z: 1, y: 'x' }); p.sort(); const fromPairs = new URLSearchParams([['k', 'v'], ['k', 'w']]); return [u.href, u.host, u.origin, u.pathname, u.search, String(p), fromPairs.getAll('k'), [...new URLSearchParams('?q=a+b&r')], URL.canParse('nope'), JSON.stringify({ u })] }",
+    )
+    .await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            "https://example.com:8443/hooks/1?a=one+two&c=%26",
+            "example.com:8443",
+            "https://example.com:8443",
+            "/hooks/1",
+            "?a=one+two&c=%26",
+            "y=x&z=1",
+            ["v", "w"],
+            [["q", "a b"], ["r", ""]],
+            false,
+            "{\"u\":\"https://example.com:8443/hooks/1?a=one+two&c=%26\"}",
+        ])),
+        "{report:?}"
+    );
+}
+
+#[tokio::test]
+async fn search_params_stay_live_after_the_query_changes() {
+    let report = run(
+        "export default () => { const u = new URL('https://a.example/?x=1'); const p = u.searchParams; u.search = '?y=2'; p.append('z', '3'); const same = u.searchParams === p; u.href = 'https://b.example/?k=v'; return [u.href, same, p.get('k')] }",
+    )
+    .await;
+    assert_eq!(report.output, Some(json!(["https://b.example/?k=v", true, "v"])), "{report:?}");
+    let appended = run(
+        "export default () => { const u = new URL('https://a.example/?x=1'); const p = u.searchParams; u.search = '?y=2'; p.append('z', '3'); return u.href }",
+    )
+    .await;
+    assert_eq!(appended.output, Some(json!("https://a.example/?y=2&z=3")), "{appended:?}");
+}
+
+#[tokio::test]
+async fn globals_cannot_be_replaced() {
+    let report = run(
+        "export default () => { 'use strict'; const out = []; for (const f of [() => { globalThis.crypto = {} }, () => { crypto.hmac = null }, () => { URL.prototype.toString = null }]) { try { f(); out.push('wrote') } catch { out.push('threw') } } return out }",
+    )
+    .await;
+    assert_eq!(report.output, Some(json!(["threw", "threw", "threw"])), "{report:?}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn every_reference_entry_exists() {
+    use crate::api::Capability;
+    let names: Vec<String> =
+        crate::reference::entries(&[Capability::Log, Capability::Secrets, Capability::Fetch])
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+    let mut req = request(&format!(
+        "export default (input, ctx) => {}.filter((name) => name.split('.').reduce((at, key) => at?.[key], {{ ...globalThis, crypto, encoding, URL, URLSearchParams, ctx }}) === undefined)",
+        json!(names)
+    ));
+    req.secrets = Some(BTreeMap::new());
+    req.fetch = Some(FetchBridge::new(
+        Arc::new(FakeHttp::default()),
+        tokio::runtime::Handle::current(),
+        Instant::now() + req.budget,
+    ));
+    let report = pool(1, LIMITS).run(req).await;
+    assert_eq!(report.output, Some(json!([])), "missing from a run: {report:?}");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -253,6 +364,49 @@ async fn fetch_refuses_private_addresses_and_counts_calls() {
         "{report:?}"
     );
     assert_eq!(http.requests().len(), 2, "blocked fetches never reached the client");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn fetch_encodes_json_and_form_bodies_and_caps_responses() {
+    let http = FakeHttp::default();
+    http.respond(Method::POST, "https://api.example.com/json", StatusCode::CREATED, "{}");
+    http.respond(Method::POST, "https://api.example.com/form", StatusCode::OK, "");
+    http.respond(
+        Method::GET,
+        "https://api.example.com/big",
+        StatusCode::OK,
+        "x".repeat(MAX_RESPONSE_BYTES + 1),
+    );
+    let mut req = request(
+        "export default async (input, ctx) => { const out = []; out.push((await ctx.fetch('https://api.example.com/json', { method: 'POST', json: { who: input.name } })).status); out.push((await ctx.fetch('https://api.example.com/form', { method: 'POST', headers: { 'Content-Type': 'text/x-custom' }, form: { a: '1 2' } })).ok); for (const init of [{ body: 'x', json: {} }, { body: { a: 1 } }, { headers: { a: 1 } }, { timeoutMs: 0 }, {}]) { try { await ctx.fetch('https://api.example.com/big', init); out.push('ok') } catch (e) { out.push(e.message) } } return out }",
+    );
+    req.budget = Duration::from_secs(2);
+    req.hard = Duration::from_secs(3);
+    req.fetch = Some(FetchBridge::new(
+        Arc::new(http.clone()),
+        tokio::runtime::Handle::current(),
+        Instant::now() + req.budget,
+    ));
+    let report = pool(1, LIMITS).run(req).await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            201,
+            true,
+            "fetch takes one of body, json and form",
+            "fetch body must be a string; use json for objects",
+            "fetch header a must be a string",
+            "GET api.example.com: timeoutMs must be above 0",
+            "GET api.example.com: the response body is over 256 KiB",
+        ])),
+        "{report:?}"
+    );
+    let requests = http.requests();
+    assert_eq!(requests[0].2, r#"{"who":"Ada"}"#, "json body");
+    assert_eq!(requests[1].2, "a=1+2", "form body");
+    let headers = http.request_headers();
+    assert_eq!(headers[0]["content-type"], "application/json", "json content type");
+    assert_eq!(headers[1]["content-type"], "text/x-custom", "a given content type wins");
 }
 
 #[tokio::test]

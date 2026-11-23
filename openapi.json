@@ -6361,6 +6361,42 @@
           }
         }
       },
+      "ApiEntry": {
+        "type": "object",
+        "description": "One function or object a script can use.",
+        "required": [
+          "name",
+          "signature",
+          "summary",
+          "errors",
+          "example"
+        ],
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "When it throws, one case per item."
+          },
+          "example": {
+            "type": "string",
+            "description": "A short example."
+          },
+          "name": {
+            "type": "string",
+            "description": "How scripts reach it, such as `crypto.hmac` or `ctx.fetch`."
+          },
+          "signature": {
+            "type": "string",
+            "description": "Its call shape, TypeScript-style."
+          },
+          "summary": {
+            "type": "string",
+            "description": "What it does and its limits."
+          }
+        }
+      },
       "ApiKey": {
         "type": "object",
         "description": "An API key. The secret is shown once, at creation.",
@@ -6477,7 +6513,8 @@
         "enum": [
           "log",
           "secrets",
-          "fetch"
+          "fetch",
+          "mail"
         ]
       },
       "Captured": {
@@ -6984,9 +7021,17 @@
           "kind",
           "budget_ms",
           "capabilities",
-          "sample"
+          "sample",
+          "api"
         ],
         "properties": {
+          "api": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiEntry"
+            },
+            "description": "What scripts on it can call: the globals, then the `ctx` members\nits capabilities grant."
+          },
           "budget_ms": {
             "type": "integer",
             "format": "int64",

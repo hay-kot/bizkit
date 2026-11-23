@@ -22,8 +22,7 @@ export default async function (input, ctx) {
     .map(([field, value]) => `**${field}**: ${[].concat(value).join(', ')}`)
   const res = await ctx.fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ content: `New ${form.name} submission\n${lines.join('\n')}` }),
+    json: { content: `New ${form.name} submission\n${lines.join('\n')}`.slice(0, 2000) },
   })
   ctx.log('Discord answered', res.status)
 }
@@ -37,11 +36,38 @@ export default function (input) {
 }
 ";
 
-const LOG_STRIPE: &str = r"// Logs the type of each Stripe event the endpoint captures.
+const LOG_STRIPE: &str = r"// Logs the type of each Stripe event the endpoint captures. With the
+// STRIPE_WEBHOOK_SECRET secret set, it also checks the Stripe-Signature
+// header (docs.stripe.com/webhooks#verify-manually).
 export default function (input, ctx) {
   const type = input.request.json?.type ?? 'unknown'
-  ctx.log(`Stripe sent ${type}`)
-  return { type }
+  const secret = ctx.secrets.STRIPE_WEBHOOK_SECRET
+  if (!secret) {
+    ctx.log(`Stripe sent ${type}`)
+    return { type }
+  }
+  const parts = (input.request.headers['stripe-signature'] ?? '').split(',').map((p) => p.split('='))
+  const t = parts.find(([k]) => k === 't')?.[1]
+  // Refuse replays: Stripe's tolerance is 5 minutes from the time it signed.
+  const age = Date.parse(input.request.received_at) / 1000 - Number(t)
+  const expected = crypto.hmac('sha256', secret, `${t}.${input.request.body}`)
+  const verified = Math.abs(age) <= 300 &&
+    parts.some(([k, v]) => k === 'v1' && crypto.timingSafeEqual(v, expected))
+  ctx.log(`Stripe sent ${type}`, verified ? 'with a valid signature' : 'WITHOUT a valid signature')
+  return { type, verified }
+}
+";
+
+const EMAIL_LEADS: &str = r"// Emails each submission to the team. Change `to` to your address.
+export default function (input, ctx) {
+  const { form, submission } = input
+  const lines = Object.entries(submission.data).map(([field, value]) => `${field}: ${value}`)
+  ctx.mail.send({
+    to: 'demo@bizkit.test',
+    subject: `New ${form.name} submission`.slice(0, 200),
+    text: lines.join('\n'),
+  })
+  return { sent: 1 }
 }
 ";
 
@@ -59,11 +85,18 @@ fn discord_tests() -> Vec<TestCase> {
         "form": form(),
         "submission": {
             "id": "0190a5f0-0000-7000-8000-000000000003",
-            "created_at": 1_767_225_600_000_i64,
+            "created_at": "2026-01-01T00:00:00Z",
             "data": { "email": "ada@example.com", "message": "Hello there" },
         },
     });
     vec![case("Posts a submission", input, None)]
+}
+
+fn leads_tests() -> Vec<TestCase> {
+    discord_tests()
+        .into_iter()
+        .map(|test| case("Emails a submission", test.input, Some(json!({ "sent": 1 }))))
+        .collect()
 }
 
 fn stripe_tests() -> Vec<TestCase> {
@@ -102,7 +135,8 @@ fn casino_tests() -> Vec<TestCase> {
 
 /// Seeds "Post to Discord" (after each submission, for every form),
 /// "Block casino spam" (before validation, for the Contact form when the
-/// forms seed made one) and "Log Stripe events" (for the Stripe endpoint,
+/// forms seed made one), "Email new leads" (after each Contact
+/// submission) and "Log Stripe events" (for the Stripe endpoint,
 /// only when the webhooks seed made one) in the `website` project. A script
 /// that already exists by name is left alone, and so is a sync point whose
 /// slot another script holds.
@@ -123,6 +157,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             discord_tests(),
         ),
         ("Block casino spam", "forms.pre_validate", true, BLOCK_CASINO, contact, casino_tests()),
+        ("Email new leads", "forms.submission_created", false, EMAIL_LEADS, contact, leads_tests()),
         (
             "Log Stripe events",
             "webhooks.request_received",
@@ -134,9 +169,11 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     ];
     let mut tx = db.write().await.context("starting the seed transaction")?;
     for (name, hook, sync, source, target, tests) in scripts {
-        // Without the endpoint, the webhooks module isn't compiled in.
-        let missing_endpoint = hook.starts_with("webhooks.") && target.is_none();
-        if missing_endpoint || existing.iter().any(|script| script.name == name) {
+        // Without the endpoint, or the Contact form for the leads mail, the
+        // script would run for nothing, or for every form.
+        let missing_target =
+            (hook.starts_with("webhooks.") || name == "Email new leads") && target.is_none();
+        if missing_target || existing.iter().any(|script| script.name == name) {
             continue;
         }
         let row = ScriptRow {

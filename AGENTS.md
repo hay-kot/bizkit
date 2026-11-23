@@ -59,10 +59,23 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 - Declare points in `register`. IDs start with the module name (`forms.pre_validate`). Keep the `HookPoint` consts in the module's `hooks.rs` with a `sample` input.
 - **Target kinds.** When scripts should pick which of the module's entities they run for (form A and C, not B), declare a `TargetKind` (`forms.form`, owned like a point ID) with `cx.hook_target_kind(&KIND, resolver)` before the points, and set `target: Some(&KIND)` on them. The `TargetResolver` finds entities by ID (returning canonical IDs) and lists a project's entities for the picker. Every hook call then passes the entity in `HookTarget.entity`.
 - A script's target set is either empty (every entity of the kind) or a list of entities. Async points run every matching script. Sync points run one script per entity: one that names the entity wins over the one for all, and the API refuses (409) a second script naming the same entity on a sync point, or a second one for all.
-- **Sync** (`cx.sync_hook`): runs inside the request through `platform.call_sync_hook(&POINT, target, &input).await`, with a budget of at most 100 ms and an `output` check on the returned value. Sync hooks fail open: on any failure the call gives `HookResult::Continue`, so a broken script never blocks the request. Scripts get `ctx.log` only. One script per entity and point (see target kinds above).
-- **Async** (`cx.async_hook::<Event, _>(POINT, source)`): runs as a retried job for each event (3 attempts; a failed attempt reruns the whole script, so scripts must tolerate repeats). The `HookSource` gives the target project and rebuilds the input when the run starts, so job payloads hold IDs only and a deleted row skips the run. Scripts also get `ctx.secrets` and `ctx.fetch` (public addresses only).
+- **Sync** (`cx.sync_hook`): runs inside the request through `platform.call_sync_hook(&POINT, target, &input).await`, with a budget of at most 100 ms and an `output` check on the returned value. Sync hooks fail open: on any failure the call gives `HookResult::Continue`, so a broken script never blocks the request. Scripts get the globals and `ctx.log` only. One script per entity and point (see target kinds above).
+- **Async** (`cx.async_hook::<Event, _>(POINT, source)`): runs as a retried job for each event (3 attempts; a failed attempt reruns the whole script, so scripts must tolerate repeats). The `HookSource` gives the target project and rebuilds the input when the run starts, so job payloads hold IDs only and a deleted row skips the run. Scripts also get `ctx.secrets`, `ctx.fetch` (public addresses only) and `ctx.mail.send`.
 - Inputs are plain JSON with no secrets or internal keys. Leave control fields out. Cap any text you take back from a script.
 - Tests use `FakeHooks` with `TestAppBuilder::hook_runner` to script outcomes per point. Test that every `RunStatus` failure leaves the request working.
+- **Script API.** `crates/bizkit-extensions/src/reference.rs` is the one source for what scripts can call: signature, limits, errors and an example per entry. `extensions.hooks.list` (MCP `extensions_hooks_list`) returns it per point as `api`, and the script editor shows it. When you change `sandbox/prelude.js`, update the table; a sandbox test checks that every entry exists in a run (`ctx.mail.send` through the mail integration test). All helpers take and return strings: there are no typed arrays, `TextEncoder`, `crypto.subtle`, `setTimeout` or `import`.
+
+  | Name | Points | Notes |
+  |---|---|---|
+  | `crypto.digest`, `crypto.hmac` | all | SHA-256 or SHA-1, hex or base64 out, data at most 1 MiB |
+  | `crypto.timingSafeEqual`, `crypto.randomUUID` | all | compare signatures with `timingSafeEqual`, never `===` |
+  | `encoding.base64Encode/Decode`, `encoding.hexEncode/Decode` | all | UTF-8 text in and out; decoding non-UTF-8 bytes throws |
+  | `URL`, `URLSearchParams` | all | WHATWG; `href`, `pathname`, `search`, `hash` are settable |
+  | `ctx.log`, `console.*` | all | 50 lines of 500 characters |
+  | `ctx.secrets` | async | the project's secrets, redacted from run records |
+  | `ctx.fetch(url, {method, headers, body \| json \| form, timeoutMs})` | async | 5 calls per run, 5 s each, 256 KiB each way; non-2xx resolves |
+  | `ctx.mail.send({to, subject, text, html?})` | async | 3 per run; 50 per script and 200 per workspace per hour |
+
 - Scripts keep saved test cases (`[{name, input, expect?}]`); give each seeded script cases that pass against its seeded source.
 - **Entity sections.** A web module adds panels to other modules' entity pages through `entitySections` in `defineWebModule`; the page renders `<EntitySections kind="forms.form" :entity-id ...>` and never imports the module. Extensions uses it to list the scripts that run for the entity, so a new target kind gets that panel by rendering `EntitySections` on its page.
 - Outbound HTTP goes through `Deps.http`, which reaches public addresses only. Check user URLs with `bizkit_core::net::check_url` too, for a clear error.

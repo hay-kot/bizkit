@@ -19,6 +19,8 @@ pub const MAX_FETCHES: u32 = 5;
 pub const FETCH_TIMEOUT: Duration = Duration::from_secs(5);
 /// The largest request body a script can send.
 const MAX_REQUEST_BYTES: usize = 256 << 10;
+/// The largest response body a script can read.
+pub const MAX_RESPONSE_BYTES: usize = 256 << 10;
 
 /// Sends a run's fetches. Each run gets its own, so the call count and the
 /// deadline are per run.
@@ -31,11 +33,13 @@ pub struct FetchBridge {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Init {
     method: Option<String>,
     #[serde(default)]
     headers: BTreeMap<String, String>,
     body: Option<String>,
+    timeout_ms: Option<u64>,
 }
 
 impl FetchBridge {
@@ -76,6 +80,9 @@ impl FetchBridge {
         let method = init.method.as_deref().unwrap_or("GET").to_ascii_uppercase();
         let label = format!("{method} {host}");
         let body = init.body.unwrap_or_default();
+        if init.timeout_ms == Some(0) {
+            return Err(format!("{label}: timeoutMs must be above 0"));
+        }
         if body.len() > MAX_REQUEST_BYTES {
             return Err(format!("{label}: the body is over {} KiB", MAX_REQUEST_BYTES >> 10));
         }
@@ -84,7 +91,8 @@ impl FetchBridge {
             request = request.header(name, value);
         }
         let request = request.body(Bytes::from(body)).map_err(|err| format!("{label}: {err}"))?;
-        let left = self.deadline.saturating_duration_since(Instant::now()).min(FETCH_TIMEOUT);
+        let limit = init.timeout_ms.map_or(FETCH_TIMEOUT, Duration::from_millis).min(FETCH_TIMEOUT);
+        let left = self.deadline.saturating_duration_since(Instant::now()).min(limit);
         if left.is_zero() {
             return Err(format!("{label}: no time left in the run's budget"));
         }
@@ -101,6 +109,12 @@ impl FetchBridge {
             Ok(Err(err)) => return Err(format!("{label}: {err:#}")),
             Ok(Ok(response)) => response,
         };
+        if response.body().len() > MAX_RESPONSE_BYTES {
+            return Err(format!(
+                "{label}: the response body is over {} KiB",
+                MAX_RESPONSE_BYTES >> 10
+            ));
+        }
         let headers: BTreeMap<&str, &str> = response
             .headers()
             .iter()

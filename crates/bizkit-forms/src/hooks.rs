@@ -100,7 +100,7 @@ fn submission_created_sample() -> Value {
         },
         "submission": {
             "id": "0190a5f0-0000-7000-8000-000000000003",
-            "created_at": 1_767_225_600_000_i64,
+            "created_at": "2026-01-01T00:00:00Z",
             "data": { "email": "ada@example.com", "message": "Hello there" },
         },
     })

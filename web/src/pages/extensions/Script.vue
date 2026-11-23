@@ -3,6 +3,7 @@ import { FlaskConical, History, Play, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ApiReference from '@/components/extensions/ApiReference.vue'
 import TargetPicker from '@/components/extensions/TargetPicker.vue'
 import { runsForText } from '@/components/extensions/targets'
 import type { CasesResult } from '@/components/extensions/testCases'
@@ -386,6 +387,14 @@ function summaryOf(run: Run): string {
           <pre tabindex="0" class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
             sampleInput
           }}</pre>
+        </details>
+        <details v-if="hook" class="rounded-field border border-base-300 px-3 py-2">
+          <summary class="cursor-pointer text-sm font-medium">What the script can call</summary>
+          <p class="mt-2 mb-3 text-sm text-base-content/80">
+            Globals on every hook point, then the <code>ctx</code> members this point grants. Every
+            helper takes and returns strings.
+          </p>
+          <ApiReference :entries="hook.api" />
         </details>
       </Card>
 

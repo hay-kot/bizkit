@@ -45,6 +45,8 @@ pub enum Capability {
     Secrets,
     /// `ctx.fetch` to public addresses.
     Fetch,
+    /// `ctx.mail.send`, capped per run and per script.
+    Mail,
 }
 
 /// The kind of entity scripts on a hook point can bind to.
@@ -103,6 +105,24 @@ pub struct Hook {
     /// A sample input.
     #[schema(schema_with = any_json)]
     pub sample: serde_json::Value,
+    /// What scripts on it can call: the globals, then the `ctx` members
+    /// its capabilities grant.
+    pub api: Vec<ApiEntry>,
+}
+
+/// One function or object a script can use.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ApiEntry {
+    /// How scripts reach it, such as `crypto.hmac` or `ctx.fetch`.
+    pub name: String,
+    /// Its call shape, TypeScript-style.
+    pub signature: String,
+    /// What it does and its limits.
+    pub summary: String,
+    /// When it throws, one case per item.
+    pub errors: Vec<String>,
+    /// A short example.
+    pub example: String,
 }
 
 /// Every hook point.

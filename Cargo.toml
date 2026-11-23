@@ -57,6 +57,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = "2"
 serde_json = "1.0.154"
 serde_path_to_error = "0.1.20"
+sha1 = "0.11.0"
 sha2 = "0.11.1"
 sqlx = { version = "=0.9.1", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "macros", "migrate", "json", "uuid"] }
 tempfile = "3.27.0"
