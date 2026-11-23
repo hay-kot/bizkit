@@ -7,6 +7,12 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+  # cookie 0.18.2 comes only through axum-test (a dev dependency), and bizkit
+  # never forks. The fix, 0.18.3, came out on 2026-11-23, under the 7-day
+  # minimum release age. Remove: bump cookie to 0.18.3 on or after 2026-11-30.
+  { id = "RUSTSEC-2026-0594", reason = "dev-only via axum-test; bump cookie to 0.18.3 on or after 2026-11-30" },
+]
 
 [licenses]
 version = 2
