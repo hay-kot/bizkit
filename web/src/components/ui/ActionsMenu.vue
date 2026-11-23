@@ -15,7 +15,7 @@ withDefaults(defineProps<{ label?: string }>(), { label: 'More actions' })
     <template #trigger="{ open, toggle, controls }">
       <button
         type="button"
-        class="btn btn-square btn-ghost btn-sm"
+        class="btn btn-square btn-sm"
         :aria-label="label"
         aria-haspopup="menu"
         :aria-expanded="open"

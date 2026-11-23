@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 import EntitySections from '@/components/EntitySections.vue'
 import DeliveryBadge from '@/components/webhooks/DeliveryBadge.vue'
 import RequestInspector from '@/components/webhooks/RequestInspector.vue'
-import ActionsMenu from '@/components/ui/ActionsMenu.vue'
+import DetailActions from '@/components/ui/DetailActions.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -135,22 +135,23 @@ async function onSaveSettings() {
           : 'Requests sent to this endpoint’s URL, newest first.'
       "
     >
-      <button
-        type="button"
-        class="btn gap-1.5 btn-ghost btn-sm"
-        :disabled="asyncStatus === 'loading'"
-        @click="onRefresh"
+      <DetailActions
+        :actions="[
+          {
+            label: 'Refresh',
+            icon: RefreshCw,
+            run: onRefresh,
+            disabled: asyncStatus === 'loading',
+          },
+          { label: 'Settings', icon: Settings, run: openSettings },
+        ]"
       >
-        <RefreshCw class="size-4" aria-hidden="true" />Refresh
-      </button>
-      <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="openSettings">
-        <Settings class="size-4" aria-hidden="true" />Settings
-      </button>
-      <ActionsMenu>
-        <MenuItem danger @select="onDelete">
-          <Trash2 class="size-4" aria-hidden="true" />Delete endpoint
-        </MenuItem>
-      </ActionsMenu>
+        <template #menu>
+          <MenuItem danger @select="onDelete">
+            <Trash2 class="size-4" aria-hidden="true" />Delete endpoint
+          </MenuItem>
+        </template>
+      </DetailActions>
     </PageHeader>
 
     <p v-if="endpointError" class="text-sm text-error">This endpoint doesn’t exist.</p>

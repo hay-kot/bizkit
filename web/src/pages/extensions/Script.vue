@@ -8,12 +8,12 @@ import TargetPicker from '@/components/extensions/TargetPicker.vue'
 import { runsForText } from '@/components/extensions/targets'
 import type { CasesResult } from '@/components/extensions/testCases'
 import { lineDiff, parseCases } from '@/components/extensions/testCases'
-import ActionsMenu from '@/components/ui/ActionsMenu.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
+import DetailActions from '@/components/ui/DetailActions.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import type { Json } from '@/components/ui/JsonEditor.vue'
@@ -22,9 +22,7 @@ import MenuItem from '@/components/ui/MenuItem.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
-import SaveStatus from '@/components/ui/SaveStatus.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
-import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { runAction } from '@/lib/action'
 import { errorMessage } from '@/lib/errors'
 import { formatDateTime, formatRelative } from '@/lib/format'
@@ -324,20 +322,20 @@ function summaryOf(run: Run): string {
             : 'This hook point isn’t compiled into this server, so the script never runs.'
         "
       >
-        <SaveStatus :dirty="dirty" />
-        <SubmitButton
-          form="script-form"
-          :pending="update.asyncStatus.value === 'loading'"
-          :disabled="!dirty || !cases.ok"
-          :title="cases.ok ? undefined : 'Fix the test cases to save'"
+        <DetailActions
+          :save="{
+            form: 'script-form',
+            dirty,
+            pending: update.asyncStatus.value === 'loading',
+            blocked: cases.ok ? undefined : 'Fix the test cases to save',
+          }"
         >
-          Save
-        </SubmitButton>
-        <ActionsMenu>
-          <MenuItem danger @select="deleteScript">
-            <Trash2 class="size-4" aria-hidden="true" />Delete script
-          </MenuItem>
-        </ActionsMenu>
+          <template #menu>
+            <MenuItem danger @select="deleteScript">
+              <Trash2 class="size-4" aria-hidden="true" />Delete script
+            </MenuItem>
+          </template>
+        </DetailActions>
       </PageHeader>
 
       <DescriptionList :items="facts">
