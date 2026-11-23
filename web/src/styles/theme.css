@@ -107,12 +107,12 @@
   background-image:
     radial-gradient(
       ellipse 45% 40% at 50% 45%,
-      color-mix(in oklab, var(--color-secondary) 24%, transparent),
+      color-mix(in oklab, var(--color-secondary) 38%, transparent),
       transparent 70%
     ),
     radial-gradient(
       ellipse 35% 35% at 62% 62%,
-      color-mix(in oklab, var(--color-accent) 20%, transparent),
+      color-mix(in oklab, var(--color-accent) 32%, transparent),
       transparent 70%
     );
 }
