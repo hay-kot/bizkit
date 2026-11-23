@@ -65,6 +65,7 @@ fn execute(work: Work, limits: PoolLimits) -> RunReport {
                 hard: CHECK_BUDGET,
                 secrets: None,
                 fetch: None,
+                mail: None,
             };
             sandboxed(&req, limits, Mode::Check)
         }
@@ -194,8 +195,8 @@ fn thrown<T>(ctx: &Ctx<'_>, result: Result<T, String>) -> rquickjs::Result<T> {
     result.map_err(|message| Exception::throw_message(ctx, &message))
 }
 
-/// The host functions the prelude wraps. `fetch` is set only when the run
-/// has a bridge.
+/// The host functions the prelude wraps. `fetch` and `mail` are set only
+/// when the run has their bridge.
 fn host_functions<'js>(
     ctx: &Ctx<'js>,
     req: &RunRequest,
@@ -219,6 +220,17 @@ fn host_functions<'js>(
             Function::new(ctx.clone(), move |url: String, init: String| bridge.fetch(&url, &init)),
         )?;
     }
+    if let Some(bridge) = &req.mail {
+        let bridge = bridge.clone();
+        host.set("mail", Function::new(ctx.clone(), move |message: String| bridge.send(&message)))?;
+    }
+    stdlib_functions(ctx, &host)?;
+    Ok(host)
+}
+
+/// The pure helpers behind `crypto`, `encoding`, `URL` and
+/// `URLSearchParams`.
+fn stdlib_functions<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> {
     host.set("uuid", Function::new(ctx.clone(), stdlib::uuid))?;
     host.set(
         "digest",
@@ -279,6 +291,5 @@ fn host_functions<'js>(
             thrown(&ctx, stdlib::form_encode(&pairs))
         }),
     )?;
-    host.set("formDecode", Function::new(ctx.clone(), |text: String| stdlib::form_decode(&text)))?;
-    Ok(host)
+    host.set("formDecode", Function::new(ctx.clone(), |text: String| stdlib::form_decode(&text)))
 }

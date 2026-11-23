@@ -267,6 +267,15 @@
       });
     };
   }
+  if (host.mail !== undefined) {
+    ctx.mail = Object.freeze({
+      send: (message) => {
+        const { to, subject, text, html } = message ?? {};
+        const error = host.mail(JSON.stringify({ to, subject, text, html }));
+        if (error !== undefined && error !== null) throw new Error(error);
+      },
+    });
+  }
   if (secretsJson !== undefined) ctx.secrets = deepFreeze(JSON.parse(secretsJson));
   return [deepFreeze(JSON.parse(inputJson)), Object.freeze(ctx)];
 })

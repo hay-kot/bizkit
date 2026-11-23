@@ -153,7 +153,11 @@ mod api {
             .collect();
         assert_eq!(ids, [PRE, POST], "points");
         assert_eq!(list["items"][0]["capabilities"], json!(["log"]), "sync points only log");
-        assert_eq!(list["items"][1]["capabilities"], json!(["log", "secrets", "fetch"]), "async");
+        assert_eq!(
+            list["items"][1]["capabilities"],
+            json!(["log", "secrets", "fetch", "mail"]),
+            "async"
+        );
     }
 
     #[tokio::test]
@@ -309,6 +313,61 @@ mod api {
             "{runs:?}"
         );
         assert_eq!(runs[0]["logs"], json!(["sent 204"]), "logs");
+    }
+
+    #[tokio::test]
+    async fn async_scripts_send_mail_under_caps() {
+        let s = setup().await;
+        let script = s.script(POST, "export default async (input, ctx) => { for (let i = 0; i < 4; i++) { try { ctx.mail.send({ to: 'owner@example.com', subject: `New ${input.submission.data.name} ${i}`, text: 'hi', html: '<p>hi</p>' }) } catch (e) { ctx.log(e.message) } } }").await;
+        let form = s.form().await;
+        let to_owner = |app: &TestApp| {
+            app.mail
+                .sent()
+                .into_iter()
+                .filter(|mail| mail.to == "owner@example.com")
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(s.submit(&form, r#"{"name": "Ada"}"#).await, StatusCode::CREATED);
+        s.app.drain_jobs().await;
+        let sent = to_owner(&s.app);
+        assert_eq!(sent.len(), 3, "three per run: {sent:?}");
+        assert_eq!(sent[0].subject, "New Ada 0", "subject");
+        assert_eq!(sent[0].html.as_deref(), Some("<p>hi</p>"), "html");
+        assert_eq!(s.runs(&script).await[0]["logs"], json!(["a run can send at most 3 mails"]));
+
+        // Fill the hour's cap: 3 sent above plus 47 more.
+        let (workspace, id) = (self_ws_id(&s), script["id"].as_str().unwrap().to_owned());
+        let platform = s.app.app().platform();
+        let mut tx = platform.db().write().await.unwrap();
+        for _ in 0..47 {
+            sqlx::query("INSERT INTO extension_mail_sends (workspace_id, script_id, sent_at) VALUES (?, ?, ?)")
+                .bind(&workspace)
+                .bind(&id)
+                .bind(platform.now().0)
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        tx.commit().await.unwrap();
+        assert_eq!(s.submit(&form, r#"{"name": "Bo"}"#).await, StatusCode::CREATED);
+        s.app.drain_jobs().await;
+        assert_eq!(to_owner(&s.app).len(), 3, "capped for the hour");
+        let runs = s.runs(&script).await;
+        assert_eq!(
+            runs[0]["logs"][0],
+            json!("this script already sent 50 mails in the last hour"),
+            "{runs:?}"
+        );
+
+        s.app.clock.advance(std::time::Duration::from_secs(60 * 60 + 1));
+        assert_eq!(s.submit(&form, r#"{"name": "Cy"}"#).await, StatusCode::CREATED);
+        s.app.drain_jobs().await;
+        assert_eq!(to_owner(&s.app).len(), 6, "the window moved on");
+    }
+
+    fn self_ws_id(s: &Setup) -> String {
+        s.team.workspaces["main"].id.to_string()
     }
 
     #[tokio::test]

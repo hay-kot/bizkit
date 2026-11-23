@@ -25,6 +25,7 @@ fn request(source: &str) -> RunRequest {
         hard: HARD,
         secrets: None,
         fetch: None,
+        mail: None,
     }
 }
 
@@ -172,12 +173,12 @@ async fn logs_and_output_are_capped() {
 #[tokio::test]
 async fn code_generation_and_capabilities_are_gone() {
     let report = run(
-        "export default (input, ctx) => [typeof eval, typeof Function, typeof ctx.fetch, typeof ctx.secrets, typeof Proxy, typeof Uint8Array, typeof WeakRef, typeof setTimeout]",
+        "export default (input, ctx) => [typeof eval, typeof Function, typeof ctx.fetch, typeof ctx.secrets, typeof ctx.mail, typeof Proxy, typeof Uint8Array, typeof WeakRef, typeof setTimeout]",
     )
     .await;
     assert_eq!(
         report.output,
-        Some(json!(vec!["undefined"; 8])),
+        Some(json!(vec!["undefined"; 9])),
         "nothing but the granted ctx: {report:?}"
     );
 }

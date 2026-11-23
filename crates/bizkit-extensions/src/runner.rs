@@ -16,7 +16,7 @@ use serde_json::Value;
 
 use crate::api::{Run, RunCause, RunId, ScriptId};
 use crate::redact::Redactor;
-use crate::sandbox::{FetchBridge, PoolLimits, RunReport, RunRequest, SandboxPool};
+use crate::sandbox::{FetchBridge, MailBridge, PoolLimits, RunReport, RunRequest, SandboxPool};
 use crate::store::{self, RunRow, ScriptRow};
 
 /// The worker lane script runs use, so they never hold up mail.
@@ -171,6 +171,7 @@ impl ScriptRunner {
             hard: budget + SYNC_SLACK,
             secrets: None,
             fetch: None,
+            mail: None,
         };
         let mut report = pool.run(req).await;
         if report.status == RunStatus::Ok
@@ -224,6 +225,12 @@ impl ScriptRunner {
             hard: ASYNC_HARD,
             secrets: Some(secrets.clone()),
             fetch: Some(fetch),
+            mail: Some(MailBridge::new(
+                platform.clone(),
+                tokio::runtime::Handle::current(),
+                script.workspace_id,
+                script.id,
+            )),
         };
         (pool.run(req).await, secrets)
     }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO extension_mail_sends (workspace_id, script_id, sent_at) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "22e2a45b954e6fc7d9197c77828fbe02d1f700e49dc1186676999ba38f5f53fe"
+}

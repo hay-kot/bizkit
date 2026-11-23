@@ -45,6 +45,8 @@ pub enum Capability {
     Secrets,
     /// `ctx.fetch` to public addresses.
     Fetch,
+    /// `ctx.mail.send`, capped per run and per script.
+    Mail,
 }
 
 /// The kind of entity scripts on a hook point can bind to.

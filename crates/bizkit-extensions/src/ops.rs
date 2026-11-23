@@ -59,7 +59,7 @@ fn hook_to_api(point: &HookPoint) -> Hook {
             HookKindName::Async,
             ASYNC_BUDGET,
             Some(event.to_owned()),
-            vec![Capability::Log, Capability::Secrets, Capability::Fetch],
+            vec![Capability::Log, Capability::Secrets, Capability::Fetch, Capability::Mail],
         ),
     };
     Hook {
