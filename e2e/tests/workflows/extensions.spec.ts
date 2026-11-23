@@ -62,7 +62,7 @@ test('scripts filter spam before validation, run after submissions and test-run'
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText(/unexpected token/).first()).toBeVisible()
   await refetched
-  await expect(page.getByLabel('Script source')).toHaveValue(broken)
+  await expect(page.getByLabel('Script source')).toHaveText(broken)
   await page
     .getByLabel('Script source')
     .fill("export default (input, ctx) => { ctx.log('from', input.submission.data.name) }")
