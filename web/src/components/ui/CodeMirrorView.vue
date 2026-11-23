@@ -24,8 +24,11 @@ let view: EditorView | undefined
 const highlight = HighlightStyle.define([
   { tag: [tags.keyword, tags.operatorKeyword, tags.modifier], color: 'var(--color-primary)' },
   { tag: [tags.string, tags.special(tags.string), tags.regexp], color: 'var(--color-secondary)' },
-  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: 'var(--color-accent)' },
-  { tag: [tags.propertyName, tags.definition(tags.variableName)], color: 'var(--color-info)' },
+  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: 'var(--color-code-number)' },
+  {
+    tag: [tags.propertyName, tags.definition(tags.variableName)],
+    color: 'var(--color-code-property)',
+  },
   {
     tag: [tags.comment, tags.lineComment, tags.blockComment],
     color: 'var(--color-code-comment)',

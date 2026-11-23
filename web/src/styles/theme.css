@@ -90,4 +90,9 @@
   --color-code-comment: color-mix(in oklab, var(--color-base-content) 55%, transparent);
   --color-code-gutter: color-mix(in oklab, var(--color-base-content) 50%, transparent);
   --color-code-selection: color-mix(in oklab, var(--color-primary) 25%, transparent);
+
+  /* Info and accent alone fall under 4.5:1 on base-100; the text color pulls
+     them darker in light and lighter in dark. */
+  --color-code-property: color-mix(in oklab, var(--color-info) 60%, var(--color-base-content));
+  --color-code-number: color-mix(in oklab, var(--color-accent) 60%, var(--color-base-content));
 }

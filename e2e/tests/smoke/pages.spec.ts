@@ -27,7 +27,7 @@ test.describe('workspace pages', () => {
   })
 
   const workspacePages = ['projects', 'team', 'api-keys', 'settings']
-  const projectPages = ['forms', 'extensions']
+  const projectPages = ['forms', 'webhooks', 'extensions']
   for (const section of [...workspacePages, ...projectPages]) {
     test(`the ${section} page is clean`, async ({ page, world }) => {
       const errors = trackPageErrors(page)
@@ -56,6 +56,23 @@ test.describe('workspace pages', () => {
     await page.goto(`/w/${workspace}/p/${world.projects.site!.id}/forms/${form.id}`)
     await expect(page.getByRole('heading', { name: 'Contact' })).toBeVisible()
     await page.getByText('HTML form').click()
+    await expectCleanPage(page, errors)
+  })
+
+  test('an endpoint page with the inspector open is clean', async ({ page, world, baseURL }) => {
+    const errors = trackPageErrors(page)
+    const workspace = world.workspaces.main!.id
+    const created = await page.request.post(`/api/v1/workspaces/${workspace}/webhooks`, {
+      data: { name: 'Stripe', project_id: world.projects.site!.id },
+      headers: { Origin: new URL(baseURL!).origin },
+    })
+    expect(created.status()).toBe(201)
+    const endpoint = await created.json()
+    await page.request.post(endpoint.url, { data: { type: 'charge.succeeded' } })
+    await page.goto(`/w/${workspace}/p/${world.projects.site!.id}/webhooks/${endpoint.id}`)
+    await expect(page.getByRole('heading', { name: 'Stripe' })).toBeVisible()
+    await page.getByRole('button', { name: /^Inspect the POST request/ }).click()
+    await expect(page.getByRole('heading', { name: 'Headers' })).toBeVisible()
     await expectCleanPage(page, errors)
   })
 })
