@@ -6,7 +6,7 @@ Every page follows one of three archetypes. The primitives live in `src/componen
 
 | Block | Use |
 |---|---|
-| `Page` | The root of every page. `width`: `wide` (default) for list and detail pages, `narrow` for settings, `compact` for a one-card page. Owns the space between top-level blocks. |
+| `Page` | The root of every page. `width`: `wide` (default) for list and detail pages, `narrow` for settings, `compact` for a one-card page without a header, centered. Owns the space between top-level blocks. |
 | `PageHeader` | Eyebrow (`section`), the title with actions on the same row, then the description. |
 | `PageSection` | A titled block that isn't a card: a table or list with a heading and optional actions. |
 | `Card` | A bordered group of fields or facts. `#actions` in the heading, `#footer` for a right-aligned Save. |
