@@ -434,7 +434,7 @@ function summaryOf(run: Run): string {
           :columns="caseColumns"
           :rows="cases.ok ? cases.cases : []"
           :row-key="(c) => c.name"
-          label="Test cases"
+          label="Case results"
           :empty="{
             icon: FlaskConical,
             title: 'No test cases',

@@ -106,8 +106,8 @@ pub trait TargetResolver: Send + Sync + fmt::Debug + 'static {
 /// When a hook point runs.
 #[derive(Debug, Clone, Copy)]
 pub enum HookKind {
-    /// Runs in the request and fails open. At most one script per point
-    /// for each entity, plus one project-wide; the entity's script wins.
+    /// Runs in the request and fails open. One script runs per call: the
+    /// one that names the entity, else the one for every entity.
     Sync {
         /// The script's time budget, at most [`MAX_SYNC_BUDGET`].
         budget: Duration,
@@ -115,8 +115,8 @@ pub enum HookKind {
         /// [`RunStatus::InvalidOutput`].
         output: fn(&serde_json::Value) -> Result<(), String>,
     },
-    /// Runs as a job for each `event`. Any number of scripts per point; the
-    /// entity's scripts and the project-wide ones all run.
+    /// Runs as a job for each `event`. Every script that names the entity
+    /// or runs for every entity runs.
     Async {
         /// The event name, [`Event::NAME`].
         event: &'static str,
