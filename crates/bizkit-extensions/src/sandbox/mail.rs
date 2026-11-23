@@ -17,7 +17,7 @@ use crate::api::ScriptId;
 
 /// The most mail one run can send.
 pub const MAX_MAILS_PER_RUN: u32 = 3;
-/// The most mail one script can send in [`MAIL_WINDOW`].
+/// The most mail one script can send in a rolling hour.
 pub const MAX_MAILS_PER_HOUR: i64 = 50;
 /// The window of [`MAX_MAILS_PER_HOUR`].
 const MAIL_WINDOW: Duration = Duration::from_hours(1);

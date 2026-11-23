@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn timing_safe_eq_compares_bytes() {
         assert!(timing_safe_eq("abc", "abc"));
-        assert!(!timing_safe_eq("abc", "abd"));
+        assert!(!timing_safe_eq("abc", "abx"));
         assert!(!timing_safe_eq("abc", "ab"));
         assert!(timing_safe_eq("", ""));
     }
