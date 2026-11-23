@@ -3,7 +3,7 @@ import { UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 import InvitePanel from '@/components/InvitePanel.vue'
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import InvitationList from '@/components/team/InvitationList.vue'
 import MemberList from '@/components/team/MemberList.vue'
 

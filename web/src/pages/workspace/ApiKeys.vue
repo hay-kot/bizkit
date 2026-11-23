@@ -3,7 +3,7 @@ import { KeyRound, Plus } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 
 import ApiTokenPanel from '@/components/ApiTokenPanel.vue'
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'

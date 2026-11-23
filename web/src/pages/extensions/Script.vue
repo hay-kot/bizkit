@@ -11,7 +11,7 @@ import {
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import TargetPicker from '@/components/extensions/TargetPicker.vue'
 import { runsForText } from '@/components/extensions/targets'
 import type { CasesResult } from '@/components/extensions/testCases'

@@ -5,7 +5,9 @@ import SectionHeading from './SectionHeading.vue'
 
 /**
  * A bordered section of a page with a `SectionHeading` on top. The
- * `actions` slot goes to the heading, the default slot to the body.
+ * `actions` slot goes to the heading, the default slot to the body, and
+ * the `footer` slot to a right-aligned row under the body (a settings
+ * card's Save).
  */
 defineProps<{ title: string; description?: string }>()
 const headingId = useId()
@@ -23,5 +25,11 @@ const headingId = useId()
       </SectionHeading>
     </div>
     <div class="flex flex-1 flex-col gap-4 p-4"><slot /></div>
+    <div
+      v-if="$slots.footer"
+      class="flex items-center justify-end gap-2 border-t border-base-300 px-4 py-3"
+    >
+      <slot name="footer" />
+    </div>
   </section>
 </template>

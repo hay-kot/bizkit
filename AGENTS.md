@@ -80,10 +80,14 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 - Disabling an ESLint rule needs a reason: `// eslint-disable-next-line rule -- why`. The one inline style today is the floating list in `Select.vue`, which needs coordinates.
 - Layout: `/` is the user home (workspaces, invitations, create). Inside a workspace, `layouts/WorkspaceLayout.vue` gives the sidebar: workspace switcher on top, then the project switcher with the selected project's pages, then the workspace meta pages, then the user menu. `/w/:workspaceId` lands on the current project's first page (the last project used, else the first), or on Projects when there are none.
 - A feature's UI is a web module: `web/src/modules/<name>.ts` calls `defineWebModule({ name, projectRoutes, workspaceRoutes, nav })` and is listed in `modules/index.ts`. The router and the sidebar read the list, so a module never edits the shell. Module data belongs to a project, so feature pages go in `projectRoutes` (mounted at `/w/:workspaceId/p/:projectId/`, params arrive as props) with nav items in `section: 'project'`; they show under the sidebar's project switcher. `section: 'workspace'` is for workspace meta (Team, API keys, Settings) pinned to the bottom. Sidebar `order` 0-99 is core's; modules start at 100; Settings stays last. A unit test checks that nav items point at registered routes of their section and nothing collides.
+- Pages follow the archetypes in `web/DESIGN.md` (list, detail, settings): read it before you add or restyle a page. Detail and edit pages are one column.
 - Building blocks, and what ESLint enforces outside `src/components/ui`:
 
   | Need | Use | Enforced by |
   |---|---|---|
+  | A page | `Page` (sets the width) > `PageHeader` > `PageSection`s and `Card`s | `grid-cols-*`, `col-span-*` and `max-w-*` are errors in `src/pages` |
+  | Secondary or destructive header actions | `ActionsMenu` with `MenuItem` (`danger` for delete, last) | |
+  | Save state of an inline editor | `SaveStatus` next to the header Save | |
   | A list of rows | `DataTable` with `#cell-<key>` slots; it handles loading, error and empty | `<table>` and DaisyUI `table*` classes are errors |
   | A choice | `Select` | `<select>`, `input[type=radio]` and DaisyUI `select*` classes are errors |
   | A tick box | `Checkbox` | `input[type=checkbox]` and DaisyUI `checkbox`/`toggle` classes are errors |

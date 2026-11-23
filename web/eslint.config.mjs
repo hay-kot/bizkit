@@ -47,6 +47,15 @@ const controlRestrictions = [
   },
 ]
 
+// In src/pages: one column, width set on <Page>.
+const pageRestrictions = [
+  {
+    pattern: '^(?:.*:)?(?:grid-cols|col-span|max-w)-.+$',
+    message:
+      '$0: pages are one column inside <Page>; set the width on Page and put grids in a component.',
+  },
+]
+
 const generatedClient = {
   group: ['@/api/gen', '@/api/gen/*', '**/api/gen', '**/api/gen/*'],
   message: 'Only src/queries and src/api/client.ts import the generated client.',
@@ -144,6 +153,17 @@ export default tseslint.config(
           message: 'Use components/ui/Checkbox.vue.',
         },
         { key: 'type', value: 'radio', element: 'input', message: 'Use components/ui/Select.vue.' },
+      ],
+    },
+  },
+  {
+    // See web/DESIGN.md. Repeats the shared lists because a later block's
+    // no-restricted-classes replaces the earlier one.
+    files: ['src/pages/**/*.vue'],
+    rules: {
+      'better-tailwindcss/no-restricted-classes': [
+        'error',
+        { restrict: [...tokenRestrictions, ...controlRestrictions, ...pageRestrictions] },
       ],
     },
   },

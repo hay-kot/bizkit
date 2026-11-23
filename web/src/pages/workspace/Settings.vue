@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Field from '@/components/ui/Field.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'

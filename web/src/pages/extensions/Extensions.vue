@@ -2,7 +2,7 @@
 import { Code, KeyRound, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 
-import PageHeader from '@/components/PageHeader.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import NewScriptPanel from '@/components/extensions/NewScriptPanel.vue'
 import Field from '@/components/ui/Field.vue'
