@@ -1,6 +1,6 @@
 # Page design
 
-Every page follows one of three archetypes. The primitives live in `src/components/ui`; ESLint catches the common breaks of the layout rules in `src/pages` (`grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*`); the rest is on review.
+Every page follows one of four archetypes. The primitives live in `src/components/ui`; ESLint catches the common breaks of the layout rules in `src/pages` (`grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*`); the rest is on review.
 
 ## Building blocks
 
@@ -13,6 +13,12 @@ Every page follows one of three archetypes. The primitives live in `src/componen
 | `DescriptionList` | Read-only facts about the entity, straight under the header. |
 | `DetailActions` + `MenuItem` | A detail page's header actions: page buttons (`actions`), Save (`save`) and the "..." menu (`#menu`), all `btn-sm` in one style family. Save shows its own state: "Save", a disabled "Saved", or "Saving". Destructive menu items are `danger` and go last. |
 | `FormPanel` | Create and edit forms, as a side panel or a dialog. |
+| `Tabs` | Route links under a page header, one route per tab, for a feature with several pages (Analytics). The active tab gets `aria-current="page"`; a tab stays active on paths under it unless `exact`. |
+| `DateRangePicker` | A report's range: a preset `Select` (Today to Last month) and two date fields for Custom. Days are `YYYY-MM-DD` in UTC; `presetRange` and `previousPeriod` in `lib/range.ts` do the math. |
+| `StatTiles` | A row of KPI tiles. With `previous` set, a tile shows the change as a percent with an arrow, green up and red down, or "new" when the previous value was 0. |
+| `TimeSeriesChart` | A line chart over time in hand-written SVG. The first `primary` series gets an area; a `muted` series is the dashed previous period. Hover or arrow keys read a point. Empty data draws a flat baseline. |
+| `BarList` | A ranked list with a share bar behind each row (a `progress` element, so no width style), the top `limit` rows and a "Show all" button (`show-all`). |
+| `ReportGrid` | Lays report panels out two-up on wide screens, one column below, so the page needs no grid classes. |
 
 ## List page
 
@@ -40,6 +46,16 @@ Workspace settings.
 - Fields stack label over control at full width. Read-only values are readonly inputs with a `CopyButton`.
 - Save sits in the card's footer and stays disabled until something changed. Each card saves on its own.
 - A danger zone, when there is one, is the last card.
+
+## Report page
+
+Analytics. A read-only page of numbers for a date range.
+
+- `Page` (wide) > `PageHeader` > `Tabs` when the feature has several pages > a toolbar row with the `DateRangePicker` and the page's toggles (compare) > `StatTiles` > `TimeSeriesChart` > `ReportGrid` of `PageSection`s, each holding a `BarList`.
+- The range lives in the URL query, so a link shares the exact view. Pass `today` to `DateRangePicker` from one place, in UTC.
+- Each panel loads and fails on its own: a panel shows its own skeleton or error alert, and the others still render.
+- A range with no data shows tiles at 0, a flat chart and "No data for this range" in each panel, not an empty-state card.
+- "Show all" opens the full list in a side panel, not a new page.
 
 ## Rules for every page
 

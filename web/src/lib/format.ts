@@ -55,3 +55,28 @@ export function formatRelative(
   }
   return formatDate(value)
 }
+
+const numberFormat = new Intl.NumberFormat(undefined)
+const compactFormat = new Intl.NumberFormat(undefined, {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+const percentFormat = new Intl.NumberFormat(undefined, {
+  style: 'percent',
+  maximumFractionDigits: 1,
+})
+
+/** `1,284`. */
+export function formatNumber(value: number): string {
+  return numberFormat.format(value)
+}
+
+/** `1.3K`, for chart axes where space is short. */
+export function formatCompactNumber(value: number): string {
+  return compactFormat.format(value)
+}
+
+/** A ratio as a percent: `0.037` gives `3.7%`. */
+export function formatPercent(ratio: number): string {
+  return percentFormat.format(ratio)
+}
