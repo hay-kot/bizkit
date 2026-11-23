@@ -16,7 +16,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::api::{
     Capability, Hook, HookKindName, HookList, HookTargetKind, Run, RunCause, RunList, Script,
-    ScriptId, ScriptList, ScriptSummary, ScriptTarget, Secret, SecretList,
+    ScriptId, ScriptList, ScriptSummary, ScriptTarget, Secret, SecretList, TargetEntity,
+    TargetList,
 };
 use crate::runner::{ASYNC_BUDGET, Execution, MAX_SOURCE_BYTES, ScriptRunner};
 use crate::store::{self, RunRow, ScriptRow};
@@ -27,6 +28,7 @@ const TAGS: &[&str] = &["extensions"];
 const MAX_SECRET_BYTES: usize = 4 << 10;
 const DEFAULT_RUNS: u32 = 50;
 const MAX_RUNS: u32 = 100;
+const MAX_TARGETS: usize = 100;
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>, runner: &ScriptRunner) -> anyhow::Result<()> {
     cx.scope_area("extensions", "Scripts on hook points, their secrets and runs")?;
@@ -37,6 +39,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>, runner: &ScriptRunner) -> any
     cx.op(ScriptsUpdate { runner: runner.clone() })?;
     cx.op(ScriptsDelete)?;
     cx.op(ScriptsTest { runner: runner.clone() })?;
+    cx.op(TargetsList)?;
     cx.op(RunsList)?;
     cx.op(SecretsList)?;
     cx.op(SecretsPut)?;
@@ -75,8 +78,8 @@ fn hook_to_api(point: &HookPoint) -> Hook {
 /// Entity labels by ID, from each kind's resolver.
 type Labels = BTreeMap<String, String>;
 
-/// Looks up the labels of the entities `rows` are bound to, one resolver
-/// call per kind. A kind whose module is compiled out gives no labels.
+/// Looks up the labels of the entities `rows` target, one resolver call
+/// per kind. A kind whose module is compiled out gives no labels.
 async fn labels(
     platform: &Platform,
     workspace_id: WorkspaceId,
@@ -85,8 +88,8 @@ async fn labels(
     let mut by_kind: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
     for row in rows {
         let kind = platform.hook_point(&row.hook).and_then(|point| point.target);
-        if let (Some(kind), Some(target_id)) = (kind, &row.target_id) {
-            by_kind.entry(kind.id).or_default().insert(target_id.clone());
+        if let Some(kind) = kind {
+            by_kind.entry(kind.id).or_default().extend(row.target_ids.iter().cloned());
         }
     }
     let mut labels = Labels::new();
@@ -102,14 +105,14 @@ async fn labels(
     Ok(labels)
 }
 
-fn target_to_api(labels: &Labels, id: String) -> ScriptTarget {
-    ScriptTarget { label: labels.get(&id).cloned(), id }
+fn targets_to_api(labels: &Labels, ids: Vec<String>) -> Vec<ScriptTarget> {
+    ids.into_iter().map(|id| ScriptTarget { label: labels.get(&id).cloned(), id }).collect()
 }
 
 fn summary(platform: &Platform, labels: &Labels, row: ScriptRow) -> ScriptSummary {
     ScriptSummary {
         available: platform.hook_point(&row.hook).is_some(),
-        target: row.target_id.map(|id| target_to_api(labels, id)),
+        targets: targets_to_api(labels, row.target_ids),
         id: row.id,
         project_id: row.project_id,
         hook: row.hook,
@@ -125,7 +128,7 @@ async fn script_to_api(platform: &Platform, row: ScriptRow) -> Result<Script, Ap
     let labels = labels(platform, row.workspace_id, std::slice::from_ref(&row)).await?;
     Ok(Script {
         available: platform.hook_point(&row.hook).is_some(),
-        target: row.target_id.map(|id| target_to_api(&labels, id)),
+        targets: targets_to_api(&labels, row.target_ids),
         id: row.id,
         project_id: row.project_id,
         hook: row.hook,
@@ -183,6 +186,12 @@ fn check_source(errors: &mut FieldErrors, source: &str) {
     }
 }
 
+fn check_target_count(errors: &mut FieldErrors, target_ids: &[String]) {
+    if target_ids.len() > MAX_TARGETS {
+        errors.add("target_ids", format!("must have at most {MAX_TARGETS} entries"));
+    }
+}
+
 fn is_secret_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|first| first.is_ascii_uppercase())
@@ -212,7 +221,9 @@ pub(crate) struct ListScripts {
     /// Only this project's scripts.
     #[serde(default)]
     project_id: Option<ProjectId>,
-    /// Only scripts bound to this entity, as `target.id` spells it.
+    /// Only scripts that run for this entity, as `targets[].id` spells it:
+    /// those that name it, and those on points of its kind that target
+    /// every entity.
     #[serde(default)]
     target_id: Option<String>,
 }
@@ -239,10 +250,10 @@ pub(crate) struct CreateScript {
     project_id: ProjectId,
     /// The hook point ID, such as `forms.pre_validate`. Fixed after create.
     hook: String,
-    /// Binds the script to one entity of the point's target kind, such as
-    /// a form ID. Absent: project-wide. Fixed after create.
+    /// The entities of the point's target kind it runs for, such as form
+    /// IDs, at most 100. Empty or absent: every entity of the kind.
     #[serde(default)]
-    target_id: Option<String>,
+    target_ids: Vec<String>,
     /// The display name.
     name: String,
     /// An ES module whose default export runs, at most 64 KiB.
@@ -257,6 +268,7 @@ impl Validate for CreateScript {
         let mut errors = FieldErrors::default();
         check_name(&mut errors, "name", &self.name);
         check_source(&mut errors, &self.source);
+        check_target_count(&mut errors, &self.target_ids);
         errors.into_result()
     }
 }
@@ -278,11 +290,18 @@ pub(crate) struct UpdateScript {
     /// Whether it runs.
     #[serde(default)]
     enabled: Option<bool>,
+    /// Replaces the target set, at most 100. Empty: every entity of the
+    /// point's kind.
+    #[serde(default)]
+    target_ids: Option<Vec<String>>,
 }
 
 impl Validate for UpdateScript {
     fn validate(&self) -> Result<(), FieldErrors> {
         let mut errors = FieldErrors::default();
+        if let Some(target_ids) = &self.target_ids {
+            check_target_count(&mut errors, target_ids);
+        }
         if let Some(name) = &self.name {
             check_name(&mut errors, "name", name);
         }
@@ -394,6 +413,19 @@ pub(crate) struct InSecret {
 }
 impl Validate for InSecret {}
 
+/// Which entities to list.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListTargets {
+    /// The workspace.
+    workspace_id: WorkspaceId,
+    /// The project.
+    project_id: ProjectId,
+    /// The target kind, as `hooks[].target.id` spells it, such as `forms.form`.
+    kind: String,
+}
+impl Validate for ListTargets {}
+
 // ---------------------------------------------------------------- hooks
 
 struct HooksList;
@@ -431,13 +463,13 @@ impl Operation for ScriptsList {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: ListScripts) -> Result<ScriptList, ApiError> {
-        let rows = store::list_scripts(
-            cx.platform().db().read(),
-            input.workspace_id,
-            input.project_id,
-            input.target_id.as_deref(),
-        )
-        .await?;
+        let mut rows =
+            store::list_scripts(cx.platform().db().read(), input.workspace_id, input.project_id)
+                .await?;
+        if let Some(entity) = &input.target_id {
+            let kind = entity_kind(cx.platform(), input.workspace_id, entity).await?;
+            rows.retain(|row| runs_for(cx.platform(), row, entity, kind));
+        }
         let labels = labels(cx.platform(), input.workspace_id, &rows).await?;
         let items = rows.into_iter().map(|row| summary(cx.platform(), &labels, row)).collect();
         Ok(ScriptList { items })
@@ -480,10 +512,14 @@ impl Operation for ScriptsCreate {
         let Some(point) = cx.platform().hook_point(&input.hook) else {
             return Err(field_error("hook", "is not a hook point of this server"));
         };
-        let target_id = match &input.target_id {
-            Some(id) => Some(resolve_target(cx.platform(), point, &input, id).await?),
-            None => None,
-        };
+        let target_ids = resolve_targets(
+            cx.platform(),
+            point,
+            input.workspace_id,
+            input.project_id,
+            &input.target_ids,
+        )
+        .await?;
         self.runner.check(&input.source).await.map_err(|err| field_error("source", err))?;
         let now = cx.now();
         let row = ScriptRow {
@@ -492,7 +528,7 @@ impl Operation for ScriptsCreate {
             project_id: input.project_id,
             hook: point.id.to_owned(),
             sync: point.kind.is_sync(),
-            target_id,
+            target_ids,
             name: input.name.trim().to_owned(),
             source: input.source,
             enabled: input.enabled.unwrap_or(true),
@@ -503,63 +539,121 @@ impl Operation for ScriptsCreate {
         if !bizkit_core::projects::exists(&mut *tx, input.workspace_id, input.project_id).await? {
             return Err(field_error("project_id", "is not a project of this workspace"));
         }
-        if row.sync
-            && store::has_sync_script(
-                &mut *tx,
-                row.workspace_id,
-                row.project_id,
-                &row.hook,
-                row.target_id.as_deref(),
-            )
-            .await?
-        {
-            let holder = match point.target {
-                Some(kind) if row.target_id.is_some() => format!("the {}", kind.noun),
-                _ => "the project".to_owned(),
-            };
-            let scope = if row.target_id.is_some() { "a" } else { "a project-wide" };
-            return Err(ApiError::Conflict(format!(
-                "{holder} already has {scope} script on {}; a sync hook point takes one",
-                row.hook
-            )));
-        }
-        store::insert_script(&mut *tx, &row).await?;
+        check_sync_slots(cx.platform(), &mut tx, point, &row).await?;
+        store::insert_script(&mut tx, &row).await?;
         tx.commit().await?;
         script_to_api(cx.platform(), row).await
     }
 }
 
-/// Checks that `id` names an entity of the point's target kind in the
-/// script's project, and returns its canonical ID. The check reads outside
-/// the write transaction; an entity deleted in between leaves a script that
-/// never runs, the same as deleting it later.
-async fn resolve_target(
+/// Checks that every ID names an entity of the point's target kind in the
+/// project, and returns the canonical IDs, sorted and without repeats. The
+/// check reads outside the write transaction; an entity deleted in between
+/// leaves a target that never matches, the same as deleting it later.
+async fn resolve_targets(
     platform: &Platform,
     point: &HookPoint,
-    input: &CreateScript,
-    id: &str,
-) -> Result<String, ApiError> {
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    ids: &[String],
+) -> Result<Vec<String>, ApiError> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
     let Some(kind) = point.target else {
         return Err(field_error(
-            "target_id",
-            format!("{} scripts can't bind to an entity", point.id),
+            "target_ids",
+            format!("{} scripts run for the whole project and take no targets", point.id),
         ));
     };
     let Some((_, resolver)) = platform.hook_target_kind(kind.id) else {
         return Err(field_error(
-            "target_id",
+            "target_ids",
             format!("{} isn't compiled into this server", kind.id),
         ));
     };
-    let found = resolver
-        .find(platform, input.workspace_id, &[id.to_owned()])
-        .await
-        .with_context(|| format!("looking up a {} target", kind.id))?;
-    found
-        .into_iter()
-        .find(|entity| entity.project_id == input.project_id)
-        .map(|entity| entity.id)
-        .ok_or_else(|| field_error("target_id", format!("is not a {} in this project", kind.noun)))
+    let mut canonical = BTreeSet::new();
+    for id in ids {
+        let found = resolver
+            .find(platform, workspace_id, std::slice::from_ref(id))
+            .await
+            .with_context(|| format!("looking up a {} target", kind.id))?;
+        let Some(entity) = found.into_iter().find(|entity| entity.project_id == project_id) else {
+            return Err(field_error(
+                "target_ids",
+                format!("{id} is not a {} in this project", kind.noun),
+            ));
+        };
+        canonical.insert(entity.id);
+    }
+    Ok(canonical.into_iter().collect())
+}
+
+/// Refuses a sync script that would share a slot: per entity at most one
+/// script names it, and at most one script targets every entity.
+async fn check_sync_slots(
+    platform: &Platform,
+    tx: &mut sqlx::SqliteConnection,
+    point: &HookPoint,
+    row: &ScriptRow,
+) -> Result<(), ApiError> {
+    if !row.sync {
+        return Ok(());
+    }
+    let Some(conflict) = store::sync_conflict(&mut *tx, row).await? else { return Ok(()) };
+    let (noun, plural) =
+        point.target.map_or(("project", "the project"), |kind| (kind.noun, kind.plural));
+    let message = match conflict.target_id {
+        Some(target_id) => {
+            let labels = labels(platform, row.workspace_id, std::slice::from_ref(row)).await?;
+            let label = labels.get(&target_id).cloned().unwrap_or(target_id);
+            format!(
+                "{} already runs on {} for {label}; a sync hook point takes one script per {noun}",
+                conflict.name, row.hook
+            )
+        }
+        None => format!(
+            "{} already runs on {} for all {plural}; a sync hook point takes one script for all of them",
+            conflict.name, row.hook
+        ),
+    };
+    Err(ApiError::Conflict(message))
+}
+
+/// The target kind of `entity`: the first kind whose resolver finds it.
+/// `None` when no resolver does, such as for a deleted entity.
+async fn entity_kind(
+    platform: &Platform,
+    workspace_id: WorkspaceId,
+    entity: &str,
+) -> Result<Option<&'static str>, ApiError> {
+    let kinds: BTreeSet<&'static str> = platform
+        .hook_points()
+        .iter()
+        .filter_map(|point| point.target)
+        .map(|kind| kind.id)
+        .collect();
+    for kind in kinds {
+        let Some((_, resolver)) = platform.hook_target_kind(kind) else { continue };
+        let found = resolver
+            .find(platform, workspace_id, &[entity.to_owned()])
+            .await
+            .with_context(|| format!("looking up a {kind} target"))?;
+        if !found.is_empty() {
+            return Ok(Some(kind));
+        }
+    }
+    Ok(None)
+}
+
+/// Whether `row` runs for `entity`, an entity of `kind`.
+fn runs_for(platform: &Platform, row: &ScriptRow, entity: &str, kind: Option<&str>) -> bool {
+    if row.target_ids.is_empty() {
+        let point_kind = platform.hook_point(&row.hook).and_then(|point| point.target);
+        point_kind.is_some_and(|point_kind| Some(point_kind.id) == kind)
+    } else {
+        row.target_ids.iter().any(|id| id == entity)
+    }
 }
 
 struct ScriptsUpdate {
@@ -572,11 +666,27 @@ impl Operation for ScriptsUpdate {
     const METHOD: Method = Method::Patch;
     const PATH: &'static str = "/workspaces/{workspace_id}/extensions/scripts/{script_id}";
     const ACCESS: Access = ADMIN;
-    const SUMMARY: &'static str = "Change a script's name, source or enabled flag";
+    const SUMMARY: &'static str = "Change a script's name, source, enabled flag or targets";
     const TAGS: &'static [&'static str] = TAGS;
 
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+
     async fn call(&self, cx: OpCtx, input: UpdateScript) -> Result<Script, ApiError> {
-        script_in(&cx, input.workspace_id, input.script_id).await?;
+        let before = script_in(&cx, input.workspace_id, input.script_id).await?;
+        let point = cx.platform().hook_point(&before.hook);
+        let target_ids = match (&input.target_ids, point) {
+            (None, _) => None,
+            (Some(ids), Some(point)) => Some(
+                resolve_targets(cx.platform(), point, before.workspace_id, before.project_id, ids)
+                    .await?,
+            ),
+            (Some(_), None) => {
+                return Err(field_error(
+                    "target_ids",
+                    "its hook point isn't compiled into this server",
+                ));
+            }
+        };
         if let Some(source) = &input.source {
             self.runner.check(source).await.map_err(|err| field_error("source", err))?;
         }
@@ -595,8 +705,14 @@ impl Operation for ScriptsUpdate {
         if let Some(enabled) = input.enabled {
             row.enabled = enabled;
         }
+        if let Some(target_ids) = target_ids {
+            row.target_ids = target_ids;
+            if let Some(point) = point {
+                check_sync_slots(cx.platform(), &mut tx, point, &row).await?;
+            }
+        }
         row.updated_at = cx.now();
-        store::update_script(&mut *tx, &row).await?;
+        store::update_script(&mut tx, &row).await?;
         tx.commit().await?;
         script_to_api(cx.platform(), row).await
     }
@@ -673,6 +789,36 @@ impl Operation for RunsList {
                 .await?;
         let items = rows.into_iter().map(run_to_api).collect::<anyhow::Result<_>>()?;
         Ok(RunList { items })
+    }
+}
+
+// ---------------------------------------------------------------- targets
+
+struct TargetsList;
+impl Operation for TargetsList {
+    type Input = ListTargets;
+    type Output = TargetList;
+    const ID: &'static str = "extensions.targets.list";
+    const METHOD: Method = Method::Get;
+    const PATH: &'static str = "/workspaces/{workspace_id}/extensions/targets";
+    const ACCESS: Access = ADMIN;
+    const SUMMARY: &'static str = "List a project's entities of one target kind, such as its forms";
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: ListTargets) -> Result<TargetList, ApiError> {
+        let Some((kind, resolver)) = cx.platform().hook_target_kind(&input.kind) else {
+            return Err(field_error("kind", "is not a target kind of this server"));
+        };
+        project_in(&cx, input.workspace_id, input.project_id).await?;
+        let found = resolver
+            .list(cx.platform(), input.workspace_id, input.project_id)
+            .await
+            .with_context(|| format!("listing {} targets", kind.id))?;
+        let items = found
+            .into_iter()
+            .map(|entity| TargetEntity { id: entity.id, label: entity.label })
+            .collect();
+        Ok(TargetList { items })
     }
 }
 

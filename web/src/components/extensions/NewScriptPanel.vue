@@ -7,16 +7,18 @@ import FormPanel from '@/components/ui/FormPanel.vue'
 import Select from '@/components/ui/Select.vue'
 import { useCreateScript, useHooks } from '@/queries/extensions'
 
+import TargetPicker from './TargetPicker.vue'
+
 /**
- * Creates a script and opens it. With a `target`, the script binds to that
- * entity and only the hook points of its kind are offered; without one, it
- * is project-wide.
+ * Creates a script and opens it. With a `target`, only the hook points of
+ * its kind are offered and the script starts out running for that entity
+ * alone; the picker can widen it.
  */
 const props = defineProps<{
   open: boolean
   workspaceId: string
   projectId: string
-  target?: { kind: string; id: string; label: string }
+  target?: { kind: string; id: string }
 }>()
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
@@ -52,6 +54,8 @@ export default async function (input, ctx) {
 
 const name = ref('')
 const hook = ref('')
+const targetIds = ref<string[]>([])
+const point = computed(() => points.value.find((h) => h.id === hook.value))
 
 watch(
   () => props.open,
@@ -59,20 +63,20 @@ watch(
     if (!open) return
     name.value = ''
     hook.value = hookOptions.value[0]?.value ?? ''
+    targetIds.value = props.target ? [props.target.id] : []
     create.reset()
   },
 )
 
 async function onCreate() {
-  const point = points.value.find((h) => h.id === hook.value)
   const script = await create.mutateAsync({
     path: { workspace_id: props.workspaceId },
     body: {
       name: name.value,
       hook: hook.value,
       project_id: props.projectId,
-      target_id: props.target?.id,
-      source: STARTERS[point?.kind ?? 'async'] ?? '',
+      target_ids: point.value?.target ? targetIds.value : [],
+      source: STARTERS[point.value?.kind ?? 'async'] ?? '',
     },
   })
   emit('close')
@@ -100,8 +104,12 @@ async function onCreate() {
       />
     </Field>
     <Select v-model="hook" :options="hookOptions" label="Hook point" name="hook" />
-    <p v-if="target" class="text-sm text-base-content/80">
-      Runs only for <span class="font-medium">{{ target.label }}</span>.
-    </p>
+    <TargetPicker
+      v-if="point?.target"
+      v-model="targetIds"
+      :workspace-id="workspaceId"
+      :project-id="projectId"
+      :kind="point.target"
+    />
   </FormPanel>
 </template>

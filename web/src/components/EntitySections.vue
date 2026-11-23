@@ -10,8 +10,6 @@ const props = defineProps<{
   /** The entity kind, such as `forms.form`. */
   kind: string
   entityId: string
-  /** The entity's display name, such as the form's name. */
-  entityLabel?: string
 }>()
 
 const isAdmin = useIsAdmin(() => props.workspaceId)
@@ -33,6 +31,5 @@ const sections = computed(() =>
     :project-id="projectId"
     :kind="kind"
     :entity-id="entityId"
-    :entity-label="entityLabel"
   />
 </template>

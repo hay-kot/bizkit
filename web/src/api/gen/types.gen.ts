@@ -673,7 +673,11 @@ export type Script = {
      * Whether the hook point runs inside the request.
      */
     sync: boolean;
-    target?: ScriptTarget | null;
+    /**
+     * The entities it runs for, by ID. Empty: every entity of the point's
+     * kind, or the whole project when the point has no kind.
+     */
+    targets: Array<ScriptTarget>;
     /**
      * When it last changed.
      */
@@ -728,7 +732,11 @@ export type ScriptSummary = {
      * Whether the hook point runs inside the request.
      */
     sync: boolean;
-    target?: ScriptTarget | null;
+    /**
+     * The entities it runs for, by ID. Empty: every entity of the point's
+     * kind, or the whole project when the point has no kind.
+     */
+    targets: Array<ScriptTarget>;
     /**
      * When it last changed.
      */
@@ -736,7 +744,7 @@ export type ScriptSummary = {
 };
 
 /**
- * The entity a script is bound to.
+ * An entity a script runs for.
  */
 export type ScriptTarget = {
     /**
@@ -862,6 +870,30 @@ export type SubmissionList = {
  * Where a submission sits.
  */
 export type SubmissionStatus = 'inbox' | 'spam';
+
+/**
+ * An entity scripts can target.
+ */
+export type TargetEntity = {
+    /**
+     * The entity ID, as `target_ids` takes it.
+     */
+    id: string;
+    /**
+     * Its display name.
+     */
+    label: string;
+};
+
+/**
+ * A project's entities of one kind.
+ */
+export type TargetList = {
+    /**
+     * The entities, by label.
+     */
+    items: Array<TargetEntity>;
+};
 
 export type Timestamp = string;
 
@@ -1809,7 +1841,9 @@ export type ExtensionsScriptsListData = {
     query?: {
         project_id?: ProjectId | null;
         /**
-         * Only scripts bound to this entity, as `target.id` spells it.
+         * Only scripts that run for this entity, as `targets[].id` spells it:
+         * those that name it, and those on points of its kind that target
+         * every entity.
          */
         target_id?: string | null;
     };
@@ -1873,10 +1907,10 @@ export type ExtensionsScriptsCreateData = {
          */
         source: string;
         /**
-         * Binds the script to one entity of the point's target kind, such as
-         * a form ID. Absent: project-wide. Fixed after create.
+         * The entities of the point's target kind it runs for, such as form
+         * IDs, at most 100. Empty or absent: every entity of the kind.
          */
-        target_id?: string | null;
+        target_ids?: Array<string>;
     };
     path: {
         /**
@@ -2040,6 +2074,11 @@ export type ExtensionsScriptsUpdateData = {
          * The ES module source, at most 64 KiB.
          */
         source?: string | null;
+        /**
+         * Replaces the target set, at most 100. Empty: every entity of the
+         * point's kind.
+         */
+        target_ids?: Array<string> | null;
     };
     path: {
         /**
@@ -2068,6 +2107,10 @@ export type ExtensionsScriptsUpdateErrors = {
      * Not Found
      */
     404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
     /**
      * Unprocessable Entity
      */
@@ -2146,6 +2189,61 @@ export type ExtensionsScriptsTestResponses = {
 };
 
 export type ExtensionsScriptsTestResponse = ExtensionsScriptsTestResponses[keyof ExtensionsScriptsTestResponses];
+
+export type ExtensionsTargetsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The target kind, as `hooks[].target.id` spells it, such as `forms.form`.
+         */
+        kind: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/extensions/targets';
+};
+
+export type ExtensionsTargetsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type ExtensionsTargetsListError = ExtensionsTargetsListErrors[keyof ExtensionsTargetsListErrors];
+
+export type ExtensionsTargetsListResponses = {
+    /**
+     * OK
+     */
+    200: TargetList;
+};
+
+export type ExtensionsTargetsListResponse = ExtensionsTargetsListResponses[keyof ExtensionsTargetsListResponses];
 
 export type FormsListData = {
     body?: never;

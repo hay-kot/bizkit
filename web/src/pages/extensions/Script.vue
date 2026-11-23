@@ -4,6 +4,8 @@ import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
+import TargetPicker from '@/components/extensions/TargetPicker.vue'
+import { runsForText } from '@/components/extensions/targets'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
@@ -58,6 +60,7 @@ const hook = computed(() => hooks.value?.items.find((h) => h.id === script.value
 const name = ref('')
 const source = ref('')
 const enabled = ref(true)
+const targetIds = ref<string[]>([])
 const testInput = ref('')
 const inputEditor = useTemplateRef('inputEditor')
 const lastTest = ref<Run | null>(null)
@@ -78,6 +81,7 @@ watch(
     if (fresh || name.value === synced?.name) name.value = loaded.name
     if (fresh || source.value === synced?.source) source.value = loaded.source
     if (fresh || enabled.value === synced?.enabled) enabled.value = loaded.enabled
+    if (fresh || sameSet(targetIds.value, idsOf(synced))) targetIds.value = idsOf(loaded)
     synced = loaded
   },
   { immediate: true },
@@ -90,12 +94,21 @@ watch(
   { immediate: true },
 )
 
+function idsOf(loaded: typeof script.value): string[] {
+  return loaded?.targets.map((target) => target.id) ?? []
+}
+
+function sameSet(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id))
+}
+
 const dirty = computed(
   () =>
     script.value !== undefined &&
     (name.value !== script.value.name ||
       source.value !== script.value.source ||
-      enabled.value !== script.value.enabled),
+      enabled.value !== script.value.enabled ||
+      !sameSet(targetIds.value, idsOf(script.value))),
 )
 
 const CAPABILITY_NAMES: Record<string, string> = {
@@ -105,12 +118,9 @@ const CAPABILITY_NAMES: Record<string, string> = {
 }
 
 /** What the script runs for, in words. */
-const runsFor = computed(() => {
-  const kind = hook.value?.target
-  const target = script.value?.target
-  if (!target) return kind ? `All ${kind.plural}` : 'The project'
-  return target.label ?? `A deleted ${kind?.noun ?? 'entity'}`
-})
+const runsFor = computed(() =>
+  runsForText(script.value?.targets ?? [], hook.value?.target ?? undefined),
+)
 
 const facts = computed(() => {
   const point = hook.value
@@ -162,7 +172,12 @@ function save() {
     run: () =>
       update.mutateAsync({
         path: { workspace_id: props.workspaceId, script_id: props.scriptId },
-        body: { name: name.value, source: source.value, enabled: enabled.value },
+        body: {
+          name: name.value,
+          source: source.value,
+          enabled: enabled.value,
+          ...(hook.value?.target ? { target_ids: targetIds.value } : {}),
+        },
       }),
     success: 'Script saved',
   })
@@ -209,7 +224,7 @@ function summaryOf(run: Run): string {
         :title="script.name"
         :description="
           hook
-            ? `Runs ${script.sync ? 'on' : 'after'} ${script.hook} for ${script.target ? runsFor : runsFor.toLowerCase()}.`
+            ? `Runs ${script.sync ? 'on' : 'after'} ${script.hook} for ${script.targets.length ? runsFor : runsFor.toLowerCase()}.`
             : 'This hook point isn’t compiled into this server, so the script never runs.'
         "
       >
@@ -265,6 +280,13 @@ function summaryOf(run: Run): string {
                 <Checkbox v-model="enabled" label="Enabled" />
               </div>
             </div>
+            <TargetPicker
+              v-if="hook?.target"
+              v-model="targetIds"
+              :workspace-id="workspaceId"
+              :project-id="projectId"
+              :kind="hook.target"
+            />
             <div class="flex flex-col gap-1.5">
               <span class="text-sm font-medium">Source</span>
               <CodeEditor

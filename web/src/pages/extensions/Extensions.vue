@@ -11,6 +11,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
+import { runsForText } from '@/components/extensions/targets'
 import type { ScriptSummary } from '@/queries/extensions'
 import {
   useDeleteSecret,
@@ -50,31 +51,46 @@ const scriptColumns = [
 
 const pointsById = computed(() => new Map((hooks.value?.items ?? []).map((h) => [h.id, h])))
 
+function targetKind(script: ScriptSummary) {
+  return pointsById.value.get(script.hook)?.target ?? undefined
+}
+
 function targetText(script: ScriptSummary): string {
-  const kind = pointsById.value.get(script.hook)?.target
-  if (!script.target) return kind ? `All ${kind.plural}` : 'The project'
-  return script.target.label ?? `Deleted ${kind?.noun ?? 'entity'}`
+  return runsForText(script.targets, targetKind(script))
 }
 
 const ALL = 'all'
-const WIDE = 'project-wide'
+const FOR_ALL = 'for-all'
 const targetFilter = ref(ALL)
-const targetOptions = computed(() => {
-  const seen = new Map<string, string>()
+/** The entities scripts name, by ID, with their kind and label. */
+const namedTargets = computed(() => {
+  const seen = new Map<string, { kind: string | undefined; label: string }>()
   for (const script of scripts.value?.items ?? []) {
-    if (script.target) seen.set(script.target.id, targetText(script))
+    const kind = targetKind(script)
+    for (const target of script.targets) {
+      seen.set(target.id, {
+        kind: kind?.id,
+        label: target.label ?? `Deleted ${kind?.noun ?? 'entity'}`,
+      })
+    }
   }
-  return [
-    { value: ALL, label: 'All scripts' },
-    { value: WIDE, label: 'Project-wide' },
-    ...[...seen].map(([value, label]) => ({ value, label })),
-  ]
+  return seen
 })
+const targetOptions = computed(() => [
+  { value: ALL, label: 'All scripts' },
+  { value: FOR_ALL, label: 'Scripts for every entity' },
+  ...[...namedTargets.value].map(([value, { label }]) => ({ value, label })),
+])
+/** A named entity shows the scripts that run for it: those naming it and those for all of its kind. */
 const shownScripts = computed(() =>
   scripts.value?.items.filter((script) => {
     if (targetFilter.value === ALL) return true
-    if (targetFilter.value === WIDE) return !script.target
-    return script.target?.id === targetFilter.value
+    if (script.targets.length === 0) {
+      if (targetFilter.value === FOR_ALL) return true
+      const kind = targetKind(script)?.id
+      return kind !== undefined && namedTargets.value.get(targetFilter.value)?.kind === kind
+    }
+    return script.targets.some((target) => target.id === targetFilter.value)
   }),
 )
 const secretColumns = [
@@ -177,7 +193,7 @@ function removeSecret(secret: string) {
         <span class="ms-2 badge badge-outline badge-sm">{{ row.sync ? 'sync' : 'async' }}</span>
       </template>
       <template #cell-target="{ row }"
-        ><span class="text-sm" :class="{ 'text-base-content/70': !row.target }">{{
+        ><span class="text-sm" :class="{ 'text-base-content/70': row.targets.length === 0 }">{{
           targetText(row)
         }}</span></template
       >

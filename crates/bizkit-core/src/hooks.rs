@@ -92,6 +92,15 @@ pub trait TargetResolver: Send + Sync + fmt::Debug + 'static {
         workspace_id: WorkspaceId,
         ids: &[String],
     ) -> anyhow::Result<Vec<TargetEntity>>;
+
+    /// Every entity of the kind in one project, by label, for a target
+    /// picker.
+    async fn list(
+        &self,
+        platform: &Platform,
+        workspace_id: WorkspaceId,
+        project_id: ProjectId,
+    ) -> anyhow::Result<Vec<TargetEntity>>;
 }
 
 /// When a hook point runs.
@@ -668,6 +677,15 @@ mod tests {
             _platform: &Platform,
             _workspace_id: WorkspaceId,
             _ids: &[String],
+        ) -> anyhow::Result<Vec<TargetEntity>> {
+            Ok(Vec::new())
+        }
+
+        async fn list(
+            &self,
+            _platform: &Platform,
+            _workspace_id: WorkspaceId,
+            _project_id: ProjectId,
         ) -> anyhow::Result<Vec<TargetEntity>> {
             Ok(Vec::new())
         }

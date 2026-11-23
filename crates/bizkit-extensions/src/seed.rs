@@ -35,47 +35,24 @@ export default function (input) {
 }
 ";
 
-/// Seeds "Post to Discord" (after each submission) and "Block casino spam"
-/// (before validation) in the `website` project, bound to the Contact form
-/// when the forms seed made one. A script that already exists by name is
-/// left alone, except that a project-wide one from an earlier seed gets
-/// bound.
+/// Seeds "Post to Discord" (after each submission, for every form) and
+/// "Block casino spam" (before validation, for the Contact form when the
+/// forms seed made one) in the `website` project. A script that already
+/// exists by name is left alone, and so is a sync point whose slot another
+/// script holds.
 pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let contact = seed.entities.get(&("forms.form".to_owned(), "Contact".to_owned()));
-    let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id), None)
+    let existing = store::list_scripts(db.read(), seed.workspace_id, Some(project_id))
         .await
         .context("listing the demo scripts")?;
     let scripts = [
-        ("Post to Discord", "forms.submission_created", false, POST_TO_DISCORD),
-        ("Block casino spam", "forms.pre_validate", true, BLOCK_CASINO),
+        ("Post to Discord", "forms.submission_created", false, POST_TO_DISCORD, None),
+        ("Block casino spam", "forms.pre_validate", true, BLOCK_CASINO, contact),
     ];
     let mut tx = db.write().await.context("starting the seed transaction")?;
-    for (name, hook, sync, source) in scripts {
-        let slot_taken = |conn| async move {
-            Ok::<_, anyhow::Error>(
-                sync && store::has_sync_script(
-                    conn,
-                    seed.workspace_id,
-                    project_id,
-                    hook,
-                    contact.map(String::as_str),
-                )
-                .await
-                .context("checking the sync slot")?,
-            )
-        };
-        if let Some(found) = existing.iter().find(|script| script.name == name) {
-            if let (Some(contact), None) = (contact, &found.target_id)
-                && !slot_taken(&mut *tx).await?
-            {
-                store::bind_script(&mut *tx, seed.workspace_id, found.id, contact)
-                    .await
-                    .with_context(|| format!("binding the {name} script"))?;
-            }
-            continue;
-        }
-        if slot_taken(&mut *tx).await? {
+    for (name, hook, sync, source, target) in scripts {
+        if existing.iter().any(|script| script.name == name) {
             continue;
         }
         let row = ScriptRow {
@@ -84,14 +61,17 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             project_id,
             hook: hook.to_owned(),
             sync,
-            target_id: contact.cloned(),
+            target_ids: target.into_iter().cloned().collect(),
             name: name.to_owned(),
             source: source.to_owned(),
             enabled: true,
             created_at: seed.now,
             updated_at: seed.now,
         };
-        store::insert_script(&mut *tx, &row)
+        if store::sync_conflict(&mut *tx, &row).await.context("checking the sync slot")?.is_some() {
+            continue;
+        }
+        store::insert_script(&mut tx, &row)
             .await
             .with_context(|| format!("inserting the {name} script"))?;
     }

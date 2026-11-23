@@ -6,18 +6,18 @@ import DataTable from '@/components/ui/DataTable.vue'
 import { useHooks, useScripts } from '@/queries/extensions'
 
 import NewScriptPanel from './NewScriptPanel.vue'
+import { runsForText } from './targets'
 
 /**
- * The scripts bound to one entity, on that entity's page. Renders nothing
- * when no hook point targets the entity's kind.
+ * The scripts that run for one entity, on that entity's page: those that
+ * name it and those for every entity of its kind. Renders nothing when no
+ * hook point targets the kind.
  */
 const props = defineProps<{
   workspaceId: string
   projectId: string
   kind: string
   entityId: string
-  /** The entity's display name, for the create panel. */
-  entityLabel?: string
 }>()
 
 const { data: hooks } = useHooks(() => props.workspaceId)
@@ -38,6 +38,7 @@ const panelOpen = ref(false)
 const columns = [
   { key: 'name', label: 'Name' },
   { key: 'hook', label: 'Hook' },
+  { key: 'target', label: 'Runs for' },
 ]
 
 function scriptPath(scriptId: string) {
@@ -51,8 +52,8 @@ function scriptPath(scriptId: string) {
       <div>
         <h2 id="entity-extensions" class="text-sm font-semibold">Extensions</h2>
         <p class="text-xs text-base-content/70">
-          Scripts that run only for this {{ targetKind.noun }}. Project-wide scripts on the
-          Extensions page run for all {{ targetKind.plural }}.
+          Scripts that run for this {{ targetKind.noun }}: those picked for it and those for all
+          {{ targetKind.plural }}.
         </p>
       </div>
       <button type="button" class="btn gap-1.5 btn-sm" @click="panelOpen = true">
@@ -82,12 +83,17 @@ function scriptPath(scriptId: string) {
         <code class="text-xs">{{ row.hook }}</code>
         <span class="ms-2 badge badge-outline badge-sm">{{ row.sync ? 'sync' : 'async' }}</span>
       </template>
+      <template #cell-target="{ row }"
+        ><span class="text-sm" :class="{ 'text-base-content/70': row.targets.length === 0 }">{{
+          runsForText(row.targets, targetKind)
+        }}</span></template
+      >
     </DataTable>
     <NewScriptPanel
       :open="panelOpen"
       :workspace-id="workspaceId"
       :project-id="projectId"
-      :target="{ kind, id: entityId, label: entityLabel ?? `this ${targetKind.noun}` }"
+      :target="{ kind, id: entityId }"
       @close="panelOpen = false"
     />
   </section>

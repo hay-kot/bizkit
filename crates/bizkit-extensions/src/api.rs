@@ -58,13 +58,29 @@ pub struct HookTargetKind {
     pub plural: String,
 }
 
-/// The entity a script is bound to.
+/// An entity a script runs for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ScriptTarget {
     /// The entity ID, such as a form ID.
     pub id: String,
     /// Its display name; `None` when it no longer exists.
     pub label: Option<String>,
+}
+
+/// An entity scripts can target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TargetEntity {
+    /// The entity ID, as `target_ids` takes it.
+    pub id: String,
+    /// Its display name.
+    pub label: String,
+}
+
+/// A project's entities of one kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TargetList {
+    /// The entities, by label.
+    pub items: Vec<TargetEntity>,
 }
 
 /// A hook point a compiled-in module declares.
@@ -107,9 +123,9 @@ pub struct ScriptSummary {
     pub hook: String,
     /// Whether the hook point runs inside the request.
     pub sync: bool,
-    /// The bound entity; `None` for a project-wide script, which runs for
-    /// every entity of the point's kind.
-    pub target: Option<ScriptTarget>,
+    /// The entities it runs for, by ID. Empty: every entity of the point's
+    /// kind, or the whole project when the point has no kind.
+    pub targets: Vec<ScriptTarget>,
     /// The display name.
     pub name: String,
     /// Whether it runs.
@@ -140,9 +156,9 @@ pub struct Script {
     pub hook: String,
     /// Whether the hook point runs inside the request.
     pub sync: bool,
-    /// The bound entity; `None` for a project-wide script, which runs for
-    /// every entity of the point's kind.
-    pub target: Option<ScriptTarget>,
+    /// The entities it runs for, by ID. Empty: every entity of the point's
+    /// kind, or the whole project when the point has no kind.
+    pub targets: Vec<ScriptTarget>,
     /// The display name.
     pub name: String,
     /// The ES module source. Its default export runs.

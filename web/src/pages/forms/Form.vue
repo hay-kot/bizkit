@@ -349,7 +349,6 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       :project-id="projectId"
       kind="forms.form"
       :entity-id="form.id"
-      :entity-label="form.name"
     />
 
     <DetailPanel

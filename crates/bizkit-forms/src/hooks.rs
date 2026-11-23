@@ -11,7 +11,7 @@ use bizkit_core::Platform;
 use bizkit_core::hooks::{
     HookKind, HookPoint, HookSource, HookTarget, TargetEntity, TargetKind, TargetResolver,
 };
-use bizkit_core::ids::WorkspaceId;
+use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::jobs::{Event, JobCtx};
 use bizkit_core::validate::FieldErrors;
 use serde::{Deserialize, Serialize};
@@ -192,6 +192,25 @@ impl TargetResolver for FormTargets {
             })
             .collect())
     }
+
+    async fn list(
+        &self,
+        platform: &Platform,
+        workspace_id: WorkspaceId,
+        project_id: ProjectId,
+    ) -> anyhow::Result<Vec<TargetEntity>> {
+        let forms = store::list_forms(platform.db().read(), workspace_id, Some(project_id))
+            .await
+            .context("listing forms")?;
+        Ok(forms
+            .into_iter()
+            .map(|row| TargetEntity {
+                id: row.form.id.to_string(),
+                project_id: row.form.project_id,
+                label: row.form.name,
+            })
+            .collect())
+    }
 }
 
 /// Builds the `forms.submission_created` target and input from the event.
@@ -302,7 +321,7 @@ mod tests {
         let form = FormRow {
             id: FormId::new(),
             workspace_id: WorkspaceId::new(),
-            project_id: bizkit_core::ids::ProjectId::new(),
+            project_id: ProjectId::new(),
             name: "Contact".to_owned(),
             enabled: true,
             fields: "[]".to_owned(),

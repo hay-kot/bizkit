@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM extension_script_targets WHERE workspace_id = ? AND script_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "bed4b8132c8880d1173224b9100de21bee1e1e6e86f062c7cdd5f57a7aa5b3aa"
+}

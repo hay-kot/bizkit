@@ -1714,7 +1714,7 @@
                 "string",
                 "null"
               ],
-              "description": "Only scripts bound to this entity, as `target.id` spells it."
+              "description": "Only scripts that run for this entity, as `targets[].id` spells it:\nthose that name it, and those on points of its kind that target\nevery entity."
             }
           }
         ],
@@ -1842,12 +1842,12 @@
                     "type": "string",
                     "description": "An ES module whose default export runs, at most 64 KiB."
                   },
-                  "target_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "description": "Binds the script to one entity of the point's target kind, such as\na form ID. Absent: project-wide. Fixed after create."
+                  "target_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The entities of the point's target kind it runs for, such as form\nIDs, at most 100. Empty or absent: every entity of the kind."
                   }
                 },
                 "additionalProperties": false
@@ -2133,7 +2133,7 @@
         "tags": [
           "extensions"
         ],
-        "summary": "Change a script's name, source or enabled flag",
+        "summary": "Change a script's name, source, enabled flag or targets",
         "operationId": "extensions.scripts.update",
         "parameters": [
           {
@@ -2181,6 +2181,16 @@
                       "null"
                     ],
                     "description": "The ES module source, at most 64 KiB."
+                  },
+                  "target_ids": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Replaces the target set, at most 100. Empty: every entity of the\npoint's kind."
                   }
                 },
                 "additionalProperties": false
@@ -2222,6 +2232,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -2326,6 +2346,115 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "extensions:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/extensions/targets": {
+      "get": {
+        "tags": [
+          "extensions"
+        ],
+        "summary": "List a project's entities of one target kind, such as its forms",
+        "operationId": "extensions.targets.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The target kind, as `hooks[].target.id` spells it, such as `forms.form`."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetList"
                 }
               }
             }
@@ -5939,6 +6068,7 @@
           "project_id",
           "hook",
           "sync",
+          "targets",
           "name",
           "source",
           "enabled",
@@ -5983,16 +6113,12 @@
             "type": "boolean",
             "description": "Whether the hook point runs inside the request."
           },
-          "target": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/ScriptTarget",
-                "description": "The bound entity; `None` for a project-wide script, which runs for\nevery entity of the point's kind."
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScriptTarget"
+            },
+            "description": "The entities it runs for, by ID. Empty: every entity of the point's\nkind, or the whole project when the point has no kind."
           },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -6028,6 +6154,7 @@
           "project_id",
           "hook",
           "sync",
+          "targets",
           "name",
           "enabled",
           "available",
@@ -6067,16 +6194,12 @@
             "type": "boolean",
             "description": "Whether the hook point runs inside the request."
           },
-          "target": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/ScriptTarget",
-                "description": "The bound entity; `None` for a project-wide script, which runs for\nevery entity of the point's kind."
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScriptTarget"
+            },
+            "description": "The entities it runs for, by ID. Empty: every entity of the point's\nkind, or the whole project when the point has no kind."
           },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -6086,7 +6209,7 @@
       },
       "ScriptTarget": {
         "type": "object",
-        "description": "The entity a script is bound to.",
+        "description": "An entity a script runs for.",
         "required": [
           "id"
         ],
@@ -6280,6 +6403,40 @@
           "inbox",
           "spam"
         ]
+      },
+      "TargetEntity": {
+        "type": "object",
+        "description": "An entity scripts can target.",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The entity ID, as `target_ids` takes it."
+          },
+          "label": {
+            "type": "string",
+            "description": "Its display name."
+          }
+        }
+      },
+      "TargetList": {
+        "type": "object",
+        "description": "A project's entities of one kind.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetEntity"
+            },
+            "description": "The entities, by label."
+          }
+        }
       },
       "Timestamp": {
         "type": "string",

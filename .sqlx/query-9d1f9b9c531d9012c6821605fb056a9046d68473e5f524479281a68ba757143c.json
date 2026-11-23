@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.name FROM extension_scripts s\n             WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.sync = 1\n               AND s.id != ?4\n               AND NOT EXISTS (SELECT 1 FROM extension_script_targets t\n                               WHERE t.workspace_id = ?1 AND t.script_id = s.id)\n             ORDER BY s.id LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_scripts",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9d1f9b9c531d9012c6821605fb056a9046d68473e5f524479281a68ba757143c"
+}

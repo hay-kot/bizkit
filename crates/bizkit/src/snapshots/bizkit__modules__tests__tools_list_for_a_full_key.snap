@@ -175,12 +175,12 @@ expression: tools
             "description": "An ES module whose default export runs, at most 64 KiB.",
             "type": "string"
           },
-          "target_id": {
-            "description": "Binds the script to one entity of the point's target kind, such as\na form ID. Absent: project-wide. Fixed after create.",
-            "type": [
-              "string",
-              "null"
-            ]
+          "target_ids": {
+            "description": "The entities of the point's target kind it runs for, such as form\nIDs, at most 100. Empty or absent: every entity of the kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -277,7 +277,7 @@ expression: tools
             ]
           },
           "target_id": {
-            "description": "Only scripts bound to this entity, as `target.id` spells it.",
+            "description": "Only scripts that run for this entity, as `targets[].id` spells it:\nthose that name it, and those on points of its kind that target\nevery entity.",
             "type": [
               "string",
               "null"
@@ -338,7 +338,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Change a script's name, source or enabled flag",
+      "description": "Change a script's name, source, enabled flag or targets",
       "inputSchema": {
         "$defs": {
           "ScriptId": {
@@ -371,6 +371,16 @@ expression: tools
             "description": "The ES module source, at most 64 KiB.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "target_ids": {
+            "description": "Replaces the target set, at most 100. Empty: every entity of the\npoint's kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
               "null"
             ]
           }
@@ -480,6 +490,39 @@ expression: tools
         "type": "object"
       },
       "name": "extensions_secrets_put"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's entities of one target kind, such as its forms",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which entities to list.",
+        "properties": {
+          "kind": {
+            "description": "The target kind, as `hooks[].target.id` spells it, such as `forms.form`.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "name": "extensions_targets_list"
     },
     {
       "annotations": {

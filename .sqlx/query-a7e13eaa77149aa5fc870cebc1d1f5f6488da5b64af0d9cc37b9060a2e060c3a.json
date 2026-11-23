@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.name, t.target_id FROM extension_scripts s\n         JOIN extension_script_targets t ON t.workspace_id = s.workspace_id AND t.script_id = s.id\n         WHERE s.workspace_id = ?1 AND s.project_id = ?2 AND s.hook = ?3 AND s.sync = 1\n           AND s.id != ?4 AND t.target_id IN (SELECT value FROM json_each(?5))\n         ORDER BY s.id, t.target_id LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_scripts",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "target_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_script_targets",
+            "name": "target_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a7e13eaa77149aa5fc870cebc1d1f5f6488da5b64af0d9cc37b9060a2e060c3a"
+}
