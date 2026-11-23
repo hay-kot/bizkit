@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import { useIsAdmin } from '@/composables/useIsAdmin'
-import { modules } from '@/modules'
+import { useEntitySections } from '@/modules/entitySections'
 
 const props = defineProps<{
   workspaceId: string
@@ -13,13 +13,8 @@ const props = defineProps<{
 }>()
 
 const isAdmin = useIsAdmin(() => props.workspaceId)
-// `modules` is read here, never at module load: modules/index.ts imports the
-// pages that render this component, so the import is a cycle.
-const sections = computed(() =>
-  modules
-    .flatMap((module) => module.entitySections ?? [])
-    .filter((section) => !section.adminOnly || isAdmin.value),
-)
+const all = useEntitySections()
+const sections = computed(() => all.filter((section) => !section.adminOnly || isAdmin.value))
 </script>
 
 <template>

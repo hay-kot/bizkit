@@ -49,4 +49,24 @@ describe('web modules', () => {
   it('pin Settings to the bottom of the sidebar', () => {
     expect(workspaceNav.at(-1)?.path).toBe('settings')
   })
+
+  it('stay out of the imports of the pages and components they register', () => {
+    // The registry imports every module page, so a page that imports it back
+    // makes a cycle: fine on a full load, but Vite's hot reload re-runs the
+    // cycle and fails. The shell's own files are not module pages.
+    const shell = [
+      '/src/components/PaletteRows.vue',
+      '/src/components/ProjectSwitcher.vue',
+      '/src/pages/workspace/WorkspaceHome.vue',
+    ]
+    const sources = import.meta.glob<string>('/src/{pages,components}/**/*.vue', {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    })
+    const importers = Object.entries(sources)
+      .filter(([path, source]) => !shell.includes(path) && /from '@\/modules'/.test(source))
+      .map(([path]) => path)
+    expect(importers).toEqual([])
+  })
 })
