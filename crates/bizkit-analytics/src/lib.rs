@@ -5,12 +5,15 @@ pub mod api;
 pub mod beacon;
 mod cache;
 pub mod enrich;
+mod explore;
+mod funnels;
 pub mod geo;
 pub mod hooks;
 mod ingest;
 pub mod limit;
 pub mod names;
 mod ops;
+mod people;
 mod report;
 mod rollup;
 mod server;
@@ -64,6 +67,9 @@ impl Module for Analytics {
         cx.job::<rollup::Rollup, _>(rollup::RollupHandler { retention_days })?;
         ops::register(cx, &ingest)?;
         stats::register(cx)?;
+        explore::register(cx)?;
+        funnels::register(cx)?;
+        people::register(cx)?;
         cx.public_routes(ingest::router(ingest), ingest::IngestDocs::openapi())
     }
 }

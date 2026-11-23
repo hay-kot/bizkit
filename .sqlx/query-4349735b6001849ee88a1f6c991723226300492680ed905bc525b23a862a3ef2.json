@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT person, ts AS \"ts!: i64\", name, path FROM analytics_events\n           WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n             AND name IN (SELECT value FROM json_each(?))\n           ORDER BY person, ts, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "person",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "person"
+          }
+        }
+      },
+      {
+        "name": "ts!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "path",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "path"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "4349735b6001849ee88a1f6c991723226300492680ed905bc525b23a862a3ef2"
+}

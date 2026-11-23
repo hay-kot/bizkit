@@ -92,6 +92,417 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Count product events over time, filtered by name and properties",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Event counts over a range.",
+        "properties": {
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day, UTC."
+          },
+          "name": {
+            "description": "Only this event name (`pageview` included); default every custom event.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "props": {
+            "description": "Property filters, `key=value`; all must match.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day, UTC, inclusive."
+          }
+        },
+        "required": [
+          "project_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_events_query"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List recent analytics events, newest first",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of recent events.",
+        "properties": {
+          "before": {
+            "description": "Events older than this one, from `next_before`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day, UTC."
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Only this event name; default every event, pageviews included.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "props": {
+            "description": "Property filters, `key=value`; all must match.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day, UTC, inclusive."
+          }
+        },
+        "required": [
+          "project_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_events_recent"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Save a funnel: 2 to 8 page or event steps",
+      "inputSchema": {
+        "$defs": {
+          "GoalKind": {
+            "description": "What a goal matches.",
+            "enum": [
+              "page",
+              "event"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "Step": {
+            "additionalProperties": false,
+            "description": "One funnel step.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/GoalKind",
+                "description": "A pageview or a custom event."
+              },
+              "match": {
+                "description": "A page path (exact, or a prefix ending in `*`) or an event name.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "match"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new funnel.",
+        "properties": {
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "steps": {
+            "description": "2 to 8 steps, in order.",
+            "items": {
+              "$ref": "#/$defs/Step"
+            },
+            "type": "array"
+          },
+          "window_days": {
+            "description": "Days after the first step in which the rest must happen, 1-90.\nDefault 7.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a funnel",
+      "inputSchema": {
+        "$defs": {
+          "FunnelId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A funnel of a workspace.",
+        "properties": {
+          "funnel_id": {
+            "$ref": "#/$defs/FunnelId",
+            "description": "The funnel."
+          }
+        },
+        "required": [
+          "funnel_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a funnel",
+      "inputSchema": {
+        "$defs": {
+          "FunnelId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A funnel of a workspace.",
+        "properties": {
+          "funnel_id": {
+            "$ref": "#/$defs/FunnelId",
+            "description": "The funnel."
+          }
+        },
+        "required": [
+          "funnel_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's funnels",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which funnels to list.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Count the people who reached each step of a funnel, with conversion between steps",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "FunnelId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A funnel's results over a range.",
+        "properties": {
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day people may enter, UTC."
+          },
+          "funnel_id": {
+            "$ref": "#/$defs/FunnelId",
+            "description": "The funnel."
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day people may enter, UTC, inclusive."
+          }
+        },
+        "required": [
+          "funnel_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_results"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a funnel",
+      "inputSchema": {
+        "$defs": {
+          "FunnelId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "GoalKind": {
+            "description": "What a goal matches.",
+            "enum": [
+              "page",
+              "event"
+            ],
+            "type": "string"
+          },
+          "Step": {
+            "additionalProperties": false,
+            "description": "One funnel step.",
+            "properties": {
+              "kind": {
+                "$ref": "#/$defs/GoalKind",
+                "description": "A pageview or a custom event."
+              },
+              "match": {
+                "description": "A page path (exact, or a prefix ending in `*`) or an event name.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "match"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a funnel. Absent fields stay as they are.",
+        "properties": {
+          "funnel_id": {
+            "$ref": "#/$defs/FunnelId",
+            "description": "The funnel."
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "description": "2 to 8 steps, in order.",
+            "items": {
+              "$ref": "#/$defs/Step"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "window_days": {
+            "description": "Days after the first step in which the rest must happen, 1-90.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "funnel_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": false
       },
       "description": "Add a goal: a page or event that counts as a conversion",
@@ -195,6 +606,159 @@ expression: tools
         "type": "object"
       },
       "name": "analytics_goals_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a person's traits and event timeline",
+      "inputSchema": {
+        "$defs": {
+          "PersonId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A person with a page of their timeline.",
+        "properties": {
+          "before": {
+            "description": "Events older than this one, from `next_before`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "At most this many events, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "person_id": {
+            "$ref": "#/$defs/PersonId",
+            "description": "The person."
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_people_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List identified people, newest first",
+      "inputSchema": {
+        "$defs": {
+          "PersonId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which people to list.",
+        "properties": {
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PersonId",
+                "description": "People older than this one, from `next_before`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "q": {
+            "description": "Text to find in the user ID or traits.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_people_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show weekly retention: of the people first seen each week, the share who came back",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Retention cohorts.",
+        "properties": {
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day a cohort may start, UTC."
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "return_event": {
+            "description": "The event that counts as a return; default any event.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day a cohort may start, UTC, inclusive."
+          }
+        },
+        "required": [
+          "project_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_retention"
     },
     {
       "annotations": {

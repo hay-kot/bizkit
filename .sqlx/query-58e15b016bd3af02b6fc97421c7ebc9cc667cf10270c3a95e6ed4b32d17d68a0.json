@@ -1,0 +1,45 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT person AS \"person!: String\", day AS \"day!: String\", MAX(? IS NULL OR name = ?) AS \"returned!: bool\"\n               FROM analytics_events\n               WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n                 AND substr(person, 1, 2) <> 'v:'\n               GROUP BY person, day",
+  "describe": {
+    "columns": [
+      {
+        "name": "person!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "person"
+          }
+        }
+      },
+      {
+        "name": "day!: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "day"
+          }
+        }
+      },
+      {
+        "name": "returned!: bool",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "58e15b016bd3af02b6fc97421c7ebc9cc667cf10270c3a95e6ed4b32d17d68a0"
+}

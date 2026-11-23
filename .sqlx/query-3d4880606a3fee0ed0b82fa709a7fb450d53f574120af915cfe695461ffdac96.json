@@ -1,0 +1,81 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: PersonId\", user_id, traits, first_seen AS \"first_seen: UnixMillis\",\n                      last_seen AS \"last_seen: UnixMillis\",\n                      (SELECT COUNT(*) FROM analytics_events e\n                       WHERE e.project_id = p.project_id AND e.person = 'p:' || p.id) AS \"events!: i64\"\n               FROM analytics_people p\n               WHERE workspace_id = ? AND project_id = ? AND (? IS NULL OR id < ?)\n                 AND (? IS NULL OR user_id LIKE ? ESCAPE '\\' OR traits LIKE ? ESCAPE '\\')\n               ORDER BY id DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: PersonId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "traits",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "traits"
+          }
+        }
+      },
+      {
+        "name": "first_seen: UnixMillis",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "first_seen"
+          }
+        }
+      },
+      {
+        "name": "last_seen: UnixMillis",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "last_seen"
+          }
+        }
+      },
+      {
+        "name": "events!: i64",
+        "ordinal": 5,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "3d4880606a3fee0ed0b82fa709a7fb450d53f574120af915cfe695461ffdac96"
+}

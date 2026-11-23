@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: FunnelId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                      project_id AS \"project_id: ProjectId\", name, steps, window_days,\n                      created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n               FROM analytics_funnels WHERE workspace_id = ? AND project_id = ? ORDER BY name, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: FunnelId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "steps",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "steps"
+          }
+        }
+      },
+      {
+        "name": "window_days",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "window_days"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_funnels",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6002099a0e642ddc853bd1ab64b782894718fc1bcfdab87178f92e45ff38ae9d"
+}

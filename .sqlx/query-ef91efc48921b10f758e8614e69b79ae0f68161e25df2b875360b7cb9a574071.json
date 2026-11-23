@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_funnels (id, workspace_id, project_id, name, steps, window_days, created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n         ON CONFLICT (id) DO UPDATE SET name = excluded.name, steps = excluded.steps,\n           window_days = excluded.window_days, updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "ef91efc48921b10f758e8614e69b79ae0f68161e25df2b875360b7cb9a574071"
+}

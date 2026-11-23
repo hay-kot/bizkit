@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT ? + ((ts - ?) / ?) * ? AS \"start!: i64\", COUNT(*) AS \"count!: i64\",\n                  COUNT(DISTINCT person) AS \"users!: i64\"\n           FROM analytics_events e\n           WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n             AND (CASE WHEN ? IS NULL THEN name <> 'pageview' ELSE name = ? END)\n             AND NOT EXISTS (\n               SELECT 1 FROM json_each(?) f\n               WHERE NOT EXISTS (\n                 SELECT 1 FROM json_each(COALESCE(e.props, '{}')) p\n                 WHERE p.key = json_extract(f.value, '$.k')\n                   AND CASE p.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                                   ELSE CAST(p.atom AS TEXT) END = json_extract(f.value, '$.v')))\n           GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "start!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "count!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "users!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "9b1fee47258bf7bf46fcb5170a5e79bd2ebce48105110d6662d595d77219caff"
+}

@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { analyticsEventsIngest, analyticsGoalsCreate, analyticsGoalsDelete, analyticsGoalsList, analyticsPublicCollect, analyticsPublicScript, analyticsSiteCreate, analyticsSiteGet, analyticsSiteUpdate, analyticsStatsBreakdown, analyticsStatsSummary, apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, extensionsHooksList, extensionsRunsList, extensionsScriptsCreate, extensionsScriptsDelete, extensionsScriptsGet, extensionsScriptsList, extensionsScriptsTest, extensionsScriptsUpdate, extensionsSecretsDelete, extensionsSecretsList, extensionsSecretsPut, extensionsTargetsList, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, webhooksEndpointsCreate, webhooksEndpointsDelete, webhooksEndpointsGet, webhooksEndpointsList, webhooksEndpointsUpdate, webhooksPublicCaptureDelete, webhooksPublicCaptureGet, webhooksPublicCapturePatch, webhooksPublicCapturePost, webhooksPublicCapturePut, webhooksRequestsGet, webhooksRequestsList, webhooksRequestsReplay, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
-import type { AnalyticsEventsIngestData, AnalyticsEventsIngestError, AnalyticsEventsIngestResponse, AnalyticsGoalsCreateData, AnalyticsGoalsCreateError, AnalyticsGoalsCreateResponse, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteError, AnalyticsGoalsDeleteResponse, AnalyticsGoalsListData, AnalyticsGoalsListError, AnalyticsGoalsListResponse, AnalyticsPublicCollectData, AnalyticsPublicScriptData, AnalyticsPublicScriptResponse, AnalyticsSiteCreateData, AnalyticsSiteCreateError, AnalyticsSiteCreateResponse, AnalyticsSiteGetData, AnalyticsSiteGetError, AnalyticsSiteGetResponse, AnalyticsSiteUpdateData, AnalyticsSiteUpdateError, AnalyticsSiteUpdateResponse, AnalyticsStatsBreakdownData, AnalyticsStatsBreakdownError, AnalyticsStatsBreakdownResponse, AnalyticsStatsSummaryData, AnalyticsStatsSummaryError, AnalyticsStatsSummaryResponse, ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, ExtensionsHooksListData, ExtensionsHooksListError, ExtensionsHooksListResponse, ExtensionsRunsListData, ExtensionsRunsListError, ExtensionsRunsListResponse, ExtensionsScriptsCreateData, ExtensionsScriptsCreateError, ExtensionsScriptsCreateResponse, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteError, ExtensionsScriptsDeleteResponse, ExtensionsScriptsGetData, ExtensionsScriptsGetError, ExtensionsScriptsGetResponse, ExtensionsScriptsListData, ExtensionsScriptsListError, ExtensionsScriptsListResponse, ExtensionsScriptsTestData, ExtensionsScriptsTestError, ExtensionsScriptsTestResponse, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateError, ExtensionsScriptsUpdateResponse, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteError, ExtensionsSecretsDeleteResponse, ExtensionsSecretsListData, ExtensionsSecretsListError, ExtensionsSecretsListResponse, ExtensionsSecretsPutData, ExtensionsSecretsPutError, ExtensionsSecretsPutResponse, ExtensionsTargetsListData, ExtensionsTargetsListError, ExtensionsTargetsListResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WebhooksEndpointsCreateData, WebhooksEndpointsCreateError, WebhooksEndpointsCreateResponse, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteError, WebhooksEndpointsDeleteResponse, WebhooksEndpointsGetData, WebhooksEndpointsGetError, WebhooksEndpointsGetResponse, WebhooksEndpointsListData, WebhooksEndpointsListError, WebhooksEndpointsListResponse, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateError, WebhooksEndpointsUpdateResponse, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteError, WebhooksPublicCaptureDeleteResponse, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetError, WebhooksPublicCaptureGetResponse, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchError, WebhooksPublicCapturePatchResponse, WebhooksPublicCapturePostData, WebhooksPublicCapturePostError, WebhooksPublicCapturePostResponse, WebhooksPublicCapturePutData, WebhooksPublicCapturePutError, WebhooksPublicCapturePutResponse, WebhooksRequestsGetData, WebhooksRequestsGetError, WebhooksRequestsGetResponse, WebhooksRequestsListData, WebhooksRequestsListError, WebhooksRequestsListResponse, WebhooksRequestsReplayData, WebhooksRequestsReplayError, WebhooksRequestsReplayResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
+import { analyticsEventsIngest, analyticsEventsQuery, analyticsEventsRecent, analyticsFunnelsCreate, analyticsFunnelsDelete, analyticsFunnelsGet, analyticsFunnelsList, analyticsFunnelsResults, analyticsFunnelsUpdate, analyticsGoalsCreate, analyticsGoalsDelete, analyticsGoalsList, analyticsPeopleGet, analyticsPeopleList, analyticsPublicCollect, analyticsPublicScript, analyticsRetention, analyticsSiteCreate, analyticsSiteGet, analyticsSiteUpdate, analyticsStatsBreakdown, analyticsStatsSummary, apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, extensionsHooksList, extensionsRunsList, extensionsScriptsCreate, extensionsScriptsDelete, extensionsScriptsGet, extensionsScriptsList, extensionsScriptsTest, extensionsScriptsUpdate, extensionsSecretsDelete, extensionsSecretsList, extensionsSecretsPut, extensionsTargetsList, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, webhooksEndpointsCreate, webhooksEndpointsDelete, webhooksEndpointsGet, webhooksEndpointsList, webhooksEndpointsUpdate, webhooksPublicCaptureDelete, webhooksPublicCaptureGet, webhooksPublicCapturePatch, webhooksPublicCapturePost, webhooksPublicCapturePut, webhooksRequestsGet, webhooksRequestsList, webhooksRequestsReplay, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
+import type { AnalyticsEventsIngestData, AnalyticsEventsIngestError, AnalyticsEventsIngestResponse, AnalyticsEventsQueryData, AnalyticsEventsQueryError, AnalyticsEventsQueryResponse, AnalyticsEventsRecentData, AnalyticsEventsRecentError, AnalyticsEventsRecentResponse, AnalyticsFunnelsCreateData, AnalyticsFunnelsCreateError, AnalyticsFunnelsCreateResponse, AnalyticsFunnelsDeleteData, AnalyticsFunnelsDeleteError, AnalyticsFunnelsDeleteResponse, AnalyticsFunnelsGetData, AnalyticsFunnelsGetError, AnalyticsFunnelsGetResponse, AnalyticsFunnelsListData, AnalyticsFunnelsListError, AnalyticsFunnelsListResponse, AnalyticsFunnelsResultsData, AnalyticsFunnelsResultsError, AnalyticsFunnelsResultsResponse, AnalyticsFunnelsUpdateData, AnalyticsFunnelsUpdateError, AnalyticsFunnelsUpdateResponse, AnalyticsGoalsCreateData, AnalyticsGoalsCreateError, AnalyticsGoalsCreateResponse, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteError, AnalyticsGoalsDeleteResponse, AnalyticsGoalsListData, AnalyticsGoalsListError, AnalyticsGoalsListResponse, AnalyticsPeopleGetData, AnalyticsPeopleGetError, AnalyticsPeopleGetResponse, AnalyticsPeopleListData, AnalyticsPeopleListError, AnalyticsPeopleListResponse, AnalyticsPublicCollectData, AnalyticsPublicScriptData, AnalyticsPublicScriptResponse, AnalyticsRetentionData, AnalyticsRetentionError, AnalyticsRetentionResponse, AnalyticsSiteCreateData, AnalyticsSiteCreateError, AnalyticsSiteCreateResponse, AnalyticsSiteGetData, AnalyticsSiteGetError, AnalyticsSiteGetResponse, AnalyticsSiteUpdateData, AnalyticsSiteUpdateError, AnalyticsSiteUpdateResponse, AnalyticsStatsBreakdownData, AnalyticsStatsBreakdownError, AnalyticsStatsBreakdownResponse, AnalyticsStatsSummaryData, AnalyticsStatsSummaryError, AnalyticsStatsSummaryResponse, ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, ExtensionsHooksListData, ExtensionsHooksListError, ExtensionsHooksListResponse, ExtensionsRunsListData, ExtensionsRunsListError, ExtensionsRunsListResponse, ExtensionsScriptsCreateData, ExtensionsScriptsCreateError, ExtensionsScriptsCreateResponse, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteError, ExtensionsScriptsDeleteResponse, ExtensionsScriptsGetData, ExtensionsScriptsGetError, ExtensionsScriptsGetResponse, ExtensionsScriptsListData, ExtensionsScriptsListError, ExtensionsScriptsListResponse, ExtensionsScriptsTestData, ExtensionsScriptsTestError, ExtensionsScriptsTestResponse, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateError, ExtensionsScriptsUpdateResponse, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteError, ExtensionsSecretsDeleteResponse, ExtensionsSecretsListData, ExtensionsSecretsListError, ExtensionsSecretsListResponse, ExtensionsSecretsPutData, ExtensionsSecretsPutError, ExtensionsSecretsPutResponse, ExtensionsTargetsListData, ExtensionsTargetsListError, ExtensionsTargetsListResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WebhooksEndpointsCreateData, WebhooksEndpointsCreateError, WebhooksEndpointsCreateResponse, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteError, WebhooksEndpointsDeleteResponse, WebhooksEndpointsGetData, WebhooksEndpointsGetError, WebhooksEndpointsGetResponse, WebhooksEndpointsListData, WebhooksEndpointsListError, WebhooksEndpointsListResponse, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateError, WebhooksEndpointsUpdateResponse, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteError, WebhooksPublicCaptureDeleteResponse, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetError, WebhooksPublicCaptureGetResponse, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchError, WebhooksPublicCapturePatchResponse, WebhooksPublicCapturePostData, WebhooksPublicCapturePostError, WebhooksPublicCapturePostResponse, WebhooksPublicCapturePutData, WebhooksPublicCapturePutError, WebhooksPublicCapturePutResponse, WebhooksRequestsGetData, WebhooksRequestsGetError, WebhooksRequestsGetResponse, WebhooksRequestsListData, WebhooksRequestsListError, WebhooksRequestsListResponse, WebhooksRequestsReplayData, WebhooksRequestsReplayError, WebhooksRequestsReplayResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
 
 /**
  * Sends a sign-in link if the email may sign in. Always 202, so the response
@@ -226,6 +226,23 @@ export const workspacesUpdateMutation = (options?: Partial<Options<WorkspacesUpd
     }
 });
 
+export const analyticsEventsRecentQueryKey = (options: Options<AnalyticsEventsRecentData>) => createQueryKey('analyticsEventsRecent', options);
+
+/**
+ * List recent analytics events, newest first
+ */
+export const analyticsEventsRecentQuery = defineQueryOptions<Options<AnalyticsEventsRecentData>, AnalyticsEventsRecentResponse, AnalyticsEventsRecentError>((options: Options<AnalyticsEventsRecentData>) => ({
+    key: analyticsEventsRecentQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsEventsRecent({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
 /**
  * Record product events from your server
  */
@@ -239,6 +256,116 @@ export const analyticsEventsIngestMutation = (options?: Partial<Options<Analytic
         return data;
     }
 });
+
+export const analyticsEventsQueryQueryKey = (options: Options<AnalyticsEventsQueryData>) => createQueryKey('analyticsEventsQuery', options);
+
+/**
+ * Count product events over time, filtered by name and properties
+ */
+export const analyticsEventsQueryQuery = defineQueryOptions<Options<AnalyticsEventsQueryData>, AnalyticsEventsQueryResponse, AnalyticsEventsQueryError>((options: Options<AnalyticsEventsQueryData>) => ({
+    key: analyticsEventsQueryQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsEventsQuery({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const analyticsFunnelsListQueryKey = (options: Options<AnalyticsFunnelsListData>) => createQueryKey('analyticsFunnelsList', options);
+
+/**
+ * List a project's funnels
+ */
+export const analyticsFunnelsListQuery = defineQueryOptions<Options<AnalyticsFunnelsListData>, AnalyticsFunnelsListResponse, AnalyticsFunnelsListError>((options: Options<AnalyticsFunnelsListData>) => ({
+    key: analyticsFunnelsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsFunnelsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Save a funnel: 2 to 8 page or event steps
+ */
+export const analyticsFunnelsCreateMutation = (options?: Partial<Options<AnalyticsFunnelsCreateData>>): UseMutationOptions<AnalyticsFunnelsCreateResponse, Options<AnalyticsFunnelsCreateData>, AnalyticsFunnelsCreateError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsFunnelsCreate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Delete a funnel
+ */
+export const analyticsFunnelsDeleteMutation = (options?: Partial<Options<AnalyticsFunnelsDeleteData>>): UseMutationOptions<AnalyticsFunnelsDeleteResponse, Options<AnalyticsFunnelsDeleteData>, AnalyticsFunnelsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsFunnelsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const analyticsFunnelsGetQueryKey = (options: Options<AnalyticsFunnelsGetData>) => createQueryKey('analyticsFunnelsGet', options);
+
+/**
+ * Show a funnel
+ */
+export const analyticsFunnelsGetQuery = defineQueryOptions<Options<AnalyticsFunnelsGetData>, AnalyticsFunnelsGetResponse, AnalyticsFunnelsGetError>((options: Options<AnalyticsFunnelsGetData>) => ({
+    key: analyticsFunnelsGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsFunnelsGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Change a funnel
+ */
+export const analyticsFunnelsUpdateMutation = (options?: Partial<Options<AnalyticsFunnelsUpdateData>>): UseMutationOptions<AnalyticsFunnelsUpdateResponse, Options<AnalyticsFunnelsUpdateData>, AnalyticsFunnelsUpdateError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsFunnelsUpdate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const analyticsFunnelsResultsQueryKey = (options: Options<AnalyticsFunnelsResultsData>) => createQueryKey('analyticsFunnelsResults', options);
+
+/**
+ * Count the people who reached each step of a funnel, with conversion between steps
+ */
+export const analyticsFunnelsResultsQuery = defineQueryOptions<Options<AnalyticsFunnelsResultsData>, AnalyticsFunnelsResultsResponse, AnalyticsFunnelsResultsError>((options: Options<AnalyticsFunnelsResultsData>) => ({
+    key: analyticsFunnelsResultsQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsFunnelsResults({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
 
 export const analyticsGoalsListQueryKey = (options: Options<AnalyticsGoalsListData>) => createQueryKey('analyticsGoalsList', options);
 
@@ -284,6 +411,57 @@ export const analyticsGoalsDeleteMutation = (options?: Partial<Options<Analytics
         return data;
     }
 });
+
+export const analyticsPeopleListQueryKey = (options: Options<AnalyticsPeopleListData>) => createQueryKey('analyticsPeopleList', options);
+
+/**
+ * List identified people, newest first
+ */
+export const analyticsPeopleListQuery = defineQueryOptions<Options<AnalyticsPeopleListData>, AnalyticsPeopleListResponse, AnalyticsPeopleListError>((options: Options<AnalyticsPeopleListData>) => ({
+    key: analyticsPeopleListQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsPeopleList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const analyticsPeopleGetQueryKey = (options: Options<AnalyticsPeopleGetData>) => createQueryKey('analyticsPeopleGet', options);
+
+/**
+ * Show a person's traits and event timeline
+ */
+export const analyticsPeopleGetQuery = defineQueryOptions<Options<AnalyticsPeopleGetData>, AnalyticsPeopleGetResponse, AnalyticsPeopleGetError>((options: Options<AnalyticsPeopleGetData>) => ({
+    key: analyticsPeopleGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsPeopleGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const analyticsRetentionQueryKey = (options: Options<AnalyticsRetentionData>) => createQueryKey('analyticsRetention', options);
+
+/**
+ * Show weekly retention: of the people first seen each week, the share who came back
+ */
+export const analyticsRetentionQuery = defineQueryOptions<Options<AnalyticsRetentionData>, AnalyticsRetentionResponse, AnalyticsRetentionError>((options: Options<AnalyticsRetentionData>) => ({
+    key: analyticsRetentionQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsRetention({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
 
 export const analyticsSiteGetQueryKey = (options: Options<AnalyticsSiteGetData>) => createQueryKey('analyticsSiteGet', options);
 

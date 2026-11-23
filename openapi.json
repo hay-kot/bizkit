@@ -829,6 +829,173 @@
       }
     },
     "/api/v1/workspaces/{workspace_id}/analytics/events": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List recent analytics events, newest first",
+        "operationId": "analytics.events.recent",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "description": "Events older than this one, from `next_before`."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day, UTC."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only this event name; default every event, pageviews included."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "props",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Property filters, `key=value`; all must match."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day, UTC, inclusive."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
       "post": {
         "tags": [
           "analytics"
@@ -945,6 +1112,823 @@
           }
         ],
         "x-bizkit-scope": "analytics:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/events/stats": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Count product events over time, filtered by name and properties",
+        "operationId": "analytics.events.query",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day, UTC."
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only this event name (`pageview` included); default every custom event."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "props",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Property filters, `key=value`; all must match."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day, UTC, inclusive."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventStats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/funnels": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List a project's funnels",
+        "operationId": "analytics.funnels.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Save a funnel: 2 to 8 page or event steps",
+        "operationId": "analytics.funnels.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "name",
+                  "steps"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The display name."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Step"
+                    },
+                    "description": "2 to 8 steps, in order."
+                  },
+                  "window_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int64",
+                    "description": "Days after the first step in which the rest must happen, 1-90.\nDefault 7."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Funnel"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Show a funnel",
+        "operationId": "analytics.funnels.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "funnel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunnelId",
+              "description": "The funnel."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Funnel"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "delete": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Delete a funnel",
+        "operationId": "analytics.funnels.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "funnel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunnelId",
+              "description": "The funnel."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      },
+      "patch": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Change a funnel",
+        "operationId": "analytics.funnels.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "funnel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunnelId",
+              "description": "The funnel."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The display name."
+                  },
+                  "steps": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/Step"
+                    },
+                    "description": "2 to 8 steps, in order."
+                  },
+                  "window_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int64",
+                    "description": "Days after the first step in which the rest must happen, 1-90."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Funnel"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}/results": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Count the people who reached each step of a funnel, with conversion between steps",
+        "operationId": "analytics.funnels.results",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "funnel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunnelId",
+              "description": "The funnel."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day people may enter, UTC."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day people may enter, UTC, inclusive."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
       }
     },
     "/api/v1/workspaces/{workspace_id}/analytics/goals": {
@@ -1272,6 +2256,405 @@
           }
         ],
         "x-bizkit-scope": "analytics:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/people": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List identified people, newest first",
+        "operationId": "analytics.people.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PersonId",
+                  "description": "People older than this one, from `next_before`."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Text to find in the user ID or traits."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/people/{person_id}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Show a person's traits and event timeline",
+        "operationId": "analytics.people.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PersonId",
+              "description": "The person."
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "description": "Events older than this one, from `next_before`."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many events, 1-200. Default 50.",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/retention": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Show weekly retention: of the people first seen each week, the share who came back",
+        "operationId": "analytics.retention",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day a cohort may start, UTC."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "return_event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The event that counts as a return; default any event."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day a cohort may start, UTC, inclusive."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionTable"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
       }
     },
     "/api/v1/workspaces/{workspace_id}/analytics/site": {
@@ -7787,6 +9170,37 @@
           }
         }
       },
+      "Cohort": {
+        "type": "object",
+        "description": "People first seen in one week, and who came back.",
+        "required": [
+          "week",
+          "people",
+          "weeks"
+        ],
+        "properties": {
+          "people": {
+            "type": "integer",
+            "format": "int64",
+            "description": "People first seen that week."
+          },
+          "week": {
+            "$ref": "#/components/schemas/Day",
+            "description": "The Monday the week starts, UTC."
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "double"
+            },
+            "description": "For weeks 0 to 8 after: the share of the cohort with a return event\nthat week, 0 to 1. Null for weeks that haven't begun."
+          }
+        }
+      },
       "CreatedApiKey": {
         "type": "object",
         "description": "A new key and its token.",
@@ -8016,6 +9430,168 @@
           }
         }
       },
+      "EventItem": {
+        "type": "object",
+        "description": "One stored event.",
+        "required": [
+          "id",
+          "ts",
+          "name",
+          "props",
+          "source"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The event's row ID; pass it as `before` for the next page."
+          },
+          "name": {
+            "type": "string",
+            "description": "The event name."
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The page path, when it came with a URL."
+          },
+          "person_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonId",
+                "description": "The identified person, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "props": {
+            "type": "object",
+            "description": "Event properties."
+          },
+          "source": {
+            "type": "string",
+            "description": "`web` (the snippet) or `server`."
+          },
+          "ts": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it arrived."
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person's user ID, if identified."
+          }
+        }
+      },
+      "EventName": {
+        "type": "object",
+        "description": "One event name seen in the range.",
+        "required": [
+          "name",
+          "count",
+          "users"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching events with this name."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name."
+          },
+          "users": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Distinct people (or daily visitors) who sent them."
+          }
+        }
+      },
+      "EventPage": {
+        "type": "object",
+        "description": "A page of events, newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventItem"
+            },
+            "description": "The events."
+          },
+          "next_before": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Pass as `before` for the next page; none on the last page."
+          }
+        }
+      },
+      "EventPoint": {
+        "type": "object",
+        "description": "Matching events per hour or day.",
+        "required": [
+          "start",
+          "count",
+          "users"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching events."
+          },
+          "start": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the hour or day starts."
+          },
+          "users": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Distinct people (or daily visitors) who sent them."
+          }
+        }
+      },
+      "EventStats": {
+        "type": "object",
+        "description": "The explorer's chart and name table.",
+        "required": [
+          "interval",
+          "series",
+          "names"
+        ],
+        "properties": {
+          "interval": {
+            "$ref": "#/components/schemas/Interval",
+            "description": "What one point covers."
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventName"
+            },
+            "description": "Custom event names in the range with the props filter applied, most\nsent first. Ignores the name filter, so it can fill a picker."
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventPoint"
+            },
+            "description": "Counts over time."
+          }
+        }
+      },
       "FieldDef": {
         "type": "object",
         "description": "A field a form accepts.",
@@ -8200,6 +9776,94 @@
               "$ref": "#/components/schemas/Form"
             },
             "description": "Sorted by name."
+          }
+        }
+      },
+      "Funnel": {
+        "type": "object",
+        "description": "A saved funnel.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "steps",
+          "window_days",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was made."
+          },
+          "id": {
+            "$ref": "#/components/schemas/FunnelId",
+            "description": "The funnel ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "description": "2 to 8 steps, in order."
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it last changed."
+          },
+          "window_days": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Days after the first step in which the rest must happen."
+          }
+        }
+      },
+      "FunnelId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "FunnelList": {
+        "type": "object",
+        "description": "A project's funnels.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Funnel"
+            },
+            "description": "Sorted by name."
+          }
+        }
+      },
+      "FunnelResults": {
+        "type": "object",
+        "description": "A funnel's results over a range.",
+        "required": [
+          "funnel",
+          "steps"
+        ],
+        "properties": {
+          "funnel": {
+            "$ref": "#/components/schemas/Funnel",
+            "description": "The funnel."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepResult"
+            },
+            "description": "One entry per step."
           }
         }
       },
@@ -8696,6 +10360,132 @@
           }
         }
       },
+      "PersonDetail": {
+        "type": "object",
+        "description": "A person, their traits and a page of their events, newest first.",
+        "required": [
+          "id",
+          "project_id",
+          "user_id",
+          "traits",
+          "first_seen",
+          "last_seen",
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventItem"
+            },
+            "description": "Their events, newest first."
+          },
+          "first_seen": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When their first event or identify arrived."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PersonId",
+            "description": "The person ID."
+          },
+          "last_seen": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When their latest one arrived."
+          },
+          "next_before": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Pass as `before` for the next page; none on the last page."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project."
+          },
+          "traits": {
+            "type": "object",
+            "description": "Traits from `identify`."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The site's ID for the user."
+          }
+        }
+      },
+      "PersonId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "PersonPage": {
+        "type": "object",
+        "description": "A page of people, newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonSummary"
+            },
+            "description": "The people."
+          },
+          "next_before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonId",
+                "description": "Pass as `before` for the next page; none on the last page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PersonSummary": {
+        "type": "object",
+        "description": "A known person, as a list row.",
+        "required": [
+          "id",
+          "user_id",
+          "first_seen",
+          "last_seen",
+          "events"
+        ],
+        "properties": {
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `email` or `name` trait, when there is one."
+          },
+          "events": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Stored events under this person."
+          },
+          "first_seen": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When their first event or identify arrived."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PersonId",
+            "description": "The person ID."
+          },
+          "last_seen": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When their latest one arrived."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The site's ID for the user."
+          }
+        }
+      },
       "Project": {
         "type": "object",
         "description": "A project.",
@@ -8832,6 +10622,22 @@
             "format": "int64",
             "description": "The body size in bytes.",
             "minimum": 0
+          }
+        }
+      },
+      "RetentionTable": {
+        "type": "object",
+        "description": "Weekly retention cohorts, oldest first.",
+        "required": [
+          "cohorts"
+        ],
+        "properties": {
+          "cohorts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cohort"
+            },
+            "description": "The cohorts."
           }
         }
       },
@@ -9327,6 +11133,56 @@
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "When its settings last changed."
+          }
+        }
+      },
+      "Step": {
+        "type": "object",
+        "description": "One funnel step.",
+        "required": [
+          "kind",
+          "match"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/GoalKind",
+            "description": "A pageview or a custom event."
+          },
+          "match": {
+            "type": "string",
+            "description": "A page path (exact, or a prefix ending in `*`) or an event name."
+          }
+        },
+        "additionalProperties": false
+      },
+      "StepResult": {
+        "type": "object",
+        "description": "One step's result.",
+        "required": [
+          "step",
+          "people",
+          "from_previous",
+          "from_first"
+        ],
+        "properties": {
+          "from_first": {
+            "type": "number",
+            "format": "double",
+            "description": "Share of the first step's people, 0 to 1."
+          },
+          "from_previous": {
+            "type": "number",
+            "format": "double",
+            "description": "Share of the previous step's people, 0 to 1; 1 for the first step."
+          },
+          "people": {
+            "type": "integer",
+            "format": "int64",
+            "description": "People who reached it."
+          },
+          "step": {
+            "$ref": "#/components/schemas/Step",
+            "description": "The step."
           }
         }
       },
