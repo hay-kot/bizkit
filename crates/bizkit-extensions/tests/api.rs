@@ -486,6 +486,20 @@ mod api {
         assert_eq!(names(&filtered), ["Contact only", "Shared", "Test"], "what runs for contact");
         let for_other = s.list(&format!("target_id={other}")).await;
         assert_eq!(names(&for_other), ["Test"], "what runs for the other form");
+        let elsewhere = s.form_in("app", "Elsewhere").await;
+        let app_script = json!({"project_id": s.team.projects["app"].id.to_string(), "hook": POST, "name": "App wide", "source": "export default () => {}"});
+        s.admin
+            .post(&format!("{}/extensions/scripts", s.ws()), &app_script)
+            .await
+            .expect(StatusCode::CREATED);
+        let unscoped = s.list(&format!("target_id={}", contact.to_uppercase())).await;
+        assert_eq!(
+            names(&unscoped),
+            ["Contact only", "Shared", "Test"],
+            "canonical ID, own project only"
+        );
+        let for_elsewhere = s.list(&format!("target_id={elsewhere}")).await;
+        assert_eq!(names(&for_elsewhere), ["App wide"], "the other project's for-all script");
     }
 
     #[tokio::test]
@@ -531,6 +545,11 @@ mod api {
         assert_eq!(items[0]["targets"], json!([{"id": form, "label": null}]), "kept, unlabelled");
         let filtered = s.list(&format!("target_id={form}")).await;
         assert_eq!(names(&filtered), ["Orphan"], "the filter still finds it");
+        let other = s.form_in("site", "Other").await;
+        let orphan = &items[0];
+        s.retarget(orphan, &[&form, &other]).await.expect(StatusCode::OK);
+        let rename = format!("{}/extensions/scripts/{}", s.ws(), orphan["id"].as_str().unwrap());
+        s.admin.patch(&rename, &json!({"name": "Still saves"})).await.expect(StatusCode::OK);
     }
 
     #[tokio::test]

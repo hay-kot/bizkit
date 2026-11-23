@@ -509,8 +509,13 @@ impl Operation for ScriptsList {
             store::list_scripts(cx.platform().db().read(), input.workspace_id, input.project_id)
                 .await?;
         if let Some(entity) = &input.target_id {
-            let kind = entity_kind(cx.platform(), input.workspace_id, entity).await?;
-            rows.retain(|row| runs_for(cx.platform(), row, entity, kind));
+            match find_entity(cx.platform(), input.workspace_id, entity).await? {
+                Some((kind, found)) => rows.retain(|row| {
+                    row.project_id == found.project_id
+                        && runs_for(cx.platform(), row, &found.id, Some(kind))
+                }),
+                None => rows.retain(|row| runs_for(cx.platform(), row, entity, None)),
+            }
         }
         let labels = labels(cx.platform(), input.workspace_id, &rows).await?;
         let items = rows.into_iter().map(|row| summary(cx.platform(), &labels, row)).collect();
@@ -557,9 +562,9 @@ impl Operation for ScriptsCreate {
         let target_ids = resolve_targets(
             cx.platform(),
             point,
-            input.workspace_id,
-            input.project_id,
+            (input.workspace_id, input.project_id),
             &input.target_ids,
+            &[],
         )
         .await?;
         self.runner.check(&input.source).await.map_err(|err| field_error("source", err))?;
@@ -599,15 +604,17 @@ impl Operation for ScriptsCreate {
 }
 
 /// Checks that every ID names an entity of the point's target kind in the
-/// project, and returns the canonical IDs, sorted and without repeats. The
+/// project, and returns the canonical IDs, sorted and without repeats. IDs
+/// in `stored`, the script's current set, are kept unchecked: a deleted
+/// entity in the set must not block saving the script. The
 /// check reads outside the write transaction; an entity deleted in between
 /// leaves a target that never matches, the same as deleting it later.
 async fn resolve_targets(
     platform: &Platform,
     point: &HookPoint,
-    workspace_id: WorkspaceId,
-    project_id: ProjectId,
+    (workspace_id, project_id): (WorkspaceId, ProjectId),
     ids: &[String],
+    stored: &[String],
 ) -> Result<Vec<String>, ApiError> {
     if ids.is_empty() {
         return Ok(Vec::new());
@@ -626,6 +633,10 @@ async fn resolve_targets(
     };
     let mut canonical = BTreeSet::new();
     for id in ids {
+        if stored.contains(id) {
+            canonical.insert(id.clone());
+            continue;
+        }
         let found = resolver
             .find(platform, workspace_id, std::slice::from_ref(id))
             .await
@@ -672,13 +683,13 @@ async fn check_sync_slots(
     Err(ApiError::Conflict(message))
 }
 
-/// The target kind of `entity`: the first kind whose resolver finds it.
-/// `None` when no resolver does, such as for a deleted entity.
-async fn entity_kind(
+/// The kind and the entity `entity` names: the first kind whose resolver
+/// finds it. `None` when no resolver does, such as for a deleted entity.
+async fn find_entity(
     platform: &Platform,
     workspace_id: WorkspaceId,
     entity: &str,
-) -> Result<Option<&'static str>, ApiError> {
+) -> Result<Option<(&'static str, bizkit_core::hooks::TargetEntity)>, ApiError> {
     let kinds: BTreeSet<&'static str> = platform
         .hook_points()
         .iter()
@@ -691,8 +702,8 @@ async fn entity_kind(
             .find(platform, workspace_id, &[entity.to_owned()])
             .await
             .with_context(|| format!("looking up a {kind} target"))?;
-        if !found.is_empty() {
-            return Ok(Some(kind));
+        if let Some(found) = found.into_iter().next() {
+            return Ok(Some((kind, found)));
         }
     }
     Ok(None)
@@ -730,8 +741,14 @@ impl Operation for ScriptsUpdate {
         let target_ids = match (&input.target_ids, point) {
             (None, _) => None,
             (Some(ids), Some(point)) => Some(
-                resolve_targets(cx.platform(), point, before.workspace_id, before.project_id, ids)
-                    .await?,
+                resolve_targets(
+                    cx.platform(),
+                    point,
+                    (before.workspace_id, before.project_id),
+                    ids,
+                    &before.target_ids,
+                )
+                .await?,
             ),
             (Some(_), None) => {
                 return Err(field_error(

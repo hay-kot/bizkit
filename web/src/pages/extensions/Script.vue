@@ -111,6 +111,15 @@ function casesText(tests: TestCase[] | undefined): string {
     : pretty(tests.map(({ name, input, expect }) => ({ name, input, expect })))
 }
 
+/** Cases as the server stores them: trimmed names, no `expect: null`. */
+function normalized(tests: TestCase[]): TestCase[] {
+  return tests.map(({ name, input, expect }) =>
+    expect === null || expect === undefined
+      ? { name: name.trim(), input }
+      : { name: name.trim(), input, expect },
+  )
+}
+
 /** JSON with object keys sorted, so key order never counts as a change. */
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, item: unknown) =>
@@ -152,7 +161,7 @@ const dirty = computed(
       enabled.value !== script.value.enabled ||
       !sameSet(targetIds.value, idsOf(script.value)) ||
       !cases.value.ok ||
-      canonical(cases.value.cases) !== canonical(script.value.tests)),
+      canonical(normalized(cases.value.cases)) !== canonical(normalized(script.value.tests))),
 )
 
 const CAPABILITY_NAMES: Record<string, string> = {
@@ -226,6 +235,8 @@ const columns = [
 ]
 
 function save() {
+  const current = cases.value
+  if (!current.ok) return
   return runAction({
     run: () =>
       update.mutateAsync({
@@ -234,8 +245,10 @@ function save() {
           name: name.value,
           source: source.value,
           enabled: enabled.value,
-          ...(cases.value.ok ? { tests: cases.value.cases } : {}),
-          ...(hook.value?.target ? { target_ids: targetIds.value } : {}),
+          tests: current.cases,
+          ...(hook.value?.target && !sameSet(targetIds.value, idsOf(script.value))
+            ? { target_ids: targetIds.value }
+            : {}),
         },
       }),
     success: 'Script saved',
@@ -320,7 +333,8 @@ function summaryOf(run: Run): string {
         <SubmitButton
           form="script-form"
           :pending="update.asyncStatus.value === 'loading'"
-          :disabled="!dirty"
+          :disabled="!dirty || !cases.ok"
+          :title="cases.ok ? undefined : 'Fix the test cases to save'"
         >
           Save
         </SubmitButton>

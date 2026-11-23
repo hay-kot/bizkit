@@ -28,7 +28,7 @@ const highlight = HighlightStyle.define([
   { tag: [tags.propertyName, tags.definition(tags.variableName)], color: 'var(--color-info)' },
   {
     tag: [tags.comment, tags.lineComment, tags.blockComment],
-    color: 'color-mix(in oklab, var(--color-base-content) 55%, transparent)',
+    color: 'var(--color-code-comment)',
     fontStyle: 'italic',
   },
   { tag: tags.invalid, color: 'var(--color-error)' },
@@ -61,14 +61,14 @@ function theme() {
     '.cm-content': { caretColor: 'var(--color-base-content)', padding: '4px 0' },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--color-base-content)' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-      backgroundColor: 'color-mix(in oklab, var(--color-primary) 25%, transparent)',
+      backgroundColor: 'var(--color-code-selection)',
     },
     '.cm-gutters': {
       backgroundColor: 'var(--color-base-200)',
-      color: 'color-mix(in oklab, var(--color-base-content) 50%, transparent)',
+      color: 'var(--color-code-gutter)',
       borderRight: 'var(--border) solid var(--color-base-300)',
     },
-    '.cm-activeLine': { backgroundColor: 'transparent' },
+    '.cm-activeLine': { backgroundColor: 'inherit' },
   })
 }
 

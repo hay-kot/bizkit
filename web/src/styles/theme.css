@@ -83,3 +83,11 @@
 .table :where(thead, tfoot) {
   color: color-mix(in oklab, var(--color-base-content) 85%, transparent);
 }
+
+/* Code editor colors, mixed from each theme's own so they follow light and dark. */
+:root,
+[data-theme] {
+  --color-code-comment: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  --color-code-gutter: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  --color-code-selection: color-mix(in oklab, var(--color-primary) 25%, transparent);
+}
