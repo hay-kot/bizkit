@@ -27,7 +27,7 @@ pub struct Labels {
     /// The server's synchronous mode.
     #[arg(long = "label-sync", value_enum, default_value = "normal")]
     pub sync: Sync,
-    /// The server's flush interval, for buffered.
+    /// The server's flush interval, for buffered and hybrid.
     #[arg(long = "label-flush-ms", default_value_t = 250)]
     pub flush_ms: u64,
 }
@@ -218,6 +218,7 @@ const fn design_order(design: Design) -> u8 {
         Design::WriteThrough => 0,
         Design::Batched => 1,
         Design::Buffered => 2,
+        Design::Hybrid => 3,
     }
 }
 
@@ -226,6 +227,7 @@ fn design_name(run: &RunResult) -> String {
         Design::WriteThrough => "write-through".to_owned(),
         Design::Batched => "batched".to_owned(),
         Design::Buffered => format!("buffered {}ms", run.labels.flush_ms),
+        Design::Hybrid => format!("hybrid {}ms", run.labels.flush_ms),
     };
     if run.labels.layout == Layout::Shared {
         name.push_str(", shared");

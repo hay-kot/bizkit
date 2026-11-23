@@ -25,12 +25,15 @@ pub enum Design {
     /// One writer task per file buffers rows and flushes on a timer or a
     /// size; requests are answered when the row is queued.
     Buffered,
+    /// Buffered's timer and size flushes, but each request is answered after
+    /// the flush that holds its row commits.
+    Hybrid,
 }
 
 /// Queue and flush settings for the batched and buffered designs.
 #[derive(Debug, Clone, Copy)]
 pub struct Tuning {
-    /// Buffered: the longest a row waits before a flush.
+    /// Buffered and hybrid: the longest a row waits before a flush.
     pub flush: Duration,
     /// The most rows in one transaction; buffered also flushes at this size.
     pub flush_max: usize,
@@ -135,6 +138,7 @@ pub fn build(design: Design, store: Arc<Store>, tuning: Tuning) -> Arc<dyn Pipel
         Design::WriteThrough => Arc::new(WriteThrough { store, counters: Counters::default() }),
         Design::Batched => Arc::new(Writers::<Batch>::new(store, tuning)),
         Design::Buffered => Arc::new(Writers::<Buffer>::new(store, tuning)),
+        Design::Hybrid => Arc::new(Writers::<Hybrid>::new(store, tuning)),
     }
 }
 
@@ -259,17 +263,74 @@ impl Mode for Batch {
                 }
             }
             let (rows, answers): (Vec<Row>, Vec<oneshot::Sender<bool>>) = batch.into_iter().unzip();
-            let ok = store.insert_batch(key, &rows).await.is_ok();
-            if ok {
-                counters.committed(rows.len());
-            } else {
-                counters.failed(rows.len());
-            }
+            let ok = commit(&store, key, &rows, &counters).await;
             for answer in answers {
                 answer.send(ok).unwrap_or_default();
             }
         }
     }
+}
+
+/// Commits one flush and counts it.
+async fn commit(store: &Store, key: u32, rows: &[Row], counters: &Counters) -> bool {
+    let ok = store.insert_batch(key, rows).await.is_ok();
+    if ok {
+        counters.committed(rows.len());
+    } else {
+        counters.failed(rows.len());
+    }
+    ok
+}
+
+/// Rows to write and the requests to answer once they commit.
+type Flush = (Vec<Row>, Vec<oneshot::Sender<bool>>);
+
+/// What a writer task writes to.
+struct Writer {
+    store: Arc<Store>,
+    key: u32,
+    counters: Arc<Counters>,
+}
+
+/// Writes queued messages every `tuning.flush`, or as soon as
+/// `tuning.flush_max` are waiting, and once more when the channel closes.
+/// `split` turns the waiting messages into a flush.
+async fn flush_on_timer<T>(
+    writer: Writer,
+    mut rx: mpsc::Receiver<T>,
+    tuning: Tuning,
+    split: fn(Vec<T>) -> Flush,
+) {
+    let Writer { store, key, counters } = writer;
+    let flush = async |pending: &mut Vec<T>| {
+        if pending.is_empty() {
+            return;
+        }
+        let (rows, answers) = split(std::mem::take(pending));
+        let ok = commit(&store, key, &rows, &counters).await;
+        for answer in answers {
+            answer.send(ok).unwrap_or_default();
+        }
+    };
+    let mut pending: Vec<T> = Vec::with_capacity(tuning.flush_max);
+    // `interval` would tick at once; the first flush is one window out.
+    let mut tick =
+        tokio::time::interval_at(tokio::time::Instant::now() + tuning.flush, tuning.flush);
+    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        tokio::select! {
+            msg = rx.recv() => {
+                let Some(msg) = msg else { break };
+                pending.push(msg);
+                if pending.len() >= tuning.flush_max {
+                    flush(&mut pending).await;
+                    tick.reset();
+                }
+            }
+            _ = tick.tick() => flush(&mut pending).await,
+        }
+    }
+    flush(&mut pending).await;
 }
 
 /// Interval flush: answer on enqueue, write later.
@@ -281,43 +342,40 @@ impl Mode for Buffer {
     async fn run(
         store: Arc<Store>,
         key: u32,
-        mut rx: mpsc::Receiver<Row>,
+        rx: mpsc::Receiver<Row>,
         tuning: Tuning,
         counters: Arc<Counters>,
     ) {
-        let mut buffer: Vec<Row> = Vec::with_capacity(tuning.flush_max);
-        let mut tick = tokio::time::interval(tuning.flush);
-        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        let flush = async |pending: &mut Vec<Row>| {
-            if pending.is_empty() {
-                return;
-            }
-            let rows = std::mem::take(pending);
-            if store.insert_batch(key, &rows).await.is_ok() {
-                counters.committed(rows.len());
-            } else {
-                counters.failed(rows.len());
-            }
-        };
-        loop {
-            tokio::select! {
-                msg = rx.recv() => {
-                    let Some(row) = msg else { break };
-                    buffer.push(row);
-                    if buffer.len() >= tuning.flush_max {
-                        flush(&mut buffer).await;
-                        tick.reset();
-                    }
-                }
-                _ = tick.tick() => flush(&mut buffer).await,
-            }
-        }
-        flush(&mut buffer).await;
+        let writer = Writer { store, key, counters };
+        flush_on_timer(writer, rx, tuning, |rows| (rows, Vec::new())).await;
     }
 }
 
+/// Interval flush: answer after the flush that holds the row commits.
+struct Hybrid;
+
+impl Mode for Hybrid {
+    type Msg = (Row, oneshot::Sender<bool>);
+
+    async fn run(
+        store: Arc<Store>,
+        key: u32,
+        rx: mpsc::Receiver<Self::Msg>,
+        tuning: Tuning,
+        counters: Arc<Counters>,
+    ) {
+        let writer = Writer { store, key, counters };
+        flush_on_timer(writer, rx, tuning, |batch| batch.into_iter().unzip()).await;
+    }
+}
+
+/// Modes that answer after commit: the message carries the answer channel.
+trait AnswersAfterCommit: Mode<Msg = (Row, oneshot::Sender<bool>)> {}
+impl AnswersAfterCommit for Batch {}
+impl AnswersAfterCommit for Hybrid {}
+
 #[async_trait::async_trait]
-impl Pipeline for Writers<Batch> {
+impl<M: AnswersAfterCommit> Pipeline for Writers<M> {
     async fn submit(&self, row: Row) -> Result<(), Rejected> {
         let key = self.store.writer_key(row.project);
         let (tx, rx) = oneshot::channel();
@@ -387,7 +445,7 @@ mod tests {
 
     #[tokio::test]
     async fn every_design_stores_every_accepted_row() {
-        for design in [Design::WriteThrough, Design::Batched, Design::Buffered] {
+        for design in [Design::WriteThrough, Design::Batched, Design::Buffered, Design::Hybrid] {
             for layout in [Layout::PerProject, Layout::Shared] {
                 let (stats, stored) = run(design, layout).await;
                 assert_eq!(stats.accepted, 500, "{design:?} {layout:?}");
@@ -419,6 +477,19 @@ mod tests {
         assert!(stored_seqs(dir.path()).await.unwrap().is_empty(), "not written yet");
         pipeline.shutdown().await;
         assert_eq!(stored_seqs(dir.path()).await.unwrap(), [42], "shutdown flushes");
+    }
+
+    #[tokio::test]
+    async fn hybrid_answers_after_the_flush() {
+        let dir = tempfile::tempdir().unwrap();
+        let store =
+            Arc::new(Store::open(dir.path(), Layout::PerProject, Sync::Normal).await.unwrap());
+        let pipeline = build(Design::Hybrid, Arc::clone(&store), TUNING);
+        let started = tokio::time::Instant::now();
+        pipeline.submit(row(1, 42)).await.unwrap();
+        assert!(started.elapsed() >= Duration::from_millis(40), "waited for the timer");
+        assert_eq!(stored_seqs(dir.path()).await.unwrap(), [42], "committed before the answer");
+        pipeline.shutdown().await;
     }
 
     #[tokio::test]

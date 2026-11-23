@@ -6,7 +6,9 @@
 #
 #   scripts/bench-ingest-matrix.sh [out-dir] [scenario ...]
 #
-# Scenarios: steady sync shared burst mixed kill (default: all).
+# Scenarios: steady sync shared burst mixed kill (default: all), and windows:
+# buffered and hybrid at 100 and 250 ms flush through steady, burst, mixed
+# and kill.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -59,6 +61,17 @@ for scenario in "${scenarios[@]}"; do
     kill)
       for design in "${designs[@]}"; do case_run kill "$design" 2000 10 "" "" "$half"; done
       for flush in 100 500; do case_run kill buffered 2000 10 "" "" "$half" per-project normal "$flush"; done ;;
+    windows)
+      for flush in 100 250; do
+        for design in buffered hybrid; do
+          w=(per-project normal "$flush")
+          for rate in 500 2000 5000 10000; do case_run steady "$design" "$rate" 10 "" "" "" "${w[@]}"; done
+          for projects in 1 100; do case_run steady "$design" 5000 "$projects" "" "" "" "${w[@]}"; done
+          case_run burst "$design" 500 10 "" "--burst-x 10 --burst-at $quarter --burst-for $half" "" "${w[@]}"
+          case_run mixed "$design" 2000 10 "" "--queries-per-s 10 --rollup-every $half" "" "${w[@]}"
+          case_run kill "$design" 2000 10 "" "" "$half" "${w[@]}"
+        done
+      done ;;
     *) echo "unknown scenario: $scenario" >&2; exit 2 ;;
   esac
 done
