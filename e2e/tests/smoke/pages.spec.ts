@@ -75,4 +75,13 @@ test.describe('workspace pages', () => {
     await expect(page.getByRole('heading', { name: 'Headers' })).toBeVisible()
     await expectCleanPage(page, errors)
   })
+
+  test('the open command palette is clean', async ({ page, world }) => {
+    const errors = trackPageErrors(page)
+    await page.goto(`/w/${world.workspaces.main!.id}/p/${world.projects.site!.id}/forms`)
+    await expect(page.getByTestId('workspace-name')).toHaveText('Team')
+    await page.getByTestId('open-palette').click()
+    await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible()
+    await expectCleanPage(page, errors)
+  })
 })

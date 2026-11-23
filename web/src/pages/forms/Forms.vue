@@ -8,6 +8,7 @@ import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatDate } from '@/lib/format'
 import { useCreateForm, useForms } from '@/queries/forms'
 
@@ -23,6 +24,7 @@ const {
 )
 const create = useCreateForm()
 const panelOpen = ref(false)
+useCreateIntent(openPanel)
 const name = ref('')
 const columns = [
   { key: 'name', label: 'Name' },
