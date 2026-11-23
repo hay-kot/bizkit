@@ -355,7 +355,8 @@ impl Store {
 }
 
 /// Reads the `seq` of every stored event under `data`, from every `.db`
-/// file, read-only.
+/// file. It opens them read-write, as a restarted server would, so SQLite
+/// recovers a WAL a crash left behind.
 ///
 /// # Errors
 ///
@@ -368,7 +369,7 @@ pub async fn stored_seqs(data: &Path) -> anyhow::Result<Vec<u64>> {
         if path.extension().is_none_or(|ext| ext != "db") {
             continue;
         }
-        let options = SqliteConnectOptions::from_str("sqlite:")?.filename(&path).read_only(true);
+        let options = SqliteConnectOptions::from_str("sqlite:")?.filename(&path);
         let pool = PoolOptions::<Sqlite>::new().max_connections(1).connect_with(options).await?;
         let has_events: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE name = 'analytics_events')",

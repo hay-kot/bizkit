@@ -10,7 +10,9 @@ use clap::{Parser, Subcommand};
 
 /// Benchmarks analytics ingest pipelines.
 #[derive(Debug, Parser)]
-#[command(version, about)]
+// The scripts append overrides (the warmup's --duration) to a run's flags;
+// the last value wins.
+#[command(version, about, args_override_self = true)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

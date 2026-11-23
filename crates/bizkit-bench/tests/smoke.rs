@@ -39,6 +39,7 @@ mod smoke {
             app_per_s: 5,
             rollup_every: 1,
             max_inflight: 512,
+            seq_start: 1,
             out: out.clone(),
             labels: Labels {
                 scenario: "smoke".to_owned(),

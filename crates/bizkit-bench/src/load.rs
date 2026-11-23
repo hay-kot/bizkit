@@ -33,7 +33,8 @@ pub struct LoadArgs {
     /// The hot project for bursts, queries and rollups.
     #[arg(long, default_value_t = 0)]
     pub hot: u32,
-    /// During the burst the hot project gets this many times its share.
+    /// During the burst the offered load is this many times `--rate`; the
+    /// extra all goes to the hot project.
     #[arg(long, default_value_t = 1)]
     pub burst_x: u32,
     /// Seconds into the run the burst starts.
@@ -54,6 +55,9 @@ pub struct LoadArgs {
     /// Requests allowed in flight before sends count as client errors.
     #[arg(long, default_value_t = 4096)]
     pub max_inflight: usize,
+    /// The first seq ID; keep warmup and measured runs apart.
+    #[arg(long, default_value_t = 1)]
+    pub seq_start: u64,
     /// Where the run's JSON goes; acked seq IDs go next to it as `.acked`.
     #[arg(long)]
     pub out: PathBuf,
@@ -280,7 +284,7 @@ async fn server_stats(client: &reqwest::Client, url: &str) -> anyhow::Result<Ser
 ///
 /// # Errors
 ///
-/// When the server's stats can't be read or the acked file can't be written.
+/// When the acked file can't be written.
 pub async fn run(args: &LoadArgs) -> anyhow::Result<RunResult> {
     let client = reqwest::Client::builder()
         .pool_max_idle_per_host(args.max_inflight)
@@ -291,7 +295,7 @@ pub async fn run(args: &LoadArgs) -> anyhow::Result<RunResult> {
         client: client.clone(),
         url: args.url.clone(),
         tally: Arc::clone(&tally),
-        seq: Arc::new(AtomicU64::new(1)),
+        seq: Arc::new(AtomicU64::new(args.seq_start)),
         inflight: Arc::new(Semaphore::new(args.max_inflight)),
     };
     let start = Instant::now();
@@ -301,7 +305,7 @@ pub async fn run(args: &LoadArgs) -> anyhow::Result<RunResult> {
         u32::try_from(n % u64::from(projects)).unwrap_or(0)
     }));
     let hot = args.hot;
-    let burst_rate = (args.rate / projects).saturating_mul(args.burst_x.saturating_sub(1));
+    let burst_rate = args.rate.saturating_mul(args.burst_x.saturating_sub(1));
     let burst_start = start + Duration::from_secs(args.burst_at);
     let burst_end = (burst_start + Duration::from_secs(args.burst_for)).min(end);
     let burst = tokio::spawn(async move {
@@ -334,7 +338,8 @@ pub async fn run(args: &LoadArgs) -> anyhow::Result<RunResult> {
     let app_ms = app.await?;
     let rollup_ms = rolled.await?;
     tally.drain(Duration::from_secs(30)).await;
-    let server = server_stats(&client, &args.url).await?;
+    // After a kill -9 there is no server to ask; the run still gets written.
+    let server = server_stats(&client, &args.url).await.unwrap_or_default();
     tally.write_acked(&args.out.with_extension("acked"))?;
     let mut latencies =
         std::mem::take(&mut *tally.latencies.lock().unwrap_or_else(PoisonError::into_inner));
