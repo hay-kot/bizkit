@@ -3,6 +3,7 @@ import { Download, Eye, Inbox, Settings, ShieldAlert, Trash2 } from 'lucide-vue-
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import EntitySections from '@/components/EntitySections.vue'
 import FieldsEditor from '@/components/forms/FieldsEditor.vue'
 import { fetchSnippet, htmlSnippet } from '@/components/forms/embed'
 import PageHeader from '@/components/PageHeader.vue'
@@ -341,6 +342,15 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
     <p v-if="submissions?.next_before" class="mt-2 text-sm text-base-content/80">
       Showing the newest {{ SUBMISSIONS_SHOWN }}. Export CSV for the rest.
     </p>
+
+    <EntitySections
+      v-if="form"
+      :workspace-id="workspaceId"
+      :project-id="projectId"
+      kind="forms.form"
+      :entity-id="form.id"
+      :entity-label="form.name"
+    />
 
     <DetailPanel
       :open="viewing !== null"

@@ -26,6 +26,11 @@ describe('web modules', () => {
     expect(new Set(orders).size, 'nav order').toBe(orders.length)
   })
 
+  it('give entity sections unique keys', () => {
+    const keys = modules.flatMap((m) => (m.entitySections ?? []).map((section) => section.key))
+    expect(new Set(keys).size, 'entity section keys').toBe(keys.length)
+  })
+
   it('keep the workspace prefix p/ free for project routes', () => {
     for (const route of modules.flatMap((m) => m.workspaceRoutes ?? [])) {
       expect(route.path === 'p' || route.path.startsWith('p/'), route.path).toBe(false)

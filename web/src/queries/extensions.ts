@@ -18,6 +18,7 @@ import {
 import type {
   Capability,
   Hook,
+  HookTargetKind,
   Run,
   RunStatus,
   Script,
@@ -27,7 +28,7 @@ import type {
 
 import { useInvalidate } from './keys'
 
-export type { Capability, Hook, Run, RunStatus, Script, ScriptSummary, Secret }
+export type { Capability, Hook, HookTargetKind, Run, RunStatus, Script, ScriptSummary, Secret }
 
 const SCRIPT_QUERIES = ['extensionsScriptsList', 'extensionsScriptsGet']
 const RUN_QUERIES = ['extensionsRunsList']
@@ -37,14 +38,16 @@ export function useHooks(workspaceId: MaybeRefOrGetter<string>) {
   return useQuery(() => extensionsHooksListQuery({ path: { workspace_id: toValue(workspaceId) } }))
 }
 
+/** A project's scripts, or only those bound to `targetId`. */
 export function useScripts(
   workspaceId: MaybeRefOrGetter<string>,
   projectId: MaybeRefOrGetter<string>,
+  targetId?: MaybeRefOrGetter<string | undefined>,
 ) {
   return useQuery(() =>
     extensionsScriptsListQuery({
       path: { workspace_id: toValue(workspaceId) },
-      query: { project_id: toValue(projectId) },
+      query: { project_id: toValue(projectId), target_id: toValue(targetId) },
     }),
   )
 }

@@ -1,5 +1,6 @@
 import { Code } from 'lucide-vue-next'
 
+import ExtensionsSection from '@/components/extensions/ExtensionsSection.vue'
 import Extensions from '@/pages/extensions/Extensions.vue'
 import Script from '@/pages/extensions/Script.vue'
 
@@ -21,4 +22,5 @@ export default defineWebModule({
       adminOnly: true,
     },
   ],
+  entitySections: [{ key: 'extensions', component: ExtensionsSection, adminOnly: true }],
 })

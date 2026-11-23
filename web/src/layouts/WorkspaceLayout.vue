@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { FolderX, Menu as MenuIcon, X } from 'lucide-vue-next'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import EmptyState from '@/components/EmptyState.vue'
@@ -12,16 +12,13 @@ import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import { useCurrentProject } from '@/composables/useCurrentProject'
 import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
-import { useMe } from '@/queries/auth'
+import { useIsAdmin } from '@/composables/useIsAdmin'
 import { useWorkspace } from '@/queries/workspaces'
 
 const props = defineProps<{ workspaceId: string }>()
 const route = useRoute()
 const { data: workspace, error } = useWorkspace(() => props.workspaceId)
-const { data: me } = useMe()
-const isAdmin = computed(
-  () => me.value?.memberships.find((m) => m.workspace.id === props.workspaceId)?.role === 'admin',
-)
+const isAdmin = useIsAdmin(() => props.workspaceId)
 const visible = (items: NavItem[]) => items.filter((item) => !item.adminOnly || isAdmin.value)
 const {
   projects,
