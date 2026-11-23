@@ -203,6 +203,80 @@ async fn check_refuses_bad_scripts() {
     assert!(thrown.unwrap_err().contains("boom"), "top-level throw");
 }
 
+#[tokio::test]
+async fn crypto_and_encoding_globals_work_without_capabilities() {
+    let report = run(
+        "export default () => [crypto.hmac('sha256', 'Jefe', 'what do ya want for nothing?'), crypto.digest('sha1', 'abc', { encoding: 'base64' }), crypto.hmac('sha1', encoding.hexEncode('Jefe'), 'what do ya want for nothing?', { keyEncoding: 'hex', encoding: 'base64' }), crypto.timingSafeEqual('a', 'a'), crypto.timingSafeEqual('a', 'b'), crypto.randomUUID().length, encoding.base64Encode('héllo'), encoding.base64Decode(encoding.base64Encode('héllo', { url: true }), { url: true }), encoding.hexDecode('6869')]",
+    )
+    .await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
+            "qZk+NkcGgWq6PiVxeFDCbJzQ2J0=",
+            "7/zfauXrL6LSdBbV8YTfnCWafHk=",
+            true,
+            false,
+            36,
+            "aMOpbGxv",
+            "héllo",
+            "hi",
+        ])),
+        "{report:?}"
+    );
+}
+
+#[tokio::test]
+async fn helper_errors_are_catchable_errors() {
+    let report = run(
+        "export default () => [() => crypto.digest('md5', 'x'), () => encoding.base64Decode('//4='), () => new URL('nope'), () => new URL('https://a.example/').host = 'b'].map((f) => { try { f(); return 'no error' } catch (e) { return [e instanceof Error, e.message.split(':')[0]] } })",
+    )
+    .await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            [true, "unknown algorithm \"md5\"; use \"sha256\" or \"sha1\""],
+            [true, "the decoded bytes are not UTF-8 text; scripts work on text only"],
+            [true, "invalid URL"],
+            [true, "no setter for property"],
+        ])),
+        "{report:?}"
+    );
+}
+
+#[tokio::test]
+async fn url_and_search_params() {
+    let report = run(
+        "export default () => { const u = new URL('/hooks/1?a=1&b=2#x', 'https://Example.com:8443'); u.searchParams.set('a', 'one two'); u.searchParams.append('c', '&'); u.searchParams.delete('b'); u.hash = ''; const p = new URLSearchParams({ z: 1, y: 'x' }); p.sort(); const fromPairs = new URLSearchParams([['k', 'v'], ['k', 'w']]); return [u.href, u.host, u.origin, u.pathname, u.search, String(p), fromPairs.getAll('k'), [...new URLSearchParams('?q=a+b&r')], URL.canParse('nope'), JSON.stringify({ u })] }",
+    )
+    .await;
+    assert_eq!(
+        report.output,
+        Some(json!([
+            "https://example.com:8443/hooks/1?a=one+two&c=%26",
+            "example.com:8443",
+            "https://example.com:8443",
+            "/hooks/1",
+            "?a=one+two&c=%26",
+            "y=x&z=1",
+            ["v", "w"],
+            [["q", "a b"], ["r", ""]],
+            false,
+            "{\"u\":\"https://example.com:8443/hooks/1?a=one+two&c=%26\"}",
+        ])),
+        "{report:?}"
+    );
+}
+
+#[tokio::test]
+async fn globals_cannot_be_replaced() {
+    let report = run(
+        "export default () => { 'use strict'; const out = []; for (const f of [() => { globalThis.crypto = {} }, () => { crypto.hmac = null }, () => { URL.prototype.toString = null }]) { try { f(); out.push('wrote') } catch { out.push('threw') } } return out }",
+    )
+    .await;
+    assert_eq!(report.output, Some(json!(["threw", "threw", "threw"])), "{report:?}");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn secrets_and_fetch_when_granted() {
     let http = FakeHttp::default();

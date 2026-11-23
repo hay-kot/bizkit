@@ -10,6 +10,7 @@
 //! how long that takes.
 
 mod fetch;
+mod stdlib;
 mod thread;
 
 use std::collections::BTreeMap;

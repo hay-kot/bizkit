@@ -11,12 +11,13 @@ use anyhow::Context as _;
 use bizkit_core::hooks::RunStatus;
 use rquickjs::context::intrinsic::{Date, Eval, Json, MapSet, Promise as PromiseIntrinsic, RegExp};
 use rquickjs::{
-    Array, CatchResultExt as _, CaughtError, Context, Ctx, Function, Module, Runtime, Value,
+    Array, CatchResultExt as _, CaughtError, Context, Ctx, Exception, Function, Module, Object,
+    Runtime, Value,
 };
 
 use super::{
     CHECK_BUDGET, MAX_ERROR_CHARS, MAX_LOG_CHARS, MAX_LOG_LINES, MAX_OUTPUT_BYTES, PoolLimits,
-    RunReport, RunRequest, Shared, Task, Work, capped,
+    RunReport, RunRequest, Shared, Task, Work, capped, stdlib,
 };
 
 const PRELUDE: &str = include_str!("prelude.js");
@@ -177,26 +178,7 @@ fn prelude<'js>(
     logs: &Rc<RefCell<Vec<String>>>,
 ) -> Result<Array<'js>, String> {
     let setup: Function<'js> = caught(ctx, ctx.eval(PRELUDE))?;
-    let sink = Rc::clone(logs);
-    let log = caught(
-        ctx,
-        Function::new(ctx.clone(), move |line: String| {
-            let mut lines = sink.borrow_mut();
-            if lines.len() < MAX_LOG_LINES {
-                lines.push(capped(&line, MAX_LOG_CHARS));
-            }
-        }),
-    )?;
-    let fetch = match &req.fetch {
-        Some(bridge) => {
-            let bridge = bridge.clone();
-            let host = Function::new(ctx.clone(), move |url: String, init: String| {
-                bridge.fetch(&url, &init)
-            });
-            Some(caught(ctx, host)?)
-        }
-        None => None,
-    };
+    let host = caught(ctx, host_functions(ctx, req, logs))?;
     let input = serde_json::to_string(&req.input).map_err(|err| err.to_string())?;
     let secrets = req
         .secrets
@@ -204,5 +186,99 @@ fn prelude<'js>(
         .map(serde_json::to_string)
         .transpose()
         .map_err(|err| err.to_string())?;
-    caught(ctx, setup.call((log, fetch, input, secrets)))
+    caught(ctx, setup.call((host, input, secrets)))
+}
+
+/// Throws a helper's error as a JavaScript `Error`.
+fn thrown<T>(ctx: &Ctx<'_>, result: Result<T, String>) -> rquickjs::Result<T> {
+    result.map_err(|message| Exception::throw_message(ctx, &message))
+}
+
+/// The host functions the prelude wraps. `fetch` is set only when the run
+/// has a bridge.
+fn host_functions<'js>(
+    ctx: &Ctx<'js>,
+    req: &RunRequest,
+    logs: &Rc<RefCell<Vec<String>>>,
+) -> rquickjs::Result<Object<'js>> {
+    let host = Object::new(ctx.clone())?;
+    let sink = Rc::clone(logs);
+    host.set(
+        "log",
+        Function::new(ctx.clone(), move |line: String| {
+            let mut lines = sink.borrow_mut();
+            if lines.len() < MAX_LOG_LINES {
+                lines.push(capped(&line, MAX_LOG_CHARS));
+            }
+        }),
+    )?;
+    if let Some(bridge) = &req.fetch {
+        let bridge = bridge.clone();
+        host.set(
+            "fetch",
+            Function::new(ctx.clone(), move |url: String, init: String| bridge.fetch(&url, &init)),
+        )?;
+    }
+    host.set("uuid", Function::new(ctx.clone(), stdlib::uuid))?;
+    host.set(
+        "digest",
+        Function::new(ctx.clone(), |ctx: Ctx<'js>, alg: String, data: String, enc: String| {
+            thrown(&ctx, stdlib::digest(&alg, &data, &enc))
+        }),
+    )?;
+    host.set(
+        "hmac",
+        Function::new(
+            ctx.clone(),
+            |ctx: Ctx<'js>,
+             alg: String,
+             key: String,
+             data: String,
+             key_enc: String,
+             enc: String| {
+                thrown(&ctx, stdlib::hmac(&alg, &key, &data, &key_enc, &enc))
+            },
+        ),
+    )?;
+    host.set(
+        "timingSafeEqual",
+        Function::new(ctx.clone(), |a: String, b: String| stdlib::timing_safe_eq(&a, &b)),
+    )?;
+    host.set(
+        "b64Encode",
+        Function::new(ctx.clone(), |text: String, url: bool| stdlib::b64_encode(&text, url)),
+    )?;
+    host.set(
+        "b64Decode",
+        Function::new(ctx.clone(), |ctx: Ctx<'js>, text: String, url: bool| {
+            thrown(&ctx, stdlib::b64_decode(&text, url))
+        }),
+    )?;
+    host.set("hexEncode", Function::new(ctx.clone(), |text: String| stdlib::hex_encode(&text)))?;
+    host.set(
+        "hexDecode",
+        Function::new(ctx.clone(), |ctx: Ctx<'js>, text: String| {
+            thrown(&ctx, stdlib::hex_decode(&text))
+        }),
+    )?;
+    host.set(
+        "parseUrl",
+        Function::new(ctx.clone(), |ctx: Ctx<'js>, input: String, base: Option<String>| {
+            thrown(&ctx, stdlib::parse_url(&input, base.as_deref()))
+        }),
+    )?;
+    host.set(
+        "setUrl",
+        Function::new(ctx.clone(), |ctx: Ctx<'js>, href: String, part: String, value: String| {
+            thrown(&ctx, stdlib::set_url(&href, &part, &value))
+        }),
+    )?;
+    host.set(
+        "formEncode",
+        Function::new(ctx.clone(), |ctx: Ctx<'js>, pairs: String| {
+            thrown(&ctx, stdlib::form_encode(&pairs))
+        }),
+    )?;
+    host.set("formDecode", Function::new(ctx.clone(), |text: String| stdlib::form_decode(&text)))?;
+    Ok(host)
 }
