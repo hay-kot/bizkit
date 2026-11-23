@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
 import Page from './Page.vue'
-import SaveStatus from './SaveStatus.vue'
 
 describe('Page', () => {
   it.each([
@@ -18,15 +17,5 @@ describe('Page', () => {
   it('wide pages have no max width', () => {
     const wrapper = mount(Page)
     expect(wrapper.classes().some((c) => c.startsWith('max-w-'))).toBe(false)
-  })
-})
-
-describe('SaveStatus', () => {
-  it.each([
-    [true, 'Unsaved changes'],
-    [false, 'Saved'],
-  ])('dirty=%s reads %s', (dirty, text) => {
-    const wrapper = mount(SaveStatus, { props: { dirty } })
-    expect(wrapper.get('[role="status"]').text()).toBe(text)
   })
 })

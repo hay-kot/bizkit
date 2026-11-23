@@ -6,11 +6,11 @@ import { useRouter } from 'vue-router'
 import EntitySections from '@/components/EntitySections.vue'
 import FieldsEditor from '@/components/forms/FieldsEditor.vue'
 import { fetchSnippet, htmlSnippet } from '@/components/forms/embed'
-import ActionsMenu from '@/components/ui/ActionsMenu.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import DetailActions from '@/components/ui/DetailActions.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
@@ -237,17 +237,18 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
         form && !form.enabled ? 'Disabled: submissions get a 404.' : 'Submissions from your site.'
       "
     >
-      <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="onExport">
-        <Download class="size-4" aria-hidden="true" />Export CSV
-      </button>
-      <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="openSettings">
-        <Settings class="size-4" aria-hidden="true" />Settings
-      </button>
-      <ActionsMenu>
-        <MenuItem danger @select="onDeleteForm">
-          <Trash2 class="size-4" aria-hidden="true" />Delete form
-        </MenuItem>
-      </ActionsMenu>
+      <DetailActions
+        :actions="[
+          { label: 'Export CSV', icon: Download, run: onExport },
+          { label: 'Settings', icon: Settings, run: openSettings },
+        ]"
+      >
+        <template #menu>
+          <MenuItem danger @select="onDeleteForm">
+            <Trash2 class="size-4" aria-hidden="true" />Delete form
+          </MenuItem>
+        </template>
+      </DetailActions>
     </PageHeader>
 
     <p v-if="formError" class="text-sm text-error">This form doesn’t exist.</p>

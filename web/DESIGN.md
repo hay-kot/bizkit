@@ -11,8 +11,7 @@ Every page follows one of three archetypes. The primitives live in `src/componen
 | `PageSection` | A titled block that isn't a card: a table or list with a heading and optional actions. |
 | `Card` | A bordered group of fields or facts. `#actions` in the heading, `#footer` for a right-aligned Save. |
 | `DescriptionList` | Read-only facts about the entity, straight under the header. |
-| `ActionsMenu` + `MenuItem` | The "..." menu in a header for secondary actions. Destructive items are `danger` and go last. |
-| `SaveStatus` | "Saved" or "Unsaved changes" next to an inline-edit Save. |
+| `DetailActions` + `MenuItem` | A detail page's header actions: page buttons (`actions`), Save (`save`) and the "..." menu (`#menu`), all `btn-sm` in one style family. Save shows its own state: "Save", a disabled "Saved", or "Saving". Destructive menu items are `danger` and go last. |
 | `FormPanel` | Create and edit forms, as a side panel or a dialog. |
 
 ## List page
@@ -28,9 +27,9 @@ Projects, Team, API keys, Forms, Extensions.
 Form, Script. One column, always: no side-by-side cards or sidebars.
 
 - `Page` (wide, so tables and editors fit) > `PageHeader` with the entity name as title and the project as eyebrow.
-- Header actions: page-level buttons first, then `ActionsMenu` with Delete last.
+- Header actions go through `DetailActions`: page-level buttons first, then Save, then the "..." menu with Delete last. Pages can't import `ActionsMenu` (ESLint), don't add their own buttons beside the group, and put no text label next to Save.
 - Facts in a `DescriptionList` under the header. Editable groups in `Card`s, data in `PageSection`s.
-- When the page edits the entity inline, one Save in the header with `SaveStatus` saves everything, so it stays reachable above long editors.
+- When the page edits the entity inline, one Save in the header (`DetailActions`' `save`) saves everything. Its label is the save state, so there is no separate status text.
 - Config that isn't the page's main content opens in a `FormPanel` (form settings).
 
 ## Settings page
@@ -47,6 +46,6 @@ Workspace settings.
 - **Spacing.** `Page` puts `gap-8` between blocks, `PageSection` `gap-3` under its heading, `Card` `gap-4` in its body. Pages add no margins between their top-level blocks.
 - **Empty states.** `DataTable`'s `empty` prop: an icon, a title and one sentence. Only the main list adds a create action.
 - **Forms.** `Field` puts the label over the control. One column. The submit button goes bottom right in panels, in the card footer on settings.
-- **Destructive actions.** Always confirm with `runAction({ confirm })` and name the thing. Never a primary-colored destructive button outside the confirm dialog. On detail pages, Delete lives in `ActionsMenu`.
+- **Destructive actions.** Always confirm with `runAction({ confirm })` and name the thing. Never a primary-colored destructive button outside the confirm dialog. On detail pages, Delete lives in the `DetailActions` menu.
 - **Loading.** Skeletons on first load (`SkeletonRows`, `DataTable` handles its own), `SubmitButton`'s `pending` while saving.
 - **Grids.** A page that needs a grid (the workspace cards on Home) puts it in a component, so the page itself stays one column.
