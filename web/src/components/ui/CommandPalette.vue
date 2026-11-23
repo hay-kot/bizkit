@@ -230,7 +230,7 @@ function pieces(row: PaletteRow): { text: string; hit: boolean }[] {
         @keydown="onKeydown"
       >
         <div class="flex items-center gap-2 border-b border-base-300 px-3">
-          <Search class="size-4 shrink-0 text-base-content/60" aria-hidden="true" />
+          <Search class="size-4 shrink-0 text-base-content/70" aria-hidden="true" />
           <input
             ref="input"
             :value="paletteQuery"
@@ -272,7 +272,7 @@ function pieces(row: PaletteRow): { text: string; hit: boolean }[] {
           <template v-for="(section, index) in sections" :key="`${index}-${section.label}`">
             <li
               role="presentation"
-              class="px-2.5 pt-2 pb-1 text-xs font-medium text-base-content/60"
+              class="px-2.5 pt-2 pb-1 text-xs font-medium text-base-content/70"
             >
               {{ section.label }}
             </li>
@@ -295,7 +295,7 @@ function pieces(row: PaletteRow): { text: string; hit: boolean }[] {
                 aria-hidden="true"
               />
               <span class="min-w-0 flex-1 truncate">
-                <span v-if="section.paths && row.group" class="text-base-content/60"
+                <span v-if="section.paths && row.group" class="text-base-content/70"
                   >{{ row.group }} ›
                 </span>
                 <template v-for="(piece, i) in pieces(row)" :key="i">
@@ -305,10 +305,10 @@ function pieces(row: PaletteRow): { text: string; hit: boolean }[] {
                   <template v-else>{{ piece.text }}</template>
                 </template>
               </span>
-              <span v-if="row.kind" class="text-xs text-base-content/60">{{ row.kind }}</span>
+              <span v-if="row.kind" class="text-xs text-base-content/70">{{ row.kind }}</span>
               <CornerDownLeft
                 v-if="row.id === selectedId"
-                class="size-3.5 text-base-content/60"
+                class="size-3.5 text-base-content/70"
                 aria-hidden="true"
               />
             </li>
@@ -322,7 +322,7 @@ function pieces(row: PaletteRow): { text: string; hit: boolean }[] {
           {{ paletteQuery ? `No results for “${paletteQuery}”` : 'Nothing here yet.' }}
         </p>
         <div
-          class="flex gap-4 border-t border-base-300 px-3 py-2 text-xs text-base-content/60"
+          class="flex gap-4 border-t border-base-300 px-3 py-2 text-xs text-base-content/70"
           aria-hidden="true"
         >
           <span><kbd class="kbd kbd-xs">↑↓</kbd> move</span>
