@@ -129,7 +129,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 
 ## Dev stack
 
-`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`), the demo seed and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Sign in as `demo@bizkit.test` for the seeded demo workspace (any `@bizkit.test` email works) and open the link from the stack's Mailpit.
+`svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`), the demo seed and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Open the app at `http://localhost:<ui port>`, not `127.0.0.1`: the API's base URL is the localhost one, so magic links and the CSRF Origin check use it, while every service still listens on 127.0.0.1. Sign in as `demo@bizkit.test` for the seeded demo workspace (any `@bizkit.test` email works; other emails get no mail, and a second request within a minute sends none) and open the link from the stack's Mailpit.
 
 ## Tests
 

@@ -15,10 +15,11 @@ services:
 
   api:
     # The base URL is the UI's, so magic links open Vite and the browser's
-    # Origin passes the CSRF check.
+    # Origin passes the CSRF check. It says localhost, not 127.0.0.1: some
+    # browser setups (proxies, HTTPS-only modes) break on the IP origin.
     run: >-
       exec cargo run -p bizkit --features test-hooks -- --config dev/bizkit.yaml serve
-      --listen 127.0.0.1:$PORT --base-url $SVX_URL_UI
+      --listen 127.0.0.1:$PORT --base-url http://localhost:$SVX_PORT_UI
       --data-dir $SVX_STACK_DIR/data --smtp-url smtp://127.0.0.1:$SVX_PORT_MAILPIT_SMTP
     port: 8484
     depends: [mailpit]
@@ -41,4 +42,4 @@ services:
     depends: [api]
     env:
       BIZKIT_API_URL: '{{ url "api" }}' # vite.config.ts proxies /api, /mcp and /m here
-    links: { App: / }
+    links: { App: 'http://localhost:{{ .port }}/' } # the API's base URL; see above
