@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT e.name, e.path, e.props, e.ts AS \"ts: UnixMillis\",\n                  p.user_id AS \"user_id?\", p.traits AS \"traits?\"\n           FROM analytics_events e\n           LEFT JOIN analytics_people p\n             ON p.project_id = e.project_id AND e.person = 'p:' || p.id\n           WHERE e.workspace_id = ? AND e.project_id = ? AND e.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "path",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "path"
+          }
+        }
+      },
+      {
+        "name": "props",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "props"
+          }
+        }
+      },
+      {
+        "name": "ts: UnixMillis",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "name": "user_id?",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "traits?",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "traits"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "75319984ec90f0cc69c9cb7bcd3e0490da388753eeccef9199d861ae903620cd"
+}

@@ -70,6 +70,8 @@ impl Module for Analytics {
         explore::register(cx)?;
         funnels::register(cx)?;
         people::register(cx)?;
+        cx.hook_target_kind(&hooks::GOAL, hooks::GoalTargets)?;
+        cx.async_hook::<hooks::GoalConverted, _>(hooks::GOAL_CONVERTED, hooks::GoalHookSource)?;
         cx.public_routes(ingest::router(ingest), ingest::IngestDocs::openapi())
     }
 }

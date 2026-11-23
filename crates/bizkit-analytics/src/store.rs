@@ -159,6 +159,63 @@ pub(crate) async fn delete_goal(
     Ok(result.rows_affected() == 1)
 }
 
+/// Goals by ID, for hook targets. Unknown IDs are left out.
+pub(crate) async fn find_goals(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    ids: &[GoalId],
+) -> sqlx::Result<Vec<GoalRow>> {
+    let ids = serde_json::to_string(ids).map_err(|err| sqlx::Error::Encode(Box::new(err)))?;
+    sqlx::query_as!(
+        GoalRow,
+        r#"SELECT id AS "id: GoalId", workspace_id AS "workspace_id: WorkspaceId",
+                  project_id AS "project_id: ProjectId", name, kind, match AS matches,
+                  created_at AS "created_at: UnixMillis"
+           FROM analytics_goals
+           WHERE workspace_id = ? AND id IN (SELECT value FROM json_each(?))
+           ORDER BY name, id"#,
+        workspace_id,
+        ids,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// The parts of a stored event a goal hook shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HookEventRow {
+    pub(crate) name: String,
+    pub(crate) path: Option<String>,
+    pub(crate) props: Option<String>,
+    pub(crate) ts: UnixMillis,
+    pub(crate) user_id: Option<String>,
+    pub(crate) traits: Option<String>,
+}
+
+/// An event by row ID, with its person's user ID and traits when the
+/// event is keyed to an identified person.
+pub(crate) async fn find_hook_event(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    event_id: i64,
+) -> sqlx::Result<Option<HookEventRow>> {
+    sqlx::query_as!(
+        HookEventRow,
+        r#"SELECT e.name, e.path, e.props, e.ts AS "ts: UnixMillis",
+                  p.user_id AS "user_id?", p.traits AS "traits?"
+           FROM analytics_events e
+           LEFT JOIN analytics_people p
+             ON p.project_id = e.project_id AND e.person = 'p:' || p.id
+           WHERE e.workspace_id = ? AND e.project_id = ? AND e.id = ?"#,
+        workspace_id,
+        project_id,
+        event_id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
 /// Finds a site by its public key, for ingest.
 pub(crate) async fn find_site_by_key(
     exec: impl SqliteExecutor<'_>,

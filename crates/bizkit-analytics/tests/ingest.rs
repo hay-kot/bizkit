@@ -6,7 +6,9 @@ mod ingest {
     use std::time::Duration;
 
     use bizkit_analytics::Analytics;
-    use bizkit_testkit::{Manifest, Persona, RawBody, SpecClient, TestApp};
+    use bizkit_analytics::hooks::GOAL_CONVERTED;
+    use bizkit_core::jobs::JobCtx;
+    use bizkit_testkit::{FakeHooks, Manifest, Persona, RawBody, SpecClient, TestApp};
     use http::{HeaderName, Method, StatusCode, header};
     use serde_json::{Value, json};
 
@@ -20,6 +22,7 @@ mod ingest {
         admin: SpecClient,
         anon: SpecClient,
         key: String,
+        hooks: FakeHooks,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
@@ -37,15 +40,17 @@ mod ingest {
     }
 
     async fn setup(mode: &str) -> Setup {
+        let hooks = FakeHooks::default();
         let app = TestApp::builder()
             .module(Analytics)
+            .hook_runner(hooks.clone())
             .config(|config| config.trust_proxy_headers = true)
             .build()
             .await;
         let team = app.seed(Persona::Team, "analytics").await;
         let admin = app.with_session(&team.accounts["admin"].session_token);
         let anon = app.client();
-        let mut s = Setup { app, team, admin, anon, key: String::new() };
+        let mut s = Setup { app, team, admin, anon, key: String::new(), hooks };
         let site: Value = s
             .admin
             .post(&s.path("site"), &s.body(&json!({})))
@@ -329,6 +334,69 @@ mod ingest {
         s.app.clock.advance(Duration::from_hours(24));
         s.send(done, "203.0.113.1").await;
         assert_eq!(s.count("SELECT count(*) FROM analytics_conversions").await, 4, "a new day");
+    }
+
+    #[tokio::test]
+    async fn conversions_dispatch_the_goal_hook_once_per_day_and_person() {
+        let s = setup("after_identify").await;
+        let goal: Value = s
+            .admin
+            .post(
+                &s.path("goals"),
+                &s.body(&json!({"name": "Signup", "kind": "event", "match": "signup"})),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        s.send(
+            json!({"n": "$identify", "a": "anon-1", "i": "user_1", "t": {"email": "ada@x.test"}}),
+            "203.0.113.1",
+        )
+        .await;
+        let signup = json!({"n": "signup", "a": "anon-1", "i": "user_1", "p": {"plan": "pro"}});
+        s.send(signup.clone(), "203.0.113.1").await;
+        s.send(signup.clone(), "203.0.113.1").await;
+        s.send(json!({"n": "signup"}), "203.0.113.2").await;
+        s.app.drain_jobs().await;
+
+        let dispatches = s.hooks.dispatches();
+        assert_eq!(dispatches.len(), 2, "one per person and day: {dispatches:?}");
+        let dispatch = &dispatches[0];
+        assert_eq!(dispatch.point, GOAL_CONVERTED.id);
+        assert_eq!(
+            dispatch.target.entity.as_deref(),
+            goal["id"].as_str(),
+            "the goal is the entity"
+        );
+        assert_eq!(dispatch.target.project_id, s.team.projects["site"].id);
+        let keys: Vec<&String> = dispatch.event.as_object().unwrap().keys().collect();
+        assert_eq!(keys, ["event_id", "goal_id", "project_id", "workspace_id"], "IDs only");
+
+        let platform = s.app.app().platform();
+        let cx = JobCtx { platform: platform.clone(), job_id: 0, attempt: 1, request_id: None };
+        let input = platform.hook_input(&cx, GOAL_CONVERTED.id, &dispatch.event).await.unwrap();
+        let input = input.unwrap();
+        assert_eq!(input["goal"], json!({"id": goal["id"], "name": "Signup"}));
+        assert_eq!(input["event"]["name"], "signup");
+        assert_eq!(input["event"]["props"], json!({"plan": "pro"}));
+        assert_eq!(
+            input["person"],
+            json!({"user_id": "user_1", "traits": {"email": "ada@x.test"}})
+        );
+        let anonymous =
+            platform.hook_input(&cx, GOAL_CONVERTED.id, &dispatches[1].event).await.unwrap();
+        assert_eq!(anonymous.unwrap()["person"], Value::Null, "no person for visitors");
+
+        s.app.clock.advance(Duration::from_hours(24));
+        s.send(signup, "203.0.113.1").await;
+        s.app.drain_jobs().await;
+        assert_eq!(s.hooks.dispatches().len(), 3, "a new day converts again");
+
+        let goal_path = format!("goals/{}", goal["id"].as_str().unwrap());
+        s.admin.delete(&s.path(&goal_path)).await.expect(StatusCode::NO_CONTENT);
+        let gone = platform.hook_input(&cx, GOAL_CONVERTED.id, &dispatch.event).await.unwrap();
+        assert_eq!(gone, None, "a deleted goal skips the run");
+        assert_eq!(s.events().await.len(), 4, "events stay");
     }
 
     impl Setup {
