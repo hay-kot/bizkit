@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: EndpointId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", name, enabled AS \"enabled: bool\",\n                  forward_url, created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\"\n           FROM webhook_endpoints\n           WHERE workspace_id = ? AND id IN (SELECT value FROM json_each(?))\n           ORDER BY name, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: EndpointId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "forward_url",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "forward_url"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_endpoints",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f9815b45aa3dd1946ded2eedfa813a0ac515dd66f89d0f34209192a93cfcd79e"
+}

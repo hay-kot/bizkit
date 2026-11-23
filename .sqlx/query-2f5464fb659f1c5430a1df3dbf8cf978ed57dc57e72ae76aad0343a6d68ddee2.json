@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM webhook_requests\n         WHERE workspace_id = ?1 AND endpoint_id = ?2 AND id < (\n           SELECT id FROM webhook_requests WHERE workspace_id = ?1 AND endpoint_id = ?2\n           ORDER BY id DESC LIMIT 1 OFFSET ?3 - 1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "2f5464fb659f1c5430a1df3dbf8cf978ed57dc57e72ae76aad0343a6d68ddee2"
+}

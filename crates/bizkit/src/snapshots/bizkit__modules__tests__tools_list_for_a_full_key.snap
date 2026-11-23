@@ -1591,6 +1591,316 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create a webhook capture endpoint in a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new endpoint.",
+        "properties": {
+          "forward_url": {
+            "description": "Where to send each captured request on, a public http or https URL.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project it belongs to."
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_endpoints_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a webhook capture endpoint and its requests",
+      "inputSchema": {
+        "$defs": {
+          "EndpointId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An endpoint of a workspace.",
+        "properties": {
+          "endpoint_id": {
+            "$ref": "#/$defs/EndpointId",
+            "description": "The endpoint."
+          }
+        },
+        "required": [
+          "endpoint_id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_endpoints_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a webhook capture endpoint",
+      "inputSchema": {
+        "$defs": {
+          "EndpointId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An endpoint of a workspace.",
+        "properties": {
+          "endpoint_id": {
+            "$ref": "#/$defs/EndpointId",
+            "description": "The endpoint."
+          }
+        },
+        "required": [
+          "endpoint_id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_endpoints_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the webhook capture endpoints of a workspace",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which endpoints to list.",
+        "properties": {
+          "project_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProjectId",
+                "description": "Only this project's endpoints."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "webhooks_endpoints_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a webhook capture endpoint's settings",
+      "inputSchema": {
+        "$defs": {
+          "EndpointId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to an endpoint. Absent fields stay as they are.",
+        "properties": {
+          "enabled": {
+            "description": "Disabled endpoints answer 404 and store nothing.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "endpoint_id": {
+            "$ref": "#/$defs/EndpointId",
+            "description": "The endpoint."
+          },
+          "forward_url": {
+            "description": "Where to send each captured request on; `null` stops forwarding.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "endpoint_id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_endpoints_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a captured request with its headers and body",
+      "inputSchema": {
+        "$defs": {
+          "EndpointId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "RequestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A request of an endpoint.",
+        "properties": {
+          "endpoint_id": {
+            "$ref": "#/$defs/EndpointId",
+            "description": "The endpoint."
+          },
+          "request_id": {
+            "$ref": "#/$defs/RequestId",
+            "description": "The request."
+          }
+        },
+        "required": [
+          "endpoint_id",
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_requests_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List an endpoint's captured requests, newest first",
+      "inputSchema": {
+        "$defs": {
+          "EndpointId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "RequestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which requests to list.",
+        "properties": {
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/RequestId",
+                "description": "Only requests older than this one, for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endpoint_id": {
+            "$ref": "#/$defs/EndpointId",
+            "description": "The endpoint."
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "endpoint_id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_requests_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Send a captured request again, to a URL or the forward URL",
+      "inputSchema": {
+        "$defs": {
+          "EndpointId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "RequestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Where to replay a request.",
+        "properties": {
+          "endpoint_id": {
+            "$ref": "#/$defs/EndpointId",
+            "description": "The endpoint."
+          },
+          "request_id": {
+            "$ref": "#/$defs/RequestId",
+            "description": "The request."
+          },
+          "url": {
+            "description": "A public http or https URL. Default the endpoint's forward URL.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "endpoint_id",
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks_requests_replay"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": true
       },
       "description": "Show a workspace",

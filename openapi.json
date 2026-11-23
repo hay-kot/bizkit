@@ -4938,6 +4938,935 @@
         "x-bizkit-scope": "projects:write"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List the webhook capture endpoints of a workspace",
+        "operationId": "webhooks.endpoints.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ProjectId",
+                  "description": "Only this project's endpoints."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:read"
+      },
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Create a webhook capture endpoint in a project",
+        "operationId": "webhooks.endpoints.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "name"
+                ],
+                "properties": {
+                  "forward_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Where to send each captured request on, a public http or https URL."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project it belongs to."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Endpoint"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Show a webhook capture endpoint",
+        "operationId": "webhooks.endpoints.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EndpointId",
+              "description": "The endpoint."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Endpoint"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:read"
+      },
+      "delete": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Delete a webhook capture endpoint and its requests",
+        "operationId": "webhooks.endpoints.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EndpointId",
+              "description": "The endpoint."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:write"
+      },
+      "patch": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Change a webhook capture endpoint's settings",
+        "operationId": "webhooks.endpoints.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EndpointId",
+              "description": "The endpoint."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Disabled endpoints answer 404 and store nothing."
+                  },
+                  "forward_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Where to send each captured request on; `null` stops forwarding."
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The display name."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Endpoint"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/requests": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List an endpoint's captured requests, newest first",
+        "operationId": "webhooks.requests.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EndpointId",
+              "description": "The endpoint."
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RequestId",
+                  "description": "Only requests older than this one, for the next page."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Show a captured request with its headers and body",
+        "operationId": "webhooks.requests.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EndpointId",
+              "description": "The endpoint."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapturedRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/webhooks/{endpoint_id}/requests/{request_id}/replay": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Send a captured request again, to a URL or the forward URL",
+        "operationId": "webhooks.requests.replay",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EndpointId",
+              "description": "The endpoint."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "A public http or https URL. Default the endpoint's forward URL."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "webhooks:write"
+      }
+    },
     "/m/forms/public/{form_id}": {
       "post": {
         "tags": [
@@ -5088,6 +6017,333 @@
           }
         }
       }
+    },
+    "/m/webhooks/public/{endpoint_id}": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Send a request to a capture endpoint",
+        "description": "Stores the method, query, headers and a body of at most 256 KiB. `Authorization`, `Cookie` and `Proxy-Authorization` are never stored.",
+        "operationId": "webhooks.public.capture_get",
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "description": "The endpoint ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Any body",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captured"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled endpoint has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 256 KiB"
+          },
+          "429": {
+            "description": "The endpoint stored 300 requests in the past hour; retry after a minute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Send a request to a capture endpoint",
+        "description": "Stores the method, query, headers and a body of at most 256 KiB. `Authorization`, `Cookie` and `Proxy-Authorization` are never stored.",
+        "operationId": "webhooks.public.capture_put",
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "description": "The endpoint ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Any body",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captured"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled endpoint has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 256 KiB"
+          },
+          "429": {
+            "description": "The endpoint stored 300 requests in the past hour; retry after a minute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Send a request to a capture endpoint",
+        "description": "Stores the method, query, headers and a body of at most 256 KiB. `Authorization`, `Cookie` and `Proxy-Authorization` are never stored.",
+        "operationId": "webhooks.public.capture_post",
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "description": "The endpoint ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Any body",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captured"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled endpoint has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 256 KiB"
+          },
+          "429": {
+            "description": "The endpoint stored 300 requests in the past hour; retry after a minute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Send a request to a capture endpoint",
+        "description": "Stores the method, query, headers and a body of at most 256 KiB. `Authorization`, `Cookie` and `Proxy-Authorization` are never stored.",
+        "operationId": "webhooks.public.capture_delete",
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "description": "The endpoint ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Any body",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captured"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled endpoint has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 256 KiB"
+          },
+          "429": {
+            "description": "The endpoint stored 300 requests in the past hour; retry after a minute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Send a request to a capture endpoint",
+        "description": "Stores the method, query, headers and a body of at most 256 KiB. `Authorization`, `Cookie` and `Proxy-Authorization` are never stored.",
+        "operationId": "webhooks.public.capture_patch",
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "description": "The endpoint ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Any body",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Captured"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled endpoint has this ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 256 KiB"
+          },
+          "429": {
+            "description": "The endpoint stored 300 requests in the past hour; retry after a minute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5199,6 +6455,14 @@
           }
         }
       },
+      "BodyEncoding": {
+        "type": "string",
+        "description": "How a request body is given.",
+        "enum": [
+          "utf8",
+          "base64"
+        ]
+      },
       "BotCheck": {
         "type": "string",
         "description": "How a form tells people from bots.",
@@ -5215,6 +6479,53 @@
           "secrets",
           "fetch"
         ]
+      },
+      "Captured": {
+        "type": "object",
+        "description": "A request was stored.",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Always true."
+          }
+        }
+      },
+      "CapturedRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestSummary",
+            "description": "The summary fields."
+          },
+          {
+            "type": "object",
+            "required": [
+              "headers",
+              "body",
+              "body_encoding"
+            ],
+            "properties": {
+              "body": {
+                "type": "string",
+                "description": "The body, encoded as `body_encoding` says."
+              },
+              "body_encoding": {
+                "$ref": "#/components/schemas/BodyEncoding",
+                "description": "How `body` is encoded."
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Header"
+                },
+                "description": "The headers by first arrival of each name (a repeated name's values\nsit together), without `Authorization`, `Cookie`,\n`Proxy-Authorization`, hop-by-hop headers and `X-Request-Id`."
+              }
+            }
+          }
+        ],
+        "description": "A captured request in full."
       },
       "Challenge": {
         "type": "object",
@@ -5266,6 +6577,135 @@
           "token": {
             "type": "string",
             "description": "The bearer token, `bk_...`. Shown only now."
+          }
+        }
+      },
+      "Delivery": {
+        "type": "object",
+        "description": "The latest time a request went to a URL, by forward or replay.",
+        "required": [
+          "url",
+          "took_ms",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was sent."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed to get an answer, or why the answer counts as a failure."
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The answer's status, when one came.",
+            "minimum": 0
+          },
+          "took_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How long it took.",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string",
+            "description": "Where it went."
+          }
+        }
+      },
+      "Endpoint": {
+        "type": "object",
+        "description": "A public URL that stores every request it gets.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "enabled",
+          "url",
+          "request_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was created."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Disabled endpoints answer 404 and store nothing."
+          },
+          "forward_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where each captured request is sent on, if anywhere."
+          },
+          "id": {
+            "$ref": "#/components/schemas/EndpointId",
+            "description": "The endpoint ID, also its public address."
+          },
+          "last_received_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the newest stored request arrived."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "request_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Stored requests. The newest 500 are kept.",
+            "minimum": 0
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When its settings last changed."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL senders post to."
+          }
+        }
+      },
+      "EndpointId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "EndpointList": {
+        "type": "object",
+        "description": "Endpoints of a workspace.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Endpoint"
+            },
+            "description": "Sorted by name."
           }
         }
       },
@@ -5514,6 +6954,24 @@
               "$ref": "#/components/schemas/Form"
             },
             "description": "Sorted by name."
+          }
+        }
+      },
+      "Header": {
+        "type": "object",
+        "description": "One request header.",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The lowercase name."
+          },
+          "value": {
+            "type": "string",
+            "description": "The value. Values over 4096 bytes are not stored."
           }
         }
       },
@@ -5937,6 +7395,92 @@
               "$ref": "#/components/schemas/Project"
             },
             "description": "Sorted by name."
+          }
+        }
+      },
+      "RequestId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "RequestList": {
+        "type": "object",
+        "description": "A page of requests, newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestSummary"
+            },
+            "description": "The requests."
+          },
+          "next_before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RequestId",
+                "description": "Pass as `before` for the next page; absent on the last page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "RequestSummary": {
+        "type": "object",
+        "description": "A captured request without its headers and body.",
+        "required": [
+          "id",
+          "method",
+          "size",
+          "received_at"
+        ],
+        "properties": {
+          "content_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `Content-Type` header, if any."
+          },
+          "delivery": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Delivery",
+                "description": "The latest forward or replay."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/RequestId",
+            "description": "The request ID."
+          },
+          "method": {
+            "type": "string",
+            "description": "The HTTP method."
+          },
+          "query": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The query string without the `?`, if any."
+          },
+          "received_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it arrived."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The body size in bytes.",
+            "minimum": 0
           }
         }
       },

@@ -6,9 +6,9 @@ use anyhow::Context as _;
 use bizkit_core::auth::{is_plausible_email, normalize_email, random_token};
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::ops::{Access, Level, Method, NoContent, OpCtx, Operation, Scope, Success};
-use bizkit_core::validate::{FieldErrors, Validate, check_name};
+use bizkit_core::validate::{FieldErrors, Validate, check_name, present};
 use bizkit_core::{ApiError, ModuleContext, Platform};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use url::Url;
 use utoipa::ToSchema;
 
@@ -208,14 +208,6 @@ pub(crate) struct UpdateForm {
     /// Who gets mail for each new submission, at most 10.
     #[serde(default)]
     notify_emails: Option<Vec<String>>,
-}
-
-/// Tells an explicit `null` (`Some(None)`) from an absent field (`None`).
-#[expect(clippy::option_option, reason = "absent keeps the value, null removes it")]
-fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
-    deserializer: D,
-) -> Result<Option<Option<T>>, D::Error> {
-    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 impl Validate for UpdateForm {
