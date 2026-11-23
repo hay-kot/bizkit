@@ -1,21 +1,13 @@
 <script setup lang="ts">
-import {
-  CircleCheck,
-  CircleDot,
-  Ellipsis,
-  FlaskConical,
-  History,
-  Play,
-  Trash2,
-} from 'lucide-vue-next'
+import { FlaskConical, History, Play, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import PageHeader from '@/components/ui/PageHeader.vue'
 import TargetPicker from '@/components/extensions/TargetPicker.vue'
 import { runsForText } from '@/components/extensions/targets'
 import type { CasesResult } from '@/components/extensions/testCases'
 import { lineDiff, parseCases } from '@/components/extensions/testCases'
+import ActionsMenu from '@/components/ui/ActionsMenu.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
@@ -25,9 +17,11 @@ import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import type { Json } from '@/components/ui/JsonEditor.vue'
 import JsonEditor from '@/components/ui/JsonEditor.vue'
-import Menu from '@/components/ui/Menu.vue'
 import MenuItem from '@/components/ui/MenuItem.vue'
-import SectionHeading from '@/components/ui/SectionHeading.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PageSection from '@/components/ui/PageSection.vue'
+import SaveStatus from '@/components/ui/SaveStatus.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { runAction } from '@/lib/action'
 import { errorMessage } from '@/lib/errors'
@@ -310,7 +304,7 @@ function summaryOf(run: Run): string {
 </script>
 
 <template>
-  <div>
+  <Page>
     <p v-if="scriptError" class="text-error">{{ errorMessage(scriptError) }}</p>
     <template v-else-if="script">
       <PageHeader
@@ -322,14 +316,7 @@ function summaryOf(run: Run): string {
             : 'This hook point isn’t compiled into this server, so the script never runs.'
         "
       >
-        <span
-          class="flex items-center gap-1.5 text-xs"
-          :class="dirty ? 'text-warning' : 'text-base-content/60'"
-          role="status"
-        >
-          <component :is="dirty ? CircleDot : CircleCheck" class="size-3.5" aria-hidden="true" />
-          {{ dirty ? 'Unsaved changes' : 'Saved' }}
-        </span>
+        <SaveStatus :dirty="dirty" />
         <SubmitButton
           form="script-form"
           :pending="update.asyncStatus.value === 'loading'"
@@ -338,27 +325,14 @@ function summaryOf(run: Run): string {
         >
           Save
         </SubmitButton>
-        <Menu label="Script actions" align="end">
-          <template #trigger="{ open, toggle, controls }">
-            <button
-              type="button"
-              class="btn btn-square btn-ghost btn-sm"
-              aria-label="More actions"
-              aria-haspopup="menu"
-              :aria-expanded="open"
-              :aria-controls="controls"
-              @click="toggle"
-            >
-              <Ellipsis class="size-4" aria-hidden="true" />
-            </button>
-          </template>
-          <MenuItem @select="deleteScript">
-            <Trash2 class="size-4 text-error" aria-hidden="true" />Delete script
+        <ActionsMenu>
+          <MenuItem danger @select="deleteScript">
+            <Trash2 class="size-4" aria-hidden="true" />Delete script
           </MenuItem>
-        </Menu>
+        </ActionsMenu>
       </PageHeader>
 
-      <DescriptionList :items="facts" class="mb-6">
+      <DescriptionList :items="facts">
         <template #hook>
           <code class="text-xs">{{ script.hook }}</code>
         </template>
@@ -410,7 +384,6 @@ function summaryOf(run: Run): string {
 
       <Card
         title="Tests"
-        class="mt-6"
         :description="`Saved with the script. Each case runs the source above, saved or not.${script.sync ? '' : ' Fetches are real.'}`"
       >
         <template #actions>
@@ -505,55 +478,52 @@ function summaryOf(run: Run): string {
         </DataTable>
       </Card>
 
-      <SectionHeading
-        title="Run log"
-        description="The newest 100 runs, test runs included."
-        class="mt-8 mb-3"
-      />
-      <DataTable
-        :columns="columns"
-        :rows="runs?.items"
-        :row-key="(r) => r.id"
-        :loading="runsPending"
-        :error="runsError"
-        label="Runs"
-        :empty="{
-          icon: History,
-          title: 'No runs yet',
-          message: script.sync
-            ? 'Runs show here as submissions come in.'
-            : 'Runs show here after each event.',
-        }"
-      >
-        <template #cell-when="{ row }">
-          <button
-            type="button"
-            class="link text-sm whitespace-nowrap link-hover"
-            :title="formatDateTime(row.created_at)"
-            @click="viewing = row"
-          >
-            {{ formatRelative(row.created_at) }}
-          </button>
-        </template>
-        <template #cell-cause="{ row }">
-          <span class="text-sm"
-            >{{ row.cause }}<template v-if="row.attempt"> #{{ row.attempt }}</template></span
-          >
-        </template>
-        <template #cell-status="{ row }">
-          <span class="badge badge-sm" :class="STATUS_CLASSES[row.status]">
-            {{ STATUS_LABELS[row.status] }}
-          </span>
-        </template>
-        <template #cell-duration="{ row }"
-          ><span class="text-sm tabular-nums">{{ row.duration_ms }} ms</span></template
+      <PageSection title="Run log" description="The newest 100 runs, test runs included.">
+        <DataTable
+          :columns="columns"
+          :rows="runs?.items"
+          :row-key="(r) => r.id"
+          :loading="runsPending"
+          :error="runsError"
+          label="Runs"
+          :empty="{
+            icon: History,
+            title: 'No runs yet',
+            message: script.sync
+              ? 'Runs show here as submissions come in.'
+              : 'Runs show here after each event.',
+          }"
         >
-        <template #cell-summary="{ row }"
-          ><span class="line-clamp-1 text-sm text-base-content/80">{{
-            summaryOf(row)
-          }}</span></template
-        >
-      </DataTable>
+          <template #cell-when="{ row }">
+            <button
+              type="button"
+              class="link text-sm whitespace-nowrap link-hover"
+              :title="formatDateTime(row.created_at)"
+              @click="viewing = row"
+            >
+              {{ formatRelative(row.created_at) }}
+            </button>
+          </template>
+          <template #cell-cause="{ row }">
+            <span class="text-sm"
+              >{{ row.cause }}<template v-if="row.attempt"> #{{ row.attempt }}</template></span
+            >
+          </template>
+          <template #cell-status="{ row }">
+            <span class="badge badge-sm" :class="STATUS_CLASSES[row.status]">
+              {{ STATUS_LABELS[row.status] }}
+            </span>
+          </template>
+          <template #cell-duration="{ row }"
+            ><span class="text-sm tabular-nums">{{ row.duration_ms }} ms</span></template
+          >
+          <template #cell-summary="{ row }"
+            ><span class="line-clamp-1 text-sm text-base-content/80">{{
+              summaryOf(row)
+            }}</span></template
+          >
+        </DataTable>
+      </PageSection>
 
       <DetailPanel
         :open="viewing !== null"
@@ -617,5 +587,5 @@ function summaryOf(run: Run): string {
         </template>
       </DetailPanel>
     </template>
-  </div>
+  </Page>
 </template>

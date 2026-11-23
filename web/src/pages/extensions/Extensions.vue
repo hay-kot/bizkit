@@ -2,12 +2,13 @@
 import { Code, KeyRound, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 
-import PageHeader from '@/components/ui/PageHeader.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import NewScriptPanel from '@/components/extensions/NewScriptPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
-import SectionHeading from '@/components/ui/SectionHeading.vue'
+import Page from '@/components/ui/Page.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PageSection from '@/components/ui/PageSection.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
@@ -145,7 +146,7 @@ function removeSecret(secret: string) {
 </script>
 
 <template>
-  <div>
+  <Page>
     <PageHeader
       :section="projectName"
       title="Extensions"
@@ -156,7 +157,7 @@ function removeSecret(secret: string) {
       </button>
     </PageHeader>
 
-    <SectionHeading title="Scripts" class="mb-3">
+    <PageSection title="Scripts">
       <template v-if="(scripts?.items.length ?? 0) > 0" #actions>
         <Select
           v-model="targetFilter"
@@ -166,48 +167,47 @@ function removeSecret(secret: string) {
           name="target"
         />
       </template>
-    </SectionHeading>
-
-    <DataTable
-      :columns="scriptColumns"
-      :rows="shownScripts"
-      :row-key="(s) => s.id"
-      :loading="isPending"
-      :error="error"
-      label="Scripts"
-      :empty="{
-        icon: Code,
-        title: 'No scripts yet',
-        message: 'Attach a script to a hook point to filter spam or post submissions elsewhere.',
-      }"
-    >
-      <template #cell-name="{ row }">
-        <RouterLink :to="scriptPath(row.id)" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
-        <span v-if="!row.enabled" class="ms-2 badge badge-ghost badge-sm">Disabled</span>
-        <span v-if="!row.available" class="ms-2 badge badge-sm badge-warning">Unavailable</span>
-      </template>
-      <template #cell-hook="{ row }">
-        <code class="text-xs">{{ row.hook }}</code>
-        <span class="ms-2 badge badge-outline badge-sm">{{ row.sync ? 'sync' : 'async' }}</span>
-      </template>
-      <template #cell-target="{ row }"
-        ><span class="text-sm" :class="{ 'text-base-content/70': row.targets.length === 0 }">{{
-          targetText(row)
-        }}</span></template
+      <DataTable
+        :columns="scriptColumns"
+        :rows="shownScripts"
+        :row-key="(s) => s.id"
+        :loading="isPending"
+        :error="error"
+        label="Scripts"
+        :empty="{
+          icon: Code,
+          title: 'No scripts yet',
+          message: 'Attach a script to a hook point to filter spam or post submissions elsewhere.',
+        }"
       >
-      <template #cell-updated="{ row }"
-        ><span class="text-sm">{{ formatDate(row.updated_at) }}</span></template
-      >
-      <template #empty-action>
-        <button type="button" class="btn btn-primary btn-sm" @click="panelOpen = true">
-          New script
-        </button>
-      </template>
-    </DataTable>
+        <template #cell-name="{ row }">
+          <RouterLink :to="scriptPath(row.id)" class="link font-medium link-hover">
+            {{ row.name }}
+          </RouterLink>
+          <span v-if="!row.enabled" class="ms-2 badge badge-ghost badge-sm">Disabled</span>
+          <span v-if="!row.available" class="ms-2 badge badge-sm badge-warning">Unavailable</span>
+        </template>
+        <template #cell-hook="{ row }">
+          <code class="text-xs">{{ row.hook }}</code>
+          <span class="ms-2 badge badge-outline badge-sm">{{ row.sync ? 'sync' : 'async' }}</span>
+        </template>
+        <template #cell-target="{ row }"
+          ><span class="text-sm" :class="{ 'text-base-content/70': row.targets.length === 0 }">{{
+            targetText(row)
+          }}</span></template
+        >
+        <template #cell-updated="{ row }"
+          ><span class="text-sm">{{ formatDate(row.updated_at) }}</span></template
+        >
+        <template #empty-action>
+          <button type="button" class="btn btn-primary btn-sm" @click="panelOpen = true">
+            New script
+          </button>
+        </template>
+      </DataTable>
+    </PageSection>
 
-    <SectionHeading title="Secrets" class="mt-8 mb-3">
+    <PageSection title="Secrets">
       <template #description>
         Async scripts read these as <code>ctx.secrets</code>. Values are never shown again, and run
         logs show <code>[secret:NAME]</code> instead.
@@ -217,34 +217,33 @@ function removeSecret(secret: string) {
           <Plus class="size-4" aria-hidden="true" />Add secret
         </button>
       </template>
-    </SectionHeading>
-
-    <DataTable
-      :columns="secretColumns"
-      :rows="secrets?.items"
-      :row-key="(s) => s.name"
-      :loading="secretsPending"
-      :error="secretsError"
-      label="Secrets"
-      :empty="{ icon: KeyRound, title: 'No secrets', message: 'Add a webhook URL or API token.' }"
-    >
-      <template #cell-name="{ row }"
-        ><code class="text-sm">{{ row.name }}</code></template
+      <DataTable
+        :columns="secretColumns"
+        :rows="secrets?.items"
+        :row-key="(s) => s.name"
+        :loading="secretsPending"
+        :error="secretsError"
+        label="Secrets"
+        :empty="{ icon: KeyRound, title: 'No secrets', message: 'Add a webhook URL or API token.' }"
       >
-      <template #cell-updated="{ row }"
-        ><span class="text-sm">{{ formatDate(row.updated_at) }}</span></template
-      >
-      <template #cell-actions="{ row }">
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-sm"
-          :aria-label="`Delete ${row.name}`"
-          @click="removeSecret(row.name)"
+        <template #cell-name="{ row }"
+          ><code class="text-sm">{{ row.name }}</code></template
         >
-          <Trash2 class="size-4" aria-hidden="true" />
-        </button>
-      </template>
-    </DataTable>
+        <template #cell-updated="{ row }"
+          ><span class="text-sm">{{ formatDate(row.updated_at) }}</span></template
+        >
+        <template #cell-actions="{ row }">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            :aria-label="`Delete ${row.name}`"
+            @click="removeSecret(row.name)"
+          >
+            <Trash2 class="size-4" aria-hidden="true" />
+          </button>
+        </template>
+      </DataTable>
+    </PageSection>
 
     <NewScriptPanel
       :open="panelOpen"
@@ -283,5 +282,5 @@ function removeSecret(secret: string) {
         />
       </Field>
     </FormPanel>
-  </div>
+  </Page>
 </template>
