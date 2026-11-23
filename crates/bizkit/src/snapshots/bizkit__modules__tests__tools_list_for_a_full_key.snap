@@ -9,6 +9,91 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Record product events from your server",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ServerEvent": {
+            "additionalProperties": false,
+            "description": "One event from a server.",
+            "properties": {
+              "anon_id": {
+                "description": "The anonymous ID the snippet stored, to link browser events.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "A custom event name (1-64 letters, digits, or `_ . : -`),\n`pageview`, or `$identify` to record traits and link `anon_id` to\n`user_id`.",
+                "type": "string"
+              },
+              "props": {
+                "description": "Event properties: at most 20, with string (256 characters), number\nor boolean values.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "traits": {
+                "description": "User traits, for `$identify` only. Same limits as `props`.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "url": {
+                "description": "The page the event relates to; its path and UTM tags are kept.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "user_id": {
+                "description": "Your ID for the user. Needed for `$identify`; one of `user_id` and\n`anon_id` is needed for every event.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Events to record.",
+        "properties": {
+          "events": {
+            "description": "1 to 100 events. They take the time they arrive.",
+            "items": {
+              "$ref": "#/$defs/ServerEvent"
+            },
+            "type": "array"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project whose site gets the events."
+          }
+        },
+        "required": [
+          "project_id",
+          "events"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_events_ingest"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Add a goal: a page or event that counts as a conversion",
       "inputSchema": {
         "$defs": {

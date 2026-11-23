@@ -51,8 +51,7 @@ mod analytics {
         let key = site["key"].as_str().unwrap();
         assert_eq!(key.len(), 24);
         let snippet = site["snippet"].as_str().unwrap();
-        assert!(snippet.contains("/m/analytics/public/s.js"), "{snippet}");
-        assert!(snippet.contains(&format!(r#"data-site="{key}""#)), "{snippet}");
+        assert!(snippet.contains(&format!("/m/analytics/public/s/{key}.js")), "{snippet}");
         assert_eq!(site["identity_mode"], "cookieless");
         assert_eq!(site["has_events"], false);
 

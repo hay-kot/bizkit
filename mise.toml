@@ -40,11 +40,14 @@ run = "scripts/test-e2e.sh"
 # toolchain and `cargo install cargo-bolero`, so it stays out of `check` and
 # CI; `cargo test` already runs the same harnesses as property tests.
 [tasks.fuzz]
-description = "Fuzz the forms ingest parser and proof check with libFuzzer (nightly, cargo-bolero)"
+description = "Fuzz the forms and analytics ingest parsers with libFuzzer (nightly, cargo-bolero)"
 run = """
 set -e
 for target in ingest::parse::tests::fuzz_parse ingest::bot::tests::fuzz_verify; do
   cargo +nightly bolero test -p bizkit-forms --engine libfuzzer -T ${FUZZ_TIME:-60s} "$target"
+done
+for target in beacon::tests::fuzz_parse ua::tests::fuzz_parse enrich::tests::fuzz_source limit::tests::fuzz_allow; do
+  cargo +nightly bolero test -p bizkit-analytics --engine libfuzzer -T ${FUZZ_TIME:-60s} "$target"
 done
 """
 

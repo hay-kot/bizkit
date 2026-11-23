@@ -1,13 +1,134 @@
 //! The analytics module's API types.
 
+use std::borrow::Cow;
+use std::fmt;
+use std::str::FromStr;
+
 use bizkit_core::ids::ProjectId;
 use bizkit_core::time::UnixMillis;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use time::{Date, Month, OffsetDateTime, Time};
 use utoipa::ToSchema;
+use utoipa::openapi::RefOr;
+use utoipa::openapi::schema::{KnownFormat, ObjectBuilder, Schema, SchemaFormat, Type};
 
 bizkit_core::id_type!(GoalId, "The ID of an analytics goal.");
 bizkit_core::id_type!(FunnelId, "The ID of an analytics funnel.");
 bizkit_core::id_type!(PersonId, "The ID of an identified person in analytics.");
+
+/// A UTC calendar day, written `YYYY-MM-DD`. Analytics counts by UTC day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Day(Date);
+
+impl Day {
+    /// The UTC day `at` falls on.
+    #[must_use]
+    pub fn of(at: UnixMillis) -> Self {
+        let nanos = i128::from(at.0) * 1_000_000;
+        let date = OffsetDateTime::from_unix_timestamp_nanos(nanos)
+            .unwrap_or(OffsetDateTime::UNIX_EPOCH)
+            .date();
+        Self(date)
+    }
+
+    /// Midnight UTC at the start of the day.
+    #[must_use]
+    pub const fn start(self) -> UnixMillis {
+        let at = self.0.with_time(Time::MIDNIGHT).assume_utc();
+        UnixMillis(at.unix_timestamp().saturating_mul(1000))
+    }
+
+    /// The day after, or this day at the end of the calendar.
+    #[must_use]
+    pub fn next(self) -> Self {
+        Self(self.0.next_day().unwrap_or(self.0))
+    }
+
+    /// The day before, or this day at the start of the calendar.
+    #[must_use]
+    pub fn previous(self) -> Self {
+        Self(self.0.previous_day().unwrap_or(self.0))
+    }
+
+    /// Whole days from `self` to `later`; negative when `later` is earlier.
+    #[must_use]
+    pub fn days_until(self, later: Self) -> i64 {
+        (later.0 - self.0).whole_days()
+    }
+
+    /// `n` days later (or earlier, for a negative `n`), clamped to the calendar.
+    #[must_use]
+    pub fn plus_days(self, n: i64) -> Self {
+        Self(self.0.checked_add(time::Duration::days(n)).unwrap_or(self.0))
+    }
+}
+
+impl fmt::Display for Day {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04}-{:02}-{:02}", self.0.year(), u8::from(self.0.month()), self.0.day())
+    }
+}
+
+/// Not a `YYYY-MM-DD` calendar day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BadDay;
+
+impl fmt::Display for BadDay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("must be a date written YYYY-MM-DD")
+    }
+}
+
+impl std::error::Error for BadDay {}
+
+impl FromStr for Day {
+    type Err = BadDay;
+
+    fn from_str(text: &str) -> Result<Self, BadDay> {
+        let mut parts = text.split('-');
+        let (Some(year), Some(month), Some(day), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return Err(BadDay);
+        };
+        if year.len() != 4 || month.len() != 2 || day.len() != 2 {
+            return Err(BadDay);
+        }
+        let year: i32 = year.parse().map_err(|_| BadDay)?;
+        let month: u8 = month.parse().map_err(|_| BadDay)?;
+        let day: u8 = day.parse().map_err(|_| BadDay)?;
+        let month = Month::try_from(month).map_err(|_| BadDay)?;
+        Date::from_calendar_date(year, month, day).map(Self).map_err(|_| BadDay)
+    }
+}
+
+impl Serialize for Day {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for Day {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = Cow::<str>::deserialize(deserializer)?;
+        text.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl utoipa::PartialSchema for Day {
+    fn schema() -> RefOr<Schema> {
+        ObjectBuilder::new()
+            .schema_type(Type::String)
+            .format(Some(SchemaFormat::KnownFormat(KnownFormat::Date)))
+            .into()
+    }
+}
+
+impl ToSchema for Day {
+    fn name() -> Cow<'static, str> {
+        Cow::Borrowed("Day")
+    }
+}
 
 /// What the snippet may store in a visitor's browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
@@ -116,4 +237,30 @@ pub struct Goal {
 pub struct GoalList {
     /// Sorted by name.
     pub items: Vec<Goal>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn days_are_utc_and_round_trip() {
+        let day = Day::of(UnixMillis(1_700_000_000_123));
+        assert_eq!(day.to_string(), "2023-11-14");
+        assert_eq!(day.start(), UnixMillis(1_699_920_000_000));
+        assert_eq!(Day::of(day.start()), day, "midnight is the same day");
+        assert_eq!(Day::of(UnixMillis(day.start().0 - 1)), day.previous());
+        assert_eq!("2023-11-14".parse::<Day>(), Ok(day));
+        assert_eq!(day.next().to_string(), "2023-11-15");
+        assert_eq!(day.days_until(day.plus_days(30)), 30);
+        let json: Day = serde_json::from_str("\"2024-02-29\"").unwrap();
+        assert_eq!(serde_json::to_string(&json).unwrap(), "\"2024-02-29\"");
+    }
+
+    #[test]
+    fn bad_days() {
+        for bad in ["", "2023-02-30", "2023-1-01", "23-01-01", "2023-01-01T00:00", "2023/01/01"] {
+            assert_eq!(bad.parse::<Day>(), Err(BadDay), "{bad}");
+        }
+    }
 }

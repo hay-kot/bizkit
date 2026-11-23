@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_salts WHERE day < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1b786115f62a48a468c5dc21f6cbfcd0340af81cdadbba7a87e65efc2d6b98b8"
+}

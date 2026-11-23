@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO analytics_salts (day, salt) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "546072d2d0137875b09319be0ff5c2fe9d119f8dfb701656cc5b3c36968a9b92"
+}

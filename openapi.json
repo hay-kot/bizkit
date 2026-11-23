@@ -828,6 +828,125 @@
         "x-bizkit-scope": "workspace:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/analytics/events": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Record product events from your server",
+        "operationId": "analytics.events.ingest",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "events"
+                ],
+                "properties": {
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ServerEvent"
+                    },
+                    "description": "1 to 100 events. They take the time they arrive."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project whose site gets the events."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ingested"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/analytics/goals": {
       "get": {
         "tags": [
@@ -6543,6 +6662,66 @@
         "x-bizkit-scope": "webhooks:write"
       }
     },
+    "/m/analytics/public/e": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Record an analytics event from the snippet",
+        "description": "Takes one event as a JSON text body of at most 8 KiB, sent as `text/plain` so browsers skip the CORS preflight. Always answers 202, whether the event was stored or dropped (bots, unknown sites, other hosts, rate limits, malformed bodies).",
+        "operationId": "analytics.public.collect",
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Received"
+          }
+        }
+      }
+    },
+    "/m/analytics/public/s/{file}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get a site's tracking snippet",
+        "operationId": "analytics.public.script",
+        "parameters": [
+          {
+            "name": "file",
+            "in": "path",
+            "description": "The site key and `.js`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The snippet",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No site has this key"
+          }
+        }
+      }
+    },
     "/m/forms/public/{form_id}": {
       "post": {
         "tags": [
@@ -7885,6 +8064,20 @@
           "always"
         ]
       },
+      "Ingested": {
+        "type": "object",
+        "description": "How many events were recorded.",
+        "required": [
+          "accepted"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "description": "Events recorded, counting `$identify` calls.",
+            "minimum": 0
+          }
+        }
+      },
       "Invitation": {
         "type": "object",
         "description": "An invitation to a workspace.",
@@ -8628,6 +8821,55 @@
             "description": "The secrets, by name."
           }
         }
+      },
+      "ServerEvent": {
+        "type": "object",
+        "description": "One event from a server.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "anon_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The anonymous ID the snippet stored, to link browser events."
+          },
+          "name": {
+            "type": "string",
+            "description": "A custom event name (1-64 letters, digits, or `_ . : -`),\n`pageview`, or `$identify` to record traits and link `anon_id` to\n`user_id`."
+          },
+          "props": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Event properties: at most 20, with string (256 characters), number\nor boolean values."
+          },
+          "traits": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "User traits, for `$identify` only. Same limits as `props`."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The page the event relates to; its path and UTM tags are kept."
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your ID for the user. Needed for `$identify`; one of `user_id` and\n`anon_id` is needed for every event."
+          }
+        },
+        "additionalProperties": false
       },
       "SignInBody": {
         "type": "object",

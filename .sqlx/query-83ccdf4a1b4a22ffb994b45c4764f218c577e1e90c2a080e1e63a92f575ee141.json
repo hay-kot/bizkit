@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_events (workspace_id, project_id, ts, day, name, path, host,\n                                       referrer_host, utm_source, utm_medium, utm_campaign,\n                                       country, device, browser, os, visitor, person, anon_id,\n                                       user_id, props, source)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 21
+    },
+    "nullable": []
+  },
+  "hash": "83ccdf4a1b4a22ffb994b45c4764f218c577e1e90c2a080e1e63a92f575ee141"
+}

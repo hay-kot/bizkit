@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT traits FROM analytics_people WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "traits",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "traits"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9cce553ae0611fa3fcec07a337fc143cbbf13d1a31dae31e4313226ac5c75f1a"
+}

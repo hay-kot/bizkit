@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT person_id AS \"person_id: PersonId\" FROM analytics_aliases\n           WHERE project_id = ? AND anon_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "person_id: PersonId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_aliases",
+            "name": "person_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f21cbc6143f7629113326569c5493a085b3aa7613c8098de8619ee252d0a2341"
+}

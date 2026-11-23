@@ -544,6 +544,16 @@ export type HookTargetKind = {
 export type IdentityMode = 'cookieless' | 'after_identify' | 'always';
 
 /**
+ * How many events were recorded.
+ */
+export type Ingested = {
+    /**
+     * Events recorded, counting `$identify` calls.
+     */
+    accepted: number;
+};
+
+/**
  * An invitation to a workspace.
  */
 export type Invitation = {
@@ -1040,6 +1050,44 @@ export type SecretList = {
      * The secrets, by name.
      */
     items: Array<Secret>;
+};
+
+/**
+ * One event from a server.
+ */
+export type ServerEvent = {
+    /**
+     * The anonymous ID the snippet stored, to link browser events.
+     */
+    anon_id?: string | null;
+    /**
+     * A custom event name (1-64 letters, digits, or `_ . : -`),
+     * `pageview`, or `$identify` to record traits and link `anon_id` to
+     * `user_id`.
+     */
+    name: string;
+    /**
+     * Event properties: at most 20, with string (256 characters), number
+     * or boolean values.
+     */
+    props?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * User traits, for `$identify` only. Same limits as `props`.
+     */
+    traits?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * The page the event relates to; its path and UTM tags are kept.
+     */
+    url?: string | null;
+    /**
+     * Your ID for the user. Needed for `$identify`; one of `user_id` and
+     * `anon_id` is needed for every event.
+     */
+    user_id?: string | null;
 };
 
 /**
@@ -1762,6 +1810,61 @@ export type WorkspacesUpdateResponses = {
 };
 
 export type WorkspacesUpdateResponse = WorkspacesUpdateResponses[keyof WorkspacesUpdateResponses];
+
+export type AnalyticsEventsIngestData = {
+    body: {
+        /**
+         * 1 to 100 events. They take the time they arrive.
+         */
+        events: Array<ServerEvent>;
+        /**
+         * The project whose site gets the events.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/events';
+};
+
+export type AnalyticsEventsIngestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsEventsIngestError = AnalyticsEventsIngestErrors[keyof AnalyticsEventsIngestErrors];
+
+export type AnalyticsEventsIngestResponses = {
+    /**
+     * OK
+     */
+    200: Ingested;
+};
+
+export type AnalyticsEventsIngestResponse = AnalyticsEventsIngestResponses[keyof AnalyticsEventsIngestResponses];
 
 export type AnalyticsGoalsListData = {
     body?: never;
@@ -4532,6 +4635,48 @@ export type WebhooksRequestsReplayResponses = {
 };
 
 export type WebhooksRequestsReplayResponse = WebhooksRequestsReplayResponses[keyof WebhooksRequestsReplayResponses];
+
+export type AnalyticsPublicCollectData = {
+    body: string;
+    path?: never;
+    query?: never;
+    url: '/m/analytics/public/e';
+};
+
+export type AnalyticsPublicCollectResponses = {
+    /**
+     * Received
+     */
+    202: unknown;
+};
+
+export type AnalyticsPublicScriptData = {
+    body?: never;
+    path: {
+        /**
+         * The site key and `.js`
+         */
+        file: string;
+    };
+    query?: never;
+    url: '/m/analytics/public/s/{file}';
+};
+
+export type AnalyticsPublicScriptErrors = {
+    /**
+     * No site has this key
+     */
+    404: unknown;
+};
+
+export type AnalyticsPublicScriptResponses = {
+    /**
+     * The snippet
+     */
+    200: Blob | File;
+};
+
+export type AnalyticsPublicScriptResponse = AnalyticsPublicScriptResponses[keyof AnalyticsPublicScriptResponses];
 
 export type FormsPublicSubmitData = {
     body: {

@@ -6,7 +6,7 @@ use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
 
-use crate::api::GoalId;
+use crate::api::{GoalId, PersonId};
 
 /// An `analytics_sites` row. `hostnames` stays JSON text here.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,6 +153,245 @@ pub(crate) async fn delete_goal(
         "DELETE FROM analytics_goals WHERE workspace_id = ? AND id = ?",
         workspace_id,
         goal_id
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Finds a site by its public key, for ingest.
+pub(crate) async fn find_site_by_key(
+    exec: impl SqliteExecutor<'_>,
+    site_key: &str,
+) -> sqlx::Result<Option<SiteRow>> {
+    sqlx::query_as!(
+        SiteRow,
+        r#"SELECT project_id AS "project_id: ProjectId", workspace_id AS "workspace_id: WorkspaceId",
+                  site_key, hostnames, identity_mode, last_event_day, rolled_through,
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM analytics_sites WHERE site_key = ?"#,
+        site_key,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// Moves `last_event_day` forward to `day`. True when it moved: the first
+/// event of a new day for the site.
+pub(crate) async fn advance_event_day(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    day: &str,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE analytics_sites SET last_event_day = ?
+         WHERE workspace_id = ? AND project_id = ? AND (last_event_day IS NULL OR last_event_day < ?)",
+        day,
+        workspace_id,
+        project_id,
+        day,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Today's salt, made if missing. Older salts are deleted in the same call,
+/// so yesterday's visitor hashes can't be recomputed.
+pub(crate) async fn day_salt(
+    tx: &mut sqlx::SqliteConnection,
+    day: &str,
+    fresh: &[u8],
+) -> sqlx::Result<Vec<u8>> {
+    sqlx::query!("INSERT OR IGNORE INTO analytics_salts (day, salt) VALUES (?, ?)", day, fresh)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query!("DELETE FROM analytics_salts WHERE day < ?", day).execute(&mut *tx).await?;
+    sqlx::query_scalar!("SELECT salt FROM analytics_salts WHERE day = ?", day)
+        .fetch_one(&mut *tx)
+        .await
+}
+
+/// An `analytics_events` row to insert.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EventRow {
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) project_id: ProjectId,
+    pub(crate) ts: UnixMillis,
+    pub(crate) day: String,
+    pub(crate) name: String,
+    pub(crate) path: Option<String>,
+    pub(crate) host: Option<String>,
+    pub(crate) referrer_host: Option<String>,
+    pub(crate) utm_source: Option<String>,
+    pub(crate) utm_medium: Option<String>,
+    pub(crate) utm_campaign: Option<String>,
+    pub(crate) country: Option<String>,
+    pub(crate) device: Option<String>,
+    pub(crate) browser: Option<String>,
+    pub(crate) os: Option<String>,
+    pub(crate) visitor: i64,
+    pub(crate) person: String,
+    pub(crate) anon_id: Option<String>,
+    pub(crate) user_id: Option<String>,
+    pub(crate) props: Option<String>,
+    pub(crate) source: &'static str,
+}
+
+/// Inserts an event and returns its row ID.
+pub(crate) async fn insert_event(
+    exec: impl SqliteExecutor<'_>,
+    row: &EventRow,
+) -> sqlx::Result<i64> {
+    let result = sqlx::query!(
+        "INSERT INTO analytics_events (workspace_id, project_id, ts, day, name, path, host,
+                                       referrer_host, utm_source, utm_medium, utm_campaign,
+                                       country, device, browser, os, visitor, person, anon_id,
+                                       user_id, props, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        row.workspace_id,
+        row.project_id,
+        row.ts,
+        row.day,
+        row.name,
+        row.path,
+        row.host,
+        row.referrer_host,
+        row.utm_source,
+        row.utm_medium,
+        row.utm_campaign,
+        row.country,
+        row.device,
+        row.browser,
+        row.os,
+        row.visitor,
+        row.person,
+        row.anon_id,
+        row.user_id,
+        row.props,
+        row.source,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.last_insert_rowid())
+}
+
+/// Records a person as seen, made on first sight, and returns their ID.
+pub(crate) async fn upsert_person(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    user_id: &str,
+    now: UnixMillis,
+) -> sqlx::Result<PersonId> {
+    let fresh = PersonId::new();
+    sqlx::query_scalar!(
+        r#"INSERT INTO analytics_people (id, workspace_id, project_id, user_id, first_seen, last_seen)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (project_id, user_id) DO UPDATE SET last_seen = max(last_seen, excluded.last_seen)
+           RETURNING id AS "id!: PersonId""#,
+        fresh,
+        workspace_id,
+        project_id,
+        user_id,
+        now,
+        now,
+    )
+    .fetch_one(exec)
+    .await
+}
+
+pub(crate) async fn person_traits(
+    exec: impl SqliteExecutor<'_>,
+    person_id: PersonId,
+) -> sqlx::Result<String> {
+    sqlx::query_scalar!("SELECT traits FROM analytics_people WHERE id = ?", person_id)
+        .fetch_one(exec)
+        .await
+}
+
+pub(crate) async fn set_person_traits(
+    exec: impl SqliteExecutor<'_>,
+    person_id: PersonId,
+    traits: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!("UPDATE analytics_people SET traits = ? WHERE id = ?", traits, person_id)
+        .execute(exec)
+        .await?;
+    Ok(())
+}
+
+/// The person an anonymous ID was linked to by `identify`.
+pub(crate) async fn aliased_person(
+    exec: impl SqliteExecutor<'_>,
+    project_id: ProjectId,
+    anon_id: &str,
+) -> sqlx::Result<Option<PersonId>> {
+    sqlx::query_scalar!(
+        r#"SELECT person_id AS "person_id: PersonId" FROM analytics_aliases
+           WHERE project_id = ? AND anon_id = ?"#,
+        project_id,
+        anon_id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// Links an anonymous ID to a person; a later identify relinks it.
+pub(crate) async fn set_alias(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    anon_id: &str,
+    person_id: PersonId,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO analytics_aliases (workspace_id, project_id, anon_id, person_id) VALUES (?, ?, ?, ?)
+         ON CONFLICT (project_id, anon_id) DO UPDATE SET person_id = excluded.person_id",
+        workspace_id,
+        project_id,
+        anon_id,
+        person_id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Moves a project's events from person key `from` to `to`.
+pub(crate) async fn rekey_events(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: ProjectId,
+    from: &str,
+    to: &str,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "UPDATE analytics_events SET person = ? WHERE project_id = ? AND person = ? AND workspace_id = ?",
+        to,
+        project_id,
+        from,
+        workspace_id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+/// Records a goal conversion. True when it is the first for the goal, day
+/// and person.
+pub(crate) async fn insert_conversion(
+    exec: impl SqliteExecutor<'_>,
+    goal_id: GoalId,
+    day: &str,
+    person: &str,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "INSERT OR IGNORE INTO analytics_conversions (goal_id, day, person) VALUES (?, ?, ?)",
+        goal_id,
+        day,
+        person,
     )
     .execute(exec)
     .await?;

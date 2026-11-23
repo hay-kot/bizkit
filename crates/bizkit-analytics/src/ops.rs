@@ -1,5 +1,7 @@
 //! The analytics operations: site settings and goals.
 
+use std::sync::Arc;
+
 use anyhow::Context as _;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::ops::{Access, Level, Method, NoContent, OpCtx, Operation, Scope, Success};
@@ -10,6 +12,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::api::{Goal, GoalId, GoalKind, GoalList, IdentityMode, Site};
+use crate::ingest::Ingest;
 use crate::names;
 use crate::store::{self, GoalRow, SiteRow};
 
@@ -20,24 +23,28 @@ const TAGS: &[&str] = &["analytics"];
 pub const MAX_HOSTNAMES: usize = 20;
 const SITE_KEY_LEN: usize = 24;
 
-pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
+pub(crate) fn register(cx: &mut ModuleContext<'_>, ingest: &Arc<Ingest>) -> anyhow::Result<()> {
     cx.scope_area("analytics", "Web analytics and product events")?;
     cx.op(SiteGet)?;
     cx.op(SiteCreate)?;
-    cx.op(SiteUpdate)?;
+    cx.op(SiteUpdate(Arc::clone(ingest)))?;
     cx.op(GoalsList)?;
-    cx.op(GoalsCreate)?;
-    cx.op(GoalsDelete)?;
+    cx.op(GoalsCreate(Arc::clone(ingest)))?;
+    cx.op(GoalsDelete(Arc::clone(ingest)))?;
+    cx.op(crate::server::EventsIngest(Arc::clone(ingest)))?;
     Ok(())
 }
 
 // ---------------------------------------------------------------- conversions
 
-/// The `<script>` tag a site adds to its pages.
+/// The `<script>` tag a site adds to its pages. The script is per site, so
+/// it carries the key and the identity mode.
 pub(crate) fn snippet_tag(platform: &Platform, site_key: &str) -> anyhow::Result<String> {
-    let src =
-        platform.base_url().join("/m/analytics/public/s.js").context("building the snippet URL")?;
-    Ok(format!(r#"<script defer src="{src}" data-site="{site_key}"></script>"#))
+    let src = platform
+        .base_url()
+        .join(&format!("/m/analytics/public/s/{site_key}.js"))
+        .context("building the snippet URL")?;
+    Ok(format!(r#"<script defer src="{src}"></script>"#))
 }
 
 fn site_to_api(platform: &Platform, row: SiteRow) -> anyhow::Result<Site> {
@@ -257,7 +264,7 @@ impl Operation for SiteCreate {
     }
 }
 
-struct SiteUpdate;
+struct SiteUpdate(Arc<Ingest>);
 impl Operation for SiteUpdate {
     type Input = UpdateSite;
     type Output = Site;
@@ -283,6 +290,7 @@ impl Operation for SiteUpdate {
         row.updated_at = cx.now();
         store::update_site_settings(&mut *tx, &row).await?;
         tx.commit().await?;
+        self.0.sites.clear();
         Ok(site_to_api(cx.platform(), row)?)
     }
 }
@@ -308,7 +316,7 @@ impl Operation for GoalsList {
     }
 }
 
-struct GoalsCreate;
+struct GoalsCreate(Arc<Ingest>);
 impl Operation for GoalsCreate {
     type Input = CreateGoal;
     type Output = Goal;
@@ -338,11 +346,12 @@ impl Operation for GoalsCreate {
         }
         store::insert_goal(&mut *tx, &row).await?;
         tx.commit().await?;
+        self.0.sites.clear();
         Ok(goal_to_api(row))
     }
 }
 
-struct GoalsDelete;
+struct GoalsDelete(Arc<Ingest>);
 impl Operation for GoalsDelete {
     type Input = InGoal;
     type Output = NoContent;
@@ -358,6 +367,7 @@ impl Operation for GoalsDelete {
         let mut tx = cx.write().await?;
         let deleted = store::delete_goal(&mut *tx, input.workspace_id, input.goal_id).await?;
         tx.commit().await?;
+        self.0.sites.clear();
         if deleted { Ok(NoContent) } else { Err(ApiError::NotFound) }
     }
 }

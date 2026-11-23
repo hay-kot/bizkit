@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO analytics_conversions (goal_id, day, person) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b1a57e7e66fe84fcf362966e1165b11c2e947b6bd5aeefa5f4e032daa6902ed9"
+}

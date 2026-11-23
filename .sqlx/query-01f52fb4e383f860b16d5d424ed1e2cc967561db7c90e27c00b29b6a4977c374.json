@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT salt FROM analytics_salts WHERE day = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "salt",
+        "ordinal": 0,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "analytics_salts",
+            "name": "salt"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "01f52fb4e383f860b16d5d424ed1e2cc967561db7c90e27c00b29b6a4977c374"
+}
