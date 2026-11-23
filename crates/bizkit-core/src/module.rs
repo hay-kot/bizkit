@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context as _, bail};
@@ -60,6 +61,22 @@ pub trait Module: Send + Sync + fmt::Debug + 'static {
     }
 }
 
+/// Background state a module keeps across requests, such as write buffers.
+/// Register it with [`ModuleContext::lifecycle`].
+pub trait Lifecycle: Send + Sync + fmt::Debug + 'static {
+    /// Writes everything buffered so far, side effects included. The module
+    /// keeps working afterwards.
+    ///
+    /// # Errors
+    ///
+    /// When buffered work can't be written.
+    fn flush(&self) -> BoxFuture<'_, anyhow::Result<()>>;
+
+    /// Flushes and stops. Runs once, after HTTP and the worker stopped and
+    /// before the database closes.
+    fn stop(&self) -> BoxFuture<'_, ()>;
+}
+
 /// The demo rows core seeded, for [`Module::seed_demo`].
 #[derive(Debug, Clone)]
 pub struct DemoSeed {
@@ -71,6 +88,8 @@ pub struct DemoSeed {
     pub user_id: UserId,
     /// The seed time.
     pub now: UnixMillis,
+    /// The data directory, for modules that keep files beside the database.
+    pub data_dir: PathBuf,
     /// Entities modules seeded, by (target kind ID, label), such as
     /// `("forms.form", "Contact")`, so later modules can refer to them
     /// without depending on the module that made them.
@@ -84,6 +103,8 @@ pub(crate) struct Registration {
     pub(crate) handlers: Handlers,
     pub(crate) routes: Vec<ModuleRoutes>,
     pub(crate) hooks: HookRegistry,
+    pub(crate) lifecycles: Vec<Arc<dyn Lifecycle>>,
+    lifecycle_modules: Vec<&'static str>,
 }
 
 /// A module's raw routes and their docs.
@@ -373,6 +394,22 @@ impl<'a> ModuleContext<'a> {
             bail!("target kind {} is already declared", kind.id);
         }
         self.registration.hooks.add_kind(kind, Arc::new(resolver));
+        Ok(())
+    }
+
+    /// Registers the module's [`Lifecycle`]: the app flushes it on demand
+    /// and stops it on shutdown.
+    ///
+    /// # Errors
+    ///
+    /// When the module already registered one.
+    pub fn lifecycle(&mut self, lifecycle: impl Lifecycle) -> anyhow::Result<()> {
+        let module = self.module;
+        if self.registration.lifecycle_modules.contains(&module) {
+            bail!("module {module} registered a lifecycle twice");
+        }
+        self.registration.lifecycle_modules.push(module);
+        self.registration.lifecycles.push(Arc::new(lifecycle));
         Ok(())
     }
 

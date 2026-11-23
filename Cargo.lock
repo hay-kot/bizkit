@@ -499,6 +499,7 @@ dependencies = [
  "axum-test",
  "bizkit-core",
  "bytes",
+ "futures",
  "http",
  "jsonschema",
  "serde",

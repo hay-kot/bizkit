@@ -100,6 +100,10 @@ impl Worker {
         Self { inner: Arc::new(Inner { platform, handlers, lanes }) }
     }
 
+    pub(crate) fn platform(&self) -> &Platform {
+        &self.inner.platform
+    }
+
     /// Runs jobs until `shutdown` fires, then returns once the jobs in flight
     /// finish. Each lane runs `concurrency` loops. Loops wake on commits that
     /// wrote jobs, and poll every second for rows other processes wrote.

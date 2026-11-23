@@ -3,6 +3,7 @@
 //! its natural key first, so seeding again changes nothing.
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use anyhow::Context as _;
 
@@ -28,6 +29,7 @@ pub async fn seed(
     db: &Db,
     modules: &[Box<dyn Module>],
     now: UnixMillis,
+    data_dir: &Path,
 ) -> anyhow::Result<DemoSeed> {
     let mut tx = db.write().await?;
     let user = match users::find_by_email(&mut *tx, DEMO_EMAIL).await? {
@@ -56,6 +58,7 @@ pub async fn seed(
         project_ids,
         user_id: user.id,
         now,
+        data_dir: data_dir.to_owned(),
         entities: BTreeMap::new(),
     };
     for module in modules {

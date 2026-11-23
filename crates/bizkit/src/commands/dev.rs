@@ -69,7 +69,8 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
             }
         }
         DevCommand::SeedDemo => {
-            bizkit_core::dev::demo::seed(&db, &modules, SystemClock.now()).await?;
+            let data_dir = config.data_dir.as_deref().context("data_dir is not set")?;
+            bizkit_core::dev::demo::seed(&db, &modules, SystemClock.now(), data_dir).await?;
             writeln!(
                 out,
                 "seeded the demo workspace; sign in as {}",

@@ -52,7 +52,8 @@ struct Drained {
     dead: u32,
 }
 
-/// `POST /__test/clock {advance_ms}` and `POST /__test/jobs/drain`.
+/// `POST /__test/clock {advance_ms}` and `POST /__test/jobs/drain`, which
+/// flushes module buffers before it runs due jobs.
 pub fn router(clock: Arc<OffsetClock>, worker: Worker) -> Router {
     Router::new()
         .route("/__test/clock", post(advance))
@@ -66,6 +67,9 @@ async fn advance(State(state): State<HookState>, Json(body): Json<Advance>) -> R
 }
 
 async fn drain(State(state): State<HookState>) -> Response {
+    if let Err(err) = state.worker.platform().flush_modules().await {
+        return ApiError::Internal(err).into_response();
+    }
     match state.worker.run_until_idle().await {
         Ok(run) => {
             Json(Drained { done: run.done, retried: run.retried, dead: run.dead }).into_response()
