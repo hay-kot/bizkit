@@ -203,12 +203,9 @@ pub fn load_runs(dir: &Path) -> anyhow::Result<Vec<RunResult>> {
         }
     }
     runs.sort_by(|a: &RunResult, b| {
-        (&a.labels.scenario, a.projects, a.rate, design_order(a.labels.design)).cmp(&(
-            &b.labels.scenario,
-            b.projects,
-            b.rate,
-            design_order(b.labels.design),
-        ))
+        let key =
+            |r: &RunResult| (r.projects, r.rate, design_order(r.labels.design), r.labels.flush_ms);
+        a.labels.scenario.cmp(&b.labels.scenario).then_with(|| key(a).cmp(&key(b)))
     });
     Ok(runs)
 }
