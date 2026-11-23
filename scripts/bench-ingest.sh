@@ -57,7 +57,7 @@ done
 
 # Warmup: same flags, seq IDs far from the measured run's.
 # shellcheck disable=SC2086
-"$bench" load --url "http://127.0.0.1:$port" $load_args --duration 5 --app-per-s 0 \
+"$bench" load --url "http://127.0.0.1:$port" $load_args --duration "${BENCH_WARMUP:-2}" --app-per-s 0 \
   --seq-start 1000000000 --out "$out_dir/.warmup.json" >/dev/null
 rm -f "$out_dir/.warmup.json" "$out_dir/.warmup.acked"
 

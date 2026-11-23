@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs every analytics ingest benchmark scenario (see the plan in
 # .hive/plans/2026-11-23-analytics-ingest-bench.md) into one results dir,
-# then prints the markdown tables. About an hour.
+# then prints the markdown tables. About 10 minutes at the default 10 s per
+# run; set BENCH_DURATION for longer runs.
 #
 #   scripts/bench-ingest-matrix.sh [out-dir] [scenario ...]
 #
@@ -13,7 +14,9 @@ out="${1:-$root/target/bench-ingest/$(date +%Y%m%d-%H%M%S)}"
 shift || true
 scenarios=("$@")
 [[ ${#scenarios[@]} -eq 0 ]] && scenarios=(steady sync shared burst mixed kill)
-duration=${BENCH_DURATION:-60}
+duration=${BENCH_DURATION:-10}
+half=$((duration / 2))
+quarter=$((duration / 4 > 0 ? duration / 4 : 1))
 built=""
 
 # case <scenario> <design> <rate> <projects> [extra serve flags] [extra load flags] [kill-at] [layout] [sync] [flush-ms]
@@ -32,32 +35,30 @@ designs=(write-through batched buffered)
 for scenario in "${scenarios[@]}"; do
   case $scenario in
     steady)
-      for projects in 1 10 100; do
-        for rate in 500 2000 5000; do
-          for design in "${designs[@]}"; do case_run steady "$design" "$rate" "$projects"; done
-        done
+      # The load curve at 10 projects, plus project count at the top rate.
+      for rate in 500 2000 5000 10000; do
+        for design in "${designs[@]}"; do case_run steady "$design" "$rate" 10; done
+      done
+      for projects in 1 100; do
+        for design in "${designs[@]}"; do case_run steady "$design" 5000 "$projects"; done
       done ;;
     sync)
-      for rate in 2000 5000; do
-        for design in batched buffered; do
-          case_run sync "$design" "$rate" 10 "" "" "" per-project full
-        done
+      for design in batched buffered; do
+        case_run sync "$design" 5000 10 "" "" "" per-project full
       done ;;
     shared)
-      for rate in 2000 5000; do
-        for design in "${designs[@]}"; do case_run shared "$design" "$rate" 10 "" "" "" shared; done
-      done ;;
+      for design in "${designs[@]}"; do case_run shared "$design" 5000 10 "" "" "" shared; done ;;
     burst)
       for design in "${designs[@]}"; do
-        case_run burst "$design" 500 10 "" "--burst-x 10 --burst-at 15 --burst-for 30"
+        case_run burst "$design" 500 10 "" "--burst-x 10 --burst-at $quarter --burst-for $half"
       done ;;
     mixed)
       for design in "${designs[@]}"; do
-        case_run mixed "$design" 2000 10 "" "--queries-per-s 10 --rollup-every 10"
+        case_run mixed "$design" 2000 10 "" "--queries-per-s 10 --rollup-every $half"
       done ;;
     kill)
-      for design in "${designs[@]}"; do case_run kill "$design" 2000 10 "" "" 30; done
-      for flush in 100 500; do case_run kill buffered 2000 10 "" "" 30 per-project normal "$flush"; done ;;
+      for design in "${designs[@]}"; do case_run kill "$design" 2000 10 "" "" "$half"; done
+      for flush in 100 500; do case_run kill buffered 2000 10 "" "" "$half" per-project normal "$flush"; done ;;
     *) echo "unknown scenario: $scenario" >&2; exit 2 ;;
   esac
 done

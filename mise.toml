@@ -60,8 +60,12 @@ description = "Run one analytics ingest benchmark scenario in a 2 CPU / 1 GB con
 run = "scripts/bench-ingest.sh"
 
 [tasks."bench:ingest:matrix"]
-description = "Run every analytics ingest benchmark scenario (about an hour) and print the tables"
+description = "Run every analytics ingest benchmark scenario (about 10 minutes) and print the tables"
 run = "scripts/bench-ingest-matrix.sh"
+
+[tasks."bench:ingest:charts"]
+description = "Render the analytics ingest benchmark charts: <results dir> <out dir> [prefix]"
+run = "scripts/bench-charts.py"
 
 [tasks.coverage]
 description = "Run tests with coverage and write lcov.info"
