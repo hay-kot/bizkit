@@ -19,7 +19,9 @@ use bizkit_core::{Module, ModuleContext};
 use futures::future::BoxFuture;
 use utoipa::OpenApi as _;
 
-use crate::hooks::{FormsHookSource, PRE_VALIDATE, SUBMISSION_CREATED, SubmissionCreated};
+use crate::hooks::{
+    FORM, FormTargets, FormsHookSource, PRE_VALIDATE, SUBMISSION_CREATED, SubmissionCreated,
+};
 
 /// The forms module.
 #[derive(Debug, Clone, Copy, Default)]
@@ -36,6 +38,7 @@ impl Module for Forms {
 
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
         ops::register(cx)?;
+        cx.hook_target_kind(&FORM, FormTargets)?;
         cx.sync_hook(PRE_VALIDATE)?;
         cx.async_hook::<SubmissionCreated, _>(SUBMISSION_CREATED, FormsHookSource)?;
         cx.public_routes(ingest::route::router(), ingest::route::IngestDocs::openapi())

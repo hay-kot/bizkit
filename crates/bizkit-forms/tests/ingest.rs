@@ -219,6 +219,7 @@ mod ingest {
         assert_eq!(call.input["fields"], json!({"name": ["Bea"]}), "control fields left out");
         assert_eq!(call.input["form"]["name"], "Contact", "form in the input");
         assert_eq!(call.target.project_id, s.team.projects["site"].id, "target");
+        assert_eq!(call.target.entity.as_deref(), Some(id(&form)), "the form is the entity");
 
         let reject = json!({"action": "reject", "errors": {"name": ["is not allowed"]}});
         s.hooks.answer(PRE_VALIDATE.id, SyncOutcome::Returned(reject));
@@ -273,6 +274,7 @@ mod ingest {
         let dispatch = &dispatches[0];
         assert_eq!(dispatch.point, SUBMISSION_CREATED.id, "point");
         assert_eq!(dispatch.target.project_id, s.team.projects["site"].id, "target");
+        assert_eq!(dispatch.target.entity.as_deref(), Some(id(&form)), "the form is the entity");
         let keys: Vec<&String> = dispatch.event.as_object().unwrap().keys().collect();
         assert_eq!(keys, ["form_id", "submission_id", "workspace_id"], "the event holds IDs only");
 

@@ -18,6 +18,7 @@ test-hooks = ["bizkit-core/test-hooks"]
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
 axum.workspace = true
 base64.workspace = true
 bizkit-core.workspace = true

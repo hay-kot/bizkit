@@ -6,7 +6,11 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use anyhow::Context as _;
-use bizkit_core::hooks::{HookKind, HookPoint, HookSource, HookTarget};
+use async_trait::async_trait;
+use bizkit_core::Platform;
+use bizkit_core::hooks::{
+    HookKind, HookPoint, HookSource, HookTarget, TargetEntity, TargetKind, TargetResolver,
+};
 use bizkit_core::ids::WorkspaceId;
 use bizkit_core::jobs::{Event, JobCtx};
 use bizkit_core::validate::FieldErrors;
@@ -39,6 +43,9 @@ impl Event for SubmissionCreated {
     const NAME: &'static str = "forms.submission.created";
 }
 
+/// Scripts on the forms points can bind to one form.
+pub static FORM: TargetKind = TargetKind { id: "forms.form", noun: "form", plural: "forms" };
+
 /// Runs in the submit request after the bot checks pass, before field
 /// validation.
 pub const PRE_VALIDATE: HookPoint = HookPoint {
@@ -46,7 +53,7 @@ pub const PRE_VALIDATE: HookPoint = HookPoint {
     summary: "Before field validation, for submissions that passed the bot checks. Return nothing or {action: 'accept'}, {action: 'reject', errors: {field: ['message']}}, or {action: 'spam', reason}.",
     sample: pre_validate_sample,
     kind: HookKind::Sync { budget: Duration::from_millis(50), output: check_verdict },
-    target: None,
+    target: Some(&FORM),
 };
 
 /// Runs as a job after each inbox submission is stored.
@@ -55,7 +62,7 @@ pub const SUBMISSION_CREATED: HookPoint = HookPoint {
     summary: "After each inbox submission is stored, such as to post it to a chat channel.",
     sample: submission_created_sample,
     kind: HookKind::Async { event: SubmissionCreated::NAME },
-    target: None,
+    target: Some(&FORM),
 };
 
 fn form_json(form: &FormRow) -> Value {
@@ -157,6 +164,36 @@ fn check_verdict(value: &Value) -> Result<(), String> {
     verdict(value).map(|_| ())
 }
 
+/// Resolves [`FORM`] targets: form IDs, labelled by form name.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FormTargets;
+
+#[async_trait]
+impl TargetResolver for FormTargets {
+    async fn find(
+        &self,
+        platform: &Platform,
+        workspace_id: WorkspaceId,
+        ids: &[String],
+    ) -> anyhow::Result<Vec<TargetEntity>> {
+        let ids: Vec<FormId> = ids.iter().filter_map(|id| id.parse().ok()).collect();
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let forms = store::find_forms(platform.db().read(), workspace_id, &ids)
+            .await
+            .context("loading forms")?;
+        Ok(forms
+            .into_iter()
+            .map(|form| TargetEntity {
+                id: form.id.to_string(),
+                project_id: form.project_id,
+                label: form.name,
+            })
+            .collect())
+    }
+}
+
 /// Builds the `forms.submission_created` target and input from the event.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FormsHookSource;
@@ -173,7 +210,7 @@ impl HookSource<SubmissionCreated> for FormsHookSource {
         Ok(form.map(|form| HookTarget {
             workspace_id: form.workspace_id,
             project_id: form.project_id,
-            entity: None,
+            entity: Some(form.id.to_string()),
         }))
     }
 

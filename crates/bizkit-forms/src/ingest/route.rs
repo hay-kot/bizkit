@@ -329,7 +329,7 @@ async fn decide(platform: &Platform, form: &FormRow, raw: RawFields) -> Result<D
         let target = HookTarget {
             workspace_id: form.workspace_id,
             project_id: form.project_id,
-            entity: None,
+            entity: Some(form.id.to_string()),
         };
         let input = hooks::pre_validate_input(form, &raw);
         if let HookResult::Returned(value) =

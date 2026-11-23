@@ -160,6 +160,28 @@ pub(crate) async fn find_form(
     .await
 }
 
+/// The workspace's forms among `ids`, in any order.
+pub(crate) async fn find_forms(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    ids: &[FormId],
+) -> sqlx::Result<Vec<FormRow>> {
+    let ids = serde_json::to_string(ids).map_err(|err| sqlx::Error::Encode(Box::new(err)))?;
+    sqlx::query_as!(
+        FormRow,
+        r#"SELECT id AS "id: FormId", workspace_id AS "workspace_id: WorkspaceId",
+                  project_id AS "project_id: ProjectId", name, enabled AS "enabled: bool", fields,
+                  bot_check, min_fill_ms, redirect_url, notify_emails, challenge_key,
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM forms
+           WHERE workspace_id = ? AND id IN (SELECT value FROM json_each(?))"#,
+        workspace_id,
+        ids
+    )
+    .fetch_all(exec)
+    .await
+}
+
 /// The enabled form with `id` in any workspace, for public ingest.
 pub(crate) async fn find_public(
     exec: impl SqliteExecutor<'_>,
