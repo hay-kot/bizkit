@@ -146,6 +146,19 @@ const summary = computed(() => {
 
 <template>
   <div ref="box" class="relative w-full">
+    <ul
+      v-if="series.length > 1"
+      class="mb-2 flex flex-wrap gap-4 text-xs text-base-content/70"
+      aria-hidden="true"
+    >
+      <li v-for="s in series" :key="s.name" class="flex items-center gap-1.5">
+        <span
+          class="w-4 border-t-2"
+          :class="s.tone === 'muted' ? 'border-dashed border-base-content/40' : 'border-primary'"
+        ></span>
+        {{ s.name }}
+      </li>
+    </ul>
     <svg
       :width="width"
       :height="height"

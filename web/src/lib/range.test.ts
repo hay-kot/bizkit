@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { addDays, presetRange, previousPeriod, rangeLength } from './range'
+import {
+  addDays,
+  presetRange,
+  previousPeriod,
+  rangeFromQuery,
+  rangeLength,
+  rangeToQuery,
+  utcToday,
+} from './range'
 
 describe('range', () => {
   const today = '2026-03-15'
@@ -48,5 +56,33 @@ describe('range', () => {
       from: '2026-02-14',
       to: '2026-02-28',
     })
+  })
+
+  it('reads ranges back from the URL query', () => {
+    expect(rangeFromQuery({ range: '7d' }, today, '30d')).toEqual({
+      preset: '7d',
+      from: '2026-03-09',
+      to: '2026-03-15',
+    })
+    const custom = { preset: 'custom' as const, from: '2026-01-02', to: '2026-01-09' }
+    expect(rangeFromQuery(rangeToQuery(custom), today, '30d')).toEqual(custom)
+    expect(rangeToQuery({ preset: '7d', from: 'x', to: 'y' })).toEqual({
+      range: '7d',
+      from: undefined,
+      to: undefined,
+    })
+  })
+
+  it.each([
+    [{}],
+    [{ range: 'weekly' }],
+    [{ range: 'custom', from: '2026-01-09', to: '2026-01-02' }],
+    [{ range: 'custom', from: 'yesterday', to: '2026-01-02' }],
+  ])('falls back on a bad query %o', (query) => {
+    expect(rangeFromQuery(query, today, '30d').preset).toBe('30d')
+  })
+
+  it('takes today in UTC', () => {
+    expect(utcToday(new Date('2026-03-15T23:30:00-05:00'))).toBe('2026-03-16')
   })
 })

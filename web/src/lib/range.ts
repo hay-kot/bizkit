@@ -75,3 +75,40 @@ export function previousPeriod(range: DayRange): DayRange {
     to: addDays(range.from, -1),
   }
 }
+
+/** Today in UTC, as `YYYY-MM-DD`. */
+export function utcToday(now: Date = new Date()): string {
+  return toDay(now.getTime())
+}
+
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function isDay(value: unknown): value is string {
+  return typeof value === 'string' && DAY_PATTERN.test(value) && !Number.isNaN(toTime(value))
+}
+
+/**
+ * The range a report URL asks for: `?range=<preset>`, or `?range=custom`
+ * with `from` and `to`. Anything else gives `fallback`.
+ */
+export function rangeFromQuery(
+  query: Record<string, unknown>,
+  today: string,
+  fallback: RangePreset,
+): DateRange {
+  const preset = RANGE_PRESETS.find((p) => p.value === query.range)?.value
+  if (preset === 'custom') {
+    const { from, to } = query
+    if (isDay(from) && isDay(to) && from <= to) return { preset, from, to }
+  } else if (preset) {
+    return { preset, ...presetRange(preset, today) }
+  }
+  return { preset: fallback, ...presetRange(fallback, today) }
+}
+
+/** The query that `rangeFromQuery` reads back as `range`. */
+export function rangeToQuery(range: DateRange): Record<string, string | undefined> {
+  return range.preset === 'custom'
+    ? { range: 'custom', from: range.from, to: range.to }
+    : { range: range.preset, from: undefined, to: undefined }
+}

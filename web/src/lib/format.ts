@@ -28,6 +28,32 @@ export function formatShortDate(value: string | null | undefined, fallback = 'â€
   return value ? shortFormat.format(new Date(value)) : fallback
 }
 
+const utcDayFormat = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+const utcShortDayFormat = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+
+/**
+ * A UTC calendar day (`2026-11-22`, or a timestamp read in UTC) as
+ * `Nov 22, 2026`. Analytics counts by UTC day, so its labels must not
+ * shift into the viewer's time zone.
+ */
+export function formatUtcDay(value: string): string {
+  return utcDayFormat.format(new Date(`${value.slice(0, 10)}T00:00:00Z`))
+}
+
+/** A UTC calendar day as `Nov 22`. */
+export function formatShortUtcDay(value: string): string {
+  return utcShortDayFormat.format(new Date(`${value.slice(0, 10)}T00:00:00Z`))
+}
+
 /** True when `value` is before now. */
 export function isPast(value: string): boolean {
   return new Date(value).getTime() < Date.now()
