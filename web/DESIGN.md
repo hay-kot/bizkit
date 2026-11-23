@@ -27,7 +27,7 @@ Projects, Team, API keys, Forms, Extensions.
 Form, Script. One column, always: no side-by-side cards or sidebars.
 
 - `Page` (wide, so tables and editors fit) > `PageHeader` with the entity name as title and the project as eyebrow.
-- Header actions go through `DetailActions`: page-level buttons first, then Save, then the "..." menu with Delete last. Pages can't import `ActionsMenu` or style header buttons themselves, and no text label sits next to Save.
+- Header actions go through `DetailActions`: page-level buttons first, then Save, then the "..." menu with Delete last. Pages can't import `ActionsMenu` (ESLint), don't add their own buttons beside the group, and put no text label next to Save.
 - Facts in a `DescriptionList` under the header. Editable groups in `Card`s, data in `PageSection`s.
 - When the page edits the entity inline, one Save in the header (`DetailActions`' `save`) saves everything. Its label is the save state, so there is no separate status text.
 - Config that isn't the page's main content opens in a `FormPanel` (form settings).

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check } from 'lucide-vue-next'
-import type { Component } from 'vue'
+import { type Component, computed, useId } from 'vue'
 
 import ActionsMenu from './ActionsMenu.vue'
 
@@ -32,17 +32,24 @@ const props = withDefaults(defineProps<{ actions?: DetailAction[]; save?: Detail
   actions: () => [],
   save: undefined,
 })
+const blockedId = useId()
+const saveState = computed(() => {
+  const save = props.save
+  if (save === undefined) return ''
+  if (save.pending) return 'Saving'
+  return save.dirty ? 'Unsaved changes' : 'Saved'
+})
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
     <button
-      v-for="action in props.actions"
-      :key="action.label"
+      v-for="(action, index) in props.actions"
+      :key="index"
       type="button"
       class="btn gap-1.5 btn-sm"
       :disabled="action.disabled"
-      @click="action.run"
+      @click="action.run()"
     >
       <component :is="action.icon" class="size-4" aria-hidden="true" />{{ action.label }}
     </button>
@@ -54,6 +61,7 @@ const props = withDefaults(defineProps<{ actions?: DetailAction[]; save?: Detail
       :disabled="!save.dirty || save.pending || save.blocked !== undefined"
       :aria-busy="save.pending"
       :title="save.dirty ? save.blocked : undefined"
+      :aria-describedby="save.dirty && save.blocked ? blockedId : undefined"
     >
       <span
         v-if="save.pending"
@@ -63,6 +71,12 @@ const props = withDefaults(defineProps<{ actions?: DetailAction[]; save?: Detail
       <Check v-else-if="!save.dirty" class="size-4" aria-hidden="true" />
       {{ save.pending ? 'Saving' : save.dirty ? 'Save' : 'Saved' }}
     </button>
+    <template v-if="save">
+      <span class="sr-only" role="status">{{ saveState }}</span>
+      <span v-if="save.dirty && save.blocked" :id="blockedId" class="sr-only">{{
+        save.blocked
+      }}</span>
+    </template>
     <ActionsMenu v-if="$slots.menu"><slot name="menu" /></ActionsMenu>
   </div>
 </template>

@@ -22,6 +22,15 @@ describe('DetailActions', () => {
     expect(button.attributes('form')).toBe('f')
   })
 
+  it('announces the save state and why Save is off', () => {
+    const wrapper = mount(DetailActions, {
+      props: { save: { ...save, dirty: true, blocked: 'Fix the test cases to save' } },
+    })
+    expect(wrapper.get('[role="status"]').text()).toBe('Unsaved changes')
+    const id = wrapper.get('button[type="submit"]').attributes('aria-describedby')
+    expect(wrapper.get(`#${CSS.escape(id!)}`).text()).toBe('Fix the test cases to save')
+  })
+
   it('gives every button the same size', () => {
     const run = vi.fn()
     const wrapper = mount(DetailActions, {
@@ -34,7 +43,7 @@ describe('DetailActions', () => {
       expect(button.classes()).toEqual(expect.arrayContaining(['btn', 'btn-sm']))
     expect(buttons.some((b) => b.classes().includes('btn-ghost'))).toBe(false)
     buttons[0]!.trigger('click')
-    expect(run).toHaveBeenCalledOnce()
+    expect(run).toHaveBeenCalledWith()
   })
 
   it('leaves the menu out without items', () => {

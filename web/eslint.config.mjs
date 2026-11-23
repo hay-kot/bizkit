@@ -189,12 +189,14 @@ export default tseslint.config(
               name: '@/lib/confirm',
               message: 'Use runAction({ confirm }) from src/lib/action.ts.',
             },
+          ],
+          patterns: [
+            generatedClient,
             {
-              name: '@/components/ui/ActionsMenu.vue',
+              group: ['**/ui/ActionsMenu', '**/ui/ActionsMenu.vue'],
               message: 'Use DetailActions.vue, so header actions share one size and style.',
             },
           ],
-          patterns: [generatedClient],
         },
       ],
     },
