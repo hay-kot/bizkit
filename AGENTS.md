@@ -63,7 +63,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 - **Async** (`cx.async_hook::<Event, _>(POINT, source)`): runs as a retried job for each event (3 attempts; a failed attempt reruns the whole script, so scripts must tolerate repeats). The `HookSource` gives the target project and rebuilds the input when the run starts, so job payloads hold IDs only and a deleted row skips the run. Scripts also get `ctx.secrets`, `ctx.fetch` (public addresses only) and `ctx.mail.send`.
 - Inputs are plain JSON with no secrets or internal keys. Leave control fields out. Cap any text you take back from a script.
 - Tests use `FakeHooks` with `TestAppBuilder::hook_runner` to script outcomes per point. Test that every `RunStatus` failure leaves the request working.
-- **Script API.** `crates/bizkit-extensions/src/reference.rs` is the one source for what scripts can call: signature, limits, errors and an example per entry. `extensions.hooks.list` (MCP `extensions_hooks_list`) returns it per point as `api`, and the script editor shows it. When you change `sandbox/prelude.js`, update the table; a sandbox test checks every entry exists in a run. All helpers take and return strings: there are no typed arrays, `TextEncoder`, `crypto.subtle`, `setTimeout` or `import`.
+- **Script API.** `crates/bizkit-extensions/src/reference.rs` is the one source for what scripts can call: signature, limits, errors and an example per entry. `extensions.hooks.list` (MCP `extensions_hooks_list`) returns it per point as `api`, and the script editor shows it. When you change `sandbox/prelude.js`, update the table; a sandbox test checks that every entry exists in a run (`ctx.mail.send` through the mail integration test). All helpers take and return strings: there are no typed arrays, `TextEncoder`, `crypto.subtle`, `setTimeout` or `import`.
 
   | Name | Points | Notes |
   |---|---|---|
@@ -74,7 +74,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | `ctx.log`, `console.*` | all | 50 lines of 500 characters |
   | `ctx.secrets` | async | the project's secrets, redacted from run records |
   | `ctx.fetch(url, {method, headers, body \| json \| form, timeoutMs})` | async | 5 calls per run, 5 s each, 256 KiB each way; non-2xx resolves |
-  | `ctx.mail.send({to, subject, text, html?})` | async | 3 per run, 50 per script per hour |
+  | `ctx.mail.send({to, subject, text, html?})` | async | 3 per run; 50 per script and 200 per workspace per hour |
 
 - Scripts keep saved test cases (`[{name, input, expect?}]`); give each seeded script cases that pass against its seeded source.
 - **Entity sections.** A web module adds panels to other modules' entity pages through `entitySections` in `defineWebModule`; the page renders `<EntitySections kind="forms.form" :entity-id ...>` and never imports the module. Extensions uses it to list the scripts that run for the entity, so a new target kind gets that panel by rendering `EntitySections` on its page.

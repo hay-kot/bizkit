@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM extension_mail_sends WHERE workspace_id = ? AND sent_at <= ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2fd0292fc0acdc2b42b3930ee5d5c9eed98de6e9a693e88d93538c43b05dd30b"
+}

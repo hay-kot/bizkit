@@ -270,6 +270,20 @@ async fn url_and_search_params() {
 }
 
 #[tokio::test]
+async fn search_params_stay_live_after_the_query_changes() {
+    let report = run(
+        "export default () => { const u = new URL('https://a.example/?x=1'); const p = u.searchParams; u.search = '?y=2'; p.append('z', '3'); const same = u.searchParams === p; u.href = 'https://b.example/?k=v'; return [u.href, same, p.get('k')] }",
+    )
+    .await;
+    assert_eq!(report.output, Some(json!(["https://b.example/?k=v", true, "v"])), "{report:?}");
+    let appended = run(
+        "export default () => { const u = new URL('https://a.example/?x=1'); const p = u.searchParams; u.search = '?y=2'; p.append('z', '3'); return u.href }",
+    )
+    .await;
+    assert_eq!(appended.output, Some(json!("https://a.example/?y=2&z=3")), "{appended:?}");
+}
+
+#[tokio::test]
 async fn globals_cannot_be_replaced() {
     let report = run(
         "export default () => { 'use strict'; const out = []; for (const f of [() => { globalThis.crypto = {} }, () => { crypto.hmac = null }, () => { URL.prototype.toString = null }]) { try { f(); out.push('wrote') } catch { out.push('threw') } } return out }",
@@ -364,7 +378,7 @@ async fn fetch_encodes_json_and_form_bodies_and_caps_responses() {
         "x".repeat(MAX_RESPONSE_BYTES + 1),
     );
     let mut req = request(
-        "export default async (input, ctx) => { const out = []; out.push((await ctx.fetch('https://api.example.com/json', { method: 'POST', json: { who: input.name } })).status); out.push((await ctx.fetch('https://api.example.com/form', { method: 'POST', headers: { 'Content-Type': 'text/x-custom' }, form: { a: '1 2' } })).ok); for (const init of [{ body: 'x', json: {} }, { timeoutMs: 0 }, {}]) { try { await ctx.fetch('https://api.example.com/big', init); out.push('ok') } catch (e) { out.push(e.message) } } return out }",
+        "export default async (input, ctx) => { const out = []; out.push((await ctx.fetch('https://api.example.com/json', { method: 'POST', json: { who: input.name } })).status); out.push((await ctx.fetch('https://api.example.com/form', { method: 'POST', headers: { 'Content-Type': 'text/x-custom' }, form: { a: '1 2' } })).ok); for (const init of [{ body: 'x', json: {} }, { body: { a: 1 } }, { headers: { a: 1 } }, { timeoutMs: 0 }, {}]) { try { await ctx.fetch('https://api.example.com/big', init); out.push('ok') } catch (e) { out.push(e.message) } } return out }",
     );
     req.budget = Duration::from_secs(2);
     req.hard = Duration::from_secs(3);
@@ -380,6 +394,8 @@ async fn fetch_encodes_json_and_form_bodies_and_caps_responses() {
             201,
             true,
             "fetch takes one of body, json and form",
+            "fetch body must be a string; use json for objects",
+            "fetch header a must be a string",
             "GET api.example.com: timeoutMs must be above 0",
             "GET api.example.com: the response body is over 256 KiB",
         ])),

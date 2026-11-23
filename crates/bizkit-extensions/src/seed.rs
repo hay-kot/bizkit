@@ -48,8 +48,11 @@ export default function (input, ctx) {
   }
   const parts = (input.request.headers['stripe-signature'] ?? '').split(',').map((p) => p.split('='))
   const t = parts.find(([k]) => k === 't')?.[1]
+  // Refuse replays: Stripe's tolerance is 5 minutes from the time it signed.
+  const age = Date.parse(input.request.received_at) / 1000 - Number(t)
   const expected = crypto.hmac('sha256', secret, `${t}.${input.request.body}`)
-  const verified = parts.some(([k, v]) => k === 'v1' && crypto.timingSafeEqual(v, expected))
+  const verified = Math.abs(age) <= 300 &&
+    parts.some(([k, v]) => k === 'v1' && crypto.timingSafeEqual(v, expected))
   ctx.log(`Stripe sent ${type}`, verified ? 'with a valid signature' : 'WITHOUT a valid signature')
   return { type, verified }
 }
@@ -166,9 +169,11 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     ];
     let mut tx = db.write().await.context("starting the seed transaction")?;
     for (name, hook, sync, source, target, tests) in scripts {
-        // Without the endpoint, the webhooks module isn't compiled in.
-        let missing_endpoint = hook.starts_with("webhooks.") && target.is_none();
-        if missing_endpoint || existing.iter().any(|script| script.name == name) {
+        // Without the endpoint, or the Contact form for the leads mail, the
+        // script would run for nothing, or for every form.
+        let missing_target =
+            (hook.starts_with("webhooks.") || name == "Email new leads") && target.is_none();
+        if missing_target || existing.iter().any(|script| script.name == name) {
             continue;
         }
         let row = ScriptRow {

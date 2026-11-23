@@ -1,6 +1,7 @@
 //! The script API reference that `extensions.hooks.list` returns per point.
-//! Keep it in step with `sandbox/prelude.js`; a sandbox test checks that
-//! every listed name exists in a run.
+//! Keep it in step with `sandbox/prelude.js`. A sandbox test checks that
+//! every entry but `ctx.mail.send` exists in a run; the mail integration
+//! test covers that one.
 
 use crate::api::{ApiEntry, Capability};
 
@@ -133,9 +134,10 @@ const ROWS: &[Row] = &[
         needs: Some(Capability::Fetch),
         name: "ctx.fetch",
         signature: "(url: string, init?: { method?: string, headers?: Record<string, string>, body?: string, json?: unknown, form?: Record<string, string>, timeoutMs?: number }) => Promise<{ status: number, ok: boolean, headers: Record<string, string>, text(): Promise<string>, json(): Promise<unknown> }>",
-        summary: "Sends an HTTP request to a public http or https address. method defaults to GET. Give at most one of body (sent as is), json (JSON.stringify, content-type application/json) and form (URL-encoded, content-type application/x-www-form-urlencoded); a content-type in headers wins. Header names are lowercased both ways. ok is true for 2xx; non-2xx statuses resolve, they do not throw. Limits: 5 calls per run, 256 KiB request and response bodies, and each call ends after 5 s, timeoutMs or the run's remaining 10 s budget, whichever is first. Test runs send real requests.",
+        summary: "Sends an HTTP request to a public http or https address. method defaults to GET. Give at most one of body (a string, sent as is), json (JSON.stringify, content-type application/json) and form (URL-encoded, content-type application/x-www-form-urlencoded); a content-type in headers wins. Header names are lowercased both ways. ok is true for 2xx; non-2xx statuses resolve, they do not throw. Limits: 5 calls per run, 256 KiB request and response bodies, and each call ends after 5 s, timeoutMs or the run's remaining 10 s budget, whichever is first. Test runs send real requests.",
         errors: &[
             "more than one of body, json and form",
+            "body or a header value is not a string",
             "the URL is not absolute http or https, or points at a private, loopback or localhost address",
             "the run already made 5 calls",
             "timeoutMs is 0, the call timed out, or the run has no time left",
@@ -149,12 +151,12 @@ const ROWS: &[Row] = &[
         needs: Some(Capability::Mail),
         name: "ctx.mail.send",
         signature: "(message: { to: string, subject: string, text: string, html?: string }) => void",
-        summary: "Queues one email from the server's sender address; delivery retries on its own. Limits: 3 per run, 50 per script in a rolling hour, a subject of 1-200 characters on one line, text and html at most 64 KiB each. A failed run retries the whole script, so a retried run sends again; test runs send real mail.",
+        summary: "Queues one email from the server's sender address; delivery retries on its own. Limits: 3 per run, 50 per script and 200 per workspace in a rolling hour (test runs count), a subject of 1-200 characters on one line, text and html at most 64 KiB each. A failed run retries the whole script, so a retried run sends again; test runs send real mail.",
         errors: &[
-            "to is not an email address",
+            "to is not a bare email address (no display name, angle brackets or control characters)",
             "the subject is empty, over 200 characters, or holds line breaks or control characters",
             "text or html is over 64 KiB",
-            "the run already sent 3, or the script 50 in the last hour",
+            "the run already sent 3, the script 50 or the workspace 200 in the last hour",
             "to, subject or text is missing or not a string",
         ],
         example: "ctx.mail.send({ to: 'owner@example.com', subject: `New lead: ${input.submission.data.email}`, text: JSON.stringify(input.submission.data, null, 2) });",

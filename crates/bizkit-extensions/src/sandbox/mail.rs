@@ -19,6 +19,10 @@ use crate::api::ScriptId;
 pub const MAX_MAILS_PER_RUN: u32 = 3;
 /// The most mail one script can send in a rolling hour.
 pub const MAX_MAILS_PER_HOUR: i64 = 50;
+/// The most mail all of a workspace's scripts can send in a rolling hour,
+/// test runs included. It protects the server's sender reputation from a
+/// workspace with many scripts.
+pub const MAX_WORKSPACE_MAILS_PER_HOUR: i64 = 200;
 /// The window of [`MAX_MAILS_PER_HOUR`].
 const MAIL_WINDOW: Duration = Duration::from_hours(1);
 /// The longest subject, in characters.
@@ -76,10 +80,13 @@ impl MailBridge {
             .handle
             .block_on(async move { enqueue(&platform, workspace_id, script_id, mail).await });
         match queued {
-            Ok(true) => Ok(()),
-            Ok(false) => {
+            Ok(Queued::Sent) => Ok(()),
+            Ok(Queued::ScriptCapped) => {
                 Err(format!("this script already sent {MAX_MAILS_PER_HOUR} mails in the last hour"))
             }
+            Ok(Queued::WorkspaceCapped) => Err(format!(
+                "this workspace's scripts already sent {MAX_WORKSPACE_MAILS_PER_HOUR} mails in the last hour"
+            )),
             Err(err) => {
                 tracing::warn!(%script_id, "queueing script mail: {err:#}");
                 Err("queueing the mail failed".to_owned())
@@ -91,7 +98,10 @@ impl MailBridge {
 fn check(message: Message) -> Result<Mail, String> {
     let Message { to, subject, text, html } = message;
     let to = to.trim().to_owned();
-    if !is_plausible_email(&to) {
+    // Stricter than sign-in: the SMTP mailer parses `to` only in the job,
+    // where a failure would never reach the script.
+    let bare = !to.chars().any(|c| c.is_control() || "<>()[]\\,;:\"".contains(c));
+    if !bare || !is_plausible_email(&to) {
         return Err(format!("mail.send: {to:?} is not an email address"));
     }
     if subject.chars().count() > MAX_SUBJECT_CHARS {
@@ -111,29 +121,49 @@ fn check(message: Message) -> Result<Mail, String> {
     Ok(Mail { to, subject, text, html })
 }
 
-/// Records the send and queues the mail in one write, or answers false
-/// when the script is at its hourly cap.
+/// What [`enqueue`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Queued {
+    Sent,
+    ScriptCapped,
+    WorkspaceCapped,
+}
+
+/// Records the send and queues the mail in one write, unless a cap is
+/// reached. Rows past the window go in the same write, so the table holds
+/// at most an hour of sends.
 async fn enqueue(
     platform: &Platform,
     workspace_id: WorkspaceId,
     script_id: ScriptId,
     mail: Mail,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Queued> {
     let now = platform.now();
     let since = now.minus(MAIL_WINDOW);
     let mut tx = platform.db().write().await.context("starting the mail transaction")?;
-    let sent = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM extension_mail_sends
-         WHERE workspace_id = ? AND script_id = ? AND sent_at > ?",
+    sqlx::query!(
+        "DELETE FROM extension_mail_sends WHERE workspace_id = ? AND sent_at <= ?",
         workspace_id,
-        script_id,
         since,
+    )
+    .execute(&mut *tx)
+    .await
+    .context("dropping old mail records")?;
+    let counts = sqlx::query!(
+        r#"SELECT COUNT(*) AS "workspace!: i64",
+                  COALESCE(SUM(script_id = ?), 0) AS "script!: i64"
+           FROM extension_mail_sends WHERE workspace_id = ?"#,
+        script_id,
+        workspace_id,
     )
     .fetch_one(&mut *tx)
     .await
     .context("counting recent mail")?;
-    if sent >= MAX_MAILS_PER_HOUR {
-        return Ok(false);
+    if counts.script >= MAX_MAILS_PER_HOUR {
+        return Ok(Queued::ScriptCapped);
+    }
+    if counts.workspace >= MAX_WORKSPACE_MAILS_PER_HOUR {
+        return Ok(Queued::WorkspaceCapped);
     }
     sqlx::query!(
         "INSERT INTO extension_mail_sends (workspace_id, script_id, sent_at) VALUES (?, ?, ?)",
@@ -150,7 +180,7 @@ async fn enqueue(
         .await
         .context("queueing the mail")?;
     tx.commit().await.context("committing the mail")?;
-    Ok(true)
+    Ok(Queued::Sent)
 }
 
 #[cfg(test)]
@@ -171,6 +201,8 @@ mod tests {
         assert!(check(message(" a@example.com ", "Hello")).is_ok());
         for (to, subject, want) in [
             ("nope", "Hello", "not an email"),
+            ("a@b.example>", "Hello", "not an email"),
+            ("a\u{0}@b.example", "Hello", "not an email"),
             ("a@example.com", "", "empty"),
             ("a@example.com", "a\r\nBcc: x@example.com", "line breaks"),
             ("a@example.com", &"s".repeat(201), "over 200"),

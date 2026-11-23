@@ -63,11 +63,19 @@
     }),
   );
 
-  // A URL's searchParams write back to it through this map.
+  // A URL's searchParams write back to it through this map, and the URL
+  // reloads them through `reload` when its query changes, so a script
+  // keeps one live object, as in WHATWG.
   const owners = new WeakMap();
+  let reload;
 
   class URLSearchParams {
     #pairs;
+    static {
+      reload = (params, query) => {
+        params.#pairs = JSON.parse(host.formDecode(query));
+      };
+    }
     constructor(init) {
       if (init === undefined || init === null) {
         this.#pairs = [];
@@ -169,7 +177,7 @@
     }
     set href(value) {
       this.#parts = JSON.parse(host.parseUrl(String(value), null));
-      this.#params = undefined;
+      if (this.#params !== undefined) reload(this.#params, this.#parts.search);
     }
     get origin() {
       return this.#parts.origin;
@@ -203,7 +211,7 @@
     }
     set search(value) {
       this.#set('search', value);
-      this.#params = undefined;
+      if (this.#params !== undefined) reload(this.#params, this.#parts.search);
     }
     get hash() {
       return this.#parts.hash;
@@ -240,9 +248,15 @@
       const given = [rest.body, json, form].filter((value) => value !== undefined).length;
       if (given > 1) throw new TypeError('fetch takes one of body, json and form');
       const headers = Object.fromEntries(
-        Object.entries(rest.headers ?? {}).map(([name, value]) => [name.toLowerCase(), String(value)]),
+        Object.entries(rest.headers ?? {}).map(([name, value]) => {
+          if (typeof value !== 'string') throw new TypeError(`fetch header ${name} must be a string`);
+          return [name.toLowerCase(), value];
+        }),
       );
-      let body = rest.body === undefined ? undefined : String(rest.body);
+      if (rest.body !== undefined && typeof rest.body !== 'string') {
+        throw new TypeError('fetch body must be a string; use json for objects');
+      }
+      let body = rest.body;
       let type;
       if (json !== undefined) {
         body = JSON.stringify(json);

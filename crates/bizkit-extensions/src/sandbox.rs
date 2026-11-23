@@ -25,7 +25,8 @@ use tokio::sync::oneshot;
 
 pub use self::fetch::{FETCH_TIMEOUT, FetchBridge, MAX_FETCHES, MAX_RESPONSE_BYTES};
 pub use self::mail::{
-    MAX_MAIL_BODY_BYTES, MAX_MAILS_PER_HOUR, MAX_MAILS_PER_RUN, MAX_SUBJECT_CHARS, MailBridge,
+    MAX_MAIL_BODY_BYTES, MAX_MAILS_PER_HOUR, MAX_MAILS_PER_RUN, MAX_SUBJECT_CHARS,
+    MAX_WORKSPACE_MAILS_PER_HOUR, MailBridge,
 };
 
 /// The OS stack of each sandbox thread. QuickJS checks its own, smaller JS

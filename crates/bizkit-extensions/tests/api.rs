@@ -364,6 +364,36 @@ mod api {
         assert_eq!(s.submit(&form, r#"{"name": "Cy"}"#).await, StatusCode::CREATED);
         s.app.drain_jobs().await;
         assert_eq!(to_owner(&s.app).len(), 6, "the window moved on");
+
+        // Another script used up the workspace's hour.
+        let other = s.script(POST, "export default () => {}").await;
+        let mut fill = platform.db().write().await.unwrap();
+        for _ in 0..200 {
+            sqlx::query("INSERT INTO extension_mail_sends (workspace_id, script_id, sent_at) VALUES (?, ?, ?)")
+                .bind(&workspace)
+                .bind(other["id"].as_str().unwrap())
+                .bind(platform.now().0)
+                .execute(&mut *fill)
+                .await
+                .unwrap();
+        }
+        fill.commit().await.unwrap();
+        assert_eq!(s.submit(&form, r#"{"name": "Di"}"#).await, StatusCode::CREATED);
+        s.app.drain_jobs().await;
+        assert_eq!(to_owner(&s.app).len(), 6, "capped for the workspace");
+        let capped = s.runs(&script).await;
+        assert_eq!(
+            capped[0]["logs"][0],
+            json!("this workspace's scripts already sent 200 mails in the last hour"),
+            "{capped:?}"
+        );
+        let (kept,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM extension_mail_sends WHERE sent_at <= ?")
+                .bind(platform.now().0 - 60 * 60 * 1000)
+                .fetch_one(platform.db().read())
+                .await
+                .unwrap();
+        assert_eq!(kept, 0, "rows past the window are gone");
     }
 
     fn self_ws_id(s: &Setup) -> String {
