@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { History, Play, Trash2 } from 'lucide-vue-next'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import CodeEditor from '@/components/extensions/CodeEditor.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
+import CodeEditor from '@/components/ui/CodeEditor.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
+import JsonEditor from '@/components/ui/JsonEditor.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { runAction } from '@/lib/action'
 import { errorMessage } from '@/lib/errors'
@@ -53,7 +54,7 @@ const name = ref('')
 const source = ref('')
 const enabled = ref(true)
 const testInput = ref('')
-const inputError = ref('')
+const inputEditor = useTemplateRef('inputEditor')
 const lastTest = ref<Run | null>(null)
 const viewing = ref<Run | null>(null)
 
@@ -126,24 +127,16 @@ function save() {
   })
 }
 
-type Json = string | number | boolean | unknown[] | { [key: string]: unknown } | null
-
-function parsedInput(): Json | undefined {
-  inputError.value = ''
-  try {
-    return JSON.parse(testInput.value) as Json
-  } catch {
-    inputError.value = 'The input must be valid JSON.'
-    return undefined
-  }
-}
+const testOutput = computed(() =>
+  lastTest.value?.output == null ? '' : JSON.stringify(lastTest.value.output, null, 2),
+)
 
 async function runTest() {
-  const input = parsedInput()
-  if (input === undefined) return
+  const parsed = inputEditor.value?.parsed
+  if (!parsed?.ok) return
   lastTest.value = await test.mutateAsync({
     path: { workspace_id: props.workspaceId, script_id: props.scriptId },
-    body: { input, source: source.value },
+    body: { input: parsed.value, source: source.value },
   })
   await refetchRuns()
 }
@@ -203,7 +196,7 @@ function summaryOf(run: Run): string {
           </Field>
           <Checkbox v-model="enabled" label="Enabled" />
         </div>
-        <CodeEditor v-model="source" name="source" label="Script source" />
+        <CodeEditor v-model="source" language="javascript" label="Script source" />
         <div class="flex items-center gap-2">
           <SubmitButton :pending="update.asyncStatus.value === 'loading'" :disabled="!dirty">
             Save
@@ -218,12 +211,11 @@ function summaryOf(run: Run): string {
           Runs the source above, saved or not, with this input.
           <template v-if="!script.sync">Fetches are real.</template>
         </p>
-        <CodeEditor v-model="testInput" name="test-input" label="Test input" :rows="8" />
-        <p v-if="inputError" class="mt-1 text-xs text-error">{{ inputError }}</p>
+        <JsonEditor ref="inputEditor" v-model="testInput" label="Test input" :max-lines="16" />
         <button
           type="button"
           class="btn mt-2 gap-1.5 btn-sm"
-          :disabled="test.asyncStatus.value === 'loading'"
+          :disabled="test.asyncStatus.value === 'loading' || inputEditor?.parsed.ok === false"
           @click="runTest"
         >
           <Play class="size-4" aria-hidden="true" />Run test
@@ -247,10 +239,15 @@ function summaryOf(run: Run): string {
             v-if="lastTest.logs.length"
             class="mb-2 overflow-x-auto rounded-field bg-base-200 p-2 text-xs"
             >{{ lastTest.logs.join('\n') }}</pre>
-          <pre
+          <CodeEditor
             v-if="lastTest.output !== null"
-            class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs"
-            >{{ JSON.stringify(lastTest.output, null, 2) }}</pre>
+            :model-value="testOutput"
+            language="json"
+            label="Test output"
+            readonly
+            :min-lines="1"
+            :max-lines="16"
+          />
         </div>
       </section>
 
