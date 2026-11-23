@@ -7,7 +7,6 @@
 //! escaped and the responses forbid scripts.
 
 use std::fmt::Write as _;
-use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Body;
@@ -17,6 +16,7 @@ use axum::response::{IntoResponse as _, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use bizkit_core::error::ErrorBody;
+use bizkit_core::hooks::{HookResult, HookTarget};
 use bizkit_core::jobs::{Enqueue, SendMail};
 use bizkit_core::{ApiError, Platform};
 use rand::RngExt as _;
@@ -28,7 +28,7 @@ use utoipa::{OpenApi, ToSchema};
 use super::bot::{self, ALTCHA_FIELD, Challenge, ChallengeSettings, SpamReason, VerifiedProof};
 use super::parse::{self, LIMITS, RawFields};
 use crate::api::{BotCheck, FieldValue, FormId, SubmissionId, SubmissionStatus};
-use crate::hooks::{HookInput, HookVerdict, SubmissionCreated, SubmitHook};
+use crate::hooks::{self, PRE_VALIDATE, SubmissionCreated, Verdict};
 use crate::store::{self, FormRow, SubmissionRow};
 use crate::{fields, notify, ops};
 
@@ -43,7 +43,7 @@ const HEADER_CHARS: usize = 512;
 const CSP: &str = "default-src 'none'; style-src 'unsafe-inline'";
 
 /// The public router.
-pub(crate) fn router(hook: Arc<dyn SubmitHook>) -> Router {
+pub(crate) fn router() -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST])
@@ -52,7 +52,6 @@ pub(crate) fn router(hook: Arc<dyn SubmitHook>) -> Router {
     Router::new()
         .route("/{form_id}", post(submit))
         .route("/{form_id}/challenge", get(challenge))
-        .layer(Extension(hook))
         .layer(cors)
 }
 
@@ -260,14 +259,13 @@ struct Decision {
 
 async fn submit(
     Extension(platform): Extension<Platform>,
-    Extension(hook): Extension<Arc<dyn SubmitHook>>,
     Path(form_id): Path<String>,
     headers: HeaderMap,
     body: Body,
 ) -> Response {
     let reply = Reply::of(&headers);
     let request_id = request_id(&headers);
-    match take(&platform, hook.as_ref(), &form_id, &headers, body).await {
+    match take(&platform, &form_id, &headers, body).await {
         Ok(form) => accepted(reply, &form),
         Err(err) => {
             err.log(&request_id);
@@ -296,7 +294,6 @@ fn accepted(reply: Reply, form: &FormRow) -> Response {
 
 async fn take(
     platform: &Platform,
-    hook: &dyn SubmitHook,
     form_id: &str,
     headers: &HeaderMap,
     body: Body,
@@ -308,7 +305,7 @@ async fn take(
         .await
         .map_err(|_| bad_request(&parse::ParseError::TooLarge))?;
     let raw = parse::parse(kind, &bytes).map_err(|err| bad_request(&err))?;
-    let decision = decide(platform, hook, &form, raw)?;
+    let decision = decide(platform, &form, raw).await?;
     store_submission(platform, &form, decision, headers).await?;
     Ok(form)
 }
@@ -317,13 +314,8 @@ fn bad_request(err: &parse::ParseError) -> ApiError {
     ApiError::BadRequest(err.to_string())
 }
 
-/// Runs the bot checks, the hook and field validation.
-fn decide(
-    platform: &Platform,
-    hook: &dyn SubmitHook,
-    form: &FormRow,
-    raw: RawFields,
-) -> Result<Decision, ApiError> {
+/// Runs the bot checks, the pre-validate hook and field validation.
+async fn decide(platform: &Platform, form: &FormRow, raw: RawFields) -> Result<Decision, ApiError> {
     let mut proof = None;
     let mut spam = bot::honeypot(&raw).map(|reason| reason.as_str().to_owned());
     if spam.is_none() && ops::bot_check(form) == BotCheck::Challenge {
@@ -334,16 +326,17 @@ fn decide(
         }
     }
     if spam.is_none() {
-        let input = HookInput {
-            workspace_id: form.workspace_id,
-            form_id: form.id,
-            form_name: &form.name,
-            fields: &raw,
-        };
-        match hook.pre_validate(&input) {
-            HookVerdict::Accept => {}
-            HookVerdict::Reject(errors) => return Err(errors.into()),
-            HookVerdict::Spam(reason) => spam = Some(reason),
+        let target = HookTarget { workspace_id: form.workspace_id, project_id: form.project_id };
+        let input = hooks::pre_validate_input(form, &raw);
+        if let HookResult::Returned(value) =
+            platform.call_sync_hook(&PRE_VALIDATE, target, &input).await
+        {
+            // Core already ran the point's output check, which is this decoder.
+            match hooks::verdict(&value) {
+                Ok(Verdict::Accept) | Err(_) => {}
+                Ok(Verdict::Reject(errors)) => return Err(errors.into()),
+                Ok(Verdict::Spam(reason)) => spam = Some(reason),
+            }
         }
     }
     let defs = ops::decode_fields(form)?;

@@ -11,7 +11,7 @@ use bizkit_core::Module;
 pub(crate) fn modules() -> Vec<Box<dyn Module>> {
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     #[cfg(feature = "forms")]
-    modules.push(Box::new(bizkit_forms::Forms::default()));
+    modules.push(Box::new(bizkit_forms::Forms));
     modules
 }
 

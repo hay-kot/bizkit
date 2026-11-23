@@ -8,12 +8,12 @@ mod ingest {
     use std::time::Duration;
 
     use base64::Engine as _;
+    use bizkit_core::hooks::{RunStatus, SyncOutcome};
     use bizkit_core::jobs::{JobCtx, Subscriber};
-    use bizkit_core::validate::FieldErrors;
     use bizkit_core::{Module, ModuleContext};
     use bizkit_forms::Forms;
-    use bizkit_forms::hooks::{HookInput, HookVerdict, SubmissionCreated, SubmitHook};
-    use bizkit_testkit::{Manifest, Persona, RawBody, SpecClient, TestApp};
+    use bizkit_forms::hooks::{PRE_VALIDATE, SUBMISSION_CREATED, SubmissionCreated};
+    use bizkit_testkit::{FakeHooks, Manifest, Persona, RawBody, SpecClient, TestApp};
     use http::{HeaderName, Method, StatusCode, header};
     use serde_json::{Value, json};
     use sha2::Digest as _;
@@ -49,41 +49,26 @@ mod ingest {
         }
     }
 
-    /// Rejects `name=reject` and flags `name=spam`.
-    #[derive(Debug)]
-    struct TestHook;
-
-    impl SubmitHook for TestHook {
-        fn pre_validate(&self, input: &HookInput<'_>) -> HookVerdict {
-            match input.fields.0.get("name").and_then(|v| v.first()).map(String::as_str) {
-                Some("reject") => {
-                    let mut errors = FieldErrors::default();
-                    errors.add("name", "is not allowed");
-                    HookVerdict::Reject(errors)
-                }
-                Some("spam") => HookVerdict::Spam("hook".to_owned()),
-                _ => HookVerdict::Accept,
-            }
-        }
-    }
-
     struct Setup {
         app: TestApp,
         team: Manifest,
         admin: SpecClient,
         events: Counter,
+        hooks: FakeHooks,
     }
 
     async fn setup() -> Setup {
         let events = Counter::default();
+        let hooks = FakeHooks::default();
         let app = TestApp::builder()
-            .module(Forms::with_hook(TestHook))
+            .module(Forms)
             .module(Probe(events.clone()))
+            .hook_runner(hooks.clone())
             .build()
             .await;
         let team = app.seed(Persona::Team, "ingest").await;
         let admin = app.with_session(&team.accounts["admin"].session_token);
-        Setup { app, team, admin, events }
+        Setup { app, team, admin, events, hooks }
     }
 
     impl Setup {
@@ -221,13 +206,23 @@ mod ingest {
             StatusCode::OK,
             "spam looks accepted"
         );
+        assert!(s.hooks.calls().is_empty(), "the hook skips submissions the bot checks flagged");
+
+        let verdict = json!({"action": "spam", "reason": "x".repeat(300)});
+        s.hooks.answer(PRE_VALIDATE.id, SyncOutcome::Returned(verdict));
         assert_eq!(
-            s.post(&form, RawBody::new(FORM, "name=spam")).await.status,
+            s.post(&form, RawBody::new(FORM, "name=Bea&_gotcha=")).await.status,
             StatusCode::OK,
             "hook spam"
         );
-        let rejected =
-            s.post(&form, RawBody::new("application/json", r#"{"name": "reject"}"#)).await;
+        let call = &s.hooks.calls()[0];
+        assert_eq!(call.input["fields"], json!({"name": ["Bea"]}), "control fields left out");
+        assert_eq!(call.input["form"]["name"], "Contact", "form in the input");
+        assert_eq!(call.target.project_id, s.team.projects["site"].id, "target");
+
+        let reject = json!({"action": "reject", "errors": {"name": ["is not allowed"]}});
+        s.hooks.answer(PRE_VALIDATE.id, SyncOutcome::Returned(reject));
+        let rejected = s.post(&form, RawBody::new("application/json", r#"{"name": "Cy"}"#)).await;
         assert_eq!(
             rejected.body["error"]["fields"]["name"],
             json!(["is not allowed"]),
@@ -235,12 +230,64 @@ mod ingest {
         );
 
         let spam = s.submissions(&form, "spam").await;
-        let reasons: Vec<&str> =
-            spam.iter().map(|sub| sub["spam_reason"].as_str().unwrap()).collect();
-        assert_eq!(reasons, ["hook", "honeypot"], "reasons, newest first");
+        let reasons: Vec<usize> =
+            spam.iter().map(|sub| sub["spam_reason"].as_str().unwrap().chars().count()).collect();
+        assert_eq!(
+            reasons,
+            [200, "honeypot".len()],
+            "reasons, newest first; the script's is capped"
+        );
         assert!(s.submissions(&form, "inbox").await.is_empty(), "nothing in the inbox");
         s.app.drain_jobs().await;
         assert_eq!(s.events.0.load(Ordering::SeqCst), 0, "no events for spam");
+    }
+
+    #[tokio::test]
+    async fn failing_hooks_store_in_the_inbox() {
+        let s = setup().await;
+        let form = s.form(json!({"name": "Contact"})).await;
+        let statuses =
+            [RunStatus::Error, RunStatus::Timeout, RunStatus::Overloaded, RunStatus::InvalidOutput];
+        for status in statuses {
+            let failed = SyncOutcome::Failed { status, message: "boom".to_owned() };
+            s.hooks.answer(PRE_VALIDATE.id, failed);
+            let res = s.post(&form, RawBody::new("application/json", r#"{"name": "Ada"}"#)).await;
+            assert_eq!(res.status, StatusCode::CREATED, "{status} fails open");
+        }
+        let bad = SyncOutcome::Returned(json!({"action": "reject"}));
+        s.hooks.answer(PRE_VALIDATE.id, bad);
+        let res = s.post(&form, RawBody::new("application/json", r#"{"name": "Ada"}"#)).await;
+        assert_eq!(res.status, StatusCode::CREATED, "a malformed verdict fails open");
+        assert_eq!(s.submissions(&form, "inbox").await.len(), statuses.len() + 1, "all stored");
+    }
+
+    #[tokio::test]
+    async fn inbox_submissions_reach_async_hooks() {
+        let s = setup().await;
+        let form = s.form(json!({"name": "Contact"})).await;
+        s.post(&form, RawBody::new("application/json", r#"{"name": "Ada"}"#)).await;
+        s.app.drain_jobs().await;
+
+        let dispatches = s.hooks.dispatches();
+        assert_eq!(dispatches.len(), 1, "one dispatch");
+        let dispatch = &dispatches[0];
+        assert_eq!(dispatch.point, SUBMISSION_CREATED.id, "point");
+        assert_eq!(dispatch.target.project_id, s.team.projects["site"].id, "target");
+        let keys: Vec<&String> = dispatch.event.as_object().unwrap().keys().collect();
+        assert_eq!(keys, ["form_id", "submission_id", "workspace_id"], "the event holds IDs only");
+
+        let platform = s.app.app().platform();
+        let cx = JobCtx { platform: platform.clone(), job_id: 0, attempt: 1, request_id: None };
+        let input = platform.hook_input(&cx, SUBMISSION_CREATED.id, &dispatch.event).await.unwrap();
+        let input = input.unwrap();
+        assert_eq!(input["form"]["id"], form["id"], "form");
+        assert_eq!(input["submission"]["data"], json!({"name": "Ada"}), "data loaded at run time");
+
+        let submission = s.submissions(&form, "inbox").await[0]["id"].as_str().unwrap().to_owned();
+        let path = format!("{}/{}/submissions/{submission}", s.forms(), id(&form));
+        s.admin.delete(&path).await.expect(StatusCode::NO_CONTENT);
+        let gone = platform.hook_input(&cx, SUBMISSION_CREATED.id, &dispatch.event).await.unwrap();
+        assert_eq!(gone, None, "a deleted submission skips the run");
     }
 
     fn solve(challenge: &Value) -> String {
