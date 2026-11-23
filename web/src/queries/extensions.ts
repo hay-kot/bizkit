@@ -17,6 +17,7 @@ import {
   extensionsTargetsListQuery,
 } from '@/api/gen/@pinia/colada.gen'
 import type {
+  ApiEntry,
   Capability,
   Hook,
   HookTargetKind,
@@ -35,6 +36,7 @@ import type {
 import { useInvalidate } from './keys'
 
 export type {
+  ApiEntry,
   Capability,
   Hook,
   HookTargetKind,
