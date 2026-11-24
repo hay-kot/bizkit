@@ -18,11 +18,9 @@ import { formatDateTime, formatNumber, formatShortUtcDay, isPast } from '@/lib/f
 import {
   type EventFilter,
   type EventItem,
-  eventOptions,
   RECENT_SHOWN,
   useEventStats,
   useRecentEvents,
-  useSchemaEvents,
 } from '@/queries/analytics'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
@@ -70,14 +68,14 @@ const recent = useRecentEvents(
   filter,
 )
 
-const schemaEvents = useSchemaEvents(
-  () => props.workspaceId,
-  () => props.projectId,
-  () => ({ ...range.value, limit: 200 }),
-)
+// stats.names applies the property filters, so the picker offers only names
+// that match them.
 const nameOptions = computed(() => [
   { value: '', label: 'All custom events' },
-  ...eventOptions(schemaEvents.data.value?.items ?? []),
+  ...(stats.data.value?.names ?? []).map((n) => ({ value: n.name, count: n.count })),
+  ...(filter.value.name && !stats.data.value?.names.some((n) => n.name === filter.value.name)
+    ? [{ value: filter.value.name }]
+    : []),
 ])
 const selectedName = computed({
   get: () => filter.value.name ?? '',

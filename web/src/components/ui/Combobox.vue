@@ -21,8 +21,9 @@ export type ComboLookup = (query: string) => Promise<ComboOption[]>
 /**
  * A typeahead: the text field filters the options and the popup lists them,
  * grouped, with counts. Arrow keys move, Enter picks, Escape closes. With
- * `allowCustom` a "Use ..." row takes text that isn't listed, and leaving the
- * field keeps what was typed.
+ * `allowCustom` a "Use ..." row takes text that isn't listed: typing puts the
+ * highlight on it, so Enter keeps the typed text, and leaving the field keeps
+ * it too.
  */
 const props = withDefaults(
   defineProps<{
@@ -32,8 +33,9 @@ const props = withDefaults(
     placeholder?: string
     size?: 'sm' | 'toolbar' | 'md'
     name?: string
+    required?: boolean
   }>(),
-  { allowCustom: false, placeholder: undefined, size: 'md', name: undefined },
+  { allowCustom: false, placeholder: undefined, size: 'md', name: undefined, required: false },
 )
 const model = defineModel<string>({ required: true })
 
@@ -121,6 +123,19 @@ const sections = computed((): Section[] => {
 })
 const ordered = computed(() => sections.value.flatMap((s) => s.rows.map((r) => r.row)))
 
+/**
+ * Where the highlight starts after typing: on the custom row when there is
+ * one, so Enter keeps the typed text rather than the first partial match.
+ */
+function firstActive(): number {
+  const custom = ordered.value.findIndex((r) => r.kind === 'custom')
+  return Math.max(0, custom)
+}
+
+watch(ordered, (rows) => {
+  active.value = Math.max(0, Math.min(active.value, rows.length - 1))
+})
+
 let timer: ReturnType<typeof setTimeout> | undefined
 let request = 0
 function lookup(now = false) {
@@ -147,7 +162,7 @@ watch(query, () => {
 })
 onBeforeUnmount(() => clearTimeout(timer))
 
-const { position, update } = useFloatingList(input, list, open)
+const { position, update } = useFloatingList(input, list, open, () => close())
 
 function show() {
   if (open.value) return
@@ -177,8 +192,8 @@ function pick(row: Row | undefined) {
 
 function onInput() {
   typed.value = true
-  active.value = 0
   if (!open.value) show()
+  active.value = firstActive()
 }
 
 function onBlur() {
@@ -191,7 +206,7 @@ function onBlur() {
 onClickOutside(root, () => open.value && close(), { ignore: [list] })
 
 function onKey(event: KeyboardEvent) {
-  const last = ordered.value.length - 1
+  const last = Math.max(0, ordered.value.length - 1)
   switch (event.key) {
     case 'ArrowDown':
       event.preventDefault()
@@ -210,8 +225,11 @@ function onKey(event: KeyboardEvent) {
       }
       break
     case 'Escape':
+      // An open list owns this Escape: the overlay around the field must
+      // stay open, and Overlay skips Escapes that are defaultPrevented.
       if (open.value) {
         event.preventDefault()
+        event.stopPropagation()
         close()
       }
       break
@@ -241,6 +259,7 @@ const empty = computed(() => !looking.value && ordered.value.length === 0)
       autocomplete="off"
       spellcheck="false"
       :name="name"
+      :required="required"
       :placeholder="placeholder"
       :aria-label="label"
       aria-autocomplete="list"

@@ -2159,7 +2159,7 @@ export type SchemaValueList = {
     items: Array<SchemaValue>;
     /**
      * The scan stopped at its cap of newest events (or most recently seen
-     * people) with the key, so counts cover only those.
+     * people), so counts cover only those.
      */
     sampled: boolean;
 };

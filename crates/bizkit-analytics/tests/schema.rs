@@ -217,15 +217,22 @@ mod schema {
     #[tokio::test]
     async fn scans_stop_at_the_cap() {
         let s = setup().await;
+        s.insert_old(2, 1).await;
         s.insert_old(1, 50_000).await;
         let list = s.get("events", &[]).await;
         assert_eq!(list["sampled"], true);
         let old = list["items"].as_array().unwrap().iter().find(|item| item["name"] == "old_event");
         assert_eq!(old.unwrap()["events"], 50_000 - 5, "the 5 newer events fill the rest");
+        let by_q = s.get("events", &[("q", "old_event")]).await;
+        assert_eq!(by_q["sampled"], true, "q filters after the capped read");
+        assert_eq!(by_q["items"][0]["events"], 50_000 - 5, "the oldest one is past the cap");
         let keys = s.get("keys", &[("source", "property")]).await;
         assert_eq!(keys["sampled"], true);
-        let values = s.get("values", &[("source", "property"), ("key", "plan")]).await;
-        assert_eq!(values["sampled"], false, "only events with the key count toward the cap");
+        let values = s.get("values", &[("source", "property"), ("key", "old")]).await;
+        assert_eq!(values["sampled"], true);
+        assert_eq!(values["items"], json!([{"value": "1", "count": 50_000 - 5}]));
+        let plan = s.get("values", &[("source", "property"), ("key", "plan")]).await;
+        assert_eq!(names(&plan, "value"), ["free", "pro"], "the newest events are in the read");
         let traits = s.get("keys", &[("source", "trait")]).await;
         assert_eq!(traits["sampled"], false);
     }

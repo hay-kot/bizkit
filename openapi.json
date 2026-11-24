@@ -19303,7 +19303,7 @@
           },
           "sampled": {
             "type": "boolean",
-            "description": "The scan stopped at its cap of newest events (or most recently seen\npeople) with the key, so counts cover only those."
+            "description": "The scan stopped at its cap of newest events (or most recently seen\npeople), so counts cover only those."
           }
         }
       },

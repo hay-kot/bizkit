@@ -3,8 +3,12 @@
 //!
 //! Insight filters and breakdowns read only `analytics_events.props` and
 //! `analytics_people.traits`, so those are the two sources. Each lookup
-//! scans at most [`SCAN_CAP`] rows, newest first, and says so with
+//! reads at most [`SCAN_CAP`] rows, newest first, and says so with
 //! `sampled`, so a large project file still answers while someone types.
+//! The cap sits on an inner query that only walks an index (events by
+//! `(project_id, ts)`, people by `(workspace_id, project_id, last_seen)`);
+//! name, key and `q` filters run on its output, so a filter that matches
+//! little never makes SQLite read past the cap.
 //! Keys arrive as bound parameters and match `json_each`'s `key` column,
 //! never a JSON path, so no key can change the SQL or the path syntax.
 
@@ -186,25 +190,25 @@ impl Operation for SchemaEvents {
         let limit = i64::from(input.limit.unwrap_or(50));
         let rows = sqlx::query!(
             r#"WITH s AS MATERIALIZED (
-                 SELECT name, person, ts FROM analytics_events
-                 WHERE workspace_id = ? AND project_id = ? AND ts >= ? AND ts < ?
-                   AND (? IS NULL OR name LIKE ? ESCAPE '\')
+                 SELECT workspace_id, name, person, ts FROM analytics_events
+                 WHERE project_id = ? AND ts >= ? AND ts < ?
                  ORDER BY ts DESC LIMIT ?),
                agg AS (
                  SELECT name, COUNT(*) AS events, COUNT(DISTINCT person) AS users, MAX(ts) AS last_seen
-                 FROM s GROUP BY name ORDER BY 2 DESC, name LIMIT ?)
+                 FROM s WHERE workspace_id = ? AND (? IS NULL OR name LIKE ? ESCAPE '\')
+                 GROUP BY name ORDER BY 2 DESC, name LIMIT ?)
                SELECT n.scanned AS "scanned!: i64", agg.name AS "name?: String",
                       agg.events AS "events?: i64", agg.users AS "users?: i64",
                       agg.last_seen AS "last_seen?: i64"
                FROM (SELECT COUNT(*) AS scanned FROM s) n LEFT JOIN agg
                ORDER BY agg.events DESC, agg.name"#,
-            scope.workspace_id,
             scope.project_id,
             start,
             end,
-            pattern,
-            pattern,
             SCAN_CAP,
+            scope.workspace_id,
+            pattern,
+            pattern,
             limit,
         )
         .fetch_all(file.db.read())
@@ -310,15 +314,17 @@ impl Operation for SchemaKeys {
         // up `json_each.key` as a stored column, which it can't find.
         let rows = sqlx::query!(
             r#"WITH s AS MATERIALIZED (
-                 SELECT props AS doc FROM analytics_events
-                 WHERE NOT ? AND workspace_id = ? AND project_id = ? AND ts >= ? AND ts < ?
-                   AND (? IS NULL OR name = ?) AND props IS NOT NULL AND props <> '{}'
+                 SELECT workspace_id, name, props AS doc FROM analytics_events
+                 WHERE NOT ? AND project_id = ? AND ts >= ? AND ts < ?
                  ORDER BY ts DESC LIMIT ?),
                t AS MATERIALIZED (
                  SELECT traits AS doc FROM analytics_people
-                 WHERE ? AND workspace_id = ? AND project_id = ? AND traits <> '{}'
+                 WHERE ? AND workspace_id = ? AND project_id = ?
                  ORDER BY last_seen DESC LIMIT ?),
-               d AS (SELECT doc FROM s UNION ALL SELECT doc FROM t),
+               d AS (
+                 SELECT doc FROM s
+                 WHERE workspace_id = ? AND (? IS NULL OR name = ?) AND doc IS NOT NULL
+                 UNION ALL SELECT doc FROM t),
                k AS (
                  SELECT CAST(j.key AS TEXT) AS key,
                         CASE j.type WHEN 'text' THEN 'text' WHEN 'integer' THEN 'number'
@@ -335,17 +341,17 @@ impl Operation for SchemaKeys {
                LEFT JOIN agg
                ORDER BY agg.count DESC, agg.key"#,
             is_trait,
-            scope.workspace_id,
             scope.project_id,
             start,
             end,
-            input.event,
-            input.event,
             SCAN_CAP,
             is_trait,
             scope.workspace_id,
             scope.project_id,
             SCAN_CAP,
+            scope.workspace_id,
+            input.event,
+            input.event,
             pattern,
             pattern,
             limit,
@@ -425,7 +431,7 @@ pub(crate) struct SchemaValueList {
     /// The values.
     pub(crate) items: Vec<SchemaValue>,
     /// The scan stopped at its cap of newest events (or most recently seen
-    /// people) with the key, so counts cover only those.
+    /// people), so counts cover only those.
     pub(crate) sampled: bool,
 }
 
@@ -451,17 +457,17 @@ impl Operation for SchemaValues {
         let is_trait = input.source == SchemaSource::Trait;
         let rows = sqlx::query!(
             r#"WITH s AS MATERIALIZED (
-                 SELECT props AS doc FROM analytics_events e
-                 WHERE NOT ? AND workspace_id = ? AND project_id = ? AND ts >= ? AND ts < ?
-                   AND (? IS NULL OR name = ?) AND props IS NOT NULL
-                   AND EXISTS (SELECT 1 FROM json_each(e.props) x WHERE x.key = ?)
+                 SELECT workspace_id, name, props AS doc FROM analytics_events
+                 WHERE NOT ? AND project_id = ? AND ts >= ? AND ts < ?
                  ORDER BY ts DESC LIMIT ?),
                t AS MATERIALIZED (
-                 SELECT traits AS doc FROM analytics_people p
+                 SELECT traits AS doc FROM analytics_people
                  WHERE ? AND workspace_id = ? AND project_id = ?
-                   AND EXISTS (SELECT 1 FROM json_each(p.traits) x WHERE x.key = ?)
                  ORDER BY last_seen DESC LIMIT ?),
-               d AS (SELECT doc FROM s UNION ALL SELECT doc FROM t),
+               d AS (
+                 SELECT doc FROM s
+                 WHERE workspace_id = ? AND (? IS NULL OR name = ?) AND doc IS NOT NULL
+                 UNION ALL SELECT doc FROM t),
                v AS (
                  SELECT CASE j.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'
                                     ELSE CAST(j.atom AS TEXT) END AS value
@@ -477,19 +483,17 @@ impl Operation for SchemaValues {
                LEFT JOIN agg
                ORDER BY agg.count DESC, agg.value"#,
             is_trait,
-            scope.workspace_id,
             scope.project_id,
             start,
             end,
-            input.event,
-            input.event,
-            input.key,
             SCAN_CAP,
             is_trait,
             scope.workspace_id,
             scope.project_id,
-            input.key,
             SCAN_CAP,
+            scope.workspace_id,
+            input.event,
+            input.event,
             input.key,
             pattern,
             pattern,

@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH s AS MATERIALIZED (\n                 SELECT workspace_id, name, props AS doc FROM analytics_events\n                 WHERE NOT ? AND project_id = ? AND ts >= ? AND ts < ?\n                 ORDER BY ts DESC LIMIT ?),\n               t AS MATERIALIZED (\n                 SELECT traits AS doc FROM analytics_people\n                 WHERE ? AND workspace_id = ? AND project_id = ?\n                 ORDER BY last_seen DESC LIMIT ?),\n               d AS (\n                 SELECT doc FROM s\n                 WHERE workspace_id = ? AND (? IS NULL OR name = ?) AND doc IS NOT NULL\n                 UNION ALL SELECT doc FROM t),\n               v AS (\n                 SELECT CASE j.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                                    ELSE CAST(j.atom AS TEXT) END AS value\n                 FROM d, json_each(d.doc) j\n                 WHERE j.key = ? AND j.type IN ('text', 'integer', 'real', 'true', 'false')),\n               agg AS (\n                 SELECT value, COUNT(*) AS count FROM v\n                 WHERE ? IS NULL OR value LIKE ? ESCAPE '\\'\n                 GROUP BY value ORDER BY 2 DESC, value LIMIT ?)\n               SELECT n.scanned AS \"scanned!: i64\", agg.value AS \"value?: String\",\n                      agg.count AS \"count?: i64\"\n               FROM (SELECT (SELECT COUNT(*) FROM s) + (SELECT COUNT(*) FROM t) AS scanned) n\n               LEFT JOIN agg\n               ORDER BY agg.count DESC, agg.value",
+  "describe": {
+    "columns": [
+      {
+        "name": "scanned!: i64",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "value?: String",
+        "ordinal": 1,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "count?: i64",
+        "ordinal": 2,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f512009cd0cfdd44f4ded67e7c72351a2f53867639888a6ae189a8f0c81b9528"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "WITH s AS MATERIALIZED (\n                 SELECT name, person, ts FROM analytics_events\n                 WHERE workspace_id = ? AND project_id = ? AND ts >= ? AND ts < ?\n                   AND (? IS NULL OR name LIKE ? ESCAPE '\\')\n                 ORDER BY ts DESC LIMIT ?),\n               agg AS (\n                 SELECT name, COUNT(*) AS events, COUNT(DISTINCT person) AS users, MAX(ts) AS last_seen\n                 FROM s GROUP BY name ORDER BY 2 DESC, name LIMIT ?)\n               SELECT n.scanned AS \"scanned!: i64\", agg.name AS \"name?: String\",\n                      agg.events AS \"events?: i64\", agg.users AS \"users?: i64\",\n                      agg.last_seen AS \"last_seen?: i64\"\n               FROM (SELECT COUNT(*) AS scanned FROM s) n LEFT JOIN agg\n               ORDER BY agg.events DESC, agg.name",
+  "query": "WITH s AS MATERIALIZED (\n                 SELECT workspace_id, name, person, ts FROM analytics_events\n                 WHERE project_id = ? AND ts >= ? AND ts < ?\n                 ORDER BY ts DESC LIMIT ?),\n               agg AS (\n                 SELECT name, COUNT(*) AS events, COUNT(DISTINCT person) AS users, MAX(ts) AS last_seen\n                 FROM s WHERE workspace_id = ? AND (? IS NULL OR name LIKE ? ESCAPE '\\')\n                 GROUP BY name ORDER BY 2 DESC, name LIMIT ?)\n               SELECT n.scanned AS \"scanned!: i64\", agg.name AS \"name?: String\",\n                      agg.events AS \"events?: i64\", agg.users AS \"users?: i64\",\n                      agg.last_seen AS \"last_seen?: i64\"\n               FROM (SELECT COUNT(*) AS scanned FROM s) n LEFT JOIN agg\n               ORDER BY agg.events DESC, agg.name",
   "describe": {
     "columns": [
       {
@@ -50,5 +50,5 @@
       true
     ]
   },
-  "hash": "33cd6e4c1c24a0ccca12bc4ef138b0bfea24fb2600257a4846f5f60616f44665"
+  "hash": "e27b723ca9eb63aa28d46faed1dcefc15ebfc99ce80bdcf6a20333613ab2cd1c"
 }

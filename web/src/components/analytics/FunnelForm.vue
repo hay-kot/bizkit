@@ -83,6 +83,7 @@ function add() {
           v-model="step.match"
           :options="customEvents"
           allow-custom
+          required
           :name="`funnel-step-${i + 1}`"
           placeholder="signup_completed"
           :label="`Step ${i + 1} event name`"

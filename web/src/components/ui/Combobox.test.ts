@@ -1,7 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, ref } from 'vue'
 
 import Combobox, { type ComboOption } from './Combobox.vue'
+import Overlay from './Overlay.vue'
 
 const options: ComboOption[] = [
   { value: 'pageview', count: 1200, group: 'Page views' },
@@ -121,6 +123,73 @@ describe('Combobox', () => {
     expect(lookup).toHaveBeenCalledTimes(2)
     expect(lookup).toHaveBeenLastCalledWith('ab')
     expect(listed()).toEqual(['ab-hit'])
+  })
+
+  it('keeps the typed text on Enter with allowCustom when nothing matches exactly', async () => {
+    const { wrapper, input } = setup({ allowCustom: true })
+    await input.setValue('sig')
+    expect(listed()).toEqual(['signup40', 'Sign in', 'Use “sig”'])
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['sig'])
+  })
+
+  it('stays on a valid row when the list is empty', async () => {
+    const { wrapper, input } = setup()
+    await input.setValue('xyz')
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    await input.setValue('sig')
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['signup'])
+  })
+
+  it('drops typed text when a scroll closes the list', async () => {
+    const { wrapper, input } = setup({ allowCustom: true, modelValue: 'signup' })
+    await input.setValue('half')
+    window.dispatchEvent(new Event('scroll'))
+    await flushPromises()
+    expect(input.attributes('aria-expanded')).toBe('false')
+    expect((input.element as HTMLInputElement).value).toBe('signup')
+    await input.trigger('blur')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('passes required to the field', () => {
+    const { input } = setup({ required: true })
+    expect((input.element as HTMLInputElement).required).toBe(true)
+  })
+
+  it('closes only its list on Escape inside an overlay', async () => {
+    const open = ref(true)
+    const closed = vi.fn()
+    const Host = defineComponent({
+      setup: () => () =>
+        h(Overlay, { open: open.value, title: 'Panel', onClose: closed }, () =>
+          h(Combobox, { options, label: 'Event', modelValue: '' }),
+        ),
+    })
+    mount(Host, { attachTo: document.body })
+    await flushPromises()
+    const input = document.querySelector<HTMLInputElement>('[role="combobox"]')
+    if (!input) throw new Error('no combobox')
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    await flushPromises()
+    expect(input.getAttribute('aria-expanded')).toBe('true')
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(input.getAttribute('aria-expanded')).toBe('false')
+    expect(closed).not.toHaveBeenCalled()
+
+    const handled = (event: Event) => event.preventDefault()
+    document.body.addEventListener('keydown', handled)
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
+    document.body.removeEventListener('keydown', handled)
+    expect(closed).not.toHaveBeenCalled()
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(closed).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the list inside the viewport near the right edge', async () => {
