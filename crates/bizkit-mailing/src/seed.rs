@@ -104,9 +104,10 @@ fn days_ago(now: UnixMillis, days: u64) -> UnixMillis {
 
 /// Seeds the "Newsletter" list in the `website` project, linked to the
 /// demo Contact form, with five contacts, one sent broadcast with its send
-/// log (in the list's public archive), one draft and the welcome sequence. A list that already exists by
-/// name only gets the sequence, if it lacks one by that name, and the
-/// suppressions. Nothing is queued, so the seed sends no mail.
+/// log (in the list's public archive), one draft and the welcome sequence.
+/// A list that already exists by name only gets the sequence, if it lacks
+/// one by that name, and the suppressions. Nothing is queued, so the seed
+/// sends no mail.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let existing = store::list_lists(db.read(), seed.workspace_id, Some(project_id)).await?;

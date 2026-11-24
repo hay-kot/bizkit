@@ -27,9 +27,9 @@ import {
   uniqueTags,
 } from '@/components/mailing/attributes'
 import AttributesEditor from '@/components/mailing/AttributesEditor.vue'
-import Checkbox from '@/components/ui/Checkbox.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
 import Card from '@/components/ui/Card.vue'
+import Checkbox from '@/components/ui/Checkbox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
 import DetailActions from '@/components/ui/DetailActions.vue'
@@ -315,14 +315,16 @@ const archiveHint = computed(() => {
     return 'The list’s public archive is off. Turn it on in the list’s settings.'
   const current = broadcast.value
   if (!current?.archived) return 'Readers of the list’s archive and RSS feed won’t see it.'
-  if (!current.sent_at) return 'It shows in the archive once it is sent.'
+  if (!current.sent_at) return 'It shows in the archive once it has finished sending.'
   return 'It shows in the archive and RSS feed, without any reader’s name or links.'
 })
 
+// Its own mutation, so a toggle never shows on the draft's Save button.
+const archiveUpdate = useUpdateBroadcast()
 function setArchived(archived: boolean) {
   return runAction({
     run: () =>
-      update.mutateAsync({
+      archiveUpdate.mutateAsync({
         path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
         body: { archived },
       }),
@@ -653,7 +655,7 @@ const columns = [
         <Checkbox
           :model-value="broadcast?.archived ?? false"
           label="Show in the list’s public archive"
-          :disabled="update.asyncStatus.value === 'loading'"
+          :disabled="archiveUpdate.asyncStatus.value === 'loading'"
           @update:model-value="(value) => void setArchived(value === true)"
         />
         <a

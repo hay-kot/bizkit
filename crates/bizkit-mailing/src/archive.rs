@@ -199,9 +199,9 @@ async fn feed_xml(platform: &Platform, key: &str) -> anyhow::Result<Option<Respo
     let _ignored = write!(
         xml,
         "<title>{}</title><link>{}</link><description>{}</description>",
-        escape(&list.name),
-        escape(archive_url(platform, key)?.as_str()),
-        escape(description(&list).unwrap_or(&list.name)),
+        xml_text(&list.name),
+        xml_text(archive_url(platform, key)?.as_str()),
+        xml_text(description(&list).unwrap_or(&list.name)),
     );
     for issue in &issues {
         let url = issue_url(platform, key, issue.id)?;
@@ -209,10 +209,10 @@ async fn feed_xml(platform: &Platform, key: &str) -> anyhow::Result<Option<Respo
             xml,
             "<item><title>{title}</title><link>{url}</link><guid isPermaLink=\"true\">{url}</guid>\
              <pubDate>{date}</pubDate><description>{content}</description></item>",
-            title = escape(&subject(issue)),
-            url = escape(url.as_str()),
-            date = escape(&rfc2822(issue.sent_at)?),
-            content = escape(&render::archive_body(&issue.body_md)),
+            title = xml_text(&subject(issue)),
+            url = xml_text(url.as_str()),
+            date = xml_text(&rfc2822(issue.sent_at)?),
+            content = xml_text(&render::archive_body(&issue.body_md)),
         );
     }
     xml.push_str("</channel></rss>\n");
@@ -225,6 +225,19 @@ async fn feed_xml(platform: &Platform, key: &str) -> anyhow::Result<Option<Respo
     headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     Ok(Some(response))
+}
+
+/// Escapes text for XML 1.0 and drops the characters it forbids (most C0
+/// controls), which mail text can hold and which would make feed readers
+/// reject the whole feed.
+fn xml_text(text: &str) -> String {
+    let allowed: String = text
+        .chars()
+        .filter(|&c| {
+            matches!(c, '\t' | '\n' | '\r') || (c >= ' ' && !matches!(c, '\u{fffe}' | '\u{ffff}'))
+        })
+        .collect();
+    escape(&allowed)
 }
 
 fn description(list: &ListRow) -> Option<&str> {
@@ -280,4 +293,14 @@ fn html(status: StatusCode, title: &str, feed: Option<&Url>, body: &str) -> Resp
     headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::xml_text;
+
+    #[test]
+    fn xml_drops_forbidden_controls_and_escapes() {
+        assert_eq!(xml_text("a\u{0b}b\u{01}<c>\tok\n"), "ab&lt;c&gt;\tok\n");
+    }
 }

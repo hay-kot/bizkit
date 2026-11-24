@@ -1404,11 +1404,17 @@ impl Operation for BroadcastsUpdate {
         }
         if let Some(archived) = input.archived {
             row.archived = archived;
-            store::set_broadcast_archived(&mut *tx, row.workspace_id, row.id, archived, cx.now())
-                .await?;
+            row.updated_at = cx.now();
+            store::set_broadcast_archived(
+                &mut *tx,
+                row.workspace_id,
+                row.id,
+                archived,
+                row.updated_at,
+            )
+            .await?;
         }
         if !edits_draft {
-            row.updated_at = cx.now();
             tx.commit().await?;
             return Ok(broadcast_to_api(row)?);
         }

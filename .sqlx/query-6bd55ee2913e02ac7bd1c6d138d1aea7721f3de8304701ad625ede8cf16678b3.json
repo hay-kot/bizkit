@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: BroadcastId\", subject, body_md, sent_at AS \"sent_at!: UnixMillis\"\n           FROM mailing_broadcasts\n           WHERE workspace_id = ?1 AND list_id = ?2 AND archived = 1 AND sent_at IS NOT NULL\n             AND (?3 IS NULL OR id = ?3)\n           ORDER BY sent_at DESC, id DESC\n           LIMIT ?4",
+  "query": "SELECT id AS \"id!: BroadcastId\", subject, body_md, sent_at AS \"sent_at!: UnixMillis\"\n           FROM mailing_broadcasts\n           WHERE workspace_id = ?1 AND list_id = ?2 AND archived = 1 AND status = 'sent'\n             AND paused_at IS NULL AND sent_at IS NOT NULL\n             AND (?3 IS NULL OR id = ?3)\n           ORDER BY sent_at DESC, id DESC\n           LIMIT ?4",
   "describe": {
     "columns": [
       {
@@ -58,5 +58,5 @@
       true
     ]
   },
-  "hash": "a03770dad65385b629bbc69561cf78aefde66c7aa1a98b1bb4a82e0a3253a2f6"
+  "hash": "6bd55ee2913e02ac7bd1c6d138d1aea7721f3de8304701ad625ede8cf16678b3"
 }

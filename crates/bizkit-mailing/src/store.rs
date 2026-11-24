@@ -706,7 +706,8 @@ pub(crate) async fn insert_broadcast(
 /// Writes every changeable column of `row` but `archived`, matched by
 /// workspace and ID. `archived` changes only through
 /// [`set_broadcast_archived`], so the fan-out, which holds a row across
-/// batches, never undoes a toggle made while it runs.
+/// batches, never undoes a toggle made while it runs. It can still write
+/// back an older `updated_at`.
 pub(crate) async fn update_broadcast(
     exec: impl SqliteExecutor<'_>,
     row: &BroadcastRow,
@@ -806,8 +807,8 @@ pub(crate) struct ArchiveIssue {
     pub(crate) sent_at: UnixMillis,
 }
 
-/// The list's archived broadcasts that went out, newest first; only
-/// `only` when given.
+/// The list's archived broadcasts that finished sending, newest first; only
+/// `only` when given. A paused broadcast stays out until it resumes.
 pub(crate) async fn archive_issues(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
@@ -819,7 +820,8 @@ pub(crate) async fn archive_issues(
         ArchiveIssue,
         r#"SELECT id AS "id!: BroadcastId", subject, body_md, sent_at AS "sent_at!: UnixMillis"
            FROM mailing_broadcasts
-           WHERE workspace_id = ?1 AND list_id = ?2 AND archived = 1 AND sent_at IS NOT NULL
+           WHERE workspace_id = ?1 AND list_id = ?2 AND archived = 1 AND status = 'sent'
+             AND paused_at IS NULL AND sent_at IS NOT NULL
              AND (?3 IS NULL OR id = ?3)
            ORDER BY sent_at DESC, id DESC
            LIMIT ?4"#,
