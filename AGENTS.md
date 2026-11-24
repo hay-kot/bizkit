@@ -136,7 +136,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | A number | `formatNumber`, `formatCompactNumber`, `formatPercent` from `lib/format.ts` | `toLocale*String` and `new Intl.*` are errors elsewhere |
 | A UTC day (analytics buckets) | `formatUtcDay`, `formatShortUtcDay` from `lib/format.ts`; the local-time formatters shift it a day west of UTC | |
   | Tabs between a feature's pages | A parent route wrapping `TabLayout`, tabs as child routes, each rendering a `TabPage` (see `components/mailing/MailingLayout.vue`); `WorkspaceLayout` keys by `routeKey`, so the layout stays mounted across tabs | |
-  | A report's date range | `DateRangePicker`, with `presetRange` and `previousPeriod` from `lib/range.ts`; `useReportRange` keeps the range and compare flag in the URL | |
+  | A report's date range | `TimeRangePicker` (through `RangeToolbar`): props in, one `apply` out, compare in its slot. `shiftRange`, `zoomOut`, `presetRange` and `previousPeriod` from `lib/range.ts` do the UTC day math; `useReportRange` keeps the range and compare flag in the URL | |
   | KPIs with a change | `StatTiles` | |
   | Numbers over time | `TimeSeriesChart` (SVG, no chart library) | Inline styles and arbitrary values are errors |
   | A ranked list with share bars | `BarList` (bars are `progress` elements) | Inline styles and arbitrary values are errors |

@@ -55,6 +55,17 @@ export function formatShortUtcDay(value: string): string {
   return utcShortDayFormat.format(new Date(`${value.slice(0, 10)}T00:00:00Z`))
 }
 
+/**
+ * Two UTC days, both included, as `Nov 3 to Nov 24, 2026`. The year shows
+ * once when both days share it, on each side when they don't, and one day
+ * reads like `formatUtcDay`.
+ */
+export function formatDayRange(from: string, to: string): string {
+  if (from === to) return formatUtcDay(from)
+  const sameYear = from.slice(0, 4) === to.slice(0, 4)
+  return `${sameYear ? formatShortUtcDay(from) : formatUtcDay(from)} to ${formatUtcDay(to)}`
+}
+
 /** True when `value` is before now. */
 export function isPast(value: string): boolean {
   return new Date(value).getTime() < Date.now()
