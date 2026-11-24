@@ -641,3 +641,44 @@ pub struct EnrollmentPage {
     /// Pass as `before` for the next page; absent on the last one.
     pub next_before: Option<EnrollmentId>,
 }
+
+/// A list an exported address is on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AddressList {
+    /// The list ID.
+    pub id: ListId,
+    /// The project it belongs to.
+    pub project_id: ProjectId,
+    /// The list name.
+    pub name: String,
+}
+
+/// Everything mailing holds on one address in a workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AddressExport {
+    /// The address, lower case.
+    pub email: String,
+    /// The address was erased: a hashed record keeps it from mail and lists.
+    pub erased: bool,
+    /// Its suppression, when it has one.
+    pub suppression: Option<Suppression>,
+    /// The lists of its contact rows.
+    pub lists: Vec<AddressList>,
+    /// Its contact rows, one per list.
+    pub contacts: Vec<Contact>,
+    /// Its sequence runs.
+    pub enrollments: Vec<Enrollment>,
+    /// Every mail queued or sent to it, test sends included, newest first.
+    pub deliveries: Vec<MailDelivery>,
+}
+
+/// What an erase removed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ErasedAddress {
+    /// Contact rows deleted, with their sequence runs.
+    pub contacts: u64,
+    /// Deliveries deleted from the send log.
+    pub deliveries: u64,
+    /// A suppression row was replaced by the hashed record.
+    pub suppression: bool,
+}

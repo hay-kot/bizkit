@@ -6676,6 +6676,228 @@
         "x-bizkit-scope": "workspace:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mailing/addresses/erase": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Erase an address from every list and the send log of the workspace (GDPR erasure)",
+        "operationId": "mailing.addresses.erase",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The address."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasedAddress"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/addresses/export": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Export everything mailing holds on an address in the workspace (GDPR access)",
+        "operationId": "mailing.addresses.export",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The address."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:admin"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/mailing/broadcasts": {
       "get": {
         "tags": [
@@ -13150,6 +13372,101 @@
         }
       }
     },
+    "/m/mailing/public/manage": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Show the manage-subscriptions page",
+        "description": "The address's lists in one project, with a box per list it still gets mail from. Changes nothing.",
+        "operationId": "mailing.public.manage_page",
+        "parameters": [
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The signed token from a list mail",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The link is unknown, forged or expired",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Leave some or all of the lists",
+        "description": "Form fields: `shown` (each list the page showed), `keep` (each ticked list) and `all=1` for unsubscribe from all. Unsubscribes the shown lists that aren't kept, or every list with `all`.",
+        "operationId": "mailing.public.manage",
+        "parameters": [
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The signed token from a list mail",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The page's form",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the page again",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The link is unknown, forged or expired",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/m/mailing/public/unsubscribe": {
       "get": {
         "tags": [
@@ -13600,6 +13917,90 @@
           "ok": {
             "type": "boolean",
             "description": "Always true."
+          }
+        }
+      },
+      "AddressExport": {
+        "type": "object",
+        "description": "Everything mailing holds on one address in a workspace.",
+        "required": [
+          "email",
+          "erased",
+          "lists",
+          "contacts",
+          "enrollments",
+          "deliveries"
+        ],
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            },
+            "description": "Its contact rows, one per list."
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MailDelivery"
+            },
+            "description": "Every mail queued or sent to it, test sends included, newest first."
+          },
+          "email": {
+            "type": "string",
+            "description": "The address, lower case."
+          },
+          "enrollments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Enrollment"
+            },
+            "description": "Its sequence runs."
+          },
+          "erased": {
+            "type": "boolean",
+            "description": "The address was erased: a hashed record keeps it from mail and lists."
+          },
+          "lists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressList"
+            },
+            "description": "The lists of its contact rows."
+          },
+          "suppression": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Suppression",
+                "description": "Its suppression, when it has one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AddressList": {
+        "type": "object",
+        "description": "A list an exported address is on.",
+        "required": [
+          "id",
+          "project_id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ListId",
+            "description": "The list ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The list name."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
           }
         }
       },
@@ -14686,6 +15087,33 @@
           "exited",
           "unsubscribed"
         ]
+      },
+      "ErasedAddress": {
+        "type": "object",
+        "description": "What an erase removed.",
+        "required": [
+          "contacts",
+          "deliveries",
+          "suppression"
+        ],
+        "properties": {
+          "contacts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Contact rows deleted, with their sequence runs.",
+            "minimum": 0
+          },
+          "deliveries": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Deliveries deleted from the send log.",
+            "minimum": 0
+          },
+          "suppression": {
+            "type": "boolean",
+            "description": "A suppression row was replaced by the hashed record."
+          }
+        }
       },
       "ErrorBody": {
         "type": "object",

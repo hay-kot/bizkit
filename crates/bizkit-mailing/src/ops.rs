@@ -42,6 +42,7 @@ pub(crate) const MAX_SUBJECT: usize = 200;
 pub(crate) const MAX_BODY: usize = 100_000;
 const MAX_TAGS: usize = 20;
 const MAX_TAG: usize = 50;
+pub(crate) const ERASED: &str = "the address was erased from this workspace";
 const NOT_DRAFT: &str = "the broadcast was sent; only drafts change";
 const SCHEDULED: &str = "the broadcast is scheduled; cancel it first";
 /// How far ahead a broadcast can be scheduled.
@@ -74,6 +75,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(DeliveriesList)?;
     cx.op(FormsList)?;
     crate::suppression_ops::register(cx)?;
+    crate::privacy::register(cx)?;
     crate::sequence_ops::register(cx)
 }
 
@@ -962,7 +964,9 @@ impl Operation for ContactsCreate {
             tags: clean_tags(&input.tags),
             source,
         };
-        let contact = contacts::subscribe(cx.platform(), &mut tx, &list, new).await?;
+        let contact = contacts::subscribe(cx.platform(), &mut tx, &list, new)
+            .await?
+            .ok_or_else(|| ApiError::Conflict(ERASED.to_owned()))?;
         tx.commit().await?;
         Ok(contact_to_api(contact)?)
     }
@@ -1090,10 +1094,12 @@ impl Operation for PreviewOp {
         let platform = cx.platform();
         let list = list_in(platform.db().read(), input.workspace_id, input.list_id).await?;
         let unsubscribe = crate::public::unsubscribe_url(platform, "preview")?;
+        let manage = crate::public::manage_preview_url(platform)?;
         let frame = Frame {
             list_name: &list.name,
             footer: list.footer.as_deref(),
             unsubscribe: Some(&unsubscribe),
+            manage: Some(&manage),
         };
         let merge = Merge { name: Some("Ada Lovelace"), email: "ada@example.com" };
         let mail = render::render(&frame, &input.subject, &input.body_md, &merge);

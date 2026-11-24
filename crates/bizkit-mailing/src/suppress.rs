@@ -6,20 +6,64 @@ use anyhow::Context as _;
 use bizkit_core::db::WriteTx;
 use bizkit_core::ids::WorkspaceId;
 use bizkit_core::time::UnixMillis;
+use sha2::{Digest as _, Sha256};
 use sqlx::SqliteExecutor;
 
 use crate::api::{DeliveryId, SuppressionReason};
 use crate::contacts;
 use crate::store::{self, SuppressionRow};
 
+/// Why an address must not get mail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Block {
+    /// It is on the suppression list.
+    Suppressed(SuppressionReason),
+    /// It was erased on request. Erased addresses can't be added either.
+    Erased,
+}
+
+impl Block {
+    /// The reason text a skipped delivery records.
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Suppressed(reason) => reason.as_str(),
+            Self::Erased => "erased",
+        }
+    }
+}
+
 /// Why `email` must not get mail in the workspace, or `None` when it may.
-pub(crate) async fn suppressed(
+pub(crate) async fn blocked(
+    exec: impl SqliteExecutor<'_> + Copy,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<Option<Block>> {
+    let email = email.to_lowercase();
+    if store::is_erased(exec, workspace_id, &erasure_hash(workspace_id, &email)).await? {
+        return Ok(Some(Block::Erased));
+    }
+    let row = store::find_suppression(exec, workspace_id, &email).await?;
+    Ok(row.and_then(|r| SuppressionReason::parse(&r.reason)).map(Block::Suppressed))
+}
+
+/// Whether `email` was erased from the workspace.
+pub(crate) async fn erased(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     email: &str,
-) -> sqlx::Result<Option<SuppressionReason>> {
-    let row = store::find_suppression(exec, workspace_id, &email.to_lowercase()).await?;
-    Ok(row.and_then(|r| SuppressionReason::parse(&r.reason)))
+) -> sqlx::Result<bool> {
+    store::is_erased(exec, workspace_id, &erasure_hash(workspace_id, &email.to_lowercase())).await
+}
+
+/// The stored hash of an erased address: SHA-256 hex of the workspace ID, a
+/// NUL and the lower-case address. The workspace ID keeps two workspaces'
+/// records from matching each other.
+pub(crate) fn erasure_hash(workspace_id: WorkspaceId, email: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(workspace_id.to_string().as_bytes());
+    hasher.update([0]);
+    hasher.update(email.to_lowercase().as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 /// What to record for a suppression.

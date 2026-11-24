@@ -81,7 +81,7 @@ async fn full_sequence(
     Ok(sequence)
 }
 
-fn enrollment_to_api(row: EnrollmentView) -> anyhow::Result<Enrollment> {
+pub(crate) fn enrollment_to_api(row: EnrollmentView) -> anyhow::Result<Enrollment> {
     Ok(Enrollment {
         status: EnrollmentStatus::parse(&row.status)
             .with_context(|| format!("unknown enrollment status {:?}", row.status))?,
