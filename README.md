@@ -1,6 +1,6 @@
 # bizkit
 
-Self-hosted business hub for small software companies: analytics, forms, webhooks and document signing
+Self-hosted business hub for small software companies: analytics, forms, webhooks and mailing
 
 ## Installation
 
