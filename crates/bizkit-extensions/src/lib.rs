@@ -9,14 +9,14 @@ mod redact;
 mod reference;
 pub mod runner;
 pub mod sandbox;
+mod secrets;
 #[cfg(feature = "test-hooks")]
 mod seed;
 mod store;
 
 #[cfg(feature = "test-hooks")]
 use bizkit_core::DemoSeed;
-use bizkit_core::{Module, ModuleContext};
-#[cfg(feature = "test-hooks")]
+use bizkit_core::{Module, ModuleContext, Platform};
 use futures::future::BoxFuture;
 
 use crate::runner::{RunScriptHandler, ScriptRunner};
@@ -40,6 +40,10 @@ impl Module for Extensions {
         ops::register(cx, &self.runner)?;
         cx.job(RunScriptHandler { runner: self.runner.clone() })?;
         cx.hook_runner(self.runner.clone())
+    }
+
+    fn startup<'a>(&'a self, platform: &'a Platform) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(secrets::seal_plaintext(platform))
     }
 
     #[cfg(feature = "test-hooks")]

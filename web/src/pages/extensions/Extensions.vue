@@ -210,10 +210,21 @@ function removeSecret(secret: string) {
         logs show <code>[secret:NAME]</code> instead.
       </template>
       <template #actions>
-        <button type="button" class="btn gap-1.5 btn-sm" @click="openSecret">
+        <button
+          type="button"
+          class="btn gap-1.5 btn-sm"
+          :disabled="secrets && !secrets.can_save"
+          @click="openSecret"
+        >
           <Plus class="size-4" aria-hidden="true" />Add secret
         </button>
       </template>
+      <div v-if="secrets && !secrets.can_save" role="alert" class="alert alert-warning">
+        <span>
+          This instance has no secrets key (<code>secrets_key_env</code>), so projects can't save
+          secrets. Ask the person who runs bizkit to set one.
+        </span>
+      </div>
       <List
         :items="secrets?.items"
         :item-key="(s) => s.name"
@@ -230,7 +241,12 @@ function removeSecret(secret: string) {
             <template #title
               ><code>{{ item.name }}</code></template
             >
-            <template #meta>Set {{ formatDate(item.updated_at) }}</template>
+            <template #meta>
+              Set {{ formatDate(item.updated_at) }}
+              <span v-if="!item.readable" class="badge badge-sm badge-warning">
+                Doesn't open with this instance's key. Set it again.
+              </span>
+            </template>
             <template #trailing>
               <button
                 type="button"

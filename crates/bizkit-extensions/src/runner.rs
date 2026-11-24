@@ -17,6 +17,7 @@ use serde_json::Value;
 use crate::api::{Run, RunCause, RunId, ScriptId};
 use crate::redact::Redactor;
 use crate::sandbox::{FetchBridge, MailBridge, PoolLimits, RunReport, RunRequest, SandboxPool};
+use crate::secrets::{self, LoadError};
 use crate::store::{self, RunRow, ScriptRow};
 
 /// The worker lane script runs use, so they never hold up mail.
@@ -193,20 +194,20 @@ impl ScriptRunner {
         if json_len(&input) > MAX_ASYNC_INPUT {
             return (failed(RunStatus::Error, "the input is over 256 KiB"), BTreeMap::new());
         }
-        let secrets = match store::secret_values(
-            platform.db().read(),
-            script.workspace_id,
-            script.project_id,
-        )
-        .await
-        {
+        let secrets = match secrets::load(platform, script.workspace_id, script.project_id).await {
             Ok(secrets) => secrets,
-            Err(err) => {
+            Err(LoadError::Db(err)) => {
                 tracing::warn!(script_id = %script.id, "loading secrets: {err}");
                 return (
                     failed(RunStatus::Error, "loading the project's secrets failed"),
                     BTreeMap::new(),
                 );
+            }
+            Err(LoadError::Unreadable(name)) => {
+                let message = format!(
+                    "the secret {name} doesn't open with this instance's secrets key; set it again"
+                );
+                return (failed(RunStatus::Error, message), BTreeMap::new());
             }
         };
         let pool = match self.background_pool() {

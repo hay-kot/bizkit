@@ -12,6 +12,7 @@ use sqlx::migrate::Migrator;
 
 use futures::future::BoxFuture;
 
+use crate::app::Platform;
 use crate::db::Db;
 use crate::hooks::{
     HOOKS_SUBSCRIBER, HookKind, HookPoint, HookRegistry, HookRunner, HookSource, MAX_SYNC_BUDGET,
@@ -57,6 +58,17 @@ pub trait Module: Send + Sync + fmt::Debug + 'static {
         _db: &'a Db,
         _seed: &'a mut DemoSeed,
     ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+
+    /// Runs once as the app starts, after migrations and before it serves,
+    /// for data upgrades that need what migrations can't see, such as the
+    /// secrets key. It must be idempotent.
+    ///
+    /// # Errors
+    ///
+    /// Anything that should stop the app from starting.
+    fn startup<'a>(&'a self, _platform: &'a Platform) -> BoxFuture<'a, anyhow::Result<()>> {
         Box::pin(async { Ok(()) })
     }
 }

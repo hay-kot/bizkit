@@ -5776,6 +5776,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -20222,12 +20232,17 @@
         "description": "A secret's name. Values are never returned.",
         "required": [
           "name",
-          "updated_at"
+          "updated_at",
+          "readable"
         ],
         "properties": {
           "name": {
             "type": "string",
             "description": "The name, such as `DISCORD_WEBHOOK`."
+          },
+          "readable": {
+            "type": "boolean",
+            "description": "False when the value doesn't open with this instance's secrets key\n(it has none, or it changed). Runs fail until the secret is set\nagain."
           },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -20239,9 +20254,14 @@
         "type": "object",
         "description": "A project's secrets.",
         "required": [
-          "items"
+          "items",
+          "can_save"
         ],
         "properties": {
+          "can_save": {
+            "type": "boolean",
+            "description": "False when the instance has no secrets key (`secrets_key_env`), so\nsecrets can't be set. Existing plaintext secrets keep working."
+          },
           "items": {
             "type": "array",
             "items": {
