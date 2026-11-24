@@ -116,20 +116,21 @@ pub(crate) async fn touch(
     Ok(())
 }
 
-/// Revokes an unrevoked key in `workspace_id`. False when there is none.
+/// Revokes an unrevoked key in `workspace_id`. `None` when there is none;
+/// else who created it.
 pub(crate) async fn revoke(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     id: ApiKeyId,
     now: UnixMillis,
-) -> sqlx::Result<bool> {
-    let result = sqlx::query!(
-        "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND workspace_id = ? AND revoked_at IS NULL",
+) -> sqlx::Result<Option<Option<UserId>>> {
+    sqlx::query_scalar!(
+        r#"UPDATE api_keys SET revoked_at = ? WHERE id = ? AND workspace_id = ? AND revoked_at IS NULL
+           RETURNING created_by AS "created_by: UserId""#,
         now,
         id,
         workspace_id
     )
-    .execute(exec)
-    .await?;
-    Ok(result.rows_affected() == 1)
+    .fetch_optional(exec)
+    .await
 }

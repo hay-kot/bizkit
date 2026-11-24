@@ -24,6 +24,7 @@ mod tenancy;
 #[cfg(feature = "test-hooks")]
 pub mod test_hooks;
 pub mod time;
+pub mod usage;
 pub mod validate;
 
 pub use crate::app::{App, Platform, migrators, open_db, openapi, scope_areas};
@@ -35,7 +36,7 @@ pub use crate::module::{DemoSeed, Lifecycle, Module, ModuleContext};
 
 /// Projects, for modules that keep data per project.
 pub mod projects {
-    pub use crate::tenancy::projects::exists;
+    pub use crate::tenancy::projects::{exists, find_by_slugs};
 }
 
 /// Workspace members, for modules that check an address against them.

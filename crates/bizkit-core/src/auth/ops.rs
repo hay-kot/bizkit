@@ -11,6 +11,7 @@ use crate::ids::{ApiKeyId, WorkspaceId};
 use crate::module::ModuleContext;
 use crate::ops::{Access, Level, Method, NoContent, OpCtx, Operation, Principal, Scope, Success};
 use crate::time::UnixMillis;
+use crate::usage::{self, Report, UsageKind};
 use crate::validate::{FieldErrors, Validate, check_name};
 
 const WORKSPACE_ADMIN: Access = Access::Workspace(Scope::new("workspace", Level::Admin));
@@ -201,6 +202,8 @@ impl Operation for ApiKeysCreate {
         };
         let mut tx = cx.write().await?;
         let row = api_keys::insert(&mut *tx, &key, now).await?;
+        usage::report(&cx, &mut tx, Report::new(UsageKind::ApiKeyCreated, input.workspace_id))
+            .await?;
         tx.commit().await?;
         Ok(CreatedApiKey { key: ApiKey::from_row(row)?, token })
     }
@@ -220,9 +223,12 @@ impl Operation for ApiKeysRevoke {
 
     async fn call(&self, cx: OpCtx, input: InKey) -> Result<NoContent, ApiError> {
         let mut tx = cx.write().await?;
-        let revoked =
-            api_keys::revoke(&mut *tx, input.workspace_id, input.api_key_id, cx.now()).await?;
+        let creator = api_keys::revoke(&mut *tx, input.workspace_id, input.api_key_id, cx.now())
+            .await?
+            .ok_or(ApiError::NotFound)?;
+        let report = Report::new(UsageKind::ApiKeyRevoked, input.workspace_id).affecting(creator);
+        usage::report(&cx, &mut tx, report).await?;
         tx.commit().await?;
-        if revoked { Ok(NoContent) } else { Err(ApiError::NotFound) }
+        Ok(NoContent)
     }
 }

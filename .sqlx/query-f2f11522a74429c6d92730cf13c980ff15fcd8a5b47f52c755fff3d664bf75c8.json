@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND workspace_id = ? AND revoked_at IS NULL\n           RETURNING created_by AS \"created_by: UserId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "created_by: UserId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_keys",
+            "name": "created_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "f2f11522a74429c6d92730cf13c980ff15fcd8a5b47f52c755fff3d664bf75c8"
+}

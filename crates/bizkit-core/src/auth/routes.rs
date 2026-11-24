@@ -21,6 +21,7 @@ use crate::error::{ApiError, ErrorBody};
 use crate::jobs::{Enqueue, SendMail};
 use crate::ops::http::{MAX_BODY_BYTES, request_id};
 use crate::tenancy::{invitations, members, workspaces};
+use crate::usage::{self, UsageKind, UsageReported};
 use crate::validate::{FieldErrors, from_json};
 
 const LINK_TTL: Duration = Duration::from_mins(15);
@@ -198,6 +199,7 @@ async fn verify_inner(
         .await?
         .ok_or(ApiError::Unauthenticated)?;
     let user = if let Some(user) = users::find_by_email(&mut *tx, &email).await? {
+        report_sign_in(platform, &mut tx, user.id, UsageKind::SignedIn).await?;
         user
     } else {
         // Config or invitations may have changed since the link went out.
@@ -205,6 +207,7 @@ async fn verify_inner(
             return Err(ApiError::Unauthenticated);
         }
         let user = users::insert(&mut *tx, &email, now).await?;
+        report_sign_in(platform, &mut tx, user.id, UsageKind::SignedUp).await?;
         apply_policy_joins(platform, &mut tx, &email, user.id).await?;
         user
     };
@@ -221,6 +224,22 @@ async fn verify_inner(
     Ok(token)
 }
 
+async fn report_sign_in(
+    platform: &Platform,
+    tx: &mut WriteTx,
+    user_id: crate::ids::UserId,
+    kind: UsageKind,
+) -> anyhow::Result<()> {
+    let usage = UsageReported {
+        user_id: Some(user_id),
+        kind,
+        workspace_id: None,
+        at: platform.now(),
+        affected: Vec::new(),
+    };
+    usage::publish(platform.bus(), tx, &usage).await
+}
+
 /// Joins a new account to the existing workspaces its policy names. Joins run
 /// once, at account creation, so a later `members.remove` sticks.
 async fn apply_policy_joins(
@@ -232,7 +251,16 @@ async fn apply_policy_joins(
     let Some(policy) = platform.policies().match_email(email) else { return Ok(()) };
     for join in &policy.join {
         if let Some(workspace) = workspaces::find_by_slug(&mut **tx, &join.workspace).await? {
-            members::insert(&mut **tx, workspace.id, user_id, join.role, platform.now()).await?;
+            if members::insert(&mut **tx, workspace.id, user_id, join.role, platform.now()).await? {
+                let usage = UsageReported {
+                    user_id: Some(user_id),
+                    kind: UsageKind::MemberJoined,
+                    workspace_id: Some(workspace.id),
+                    at: platform.now(),
+                    affected: Vec::new(),
+                };
+                usage::publish(platform.bus(), tx, &usage).await?;
+            }
         } else {
             tracing::warn!(policy = %policy.name, workspace = %join.workspace, "policy join names no workspace; skipped");
         }

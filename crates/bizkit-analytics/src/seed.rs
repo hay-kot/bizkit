@@ -22,6 +22,8 @@ use crate::report::Scope;
 use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow, GoalRow, SiteRow};
 
+mod usage;
+
 const DAYS: i64 = 14;
 const SIGNUP_GOAL: &str = "Signup";
 const ONBOARDING_FUNNEL: &str = "Onboarding";
@@ -438,6 +440,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
         }
     }
+    usage::seed(db, seed).await.context("seeding the bizkit usage project")?;
     if let Some(&project_id) = seed.project_ids.get("docs") {
         if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
             let mut tx = db.write().await?;
