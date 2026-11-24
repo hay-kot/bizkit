@@ -62,8 +62,8 @@ test('build a per-user insight, save it and pin it to a new dashboard', async ({
   await expect(tile.getByRole('listitem')).toHaveCount(5)
   await expect(page.getByRole('link', { name: 'Insights', exact: true })).toHaveAttribute('aria-current', 'page')
 
-  // Dashboards moved onto the Insights tab; the old list URL lands there.
-  await page.goto(`/w/${workspace}/p/${project}/analytics/dashboards`)
+  // Dashboards are listed on the Insights tab.
+  await page.getByRole('link', { name: 'Insights', exact: true }).click()
   await expect(page).toHaveURL(/\/analytics\/insights$/)
   const boards = page.getByRole('region', { name: 'Dashboards' })
   await expect(boards.getByRole('listitem').filter({ hasText: 'Adoption' })).toContainText('1 insight')

@@ -11,10 +11,13 @@ import { computed, nextTick, ref, useId, watch } from 'vue'
 
 import { formatDayRange } from '@/lib/format'
 import {
+  canZoomOut,
   type DateRange,
+  MAX_RANGE_DAYS,
   PRESET_GROUPS,
   type PresetOption,
   presetRange,
+  rangeLength,
   shiftRange,
   zoomOut,
 } from '@/lib/range'
@@ -56,6 +59,7 @@ watch(
   ([nextFrom, nextTo]) => {
     from.value = nextFrom
     to.value = nextTo
+    touched.value = false
   },
 )
 
@@ -68,6 +72,8 @@ const absoluteError = computed(() => {
   if (!from.value || !to.value) return 'Pick both days.'
   if (from.value > to.value) return 'From must be on or before To.'
   if (to.value > props.today) return 'To can be today at the latest.'
+  if (rangeLength({ from: from.value, to: to.value }) > MAX_RANGE_DAYS)
+    return `Pick ${MAX_RANGE_DAYS} days at most.`
   return ''
 })
 
@@ -204,6 +210,7 @@ const iconButton =
       :class="iconButton"
       aria-label="Zoom out"
       title="Zoom out"
+      :disabled="!canZoomOut(range)"
       @click="apply(zoomOut(range, today))"
     >
       <ZoomOut class="size-4" aria-hidden="true" />

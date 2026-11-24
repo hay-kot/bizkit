@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { LayoutDashboard, Lightbulb, Plus } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import { describeQuery } from '@/components/analytics/insightDraft'
+import {
+  ANY_DASHBOARD,
+  filterInsights,
+  knownDashboardFilter,
+  NO_DASHBOARD,
+} from '@/components/analytics/insightList'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import CardGrid from '@/components/ui/CardGrid.vue'
@@ -30,26 +36,26 @@ const dashboards = useDashboards(
 )
 const base = computed(() => `/w/${props.workspaceId}/p/${props.projectId}/analytics`)
 
-const ALL = 'all'
-const NONE = 'none'
 const search = ref('')
-const onDashboard = ref<string>(ALL)
+const onDashboard = ref<string>(ANY_DASHBOARD)
 const dashboardOptions = computed((): SelectOption<string>[] => [
-  { value: ALL, label: 'Any dashboard' },
-  { value: NONE, label: 'No dashboard' },
+  { value: ANY_DASHBOARD, label: 'Any dashboard' },
+  { value: NO_DASHBOARD, label: 'No dashboard' },
   ...(dashboards.data.value?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
 ])
-const filtering = computed(() => search.value.trim() !== '' || onDashboard.value !== ALL)
+watch(
+  () => dashboards.data.value?.items,
+  (items) => {
+    onDashboard.value = knownDashboardFilter(
+      onDashboard.value,
+      items?.map((d) => d.id),
+    )
+  },
+)
+const filtering = computed(() => search.value.trim() !== '' || onDashboard.value !== ANY_DASHBOARD)
 const shownInsights = computed(() => {
   const items = insights.data.value?.items
-  if (!items) return undefined
-  const needle = search.value.trim().toLowerCase()
-  return items.filter((insight) => {
-    if (needle && !insight.name.toLowerCase().includes(needle)) return false
-    if (onDashboard.value === ALL) return true
-    if (onDashboard.value === NONE) return insight.dashboards.length === 0
-    return insight.dashboards.some((d) => d.id === onDashboard.value)
-  })
+  return items && filterInsights(items, search.value, onDashboard.value)
 })
 
 const columns = [
