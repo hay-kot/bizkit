@@ -1,6 +1,10 @@
-/** A one-page PDF that shows `text`, with a correct cross-reference table. */
+/**
+ * A one-page PDF that shows `text`, with a correct cross-reference table.
+ * Non-ASCII characters print as `?`, so string lengths are byte offsets.
+ */
 export function samplePdf(text: string): Buffer {
-  const content = `BT /F1 18 Tf 72 720 Td (${text.replace(/[()\\]/g, '')}) Tj ET`
+  const safe = text.replace(/[^\x20-\x7e]/g, '?').replace(/[()\\]/g, '')
+  const content = `BT /F1 18 Tf 72 720 Td (${safe}) Tj ET`
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',

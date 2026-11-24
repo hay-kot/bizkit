@@ -40,10 +40,9 @@ test('a request goes out, a signer signs through the mailed link, and it seals',
   await page.getByRole('button', { name: 'Sign' }).click()
   await expect(page.getByRole('heading', { name: 'Thank you' })).toBeVisible()
 
-  await expect(async () => {
-    await page.goto(requestPath)
-    await expect(page.getByText('completed', { exact: true })).toBeVisible({ timeout: 1_000 })
-  }).toPass({ timeout: 15_000 })
+  // The page polls while the seal runs, so no reload is needed.
+  await page.goto(requestPath)
+  await expect(page.getByText('completed', { exact: true })).toBeVisible({ timeout: 15_000 })
   const trail = page.getByRole('table', { name: 'Audit trail' })
   await expect(trail).toContainText('Signed: Ada Lovelace')
   await expect(trail).toContainText('Sealed')

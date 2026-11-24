@@ -86,7 +86,7 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
-  test('a signature request page is clean', async ({ page, world, baseURL }) => {
+  test('a signature request page is clean', async ({ page, world, baseURL, namespace }) => {
     const errors = trackPageErrors(page)
     const workspace = world.workspaces.main!.id
     const created = await page.request.post(`/api/v1/workspaces/${workspace}/signing/requests`, {
@@ -95,7 +95,7 @@ test.describe('workspace pages', () => {
         title: 'Services agreement',
         file_name: 'agreement.pdf',
         pdf_base64: samplePdf('Terms').toString('base64'),
-        signers: [{ name: 'Ada Lovelace', email: 'ada@e2e.test' }],
+        signers: [{ name: 'Ada Lovelace', email: `ada+${namespace}@e2e.test` }],
       },
       headers: { Origin: new URL(baseURL!).origin },
     })

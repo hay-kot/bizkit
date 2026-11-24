@@ -11,7 +11,7 @@ import FormPanel from '@/components/ui/FormPanel.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useCreateIntent } from '@/composables/useCreateIntent'
-import { fileToBase64 } from '@/lib/files'
+import { fileToBase64, shortFileName } from '@/lib/files'
 import { formatRelative } from '@/lib/format'
 import {
   MAX_PDF_BYTES,
@@ -93,7 +93,7 @@ async function onCreate() {
       project_id: props.projectId,
       title: title.value,
       message: message.value,
-      file_name: pdf.name,
+      file_name: shortFileName(pdf.name),
       pdf_base64: await fileToBase64(pdf),
       signers: signers.value.map((s) => ({ name: s.name.trim(), email: s.email.trim() })),
     },

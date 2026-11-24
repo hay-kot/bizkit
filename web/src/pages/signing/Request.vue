@@ -11,6 +11,7 @@ import MenuItem from '@/components/ui/MenuItem.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
+import { useIsAdmin } from '@/composables/useIsAdmin'
 import { runAction } from '@/lib/action'
 import { formatDateTime } from '@/lib/format'
 import {
@@ -18,6 +19,7 @@ import {
   type DocumentVersion,
   type EventKind,
   downloadSigningDocument,
+  isSealing,
   useDeleteSigningRequest,
   useRetrySigningRequest,
   useSendSigningRequest,
@@ -32,7 +34,12 @@ const props = defineProps<{
   requestId: string
 }>()
 const router = useRouter()
-const { data: detail, error: detailError } = useSigningRequest(
+const isAdmin = useIsAdmin(() => props.workspaceId)
+const {
+  data: detail,
+  error: detailError,
+  isPending,
+} = useSigningRequest(
   () => props.workspaceId,
   () => props.requestId,
 )
@@ -183,11 +190,18 @@ const actions = computed<DetailAction[]>(() => {
   list.push({ label: 'Original', icon: Download, run: () => download('original') })
   return list
 })
+// Once everyone signed the seal is under way, and the API refuses a void.
 const canVoid = computed(
-  () => request.value?.status === 'draft' || request.value?.status === 'sent',
+  () =>
+    request.value?.status === 'draft' ||
+    (request.value?.status === 'sent' && !isSealing(request.value)),
 )
 const canDelete = computed(
-  () => request.value?.status === 'draft' || request.value?.status === 'voided',
+  () => isAdmin.value && (request.value?.status === 'draft' || request.value?.status === 'voided'),
+)
+// Events have no ID; the trail only grows, so the position is stable.
+const events = computed(() =>
+  (detail.value?.events ?? []).map((event, index) => ({ ...event, index })),
 )
 </script>
 
@@ -212,20 +226,21 @@ const canDelete = computed(
 
     <p v-if="detailError" class="text-sm text-error">This request doesn’t exist.</p>
 
-    <template v-if="request">
-      <DescriptionList :items="facts">
+    <template v-if="!detailError">
+      <DescriptionList v-if="request" :items="facts">
         <template #status><StatusBadge :status="request.status" /></template>
       </DescriptionList>
 
-      <div v-if="request.status === 'failed'" role="alert" class="alert alert-error">
+      <div v-if="request?.status === 'failed'" role="alert" class="alert alert-error">
         <span>Sealing failed: {{ request.failure }}. Retry the seal once the cause is fixed.</span>
       </div>
 
       <PageSection title="Signers">
         <DataTable
           :columns="signerColumns"
-          :rows="request.signers"
+          :rows="request?.signers"
           :row-key="(s) => s.id"
+          :loading="isPending"
           label="Signers"
           :empty="{
             icon: FileSignature,
@@ -234,10 +249,10 @@ const canDelete = computed(
           }"
         >
           <template #cell-name="{ row }"
-            ><span class="font-medium">{{ row.name }}</span></template
+            ><span class="font-medium break-words">{{ row.name }}</span></template
           >
           <template #cell-email="{ row }"
-            ><span class="text-sm">{{ row.email }}</span></template
+            ><span class="text-sm break-all">{{ row.email }}</span></template
           >
           <template #cell-signed="{ row }">
             <span v-if="row.signed" class="text-sm">{{ formatDateTime(row.signed_at) }}</span>
@@ -249,8 +264,9 @@ const canDelete = computed(
       <PageSection title="Audit trail">
         <DataTable
           :columns="eventColumns"
-          :rows="detail?.events"
-          :row-key="(e) => `${e.at}-${e.kind}-${e.signer_id ?? ''}`"
+          :rows="events"
+          :row-key="(e) => String(e.index)"
+          :loading="isPending"
           label="Audit trail"
           :empty="{ icon: FileSignature, title: 'No events', message: 'Nothing happened yet.' }"
         >

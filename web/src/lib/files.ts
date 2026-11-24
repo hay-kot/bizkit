@@ -23,3 +23,13 @@ export function saveBase64(base64: string, fileName: string, type: string): void
   // Revoking at once can cancel the download in some browsers.
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
+
+/** `name` cut to at most `max` characters, keeping its extension. */
+export function shortFileName(name: string, max = 200): string {
+  const chars = [...name]
+  if (chars.length <= max) return name
+  const dot = name.lastIndexOf('.')
+  const extension = dot > 0 ? [...name.slice(dot)] : []
+  if (extension.length >= max) return chars.slice(0, max).join('')
+  return [...chars.slice(0, max - extension.length), ...extension].join('')
+}

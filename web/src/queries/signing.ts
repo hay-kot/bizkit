@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@pinia/colada'
+import { useIntervalFn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
-import { toValue } from 'vue'
+import { toValue, watch } from 'vue'
 
 import {
   signingRequestsCreateMutation,
@@ -55,15 +56,39 @@ export function useSigningRequests(
   )
 }
 
+/** How often a request's page checks on a seal in progress. */
+const SEALING_POLL_MS = 2_000
+
+/** True while every signer signed and the seal hasn't finished. */
+export function isSealing(request: SigningRequest | undefined): boolean {
+  return request?.status === 'sent' && request.signers.every((s) => s.signed)
+}
+
+/** One request with its audit trail; polls while its seal runs. */
 export function useSigningRequest(
   workspaceId: MaybeRefOrGetter<string>,
   requestId: MaybeRefOrGetter<string>,
 ) {
-  return useQuery(() =>
+  const query = useQuery(() =>
     signingRequestsGetQuery({
       path: { workspace_id: toValue(workspaceId), request_id: toValue(requestId) },
     }),
   )
+  // A refetch cancels one in flight, and a mutation that awaits its
+  // invalidation would then fail, so the poll skips a tick while loading.
+  const poll = useIntervalFn(
+    () => {
+      if (query.asyncStatus.value !== 'loading') void query.refetch()
+    },
+    SEALING_POLL_MS,
+    { immediate: false },
+  )
+  watch(
+    () => isSealing(query.data.value?.request),
+    (sealing) => (sealing ? poll.resume() : poll.pause()),
+    { immediate: true },
+  )
+  return query
 }
 
 export function useCreateSigningRequest() {
