@@ -4,6 +4,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import { onScopeDispose, toValue, watch } from 'vue'
 
 import {
+  mailingAddressesEraseMutation,
   mailingBroadcastsCancelMutation,
   mailingBroadcastsCreateMutation,
   mailingBroadcastsDeleteMutation,
@@ -38,7 +39,9 @@ import {
   mailingSuppressionsDeleteMutation,
   mailingSuppressionsListQuery,
 } from '@/api/gen/@pinia/colada.gen'
+import { mailingAddressesExport } from '@/api/gen/sdk.gen'
 import type {
+  AddressExport,
   Broadcast,
   BroadcastStatus,
   Contact,
@@ -60,6 +63,7 @@ import type {
 import { useInvalidate } from './keys'
 
 export type {
+  AddressExport,
   Broadcast,
   BroadcastStatus,
   Contact,
@@ -464,5 +468,48 @@ export function useRemoveSuppression() {
   return useMutation({
     ...mailingSuppressionsDeleteMutation(),
     onSettled: () => invalidate('mailingSuppressionsList'),
+  })
+}
+
+/**
+ * Fetches everything mailing holds on an address in the workspace and hands
+ * it to the browser as a JSON download.
+ */
+export async function downloadAddressExport(
+  workspaceId: string,
+  email: string,
+): Promise<AddressExport> {
+  const { data } = await mailingAddressesExport({
+    path: { workspace_id: workspaceId },
+    body: { email },
+    throwOnError: true,
+  })
+  const json = JSON.stringify(data, null, 2)
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `mailing-export-${data.email}.json`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  // Revoking at once can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  return data
+}
+
+/** Erases an address from every list and the send log of the workspace. */
+export function useEraseAddress() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingAddressesEraseMutation(),
+    onSettled: () =>
+      invalidate(
+        ...CONTACT_QUERIES,
+        ...BROADCAST_QUERIES,
+        'mailingListsList',
+        'mailingDeliveriesList',
+        'mailingEnrollmentsList',
+        'mailingSuppressionsList',
+      ),
   })
 }

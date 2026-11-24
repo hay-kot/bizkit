@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { refDebounced } from '@vueuse/core'
-import { Ban, Plus, Trash2 } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { Ban, Download, Eraser, Plus, Trash2 } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 
 import MailingTabs from '@/components/mailing/MailingTabs.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
@@ -17,10 +17,12 @@ import { useIsAdmin } from '@/composables/useIsAdmin'
 import { runAction } from '@/lib/action'
 import { formatDate } from '@/lib/format'
 import {
+  downloadAddressExport,
   ROWS_SHOWN,
   type Suppression,
   type SuppressionReason,
   useAddSuppression,
+  useEraseAddress,
   useRemoveSuppression,
   useSuppressions,
 } from '@/queries/mailing'
@@ -77,6 +79,45 @@ async function onAdd() {
   panelOpen.value = false
 }
 
+const erase = useEraseAddress()
+const addressMode = ref<'export' | 'erase' | null>(null)
+const address = ref('')
+const exporting = ref(false)
+const addressPending = computed(() => exporting.value || erase.asyncStatus.value === 'loading')
+
+function openAddress(mode: 'export' | 'erase') {
+  address.value = ''
+  erase.reset()
+  addressMode.value = mode
+}
+
+async function onAddress() {
+  const email = address.value.trim()
+  if (addressMode.value === 'export') {
+    exporting.value = true
+    const done = await runAction({
+      run: () => downloadAddressExport(props.workspaceId, email),
+      success: (data) => `Exported ${data.email}`,
+    }).finally(() => (exporting.value = false))
+    if (done) addressMode.value = null
+    return
+  }
+  const result = await runAction({
+    confirm: {
+      title: `Erase ${email}?`,
+      message:
+        "This deletes the address's contacts, sequence runs and send log in every project of " +
+        'this workspace, and keeps only a hash so it is never mailed or added again. ' +
+        "This can't be undone.",
+      confirmLabel: 'Erase',
+      danger: true,
+    },
+    run: () => erase.mutateAsync({ path: { workspace_id: props.workspaceId }, body: { email } }),
+    success: (r) => `Erased ${email}: ${r.contacts} contacts, ${r.deliveries} mails`,
+  })
+  if (result) addressMode.value = null
+}
+
 function onRemove(row: Suppression) {
   return runAction({
     confirm: {
@@ -98,14 +139,17 @@ function onRemove(row: Suppression) {
       title="Mailing"
       description="Lists people subscribe to, and the mail you send them."
     >
-      <button
-        v-if="isAdmin"
-        type="button"
-        class="btn gap-1.5 btn-primary btn-sm"
-        @click="openPanel"
-      >
-        <Plus class="size-4" aria-hidden="true" />Suppress address
-      </button>
+      <div v-if="isAdmin" class="flex flex-wrap gap-2">
+        <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="openAddress('export')">
+          <Download class="size-4" aria-hidden="true" />Export address
+        </button>
+        <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="openAddress('erase')">
+          <Eraser class="size-4" aria-hidden="true" />Erase address
+        </button>
+        <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="openPanel">
+          <Plus class="size-4" aria-hidden="true" />Suppress address
+        </button>
+      </div>
     </PageHeader>
 
     <MailingTabs :workspace-id="workspaceId" :project-id="projectId" />
@@ -190,6 +234,25 @@ function onRemove(row: Suppression) {
       </Field>
       <Field label="Note" hint="Optional. Why, for the team.">
         <input v-model="note" name="suppression-note" class="input w-full" />
+      </Field>
+    </FormPanel>
+
+    <FormPanel
+      :open="addressMode !== null"
+      variant="dialog"
+      :title="addressMode === 'erase' ? 'Erase address' : 'Export address'"
+      :description="
+        addressMode === 'erase'
+          ? 'For an erasure request: removes the address from every list and the send log of this workspace.'
+          : 'For an access request: downloads everything mailing holds on the address in this workspace, as JSON.'
+      "
+      :submit-label="addressMode === 'erase' ? 'Erase' : 'Download'"
+      :pending="addressPending"
+      @close="addressMode = null"
+      @submit="onAddress"
+    >
+      <Field label="Email">
+        <input v-model="address" type="email" name="address-email" required class="input w-full" />
       </Field>
     </FormPanel>
   </Page>

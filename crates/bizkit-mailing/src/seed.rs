@@ -15,6 +15,7 @@ use crate::api::{
     SequenceTrigger, StepId, SuppressionReason,
 };
 use crate::capture::FORM_KIND;
+use crate::privacy;
 use crate::store::{
     self, BroadcastRow, ContactRow, DeliveryFilter, DeliveryRow, EnrollmentRow, ListRow,
     SequenceRow, StepRow,
@@ -41,6 +42,12 @@ pay for a year.\n\n- Same features\n- One invoice\n- Cancel any time\n\n\
 [Switch to annual](https://example.com/pricing)";
 
 const SEQUENCE: &str = "Welcome series";
+/// The second list of the project, and who is on it.
+const UPDATES: &str = "Product updates";
+const UPDATES_CONTACTS: [(&str, &str); 2] =
+    [("ada@bizkit.test", "Ada"), ("linus@bizkit.test", "Linus")];
+/// An address erased on request; adding it to a list is refused.
+const ERASED: &str = "erased@bizkit.test";
 /// The contact whose broadcast mail bounced.
 const BOUNCED: &str = "grace@bizkit.test";
 /// An address suppressed by hand; it is on no list.
@@ -90,6 +97,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         let mut tx = db.write().await?;
         seed_sequence(&mut tx, &list, seed.now).await?;
         seed_suppressions(&mut tx, &list, seed.now).await?;
+        seed_privacy(&mut tx, &list, seed.now).await?;
         tx.commit().await?;
         seed.entities.insert(("mailing.list".to_owned(), LIST.to_owned()), list.id.to_string());
         return Ok(());
@@ -118,8 +126,56 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     seed_broadcasts(&mut tx, &list, &subscribed, now).await?;
     seed_sequence(&mut tx, &list, now).await?;
     seed_suppressions(&mut tx, &list, now).await?;
+    seed_privacy(&mut tx, &list, now).await?;
     tx.commit().await?;
     seed.entities.insert(("mailing.list".to_owned(), LIST.to_owned()), list.id.to_string());
+    Ok(())
+}
+
+/// A second list in the project, so a newsletter mail's manage page shows
+/// two lists, and one erased address that lists refuse. Skips what is
+/// already there.
+async fn seed_privacy(
+    tx: &mut WriteTx,
+    newsletter: &ListRow,
+    now: UnixMillis,
+) -> anyhow::Result<()> {
+    let existing =
+        store::list_lists(&mut **tx, newsletter.workspace_id, Some(newsletter.project_id)).await?;
+    if !existing.iter().any(|list| list.name == UPDATES) {
+        let list = ListRow {
+            id: ListId::new(),
+            name: UPDATES.to_owned(),
+            description: Some("Release notes, when a version ships.".to_owned()),
+            double_opt_in: false,
+            created_at: days_ago(now, 20),
+            updated_at: days_ago(now, 20),
+            ..newsletter.clone()
+        };
+        store::insert_list(&mut **tx, &list).await?;
+        for (email, name) in UPDATES_CONTACTS {
+            let arrived = days_ago(now, 20);
+            let contact = ContactRow {
+                id: ContactId::new(),
+                workspace_id: list.workspace_id,
+                list_id: list.id,
+                email: email.to_owned(),
+                name: Some(name.to_owned()),
+                tags: "[]".to_owned(),
+                status: ContactStatus::Subscribed.as_str().to_owned(),
+                source: "seed".to_owned(),
+                confirm_token: None,
+                confirm_sent_at: None,
+                unsubscribe_token: random_token(),
+                subscribed_at: Some(arrived),
+                unsubscribed_at: None,
+                created_at: arrived,
+                updated_at: arrived,
+            };
+            store::insert_contact(&mut **tx, &contact).await?;
+        }
+    }
+    privacy::erase(tx, newsletter.workspace_id, ERASED, days_ago(now, 1)).await?;
     Ok(())
 }
 
