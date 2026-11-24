@@ -48,8 +48,18 @@ test('a broadcast pauses after 20 failures and resume sends everyone once', asyn
   try {
     const sent = await page.request.post(`${api}/broadcasts/${broadcast.id}/send`, { data: {}, headers })
     expect(sent.status()).toBe(200)
-    // Runs the fan-out and every first attempt; retries wait for the clock.
-    for (let i = 0; i < 3; i++) expect((await request.post('/__test/jobs/drain')).ok()).toBe(true)
+    // The server's own worker may hold a job that a drain skips, so chaos
+    // stays on until the broadcast has paused. Retries wait for the clock.
+    await expect
+      .poll(
+        async () => {
+          await request.post('/__test/jobs/drain')
+          const got = await page.request.get(`${api}/broadcasts/${broadcast.id}`)
+          return (await got.json()).status
+        },
+        { timeout: 15_000 },
+      )
+      .toBe('paused')
   } finally {
     await chaos(request, 0)
   }
