@@ -327,6 +327,7 @@ dependencies = [
  "bizkit-core",
  "bizkit-extensions",
  "bizkit-forms",
+ "bizkit-mailing",
  "bizkit-testkit",
  "bizkit-web",
  "bizkit-webhooks",
@@ -489,6 +490,17 @@ dependencies = [
  "url",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "bizkit-mailing"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bizkit-core",
+ "serde",
+ "sqlx",
+ "utoipa",
 ]
 
 [[package]]
