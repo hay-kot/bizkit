@@ -16,7 +16,10 @@ export interface ChartPoint {
 
 export interface ChartSeries {
   name: string
-  /** `primary` is a solid line, the first one with an area; `muted` a faint dashed line. */
+  /**
+   * `primary` is a solid line in the next chart color (`chart-1` to
+   * `chart-4`), the first one with an area; `muted` a faint dashed line.
+   */
   tone: 'primary' | 'muted'
 }
 
@@ -28,6 +31,28 @@ const props = withDefaults(
   defineProps<{ points: ChartPoint[]; series: ChartSeries[]; height?: number }>(),
   { height: 240 },
 )
+
+// Static class strings, so Tailwind sees every one. Past four series the
+// colors repeat.
+const PALETTE = [
+  { line: 'stroke-chart-1', dot: 'fill-chart-1', swatch: 'bg-chart-1', key: 'border-chart-1' },
+  { line: 'stroke-chart-2', dot: 'fill-chart-2', swatch: 'bg-chart-2', key: 'border-chart-2' },
+  { line: 'stroke-chart-3', dot: 'fill-chart-3', swatch: 'bg-chart-3', key: 'border-chart-3' },
+  { line: 'stroke-chart-4', dot: 'fill-chart-4', swatch: 'bg-chart-4', key: 'border-chart-4' },
+] as const
+const MUTED = {
+  line: 'stroke-base-content/40',
+  dot: 'fill-base-content/40',
+  swatch: 'bg-base-content/40',
+  key: 'border-dashed border-base-content/40',
+}
+
+const tones = computed(() => {
+  let next = 0
+  return props.series.map((s) =>
+    s.tone === 'muted' ? MUTED : (PALETTE[next++ % PALETTE.length] ?? PALETTE[0]),
+  )
+})
 
 const PAD = { top: 12, right: 12, bottom: 28, left: 44 }
 const TOOLTIP_WIDTH = 200
@@ -151,11 +176,8 @@ const summary = computed(() => {
       class="mb-2 flex flex-wrap gap-4 text-xs text-base-content/70"
       aria-hidden="true"
     >
-      <li v-for="s in series" :key="s.name" class="flex items-center gap-1.5">
-        <span
-          class="w-4 border-t-2"
-          :class="s.tone === 'muted' ? 'border-dashed border-base-content/40' : 'border-primary'"
-        ></span>
+      <li v-for="(s, i) in series" :key="s.name" class="flex items-center gap-1.5">
+        <span class="w-4 border-t-2" :class="tones[i]?.key"></span>
         {{ s.name }}
       </li>
     </ul>
@@ -166,7 +188,7 @@ const summary = computed(() => {
       role="img"
       :aria-label="summary"
       :tabindex="points.length ? 0 : undefined"
-      class="block overflow-visible rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
+      class="block overflow-visible rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       @pointermove="onPointer"
       @pointerleave="active = undefined"
       @focus="active = points.length ? points.length - 1 : undefined"
@@ -206,19 +228,18 @@ const summary = computed(() => {
 
         <template v-if="points.length">
           <template v-for="s in lines" :key="`area-${s.name}`">
-            <path v-if="s.area" :d="s.area" class="fill-primary/10" />
+            <path v-if="s.area" :d="s.area" class="fill-chart-1/10" />
           </template>
           <path
-            v-for="s in lines"
+            v-for="(s, i) in lines"
             :key="`line-${s.name}`"
             :d="s.line"
             fill="none"
             stroke-linejoin="round"
             stroke-linecap="round"
             :stroke-dasharray="s.tone === 'muted' ? '4 4' : undefined"
-            :class="
-              s.tone === 'muted' ? 'stroke-base-content/40 stroke-2' : 'stroke-primary stroke-2'
-            "
+            class="stroke-2"
+            :class="tones[i]?.line"
           />
         </template>
 
@@ -237,7 +258,7 @@ const summary = computed(() => {
             :cy="y(activePoint.values[i] ?? 0)"
             r="4"
             class="stroke-base-100 stroke-2"
-            :class="s.tone === 'muted' ? 'fill-base-content/40' : 'fill-primary'"
+            :class="tones[i]?.dot"
           />
           <!-- HTML inside the SVG, so the tooltip is placed with attributes rather than an inline style. -->
           <foreignObject
@@ -249,7 +270,7 @@ const summary = computed(() => {
           >
             <div class="flex" :class="tooltipOnLeft ? 'justify-end' : 'justify-start'">
               <div
-                class="flex flex-col gap-0.5 rounded-box border border-base-300 bg-base-100 px-2.5 py-1.5 text-xs shadow-md"
+                class="flex flex-col gap-0.5 rounded-box border border-base-300 bg-raised px-2.5 py-1.5 text-xs shadow-md"
               >
                 <span class="font-medium whitespace-nowrap">{{ activePoint.label }}</span>
                 <span
@@ -257,10 +278,7 @@ const summary = computed(() => {
                   :key="s.name"
                   class="flex items-center gap-2 whitespace-nowrap"
                 >
-                  <span
-                    class="size-2 rounded-full"
-                    :class="s.tone === 'muted' ? 'bg-base-content/40' : 'bg-primary'"
-                  ></span>
+                  <span class="size-2 rounded-full" :class="tones[i]?.swatch"></span>
                   <span class="text-base-content/70">{{ s.name }}</span>
                   <span class="ml-auto font-medium tabular-nums">{{
                     formatNumber(activePoint.values[i] ?? 0)

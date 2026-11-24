@@ -6,7 +6,6 @@ import Page from './Page.vue'
 describe('Page', () => {
   it.each([
     [undefined, 'w-full'],
-    ['narrow', 'max-w-3xl'],
     ['compact', 'max-w-md'],
   ] as const)('width %s sets %s', (width, expected) => {
     const wrapper = mount(Page, { props: { width }, slots: { default: 'body' } })

@@ -250,10 +250,10 @@ const actions = computed(() => [
           name="contact-search"
           aria-label="Search contacts"
           placeholder="Search"
-          class="input w-36 input-sm sm:w-48"
+          class="input h-9 w-36 sm:w-48"
         />
         <div class="w-36 sm:w-40">
-          <Select v-model="status" :options="statusOptions" label="Status" size="sm" />
+          <Select v-model="status" :options="statusOptions" label="Status" size="toolbar" />
         </div>
       </template>
       <DataTable

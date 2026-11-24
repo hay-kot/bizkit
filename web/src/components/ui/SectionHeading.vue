@@ -10,7 +10,10 @@ defineProps<{ title: string; description?: string; id?: string }>()
   <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
     <div class="min-w-0">
       <h2 :id="id" class="text-sm font-semibold">{{ title }}</h2>
-      <p v-if="description || $slots.description" class="mt-0.5 text-xs text-base-content/70">
+      <p
+        v-if="description || $slots.description"
+        class="mt-0.5 max-w-prose text-xs text-base-content/70"
+      >
         <slot name="description">{{ description }}</slot>
       </p>
     </div>

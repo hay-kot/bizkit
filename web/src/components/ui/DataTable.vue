@@ -55,7 +55,7 @@ defineSlots<
   >
     <slot name="empty-action" />
   </EmptyState>
-  <div v-else class="overflow-x-auto rounded-box border border-base-300">
+  <div v-else class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
     <table class="table" :aria-label="label">
       <thead>
         <tr>

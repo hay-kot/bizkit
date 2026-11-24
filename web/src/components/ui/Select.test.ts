@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import Select from './Select.vue'
 
@@ -35,5 +35,25 @@ describe('Select', () => {
     expect(button.attributes('aria-expanded')).toBe('false')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     wrapper.unmount()
+  })
+
+  it('keeps the list inside the viewport near the right edge', async () => {
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(375)
+    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800)
+    const wrapper = mount(Select, {
+      props: { options, label: 'Role', modelValue: 'admin', size: 'sm' },
+      attachTo: document.body,
+    })
+    const button = wrapper.get('[role="combobox"]')
+    vi.spyOn(button.element, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 290, y: 100, width: 80, height: 32 }),
+    )
+    await button.trigger('click')
+    const list = document.querySelector<HTMLElement>('[role="listbox"]')
+    expect(list?.style.left).toBe('143px')
+    expect(list?.style.minWidth).toBe('224px')
+    expect(list?.style.maxWidth).toBe('359px')
+    wrapper.unmount()
+    vi.restoreAllMocks()
   })
 })

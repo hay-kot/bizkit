@@ -4,14 +4,13 @@ import { inject, onBeforeUnmount, useSlots, watchEffect } from 'vue'
 import { TAB_LAYOUT } from './tabLayout'
 
 /**
- * One tab's page inside a `TabLayout`: it puts its title, description,
- * width and `actions` slot in the layout's header, and renders its content
- * below the tabs.
+ * One tab's page inside a `TabLayout`: it puts its title, description and
+ * `actions` slot in the layout's header, and renders its content below the
+ * tabs.
  */
-const props = withDefaults(
-  defineProps<{ title: string; description?: string; width?: 'wide' | 'narrow' }>(),
-  { description: undefined, width: 'wide' },
-)
+const props = withDefaults(defineProps<{ title: string; description?: string }>(), {
+  description: undefined,
+})
 defineSlots<{ default?: () => unknown; actions?: () => unknown }>()
 
 const layout = inject(TAB_LAYOUT)
@@ -24,7 +23,6 @@ onBeforeUnmount(() => {
 watchEffect(() => {
   layout.header.title = props.title
   layout.header.description = props.description
-  layout.header.width = props.width
 })
 </script>
 

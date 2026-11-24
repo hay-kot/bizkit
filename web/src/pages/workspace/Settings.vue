@@ -27,30 +27,34 @@ async function onSave() {
 </script>
 
 <template>
-  <Page width="narrow">
+  <Page>
     <PageHeader :section="workspaceName" title="Settings" />
     <form @submit.prevent="onSave">
       <Card title="General" description="The name shows in the switcher and in invitation emails.">
-        <Field label="Name">
+        <Field label="Name" width="md">
           <input v-model="name" name="workspace-name" required class="input w-full" />
         </Field>
-        <Field label="Slug" hint="The slug never changes: email policies join workspaces by slug.">
+        <Field
+          label="Slug"
+          width="md"
+          hint="The slug never changes: email policies join workspaces by slug."
+        >
           <div class="flex items-center gap-2">
             <input
               :value="workspace?.slug"
               readonly
-              class="input w-full bg-base-200"
+              class="input w-full bg-base-300/50"
               aria-readonly="true"
             />
             <CopyButton v-if="workspace" :text="workspace.slug" label="Copy slug" />
           </div>
         </Field>
-        <Field label="Workspace ID">
+        <Field label="Workspace ID" width="md">
           <div class="flex items-center gap-2">
             <input
               :value="workspaceId"
               readonly
-              class="input w-full bg-base-200 font-mono text-sm"
+              class="input w-full bg-base-300/50 font-mono text-sm"
               aria-readonly="true"
             />
             <CopyButton :text="workspaceId" label="Copy workspace ID" />

@@ -10,7 +10,7 @@ defineProps<{ title: string; message?: string; icon?: Component }>()
   >
     <span
       v-if="icon"
-      class="mb-1 inline-flex size-10 items-center justify-center rounded-full bg-base-200"
+      class="mb-1 inline-flex size-10 items-center justify-center rounded-full bg-base-300"
     >
       <component :is="icon" class="size-5" aria-hidden="true" />
     </span>

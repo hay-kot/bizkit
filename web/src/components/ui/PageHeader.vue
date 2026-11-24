@@ -16,6 +16,6 @@ defineProps<{ title: string; description?: string; section?: string }>()
       <h1 class="min-w-0 text-2xl font-semibold tracking-tight break-words">{{ title }}</h1>
       <div v-if="$slots.default" class="flex flex-wrap items-center gap-2"><slot /></div>
     </div>
-    <p v-if="description" class="text-sm text-base-content/80">{{ description }}</p>
+    <p v-if="description" class="max-w-prose text-sm text-base-content/80">{{ description }}</p>
   </header>
 </template>

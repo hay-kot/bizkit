@@ -4,7 +4,6 @@ import type { InjectionKey, Ref } from 'vue'
 export interface TabHeader {
   title: string
   description?: string
-  width: 'wide' | 'narrow'
 }
 
 /** What `TabLayout` gives the `TabPage` of its current tab. */

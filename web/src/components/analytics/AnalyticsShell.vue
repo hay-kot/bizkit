@@ -30,9 +30,8 @@ const props = withDefaults(
     gate: 'setup' | 'events' | 'site'
     title?: string
     description?: string
-    width?: 'wide' | 'narrow'
   }>(),
-  { title: 'Analytics', description: undefined, width: 'wide' },
+  { title: 'Analytics', description: undefined },
 )
 defineSlots<{ default: (props: { site: Site }) => unknown; actions?: () => unknown }>()
 
@@ -64,7 +63,7 @@ const base = computed(() => `/w/${props.workspaceId}/p/${props.projectId}/analyt
 </script>
 
 <template>
-  <TabPage :title="title" :description="description" :width="width">
+  <TabPage :title="title" :description="description">
     <template v-if="$slots.actions" #actions><slot name="actions" /></template>
     <SkeletonRows v-if="isPending" :rows="4" />
     <ErrorAlert v-else-if="error && !missing" :error="error" />

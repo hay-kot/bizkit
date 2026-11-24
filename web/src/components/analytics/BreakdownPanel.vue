@@ -79,7 +79,7 @@ const showingAll = ref(false)
 <template>
   <PageSection :title="title">
     <template v-if="dimensions.length > 1" #actions>
-      <Select v-model="dimension" :options="dimensions" :label="`${title} by`" size="sm" />
+      <Select v-model="dimension" :options="dimensions" :label="`${title} by`" size="toolbar" />
     </template>
     <ErrorAlert v-if="error" :error="error" />
     <BarList

@@ -51,7 +51,7 @@ const options = computed(() => [
   >
     <template #default="{ site }">
       <RangeToolbar v-model:range="range" :today="today">
-        <Select v-model="returnEvent" :options="options" label="Return event" size="sm" />
+        <Select v-model="returnEvent" :options="options" label="Return event" size="toolbar" />
       </RangeToolbar>
       <IdentityNeeded
         v-if="

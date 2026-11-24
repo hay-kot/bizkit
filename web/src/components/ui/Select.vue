@@ -1,5 +1,11 @@
 <script setup lang="ts" generic="T extends string">
-import { onClickOutside, useElementBounding, useEventListener, useWindowSize } from '@vueuse/core'
+import {
+  onClickOutside,
+  useElementBounding,
+  useElementSize,
+  useEventListener,
+  useWindowSize,
+} from '@vueuse/core'
 import { Check, ChevronsUpDown } from 'lucide-vue-next'
 import { computed, nextTick, ref, useId } from 'vue'
 
@@ -14,10 +20,18 @@ export interface SelectOption<V extends string> {
  * Arrow keys move, Enter or Space picks, Escape closes, typing jumps.
  */
 const props = withDefaults(
-  defineProps<{ options: SelectOption<T>[]; label: string; size?: 'sm' | 'md'; name?: string }>(),
+  defineProps<{
+    options: SelectOption<T>[]
+    label: string
+    size?: 'sm' | 'toolbar' | 'md'
+    name?: string
+  }>(),
   { size: 'md', name: undefined },
 )
 const model = defineModel<T>({ required: true })
+// sm fits a table row or an inline editor, toolbar matches the other 36px
+// toolbar controls, md is a form control.
+const heights = { sm: 'h-8', toolbar: 'h-9', md: 'h-10' }
 const open = ref(false)
 const active = ref(0)
 const root = ref<HTMLElement>()
@@ -29,15 +43,26 @@ const selected = computed(() => props.options.find((o) => o.value === model.valu
 onClickOutside(root, () => (open.value = false), { ignore: [list] })
 
 // The list renders in <body> so table and panel scroll containers can't clip
-// it; it opens upward when there's no room below.
+// it; it opens upward when there's no room below. It is at least 224px (14rem)
+// wide, so a short toolbar trigger doesn't open a cramped list, and it shifts
+// left to stay inside the viewport, which matters near the right edge and on
+// phones.
+const EDGE = 8
+const MIN_LIST_WIDTH = 224
 const anchor = useElementBounding(button)
-const viewport = useWindowSize()
+const viewport = useWindowSize({ includeScrollbar: false })
+const { width: listWidth } = useElementSize(list, undefined, { box: 'border-box' })
 const position = computed(() => {
   const below = viewport.height.value - anchor.bottom.value
-  const up = below < 272 && anchor.top.value > below
+  const up = below < 336 && anchor.top.value > below
+  const maxWidth = Math.max(0, viewport.width.value - 2 * EDGE)
+  const minWidth = Math.min(Math.max(anchor.width.value, MIN_LIST_WIDTH), maxWidth)
+  const width = Math.max(listWidth.value, minWidth)
+  const left = Math.max(EDGE, Math.min(anchor.left.value, viewport.width.value - EDGE - width))
   return {
-    left: `${anchor.left.value}px`,
-    width: `${anchor.width.value}px`,
+    left: `${left}px`,
+    minWidth: `${minWidth}px`,
+    maxWidth: `${maxWidth}px`,
     ...(up
       ? { bottom: `${viewport.height.value - anchor.top.value + 4}px` }
       : { top: `${anchor.bottom.value + 4}px` }),
@@ -127,8 +152,8 @@ function onKey(event: KeyboardEvent) {
       :aria-controls="listId"
       :aria-activedescendant="open ? `${listId}-${active}` : undefined"
       :data-value="model"
-      class="flex w-full items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 text-left transition-colors hover:border-base-content/40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary"
-      :class="size === 'sm' ? 'h-8 px-2.5 text-sm' : 'h-10 px-3'"
+      class="flex w-full items-center justify-between gap-2 rounded-field border border-field-border bg-field px-3 text-left text-sm transition-colors hover:border-base-content/60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+      :class="heights[size]"
       @click="open ? (open = false) : show()"
       @keydown="onKey"
     >
@@ -150,7 +175,7 @@ function onKey(event: KeyboardEvent) {
           role="listbox"
           :aria-label="label"
           :style="position"
-          class="fixed z-60 max-h-64 min-w-40 overflow-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-lg"
+          class="fixed z-60 max-h-80 overflow-auto rounded-box border border-base-300 bg-raised p-1.5 shadow-lg"
         >
           <li
             v-for="(option, index) in options"
@@ -158,23 +183,22 @@ function onKey(event: KeyboardEvent) {
             :key="option.value"
             role="option"
             :aria-selected="option.value === model"
-            class="flex cursor-pointer items-start gap-2 rounded-field px-2 py-1.5 text-sm"
-            :class="index === active ? 'bg-base-200' : ''"
+            class="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-field px-3 py-2 text-sm"
+            :class="[
+              index === active ? 'bg-base-content/5' : '',
+              option.value === model ? 'font-medium text-primary' : '',
+            ]"
             @mouseenter="active = index"
             @mousedown.prevent
             @click="pick(index)"
           >
-            <Check
-              class="mt-0.5 size-4 shrink-0"
-              :class="option.value === model ? 'opacity-100' : 'opacity-0'"
-              aria-hidden="true"
-            />
-            <span class="flex flex-col">
+            <span class="flex flex-1 flex-col">
               <span>{{ option.label }}</span>
-              <span v-if="option.description" class="text-xs text-base-content/70">{{
+              <span v-if="option.description" class="text-xs font-normal text-base-content/70">{{
                 option.description
               }}</span>
             </span>
+            <Check v-if="option.value === model" class="size-4 shrink-0" aria-hidden="true" />
           </li>
         </ul>
         <!-- eslint-enable vue/no-restricted-v-bind -->

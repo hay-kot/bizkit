@@ -165,7 +165,7 @@ function removeSecret(secret: string) {
           v-model="targetFilter"
           :options="targetOptions"
           label="Runs for"
-          size="sm"
+          size="toolbar"
           name="target"
         />
       </template>

@@ -6,7 +6,7 @@ import type { RouteLocationRaw } from 'vue-router'
 const props = defineProps<{ to?: RouteLocationRaw; danger?: boolean }>()
 defineEmits<{ select: [] }>()
 const itemClass = computed(() => [
-  'flex w-full items-center gap-2 rounded-field px-2 py-1.5 text-left text-sm transition-colors hover:bg-base-200 focus-visible:bg-base-200 focus-visible:outline-none',
+  'flex min-h-9 w-full items-center gap-2.5 rounded-field px-3 py-2 text-left text-sm transition-colors hover:bg-base-content/5 focus-visible:bg-base-content/5 focus-visible:outline-none',
   props.danger && 'text-error',
 ])
 </script>

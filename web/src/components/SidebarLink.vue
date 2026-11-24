@@ -7,8 +7,8 @@ defineProps<{ item: NavItem; to: string }>()
 <template>
   <RouterLink
     :to="to"
-    class="flex items-center gap-2.5 rounded-field px-2.5 py-2 text-sm transition-colors hover:bg-base-300"
-    active-class="bg-base-100 font-medium shadow-sm hover:bg-base-100"
+    class="relative flex items-center gap-2.5 rounded-field px-3 py-2 text-sm transition-colors hover:bg-raised"
+    active-class="bg-primary/10 font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-0.75 before:rounded-full before:bg-primary hover:bg-primary/15"
   >
     <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
     {{ item.label }}

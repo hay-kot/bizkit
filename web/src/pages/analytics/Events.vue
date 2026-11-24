@@ -164,16 +164,16 @@ const viewingFacts = computed(() => {
       </RouterLink>
     </template>
     <RangeToolbar v-model:range="range" :today="today">
-      <Select v-model="selectedName" :options="nameOptions" label="Event name" size="sm" />
+      <Select v-model="selectedName" :options="nameOptions" label="Event name" size="toolbar" />
       <form class="flex items-center gap-2" @submit.prevent="addProp">
         <input
           v-model="propDraft"
           name="event-prop-filter"
-          class="input w-48 input-sm"
+          class="input h-9 w-48"
           placeholder="plan=pro"
           aria-label="Property filter, key=value"
         />
-        <button type="submit" class="btn btn-sm">Add filter</button>
+        <button type="submit" class="btn h-9">Add filter</button>
       </form>
     </RangeToolbar>
     <p v-if="propError" class="text-sm text-error">{{ propError }}</p>

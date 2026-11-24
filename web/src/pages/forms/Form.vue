@@ -284,7 +284,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
 
     <PageSection title="Submissions">
       <template #actions>
-        <Select v-model="status" :options="statuses" label="Show" size="sm" name="status" />
+        <Select v-model="status" :options="statuses" label="Show" size="toolbar" name="status" />
       </template>
 
       <DataTable
