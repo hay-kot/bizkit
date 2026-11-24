@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_sequences SET name = ?, trigger = ?, enabled = ?, updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "a23473727ae25a52f765ff33e8f842f990405b33cb57c85a65621c27efda9a6d"
+}

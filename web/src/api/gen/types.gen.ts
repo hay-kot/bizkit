@@ -535,6 +535,85 @@ export type EndpointList = {
 };
 
 /**
+ * One contact's run through a sequence.
+ */
+export type Enrollment = {
+    /**
+     * The contact.
+     */
+    contact_id: ContactId;
+    /**
+     * When the contact enrolled.
+     */
+    created_at: Timestamp;
+    /**
+     * The contact's address.
+     */
+    email: string;
+    /**
+     * The enrollment ID.
+     */
+    id: EnrollmentId;
+    next_run_at?: Timestamp | null;
+    /**
+     * The sequence.
+     */
+    sequence_id: SequenceId;
+    /**
+     * Where it stands.
+     */
+    status: EnrollmentStatus;
+    /**
+     * Current steps of the sequence it got, sent or skipped.
+     */
+    steps_done: number;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * Enrollments of a sequence by status.
+ */
+export type EnrollmentCounts = {
+    /**
+     * Still getting steps.
+     */
+    active: number;
+    /**
+     * Got every step.
+     */
+    completed: number;
+    /**
+     * Taken out of the sequence by the team.
+     */
+    exited: number;
+    /**
+     * Left the list.
+     */
+    unsubscribed: number;
+};
+
+export type EnrollmentId = string;
+
+/**
+ * A page of enrollments, newest first.
+ */
+export type EnrollmentPage = {
+    /**
+     * The enrollments.
+     */
+    items: Array<Enrollment>;
+    next_before?: EnrollmentId | null;
+};
+
+/**
+ * Where a contact's run through a sequence stands.
+ */
+export type EnrollmentStatus = 'active' | 'completed' | 'exited' | 'unsubscribed';
+
+/**
  * The body of every non-2xx response.
  */
 export type ErrorBody = {
@@ -1067,6 +1146,7 @@ export type MailDelivery = {
      * When it was queued.
      */
     created_at: Timestamp;
+    enrollment_id?: EnrollmentId | null;
     /**
      * Why the last attempt failed, or why it was skipped.
      */
@@ -1088,6 +1168,7 @@ export type MailDelivery = {
      * Where it stands.
      */
     status: DeliveryStatus;
+    step_id?: StepId | null;
     /**
      * The subject line.
      */
@@ -1766,6 +1847,88 @@ export type SecretList = {
 };
 
 /**
+ * Timed mails that each enrolled contact of a list gets in order.
+ */
+export type Sequence = {
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * Whether new contacts enroll. Running enrollments go on either way.
+     */
+    enabled: boolean;
+    enrollments?: EnrollmentCounts | null;
+    /**
+     * The sequence ID.
+     */
+    id: SequenceId;
+    /**
+     * The list whose contacts it mails.
+     */
+    list_id: ListId;
+    /**
+     * The name, for the team.
+     */
+    name: string;
+    /**
+     * The steps in order.
+     */
+    steps: Array<SequenceStep>;
+    /**
+     * What enrolls contacts.
+     */
+    trigger: SequenceTrigger;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+export type SequenceId = string;
+
+/**
+ * Sequences of a workspace.
+ */
+export type SequenceList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Sequence>;
+};
+
+/**
+ * One mail of a sequence.
+ */
+export type SequenceStep = {
+    /**
+     * The body in Markdown. `{{ name }}` and `{{ email }}` are filled in.
+     */
+    body_md: string;
+    /**
+     * Hours to wait after enrolling (first step) or after the step before.
+     */
+    delay_hours: number;
+    /**
+     * The step ID. Edits keep it, so a contact never gets a step twice.
+     */
+    id: StepId;
+    /**
+     * Its place in the sequence, from 0.
+     */
+    position: number;
+    /**
+     * The subject line.
+     */
+    subject: string;
+};
+
+/**
+ * What enrolls contacts in a sequence.
+ */
+export type SequenceTrigger = 'on_join' | 'manual';
+
+/**
  * One chart point.
  */
 export type SeriesPoint = {
@@ -1886,6 +2049,28 @@ export type Step = {
      * A page path (exact, or a prefix ending in `*`) or an event name.
      */
     match: string;
+};
+
+export type StepId = string;
+
+/**
+ * A step of a sequence being saved.
+ */
+export type StepInput = {
+    /**
+     * The body in Markdown.
+     */
+    body_md?: string;
+    /**
+     * Hours to wait after enrolling (first step) or after the step before,
+     * 0 to 8760.
+     */
+    delay_hours: number;
+    id?: StepId | null;
+    /**
+     * The subject line.
+     */
+    subject: string;
 };
 
 /**
@@ -5913,6 +6098,7 @@ export type MailingDeliveriesListData = {
          * At most this many, 1-200. Default 50.
          */
         limit?: number | null;
+        sequence_id?: SequenceId | null;
         status?: DeliveryStatus | null;
     };
     url: '/api/v1/workspaces/{workspace_id}/mailing/deliveries';
@@ -6713,6 +6899,457 @@ export type MailingPreviewResponses = {
 };
 
 export type MailingPreviewResponse = MailingPreviewResponses[keyof MailingPreviewResponses];
+
+export type MailingSequencesListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        list_id?: ListId | null;
+        project_id?: ProjectId | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences';
+};
+
+export type MailingSequencesListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSequencesListError = MailingSequencesListErrors[keyof MailingSequencesListErrors];
+
+export type MailingSequencesListResponses = {
+    /**
+     * OK
+     */
+    200: SequenceList;
+};
+
+export type MailingSequencesListResponse = MailingSequencesListResponses[keyof MailingSequencesListResponses];
+
+export type MailingSequencesCreateData = {
+    body: {
+        /**
+         * Whether new contacts enroll. Default true.
+         */
+        enabled?: boolean | null;
+        /**
+         * The list whose contacts it mails.
+         */
+        list_id: ListId;
+        /**
+         * The name, for the team.
+         */
+        name: string;
+        /**
+         * The steps in order.
+         */
+        steps?: Array<StepInput>;
+        /**
+         * What enrolls contacts.
+         */
+        trigger: SequenceTrigger;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences';
+};
+
+export type MailingSequencesCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSequencesCreateError = MailingSequencesCreateErrors[keyof MailingSequencesCreateErrors];
+
+export type MailingSequencesCreateResponses = {
+    /**
+     * Created
+     */
+    201: Sequence;
+};
+
+export type MailingSequencesCreateResponse = MailingSequencesCreateResponses[keyof MailingSequencesCreateResponses];
+
+export type MailingSequencesDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The sequence.
+         */
+        sequence_id: SequenceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}';
+};
+
+export type MailingSequencesDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSequencesDeleteError = MailingSequencesDeleteErrors[keyof MailingSequencesDeleteErrors];
+
+export type MailingSequencesDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type MailingSequencesDeleteResponse = MailingSequencesDeleteResponses[keyof MailingSequencesDeleteResponses];
+
+export type MailingSequencesGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The sequence.
+         */
+        sequence_id: SequenceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}';
+};
+
+export type MailingSequencesGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSequencesGetError = MailingSequencesGetErrors[keyof MailingSequencesGetErrors];
+
+export type MailingSequencesGetResponses = {
+    /**
+     * OK
+     */
+    200: Sequence;
+};
+
+export type MailingSequencesGetResponse = MailingSequencesGetResponses[keyof MailingSequencesGetResponses];
+
+export type MailingSequencesUpdateData = {
+    body: {
+        /**
+         * Whether new contacts enroll. Running enrollments go on either way.
+         */
+        enabled?: boolean | null;
+        /**
+         * The name.
+         */
+        name?: string | null;
+        /**
+         * Replaces the steps. Steps sent the ID they have keep it; steps left
+         * out are deleted; steps without an ID are added.
+         */
+        steps?: Array<StepInput> | null;
+        trigger?: SequenceTrigger | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The sequence.
+         */
+        sequence_id: SequenceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}';
+};
+
+export type MailingSequencesUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSequencesUpdateError = MailingSequencesUpdateErrors[keyof MailingSequencesUpdateErrors];
+
+export type MailingSequencesUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Sequence;
+};
+
+export type MailingSequencesUpdateResponse = MailingSequencesUpdateResponses[keyof MailingSequencesUpdateResponses];
+
+export type MailingEnrollmentsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The sequence.
+         */
+        sequence_id: SequenceId;
+    };
+    query?: {
+        before?: EnrollmentId | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        status?: EnrollmentStatus | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments';
+};
+
+export type MailingEnrollmentsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingEnrollmentsListError = MailingEnrollmentsListErrors[keyof MailingEnrollmentsListErrors];
+
+export type MailingEnrollmentsListResponses = {
+    /**
+     * OK
+     */
+    200: EnrollmentPage;
+};
+
+export type MailingEnrollmentsListResponse = MailingEnrollmentsListResponses[keyof MailingEnrollmentsListResponses];
+
+export type MailingEnrollmentsCreateData = {
+    body: {
+        /**
+         * A subscribed contact of the sequence's list.
+         */
+        contact_id: ContactId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The sequence.
+         */
+        sequence_id: SequenceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments';
+};
+
+export type MailingEnrollmentsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingEnrollmentsCreateError = MailingEnrollmentsCreateErrors[keyof MailingEnrollmentsCreateErrors];
+
+export type MailingEnrollmentsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Enrollment;
+};
+
+export type MailingEnrollmentsCreateResponse = MailingEnrollmentsCreateResponses[keyof MailingEnrollmentsCreateResponses];
+
+export type MailingEnrollmentsExitData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The sequence.
+         */
+        sequence_id: SequenceId;
+        /**
+         * The enrollment.
+         */
+        enrollment_id: EnrollmentId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments/{enrollment_id}/exit';
+};
+
+export type MailingEnrollmentsExitErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingEnrollmentsExitError = MailingEnrollmentsExitErrors[keyof MailingEnrollmentsExitErrors];
+
+export type MailingEnrollmentsExitResponses = {
+    /**
+     * OK
+     */
+    200: Enrollment;
+};
+
+export type MailingEnrollmentsExitResponse = MailingEnrollmentsExitResponses[keyof MailingEnrollmentsExitResponses];
 
 export type MembersListData = {
     body?: never;

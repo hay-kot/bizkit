@@ -7633,7 +7633,7 @@
         "tags": [
           "mailing"
         ],
-        "summary": "List the send log of a broadcast or a contact, newest first",
+        "summary": "List the send log of a broadcast, a contact or a sequence, newest first",
         "operationId": "mailing.deliveries.list",
         "parameters": [
           {
@@ -7705,6 +7705,22 @@
               "format": "int32",
               "description": "At most this many, 1-200. Default 50.",
               "minimum": 0
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SequenceId",
+                  "description": "A sequence's step deliveries."
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           {
@@ -9382,6 +9398,982 @@
           }
         ],
         "x-bizkit-scope": "mailing:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/sequences": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "List email sequences with their steps",
+        "operationId": "mailing.sequences.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "list_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ListId",
+                  "description": "Only sequences of this list."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ProjectId",
+                  "description": "Only sequences of this project's lists."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:read"
+      },
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Create an email sequence for a list",
+        "operationId": "mailing.sequences.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "list_id",
+                  "name",
+                  "trigger"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Whether new contacts enroll. Default true."
+                  },
+                  "list_id": {
+                    "$ref": "#/components/schemas/ListId",
+                    "description": "The list whose contacts it mails."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The name, for the team."
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/StepInput"
+                    },
+                    "description": "The steps in order."
+                  },
+                  "trigger": {
+                    "$ref": "#/components/schemas/SequenceTrigger",
+                    "description": "What enrolls contacts."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sequence"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Show a sequence with its steps and enrollment counts",
+        "operationId": "mailing.sequences.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SequenceId",
+              "description": "The sequence."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sequence"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:read"
+      },
+      "delete": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Delete a sequence with its steps and enrollments; sent mail stays in the log",
+        "operationId": "mailing.sequences.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SequenceId",
+              "description": "The sequence."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      },
+      "patch": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Change a sequence and its steps",
+        "operationId": "mailing.sequences.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SequenceId",
+              "description": "The sequence."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Whether new contacts enroll. Running enrollments go on either way."
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The name."
+                  },
+                  "steps": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/StepInput"
+                    },
+                    "description": "Replaces the steps. Steps sent the ID they have keep it; steps left\nout are deleted; steps without an ID are added."
+                  },
+                  "trigger": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/SequenceTrigger",
+                        "description": "What enrolls contacts from now on."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sequence"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "List a sequence's enrollments, newest first",
+        "operationId": "mailing.enrollments.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SequenceId",
+              "description": "The sequence."
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/EnrollmentId",
+                  "description": "Only enrollments older than this one, for the next page."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/EnrollmentStatus",
+                  "description": "Only enrollments with this status."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:read"
+      },
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Enroll a subscribed contact in a sequence",
+        "operationId": "mailing.enrollments.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SequenceId",
+              "description": "The sequence."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "contact_id"
+                ],
+                "properties": {
+                  "contact_id": {
+                    "$ref": "#/components/schemas/ContactId",
+                    "description": "A subscribed contact of the sequence's list."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Enrollment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments/{enrollment_id}/exit": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Take a contact out of a sequence; it gets no more steps",
+        "operationId": "mailing.enrollments.exit",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "sequence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SequenceId",
+              "description": "The sequence."
+            }
+          },
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EnrollmentId",
+              "description": "The enrollment."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Enrollment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
       }
     },
     "/api/v1/workspaces/{workspace_id}/members": {
@@ -12813,6 +13805,144 @@
           }
         }
       },
+      "Enrollment": {
+        "type": "object",
+        "description": "One contact's run through a sequence.",
+        "required": [
+          "id",
+          "sequence_id",
+          "contact_id",
+          "email",
+          "status",
+          "steps_done",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "contact_id": {
+            "$ref": "#/components/schemas/ContactId",
+            "description": "The contact."
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the contact enrolled."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact's address."
+          },
+          "id": {
+            "$ref": "#/components/schemas/EnrollmentId",
+            "description": "The enrollment ID."
+          },
+          "next_run_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the next step is due, while active."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sequence_id": {
+            "$ref": "#/components/schemas/SequenceId",
+            "description": "The sequence."
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnrollmentStatus",
+            "description": "Where it stands."
+          },
+          "steps_done": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Current steps of the sequence it got, sent or skipped.",
+            "minimum": 0
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it last changed."
+          }
+        }
+      },
+      "EnrollmentCounts": {
+        "type": "object",
+        "description": "Enrollments of a sequence by status.",
+        "required": [
+          "active",
+          "completed",
+          "exited",
+          "unsubscribed"
+        ],
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Still getting steps.",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Got every step.",
+            "minimum": 0
+          },
+          "exited": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Taken out of the sequence by the team.",
+            "minimum": 0
+          },
+          "unsubscribed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Left the list.",
+            "minimum": 0
+          }
+        }
+      },
+      "EnrollmentId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "EnrollmentPage": {
+        "type": "object",
+        "description": "A page of enrollments, newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Enrollment"
+            },
+            "description": "The enrollments."
+          },
+          "next_before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentId",
+                "description": "Pass as `before` for the next page; absent on the last one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "EnrollmentStatus": {
+        "type": "string",
+        "description": "Where a contact's run through a sequence stands.",
+        "enum": [
+          "active",
+          "completed",
+          "exited",
+          "unsubscribed"
+        ]
+      },
       "ErrorBody": {
         "type": "object",
         "description": "The body of every non-2xx response.",
@@ -13656,6 +14786,17 @@
             "$ref": "#/components/schemas/Timestamp",
             "description": "When it was queued."
           },
+          "enrollment_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentId",
+                "description": "The enrollment, for sequence steps."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "error": {
             "type": [
               "string",
@@ -13691,6 +14832,17 @@
           "status": {
             "$ref": "#/components/schemas/DeliveryStatus",
             "description": "Where it stands."
+          },
+          "step_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StepId",
+                "description": "The sequence step, unless it was deleted."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "subject": {
             "type": "string",
@@ -14716,6 +15868,133 @@
           }
         }
       },
+      "Sequence": {
+        "type": "object",
+        "description": "Timed mails that each enrolled contact of a list gets in order.",
+        "required": [
+          "id",
+          "list_id",
+          "name",
+          "trigger",
+          "enabled",
+          "steps",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was created."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether new contacts enroll. Running enrollments go on either way."
+          },
+          "enrollments": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentCounts",
+                "description": "Enrollments by status; only when getting one sequence."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/SequenceId",
+            "description": "The sequence ID."
+          },
+          "list_id": {
+            "$ref": "#/components/schemas/ListId",
+            "description": "The list whose contacts it mails."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name, for the team."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SequenceStep"
+            },
+            "description": "The steps in order."
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SequenceTrigger",
+            "description": "What enrolls contacts."
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it last changed."
+          }
+        }
+      },
+      "SequenceId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "SequenceList": {
+        "type": "object",
+        "description": "Sequences of a workspace.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sequence"
+            },
+            "description": "Sorted by name."
+          }
+        }
+      },
+      "SequenceStep": {
+        "type": "object",
+        "description": "One mail of a sequence.",
+        "required": [
+          "id",
+          "position",
+          "delay_hours",
+          "subject",
+          "body_md"
+        ],
+        "properties": {
+          "body_md": {
+            "type": "string",
+            "description": "The body in Markdown. `{{ name }}` and `{{ email }}` are filled in."
+          },
+          "delay_hours": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Hours to wait after enrolling (first step) or after the step before.",
+            "minimum": 0
+          },
+          "id": {
+            "$ref": "#/components/schemas/StepId",
+            "description": "The step ID. Edits keep it, so a contact never gets a step twice."
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its place in the sequence, from 0.",
+            "minimum": 0
+          },
+          "subject": {
+            "type": "string",
+            "description": "The subject line."
+          }
+        }
+      },
+      "SequenceTrigger": {
+        "type": "string",
+        "description": "What enrolls contacts in a sequence.",
+        "enum": [
+          "on_join",
+          "manual"
+        ]
+      },
       "SeriesPoint": {
         "type": "object",
         "description": "One chart point.",
@@ -14877,6 +16156,46 @@
           "match": {
             "type": "string",
             "description": "A page path (exact, or a prefix ending in `*`) or an event name."
+          }
+        },
+        "additionalProperties": false
+      },
+      "StepId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "StepInput": {
+        "type": "object",
+        "description": "A step of a sequence being saved.",
+        "required": [
+          "delay_hours",
+          "subject"
+        ],
+        "properties": {
+          "body_md": {
+            "type": "string",
+            "description": "The body in Markdown."
+          },
+          "delay_hours": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Hours to wait after enrolling (first step) or after the step before,\n0 to 8760.",
+            "minimum": 0
+          },
+          "id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StepId",
+                "description": "The step's ID, to keep an existing step; absent adds a new one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "The subject line."
           }
         },
         "additionalProperties": false

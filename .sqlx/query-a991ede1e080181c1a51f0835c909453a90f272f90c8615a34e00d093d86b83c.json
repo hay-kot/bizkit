@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: EnrollmentId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  sequence_id AS \"sequence_id: SequenceId\", contact_id AS \"contact_id: ContactId\",\n                  status, next_run_at AS \"next_run_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_enrollments\n           WHERE workspace_id = ? AND sequence_id = ? AND status = 'active'\n           ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: EnrollmentId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "sequence_id: SequenceId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "sequence_id"
+          }
+        }
+      },
+      {
+        "name": "contact_id: ContactId",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "contact_id"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "next_run_at: UnixMillis",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "next_run_at"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "a991ede1e080181c1a51f0835c909453a90f272f90c8615a34e00d093d86b83c"
+}

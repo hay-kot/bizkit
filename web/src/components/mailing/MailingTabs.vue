@@ -10,6 +10,7 @@ const tabs = computed(() => {
   return [
     { label: 'Lists', to: base, exact: true },
     { label: 'Broadcasts', to: `${base}/broadcasts` },
+    { label: 'Sequences', to: `${base}/sequences` },
   ]
 })
 </script>

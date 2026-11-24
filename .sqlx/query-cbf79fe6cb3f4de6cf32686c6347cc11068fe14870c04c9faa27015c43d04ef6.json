@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: SequenceId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", name, trigger, enabled AS \"enabled: bool\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_sequences WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: SequenceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "list_id: ListId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "list_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "trigger",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "trigger"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cbf79fe6cb3f4de6cf32686c6347cc11068fe14870c04c9faa27015c43d04ef6"
+}

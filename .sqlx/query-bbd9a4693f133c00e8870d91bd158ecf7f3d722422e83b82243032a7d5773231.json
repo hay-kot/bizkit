@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: StepId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  sequence_id AS \"sequence_id: SequenceId\", position, delay_hours, subject, body_md\n           FROM mailing_steps s\n           WHERE workspace_id = ?1 AND sequence_id = ?2\n             AND NOT EXISTS (SELECT 1 FROM mailing_deliveries d\n                             WHERE d.workspace_id = ?1 AND d.enrollment_id = ?3\n                               AND d.step_id = s.id)\n           ORDER BY position LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: StepId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "sequence_id: SequenceId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "sequence_id"
+          }
+        }
+      },
+      {
+        "name": "position",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "name": "delay_hours",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "delay_hours"
+          }
+        }
+      },
+      {
+        "name": "subject",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "name": "body_md",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_steps",
+            "name": "body_md"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bbd9a4693f133c00e8870d91bd158ecf7f3d722422e83b82243032a7d5773231"
+}

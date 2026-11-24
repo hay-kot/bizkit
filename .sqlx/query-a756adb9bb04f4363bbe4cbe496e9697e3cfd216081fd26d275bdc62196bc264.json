@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts, resends,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\"\n           FROM mailing_deliveries\n           WHERE workspace_id = ?1 AND kind != 'test'\n             AND (?2 IS NULL OR broadcast_id = ?2)\n             AND (?3 IS NULL OR contact_id = ?3)\n             AND (?4 IS NULL OR status = ?4)\n             AND (?5 IS NULL OR id < ?5)\n           ORDER BY id DESC LIMIT ?6",
+  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts, resends,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\"\n           FROM mailing_deliveries\n           WHERE workspace_id = ?1 AND kind != 'test'\n             AND (?2 IS NULL OR broadcast_id = ?2)\n             AND (?3 IS NULL OR contact_id = ?3)\n             AND (?4 IS NULL OR status = ?4)\n             AND (?5 IS NULL OR id < ?5)\n             AND (?6 IS NULL OR enrollment_id IN\n                   (SELECT id FROM mailing_enrollments WHERE workspace_id = ?1 AND sequence_id = ?6))\n           ORDER BY id DESC LIMIT ?7",
   "describe": {
     "columns": [
       {
@@ -181,7 +181,7 @@
       }
     ],
     "parameters": {
-      "Right": 6
+      "Right": 7
     },
     "nullable": [
       false,
@@ -202,5 +202,5 @@
       true
     ]
   },
-  "hash": "53f9abf5dc21174f73128bcd9304de32cf98f67384d13e9745b01a5f70435d16"
+  "hash": "a756adb9bb04f4363bbe4cbe496e9697e3cfd216081fd26d275bdc62196bc264"
 }

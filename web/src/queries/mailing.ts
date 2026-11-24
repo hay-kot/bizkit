@@ -17,6 +17,9 @@ import {
   mailingContactsListQuery,
   mailingContactsUnsubscribeMutation,
   mailingDeliveriesListQuery,
+  mailingEnrollmentsCreateMutation,
+  mailingEnrollmentsExitMutation,
+  mailingEnrollmentsListQuery,
   mailingFormsListQuery,
   mailingListsCreateMutation,
   mailingListsDeleteMutation,
@@ -24,6 +27,11 @@ import {
   mailingListsListQuery,
   mailingListsUpdateMutation,
   mailingPreviewMutation,
+  mailingSequencesCreateMutation,
+  mailingSequencesDeleteMutation,
+  mailingSequencesGetQuery,
+  mailingSequencesListQuery,
+  mailingSequencesUpdateMutation,
 } from '@/api/gen/@pinia/colada.gen'
 import type {
   Broadcast,
@@ -31,9 +39,14 @@ import type {
   Contact,
   ContactStatus,
   DeliveryStatus,
+  Enrollment,
+  EnrollmentStatus,
   MailDelivery,
   MailingList,
   Preview,
+  Sequence,
+  SequenceStep,
+  SequenceTrigger,
 } from '@/api/gen/types.gen'
 
 import { useInvalidate } from './keys'
@@ -44,9 +57,14 @@ export type {
   Contact,
   ContactStatus,
   DeliveryStatus,
+  Enrollment,
+  EnrollmentStatus,
   MailDelivery,
   MailingList,
   Preview,
+  Sequence,
+  SequenceStep,
+  SequenceTrigger,
 }
 
 const LIST_QUERIES = ['mailingListsList', 'mailingListsGet']
@@ -122,17 +140,21 @@ export function useDeleteMailingList() {
   })
 }
 
+/** A list's contacts; idle until `listId` is set. */
 export function useContacts(
   workspaceId: MaybeRefOrGetter<string>,
-  listId: MaybeRefOrGetter<string>,
+  listId: MaybeRefOrGetter<string | null>,
   filter: MaybeRefOrGetter<{ status?: ContactStatus; q?: string }>,
 ) {
   return useQuery(() => {
     const { status, q } = toValue(filter)
-    return mailingContactsListQuery({
-      path: { workspace_id: toValue(workspaceId), list_id: toValue(listId) },
-      query: { limit: ROWS_SHOWN, status, q: q?.trim() ? q.trim() : undefined },
-    })
+    return {
+      ...mailingContactsListQuery({
+        path: { workspace_id: toValue(workspaceId), list_id: toValue(listId) ?? '' },
+        query: { limit: ROWS_SHOWN, status, q: q?.trim() ? q.trim() : undefined },
+      }),
+      enabled: Boolean(toValue(listId)),
+    }
   })
 }
 
@@ -259,6 +281,103 @@ export function useDeliveries(
     mailingDeliveriesListQuery({
       path: { workspace_id: toValue(workspaceId) },
       query: { broadcast_id: toValue(broadcastId), limit: ROWS_SHOWN },
+    }),
+  )
+}
+
+const SEQUENCE_QUERIES = ['mailingSequencesList', 'mailingSequencesGet']
+const ENROLLMENT_QUERIES = [
+  'mailingEnrollmentsList',
+  'mailingSequencesGet',
+  'mailingDeliveriesList',
+]
+
+export function useSequences(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    mailingSequencesListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId) },
+    }),
+  )
+}
+
+export function useSequence(
+  workspaceId: MaybeRefOrGetter<string>,
+  sequenceId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    mailingSequencesGetQuery({
+      path: { workspace_id: toValue(workspaceId), sequence_id: toValue(sequenceId) },
+    }),
+  )
+}
+
+export function useCreateSequence() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingSequencesCreateMutation(),
+    onSettled: () => invalidate(...SEQUENCE_QUERIES),
+  })
+}
+
+export function useUpdateSequence() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingSequencesUpdateMutation(),
+    onSettled: () => invalidate(...SEQUENCE_QUERIES),
+  })
+}
+
+export function useDeleteSequence() {
+  const invalidate = useInvalidate()
+  // Only the list, as with mailing lists: the deleted sequence's page is
+  // still mounted.
+  return useMutation({
+    ...mailingSequencesDeleteMutation(),
+    onSettled: () => invalidate('mailingSequencesList'),
+  })
+}
+
+export function useEnrollments(
+  workspaceId: MaybeRefOrGetter<string>,
+  sequenceId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    mailingEnrollmentsListQuery({
+      path: { workspace_id: toValue(workspaceId), sequence_id: toValue(sequenceId) },
+      query: { limit: ROWS_SHOWN },
+    }),
+  )
+}
+
+export function useEnroll() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingEnrollmentsCreateMutation(),
+    onSettled: () => invalidate(...ENROLLMENT_QUERIES),
+  })
+}
+
+export function useExitEnrollment() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingEnrollmentsExitMutation(),
+    onSettled: () => invalidate(...ENROLLMENT_QUERIES),
+  })
+}
+
+/** A sequence's step deliveries. */
+export function useSequenceDeliveries(
+  workspaceId: MaybeRefOrGetter<string>,
+  sequenceId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    mailingDeliveriesListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { sequence_id: toValue(sequenceId), limit: ROWS_SHOWN },
     }),
   )
 }

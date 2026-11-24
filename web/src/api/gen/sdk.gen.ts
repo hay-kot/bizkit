@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, type Options as Options2, type RequestResult, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { AnalyticsEventsIngestData, AnalyticsEventsIngestErrors, AnalyticsEventsIngestResponses, AnalyticsEventsQueryData, AnalyticsEventsQueryErrors, AnalyticsEventsQueryResponses, AnalyticsEventsRecentData, AnalyticsEventsRecentErrors, AnalyticsEventsRecentResponses, AnalyticsFunnelsCreateData, AnalyticsFunnelsCreateErrors, AnalyticsFunnelsCreateResponses, AnalyticsFunnelsDeleteData, AnalyticsFunnelsDeleteErrors, AnalyticsFunnelsDeleteResponses, AnalyticsFunnelsDropoffsData, AnalyticsFunnelsDropoffsErrors, AnalyticsFunnelsDropoffsResponses, AnalyticsFunnelsGetData, AnalyticsFunnelsGetErrors, AnalyticsFunnelsGetResponses, AnalyticsFunnelsListData, AnalyticsFunnelsListErrors, AnalyticsFunnelsListResponses, AnalyticsFunnelsResultsData, AnalyticsFunnelsResultsErrors, AnalyticsFunnelsResultsResponses, AnalyticsFunnelsUpdateData, AnalyticsFunnelsUpdateErrors, AnalyticsFunnelsUpdateResponses, AnalyticsGoalsCreateData, AnalyticsGoalsCreateErrors, AnalyticsGoalsCreateResponses, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteErrors, AnalyticsGoalsDeleteResponses, AnalyticsGoalsListData, AnalyticsGoalsListErrors, AnalyticsGoalsListResponses, AnalyticsPeopleGetData, AnalyticsPeopleGetErrors, AnalyticsPeopleGetResponses, AnalyticsPeopleListData, AnalyticsPeopleListErrors, AnalyticsPeopleListResponses, AnalyticsPublicCollectData, AnalyticsPublicCollectResponses, AnalyticsPublicScriptData, AnalyticsPublicScriptErrors, AnalyticsPublicScriptResponses, AnalyticsRetentionData, AnalyticsRetentionErrors, AnalyticsRetentionResponses, AnalyticsSiteCreateData, AnalyticsSiteCreateErrors, AnalyticsSiteCreateResponses, AnalyticsSiteGetData, AnalyticsSiteGetErrors, AnalyticsSiteGetResponses, AnalyticsSiteUpdateData, AnalyticsSiteUpdateErrors, AnalyticsSiteUpdateResponses, AnalyticsStatsBreakdownData, AnalyticsStatsBreakdownErrors, AnalyticsStatsBreakdownResponses, AnalyticsStatsSummaryData, AnalyticsStatsSummaryErrors, AnalyticsStatsSummaryResponses, ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, ExtensionsHooksListData, ExtensionsHooksListErrors, ExtensionsHooksListResponses, ExtensionsRunsListData, ExtensionsRunsListErrors, ExtensionsRunsListResponses, ExtensionsScriptsCreateData, ExtensionsScriptsCreateErrors, ExtensionsScriptsCreateResponses, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteErrors, ExtensionsScriptsDeleteResponses, ExtensionsScriptsGetData, ExtensionsScriptsGetErrors, ExtensionsScriptsGetResponses, ExtensionsScriptsListData, ExtensionsScriptsListErrors, ExtensionsScriptsListResponses, ExtensionsScriptsTestData, ExtensionsScriptsTestErrors, ExtensionsScriptsTestResponses, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateErrors, ExtensionsScriptsUpdateResponses, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteErrors, ExtensionsSecretsDeleteResponses, ExtensionsSecretsListData, ExtensionsSecretsListErrors, ExtensionsSecretsListResponses, ExtensionsSecretsPutData, ExtensionsSecretsPutErrors, ExtensionsSecretsPutResponses, ExtensionsTargetsListData, ExtensionsTargetsListErrors, ExtensionsTargetsListResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MailingBroadcastsCreateData, MailingBroadcastsCreateErrors, MailingBroadcastsCreateResponses, MailingBroadcastsDeleteData, MailingBroadcastsDeleteErrors, MailingBroadcastsDeleteResponses, MailingBroadcastsGetData, MailingBroadcastsGetErrors, MailingBroadcastsGetResponses, MailingBroadcastsListData, MailingBroadcastsListErrors, MailingBroadcastsListResponses, MailingBroadcastsResendData, MailingBroadcastsResendErrors, MailingBroadcastsResendResponses, MailingBroadcastsSendData, MailingBroadcastsSendErrors, MailingBroadcastsSendResponses, MailingBroadcastsTestData, MailingBroadcastsTestErrors, MailingBroadcastsTestResponses, MailingBroadcastsUpdateData, MailingBroadcastsUpdateErrors, MailingBroadcastsUpdateResponses, MailingContactsCreateData, MailingContactsCreateErrors, MailingContactsCreateResponses, MailingContactsDeleteData, MailingContactsDeleteErrors, MailingContactsDeleteResponses, MailingContactsGetData, MailingContactsGetErrors, MailingContactsGetResponses, MailingContactsListData, MailingContactsListErrors, MailingContactsListResponses, MailingContactsUnsubscribeData, MailingContactsUnsubscribeErrors, MailingContactsUnsubscribeResponses, MailingContactsUpdateData, MailingContactsUpdateErrors, MailingContactsUpdateResponses, MailingDeliveriesListData, MailingDeliveriesListErrors, MailingDeliveriesListResponses, MailingFormsListData, MailingFormsListErrors, MailingFormsListResponses, MailingListsCreateData, MailingListsCreateErrors, MailingListsCreateResponses, MailingListsDeleteData, MailingListsDeleteErrors, MailingListsDeleteResponses, MailingListsGetData, MailingListsGetErrors, MailingListsGetResponses, MailingListsListData, MailingListsListErrors, MailingListsListResponses, MailingListsUpdateData, MailingListsUpdateErrors, MailingListsUpdateResponses, MailingPreviewData, MailingPreviewErrors, MailingPreviewResponses, MailingPublicConfirmData, MailingPublicConfirmErrors, MailingPublicConfirmPageData, MailingPublicConfirmPageErrors, MailingPublicConfirmPageResponses, MailingPublicConfirmResponses, MailingPublicUnsubscribeData, MailingPublicUnsubscribeErrors, MailingPublicUnsubscribePageData, MailingPublicUnsubscribePageErrors, MailingPublicUnsubscribePageResponses, MailingPublicUnsubscribeResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WebhooksEndpointsCreateData, WebhooksEndpointsCreateErrors, WebhooksEndpointsCreateResponses, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteErrors, WebhooksEndpointsDeleteResponses, WebhooksEndpointsGetData, WebhooksEndpointsGetErrors, WebhooksEndpointsGetResponses, WebhooksEndpointsListData, WebhooksEndpointsListErrors, WebhooksEndpointsListResponses, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateErrors, WebhooksEndpointsUpdateResponses, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteErrors, WebhooksPublicCaptureDeleteResponses, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetErrors, WebhooksPublicCaptureGetResponses, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchErrors, WebhooksPublicCapturePatchResponses, WebhooksPublicCapturePostData, WebhooksPublicCapturePostErrors, WebhooksPublicCapturePostResponses, WebhooksPublicCapturePutData, WebhooksPublicCapturePutErrors, WebhooksPublicCapturePutResponses, WebhooksRequestsGetData, WebhooksRequestsGetErrors, WebhooksRequestsGetResponses, WebhooksRequestsListData, WebhooksRequestsListErrors, WebhooksRequestsListResponses, WebhooksRequestsReplayData, WebhooksRequestsReplayErrors, WebhooksRequestsReplayResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
+import type { AnalyticsEventsIngestData, AnalyticsEventsIngestErrors, AnalyticsEventsIngestResponses, AnalyticsEventsQueryData, AnalyticsEventsQueryErrors, AnalyticsEventsQueryResponses, AnalyticsEventsRecentData, AnalyticsEventsRecentErrors, AnalyticsEventsRecentResponses, AnalyticsFunnelsCreateData, AnalyticsFunnelsCreateErrors, AnalyticsFunnelsCreateResponses, AnalyticsFunnelsDeleteData, AnalyticsFunnelsDeleteErrors, AnalyticsFunnelsDeleteResponses, AnalyticsFunnelsDropoffsData, AnalyticsFunnelsDropoffsErrors, AnalyticsFunnelsDropoffsResponses, AnalyticsFunnelsGetData, AnalyticsFunnelsGetErrors, AnalyticsFunnelsGetResponses, AnalyticsFunnelsListData, AnalyticsFunnelsListErrors, AnalyticsFunnelsListResponses, AnalyticsFunnelsResultsData, AnalyticsFunnelsResultsErrors, AnalyticsFunnelsResultsResponses, AnalyticsFunnelsUpdateData, AnalyticsFunnelsUpdateErrors, AnalyticsFunnelsUpdateResponses, AnalyticsGoalsCreateData, AnalyticsGoalsCreateErrors, AnalyticsGoalsCreateResponses, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteErrors, AnalyticsGoalsDeleteResponses, AnalyticsGoalsListData, AnalyticsGoalsListErrors, AnalyticsGoalsListResponses, AnalyticsPeopleGetData, AnalyticsPeopleGetErrors, AnalyticsPeopleGetResponses, AnalyticsPeopleListData, AnalyticsPeopleListErrors, AnalyticsPeopleListResponses, AnalyticsPublicCollectData, AnalyticsPublicCollectResponses, AnalyticsPublicScriptData, AnalyticsPublicScriptErrors, AnalyticsPublicScriptResponses, AnalyticsRetentionData, AnalyticsRetentionErrors, AnalyticsRetentionResponses, AnalyticsSiteCreateData, AnalyticsSiteCreateErrors, AnalyticsSiteCreateResponses, AnalyticsSiteGetData, AnalyticsSiteGetErrors, AnalyticsSiteGetResponses, AnalyticsSiteUpdateData, AnalyticsSiteUpdateErrors, AnalyticsSiteUpdateResponses, AnalyticsStatsBreakdownData, AnalyticsStatsBreakdownErrors, AnalyticsStatsBreakdownResponses, AnalyticsStatsSummaryData, AnalyticsStatsSummaryErrors, AnalyticsStatsSummaryResponses, ApiKeysCreateData, ApiKeysCreateErrors, ApiKeysCreateResponses, ApiKeysListData, ApiKeysListErrors, ApiKeysListResponses, ApiKeysRevokeData, ApiKeysRevokeErrors, ApiKeysRevokeResponses, AuthSignInData, AuthSignInErrors, AuthSignInResponses, AuthSignOutData, AuthSignOutErrors, AuthSignOutResponses, AuthVerifyData, AuthVerifyErrors, AuthVerifyResponses, ExtensionsHooksListData, ExtensionsHooksListErrors, ExtensionsHooksListResponses, ExtensionsRunsListData, ExtensionsRunsListErrors, ExtensionsRunsListResponses, ExtensionsScriptsCreateData, ExtensionsScriptsCreateErrors, ExtensionsScriptsCreateResponses, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteErrors, ExtensionsScriptsDeleteResponses, ExtensionsScriptsGetData, ExtensionsScriptsGetErrors, ExtensionsScriptsGetResponses, ExtensionsScriptsListData, ExtensionsScriptsListErrors, ExtensionsScriptsListResponses, ExtensionsScriptsTestData, ExtensionsScriptsTestErrors, ExtensionsScriptsTestResponses, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateErrors, ExtensionsScriptsUpdateResponses, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteErrors, ExtensionsSecretsDeleteResponses, ExtensionsSecretsListData, ExtensionsSecretsListErrors, ExtensionsSecretsListResponses, ExtensionsSecretsPutData, ExtensionsSecretsPutErrors, ExtensionsSecretsPutResponses, ExtensionsTargetsListData, ExtensionsTargetsListErrors, ExtensionsTargetsListResponses, FormsCreateData, FormsCreateErrors, FormsCreateResponses, FormsDeleteData, FormsDeleteErrors, FormsDeleteResponses, FormsGetData, FormsGetErrors, FormsGetResponses, FormsListData, FormsListErrors, FormsListResponses, FormsPublicChallengeData, FormsPublicChallengeErrors, FormsPublicChallengeResponses, FormsPublicSubmitData, FormsPublicSubmitErrors, FormsPublicSubmitResponses, FormsSubmissionsDeleteData, FormsSubmissionsDeleteErrors, FormsSubmissionsDeleteResponses, FormsSubmissionsExportData, FormsSubmissionsExportErrors, FormsSubmissionsExportResponses, FormsSubmissionsGetData, FormsSubmissionsGetErrors, FormsSubmissionsGetResponses, FormsSubmissionsListData, FormsSubmissionsListErrors, FormsSubmissionsListResponses, FormsSubmissionsUpdateData, FormsSubmissionsUpdateErrors, FormsSubmissionsUpdateResponses, FormsUpdateData, FormsUpdateErrors, FormsUpdateResponses, InvitationsAcceptData, InvitationsAcceptErrors, InvitationsAcceptResponses, InvitationsCreateData, InvitationsCreateErrors, InvitationsCreateResponses, InvitationsDeclineData, InvitationsDeclineErrors, InvitationsDeclineResponses, InvitationsListData, InvitationsListErrors, InvitationsListResponses, InvitationsMineData, InvitationsMineErrors, InvitationsMineResponses, InvitationsRevokeData, InvitationsRevokeErrors, InvitationsRevokeResponses, MailingBroadcastsCreateData, MailingBroadcastsCreateErrors, MailingBroadcastsCreateResponses, MailingBroadcastsDeleteData, MailingBroadcastsDeleteErrors, MailingBroadcastsDeleteResponses, MailingBroadcastsGetData, MailingBroadcastsGetErrors, MailingBroadcastsGetResponses, MailingBroadcastsListData, MailingBroadcastsListErrors, MailingBroadcastsListResponses, MailingBroadcastsResendData, MailingBroadcastsResendErrors, MailingBroadcastsResendResponses, MailingBroadcastsSendData, MailingBroadcastsSendErrors, MailingBroadcastsSendResponses, MailingBroadcastsTestData, MailingBroadcastsTestErrors, MailingBroadcastsTestResponses, MailingBroadcastsUpdateData, MailingBroadcastsUpdateErrors, MailingBroadcastsUpdateResponses, MailingContactsCreateData, MailingContactsCreateErrors, MailingContactsCreateResponses, MailingContactsDeleteData, MailingContactsDeleteErrors, MailingContactsDeleteResponses, MailingContactsGetData, MailingContactsGetErrors, MailingContactsGetResponses, MailingContactsListData, MailingContactsListErrors, MailingContactsListResponses, MailingContactsUnsubscribeData, MailingContactsUnsubscribeErrors, MailingContactsUnsubscribeResponses, MailingContactsUpdateData, MailingContactsUpdateErrors, MailingContactsUpdateResponses, MailingDeliveriesListData, MailingDeliveriesListErrors, MailingDeliveriesListResponses, MailingEnrollmentsCreateData, MailingEnrollmentsCreateErrors, MailingEnrollmentsCreateResponses, MailingEnrollmentsExitData, MailingEnrollmentsExitErrors, MailingEnrollmentsExitResponses, MailingEnrollmentsListData, MailingEnrollmentsListErrors, MailingEnrollmentsListResponses, MailingFormsListData, MailingFormsListErrors, MailingFormsListResponses, MailingListsCreateData, MailingListsCreateErrors, MailingListsCreateResponses, MailingListsDeleteData, MailingListsDeleteErrors, MailingListsDeleteResponses, MailingListsGetData, MailingListsGetErrors, MailingListsGetResponses, MailingListsListData, MailingListsListErrors, MailingListsListResponses, MailingListsUpdateData, MailingListsUpdateErrors, MailingListsUpdateResponses, MailingPreviewData, MailingPreviewErrors, MailingPreviewResponses, MailingPublicConfirmData, MailingPublicConfirmErrors, MailingPublicConfirmPageData, MailingPublicConfirmPageErrors, MailingPublicConfirmPageResponses, MailingPublicConfirmResponses, MailingPublicUnsubscribeData, MailingPublicUnsubscribeErrors, MailingPublicUnsubscribePageData, MailingPublicUnsubscribePageErrors, MailingPublicUnsubscribePageResponses, MailingPublicUnsubscribeResponses, MailingSequencesCreateData, MailingSequencesCreateErrors, MailingSequencesCreateResponses, MailingSequencesDeleteData, MailingSequencesDeleteErrors, MailingSequencesDeleteResponses, MailingSequencesGetData, MailingSequencesGetErrors, MailingSequencesGetResponses, MailingSequencesListData, MailingSequencesListErrors, MailingSequencesListResponses, MailingSequencesUpdateData, MailingSequencesUpdateErrors, MailingSequencesUpdateResponses, MeGetData, MeGetErrors, MeGetResponses, MembersListData, MembersListErrors, MembersListResponses, MembersRemoveData, MembersRemoveErrors, MembersRemoveResponses, MembersUpdateData, MembersUpdateErrors, MembersUpdateResponses, PlatformMetaData, PlatformMetaErrors, PlatformMetaResponses, ProjectsCreateData, ProjectsCreateErrors, ProjectsCreateResponses, ProjectsDeleteData, ProjectsDeleteErrors, ProjectsDeleteResponses, ProjectsGetData, ProjectsGetErrors, ProjectsGetResponses, ProjectsListData, ProjectsListErrors, ProjectsListResponses, ProjectsUpdateData, ProjectsUpdateErrors, ProjectsUpdateResponses, WebhooksEndpointsCreateData, WebhooksEndpointsCreateErrors, WebhooksEndpointsCreateResponses, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteErrors, WebhooksEndpointsDeleteResponses, WebhooksEndpointsGetData, WebhooksEndpointsGetErrors, WebhooksEndpointsGetResponses, WebhooksEndpointsListData, WebhooksEndpointsListErrors, WebhooksEndpointsListResponses, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateErrors, WebhooksEndpointsUpdateResponses, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteErrors, WebhooksPublicCaptureDeleteResponses, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetErrors, WebhooksPublicCaptureGetResponses, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchErrors, WebhooksPublicCapturePatchResponses, WebhooksPublicCapturePostData, WebhooksPublicCapturePostErrors, WebhooksPublicCapturePostResponses, WebhooksPublicCapturePutData, WebhooksPublicCapturePutErrors, WebhooksPublicCapturePutResponses, WebhooksRequestsGetData, WebhooksRequestsGetErrors, WebhooksRequestsGetResponses, WebhooksRequestsListData, WebhooksRequestsListErrors, WebhooksRequestsListResponses, WebhooksRequestsReplayData, WebhooksRequestsReplayErrors, WebhooksRequestsReplayResponses, WorkspacesCreateData, WorkspacesCreateErrors, WorkspacesCreateResponses, WorkspacesGetData, WorkspacesGetErrors, WorkspacesGetResponses, WorkspacesListData, WorkspacesListErrors, WorkspacesListResponses, WorkspacesUpdateData, WorkspacesUpdateErrors, WorkspacesUpdateResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -987,7 +987,7 @@ export const mailingBroadcastsTest = <ThrowOnError extends boolean = false>(opti
 });
 
 /**
- * List the send log of a broadcast or a contact, newest first
+ * List the send log of a broadcast, a contact or a sequence, newest first
  */
 export const mailingDeliveriesList = <ThrowOnError extends boolean = false>(options: Options<MailingDeliveriesListData, ThrowOnError>): RequestResult<MailingDeliveriesListResponses, MailingDeliveriesListErrors, ThrowOnError> => (options.client ?? client).get<MailingDeliveriesListResponses, MailingDeliveriesListErrors, ThrowOnError>({
     security: [{
@@ -1186,6 +1186,122 @@ export const mailingPreview = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List email sequences with their steps
+ */
+export const mailingSequencesList = <ThrowOnError extends boolean = false>(options: Options<MailingSequencesListData, ThrowOnError>): RequestResult<MailingSequencesListResponses, MailingSequencesListErrors, ThrowOnError> => (options.client ?? client).get<MailingSequencesListResponses, MailingSequencesListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences',
+    ...options
+});
+
+/**
+ * Create an email sequence for a list
+ */
+export const mailingSequencesCreate = <ThrowOnError extends boolean = false>(options: Options<MailingSequencesCreateData, ThrowOnError>): RequestResult<MailingSequencesCreateResponses, MailingSequencesCreateErrors, ThrowOnError> => (options.client ?? client).post<MailingSequencesCreateResponses, MailingSequencesCreateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a sequence with its steps and enrollments; sent mail stays in the log
+ */
+export const mailingSequencesDelete = <ThrowOnError extends boolean = false>(options: Options<MailingSequencesDeleteData, ThrowOnError>): RequestResult<MailingSequencesDeleteResponses, MailingSequencesDeleteErrors, ThrowOnError> => (options.client ?? client).delete<MailingSequencesDeleteResponses, MailingSequencesDeleteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}',
+    ...options
+});
+
+/**
+ * Show a sequence with its steps and enrollment counts
+ */
+export const mailingSequencesGet = <ThrowOnError extends boolean = false>(options: Options<MailingSequencesGetData, ThrowOnError>): RequestResult<MailingSequencesGetResponses, MailingSequencesGetErrors, ThrowOnError> => (options.client ?? client).get<MailingSequencesGetResponses, MailingSequencesGetErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}',
+    ...options
+});
+
+/**
+ * Change a sequence and its steps
+ */
+export const mailingSequencesUpdate = <ThrowOnError extends boolean = false>(options: Options<MailingSequencesUpdateData, ThrowOnError>): RequestResult<MailingSequencesUpdateResponses, MailingSequencesUpdateErrors, ThrowOnError> => (options.client ?? client).patch<MailingSequencesUpdateResponses, MailingSequencesUpdateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List a sequence's enrollments, newest first
+ */
+export const mailingEnrollmentsList = <ThrowOnError extends boolean = false>(options: Options<MailingEnrollmentsListData, ThrowOnError>): RequestResult<MailingEnrollmentsListResponses, MailingEnrollmentsListErrors, ThrowOnError> => (options.client ?? client).get<MailingEnrollmentsListResponses, MailingEnrollmentsListErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments',
+    ...options
+});
+
+/**
+ * Enroll a subscribed contact in a sequence
+ */
+export const mailingEnrollmentsCreate = <ThrowOnError extends boolean = false>(options: Options<MailingEnrollmentsCreateData, ThrowOnError>): RequestResult<MailingEnrollmentsCreateResponses, MailingEnrollmentsCreateErrors, ThrowOnError> => (options.client ?? client).post<MailingEnrollmentsCreateResponses, MailingEnrollmentsCreateErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Take a contact out of a sequence; it gets no more steps
+ */
+export const mailingEnrollmentsExit = <ThrowOnError extends boolean = false>(options: Options<MailingEnrollmentsExitData, ThrowOnError>): RequestResult<MailingEnrollmentsExitResponses, MailingEnrollmentsExitErrors, ThrowOnError> => (options.client ?? client).post<MailingEnrollmentsExitResponses, MailingEnrollmentsExitErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'bizkit_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/workspaces/{workspace_id}/mailing/sequences/{sequence_id}/enrollments/{enrollment_id}/exit',
+    ...options
 });
 
 /**

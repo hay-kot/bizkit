@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_enrollments SET status = 'unsubscribed', next_run_at = NULL, updated_at = ?\n         WHERE workspace_id = ? AND contact_id = ? AND status = 'active'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "08b40dab52fc2d28cfb5910d9ee0658996493090761d9c3f174e668922a9a14e"
+}

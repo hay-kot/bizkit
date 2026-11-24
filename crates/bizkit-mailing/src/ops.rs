@@ -19,7 +19,7 @@ use crate::api::{
     Broadcast, BroadcastId, BroadcastList, BroadcastStatus, Contact, ContactCounts, ContactId,
     ContactPage, ContactStatus, DeliveryCounts, DeliveryId, DeliveryKind, DeliveryStatus, ListId,
     MailDelivery, MailDeliveryPage, MailingForm, MailingFormList, MailingList, MailingListList,
-    Preview, ResendReport,
+    Preview, ResendReport, SequenceId,
 };
 use crate::capture::FORM_KIND;
 use crate::contacts::{self, NewContact, Source};
@@ -29,16 +29,16 @@ use crate::store::{
     self, BroadcastRow, ContactFilter, ContactRow, DeliveryFilter, DeliveryRow, ListRow,
 };
 
-const READ: Access = Access::Workspace(Scope::new("mailing", Level::Read));
-const WRITE: Access = Access::Workspace(Scope::new("mailing", Level::Write));
+pub(crate) const READ: Access = Access::Workspace(Scope::new("mailing", Level::Read));
+pub(crate) const WRITE: Access = Access::Workspace(Scope::new("mailing", Level::Write));
 const ADMIN: Access = Access::Workspace(Scope::new("mailing", Level::Admin));
-const TAGS: &[&str] = &["mailing"];
+pub(crate) const TAGS: &[&str] = &["mailing"];
 
 /// Test sends a workspace may queue per hour.
 pub const TESTS_PER_HOUR: i64 = 20;
 const MAX_TEXT: usize = 500;
-const MAX_SUBJECT: usize = 200;
-const MAX_BODY: usize = 100_000;
+pub(crate) const MAX_SUBJECT: usize = 200;
+pub(crate) const MAX_BODY: usize = 100_000;
 const MAX_TAGS: usize = 20;
 const MAX_TAG: usize = 50;
 const NOT_DRAFT: &str = "the broadcast was sent; only drafts change";
@@ -67,12 +67,12 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(BroadcastsResend)?;
     cx.op(DeliveriesList)?;
     cx.op(FormsList)?;
-    Ok(())
+    crate::sequence_ops::register(cx)
 }
 
 // ---------------------------------------------------------------- conversions
 
-fn count(n: i64) -> u64 {
+pub(crate) fn count(n: i64) -> u64 {
     u64::try_from(n).unwrap_or(0)
 }
 
@@ -152,7 +152,7 @@ async fn full_list(platform: &Platform, row: ListRow) -> anyhow::Result<MailingL
     Ok(list)
 }
 
-fn contact_to_api(row: ContactRow) -> anyhow::Result<Contact> {
+pub(crate) fn contact_to_api(row: ContactRow) -> anyhow::Result<Contact> {
     Ok(Contact {
         tags: serde_json::from_str(&row.tags)
             .with_context(|| format!("decoding the tags of contact {}", row.id))?,
@@ -187,7 +187,7 @@ fn broadcast_to_api(row: BroadcastRow) -> anyhow::Result<Broadcast> {
     })
 }
 
-fn delivery_to_api(row: DeliveryRow) -> anyhow::Result<MailDelivery> {
+pub(crate) fn delivery_to_api(row: DeliveryRow) -> anyhow::Result<MailDelivery> {
     Ok(MailDelivery {
         kind: DeliveryKind::parse(&row.kind)
             .with_context(|| format!("unknown delivery kind {:?}", row.kind))?,
@@ -196,6 +196,8 @@ fn delivery_to_api(row: DeliveryRow) -> anyhow::Result<MailDelivery> {
         id: row.id,
         contact_id: row.contact_id,
         broadcast_id: row.broadcast_id,
+        enrollment_id: row.enrollment_id,
+        step_id: row.step_id,
         to_email: row.to_email,
         subject: row.subject,
         error: row.error,
@@ -206,7 +208,7 @@ fn delivery_to_api(row: DeliveryRow) -> anyhow::Result<MailDelivery> {
     })
 }
 
-async fn list_in(
+pub(crate) async fn list_in(
     exec: impl sqlx::SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     list_id: ListId,
@@ -234,7 +236,7 @@ async fn broadcast_in(
     store::find_broadcast(exec, workspace_id, broadcast_id).await?.ok_or(ApiError::NotFound)
 }
 
-fn field_error(field: &str, message: &str) -> ApiError {
+pub(crate) fn field_error(field: &str, message: &str) -> ApiError {
     let mut errors = FieldErrors::default();
     errors.add(field, message);
     errors.into()
@@ -256,11 +258,11 @@ async fn check_forms(
     Ok(live.into_iter().collect())
 }
 
-fn trimmed(text: Option<&String>) -> Option<String> {
+pub(crate) fn trimmed(text: Option<&String>) -> Option<String> {
     text.map(|text| text.trim().to_owned()).filter(|text| !text.is_empty())
 }
 
-fn check_text(errors: &mut FieldErrors, field: &str, text: Option<&String>, max: usize) {
+pub(crate) fn check_text(errors: &mut FieldErrors, field: &str, text: Option<&String>, max: usize) {
     if text.is_some_and(|text| text.chars().count() > max) {
         errors.add(field, format!("must be at most {max} characters"));
     }
@@ -295,14 +297,14 @@ fn clean_tags(tags: &[String]) -> Vec<String> {
     tags.iter().map(|tag| tag.trim().to_owned()).filter(|tag| seen.insert(tag.clone())).collect()
 }
 
-fn check_limit(errors: &mut FieldErrors, limit: Option<u32>) {
+pub(crate) fn check_limit(errors: &mut FieldErrors, limit: Option<u32>) {
     if limit.is_some_and(|limit| !(1..=200).contains(&limit)) {
         errors.add("limit", "must be between 1 and 200");
     }
 }
 
 /// Splits one extra row off a page of `limit + 1`.
-fn page<T>(mut items: Vec<T>, limit: u32) -> (Vec<T>, bool) {
+pub(crate) fn page<T>(mut items: Vec<T>, limit: u32) -> (Vec<T>, bool) {
     let limit = usize::try_from(limit).unwrap_or(usize::MAX);
     let more = items.len() > limit;
     items.truncate(limit);
@@ -662,8 +664,8 @@ pub(crate) struct TestBroadcast {
 }
 impl Validate for TestBroadcast {}
 
-/// Which deliveries to list. Give exactly one of `broadcast_id` and
-/// `contact_id`.
+/// Which deliveries to list. Give exactly one of `broadcast_id`,
+/// `contact_id` and `sequence_id`.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListDeliveries {
@@ -675,6 +677,9 @@ pub(crate) struct ListDeliveries {
     /// A contact's deliveries.
     #[serde(default)]
     contact_id: Option<ContactId>,
+    /// A sequence's step deliveries.
+    #[serde(default)]
+    sequence_id: Option<SequenceId>,
     /// Only deliveries with this status.
     #[serde(default)]
     status: Option<DeliveryStatus>,
@@ -688,8 +693,13 @@ pub(crate) struct ListDeliveries {
 impl Validate for ListDeliveries {
     fn validate(&self) -> Result<(), FieldErrors> {
         let mut errors = FieldErrors::default();
-        if self.broadcast_id.is_some() == self.contact_id.is_some() {
-            errors.add("broadcast_id", "give exactly one of broadcast_id and contact_id");
+        let given =
+            [self.broadcast_id.is_some(), self.contact_id.is_some(), self.sequence_id.is_some()];
+        if given.iter().filter(|given| **given).count() != 1 {
+            errors.add(
+                "broadcast_id",
+                "give exactly one of broadcast_id, contact_id and sequence_id",
+            );
         }
         check_limit(&mut errors, self.limit);
         errors.into_result()
@@ -1314,7 +1324,8 @@ impl Operation for DeliveriesList {
     const METHOD: Method = Method::Get;
     const PATH: &'static str = "/workspaces/{workspace_id}/mailing/deliveries";
     const ACCESS: Access = READ;
-    const SUMMARY: &'static str = "List the send log of a broadcast or a contact, newest first";
+    const SUMMARY: &'static str =
+        "List the send log of a broadcast, a contact or a sequence, newest first";
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: ListDeliveries) -> Result<MailDeliveryPage, ApiError> {
@@ -1322,6 +1333,7 @@ impl Operation for DeliveriesList {
         let filter = DeliveryFilter {
             broadcast_id: input.broadcast_id,
             contact_id: input.contact_id,
+            sequence_id: input.sequence_id,
             status: input.status.map(DeliveryStatus::as_str),
             before: input.before,
         };

@@ -1,0 +1,42 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(SUM(status = 'active'), 0) AS \"active!: i64\",\n                  COALESCE(SUM(status = 'completed'), 0) AS \"completed!: i64\",\n                  COALESCE(SUM(status = 'exited'), 0) AS \"exited!: i64\",\n                  COALESCE(SUM(status = 'unsubscribed'), 0) AS \"unsubscribed!: i64\"\n           FROM mailing_enrollments WHERE workspace_id = ? AND sequence_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "active!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "completed!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "exited!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "unsubscribed!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c4ed1852e9f81273015435b4269fd1de22df617bbbed8743e9b12c954d7c7b52"
+}

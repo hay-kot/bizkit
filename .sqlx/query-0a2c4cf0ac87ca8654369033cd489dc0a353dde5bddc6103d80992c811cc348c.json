@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_enrollments SET status = ?, next_run_at = ?, updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "0a2c4cf0ac87ca8654369033cd489dc0a353dde5bddc6103d80992c811cc348c"
+}

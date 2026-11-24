@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BroadcastStatus, ContactStatus, DeliveryStatus } from '@/queries/mailing'
+import type {
+  BroadcastStatus,
+  ContactStatus,
+  DeliveryStatus,
+  EnrollmentStatus,
+} from '@/queries/mailing'
 
-const props = defineProps<{ status: ContactStatus | BroadcastStatus | DeliveryStatus }>()
+const props = defineProps<{
+  status: ContactStatus | BroadcastStatus | DeliveryStatus | EnrollmentStatus
+}>()
 
 const look = computed(() => {
   switch (props.status) {
     case 'subscribed':
     case 'sent':
+    case 'completed':
       return 'badge-success'
+    case 'active':
+      return 'badge-info'
     case 'pending':
     case 'queued':
     case 'sending':

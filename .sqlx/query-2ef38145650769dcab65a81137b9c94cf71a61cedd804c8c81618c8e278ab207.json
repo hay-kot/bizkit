@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MAX(created_at) AS \"at: UnixMillis\" FROM mailing_deliveries\n           WHERE workspace_id = ? AND enrollment_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "at: UnixMillis",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2ef38145650769dcab65a81137b9c94cf71a61cedd804c8c81618c8e278ab207"
+}
