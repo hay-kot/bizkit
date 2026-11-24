@@ -29,6 +29,7 @@ use crate::send::{self, FanOut, StartBroadcast};
 use crate::store::{
     self, BroadcastRow, ContactFilter, ContactRow, DeliveryFilter, DeliveryRow, ListRow,
 };
+use crate::suppress;
 
 pub(crate) const READ: Access = Access::Workspace(Scope::new("mailing", Level::Read));
 pub(crate) const WRITE: Access = Access::Workspace(Scope::new("mailing", Level::Write));
@@ -42,6 +43,7 @@ pub(crate) const MAX_SUBJECT: usize = 200;
 pub(crate) const MAX_BODY: usize = 100_000;
 const MAX_TAGS: usize = 20;
 const MAX_TAG: usize = 50;
+pub(crate) const ERASED: &str = "the address was erased from this workspace";
 const NOT_DRAFT: &str = "the broadcast was sent; only drafts change";
 const SCHEDULED: &str = "the broadcast is scheduled; cancel it first";
 /// How far ahead a broadcast can be scheduled.
@@ -74,6 +76,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(DeliveriesList)?;
     cx.op(FormsList)?;
     crate::suppression_ops::register(cx)?;
+    crate::privacy::register(cx)?;
     crate::sequence_ops::register(cx)
 }
 
@@ -962,7 +965,9 @@ impl Operation for ContactsCreate {
             tags: clean_tags(&input.tags),
             source,
         };
-        let contact = contacts::subscribe(cx.platform(), &mut tx, &list, new).await?;
+        let contact = contacts::subscribe(cx.platform(), &mut tx, &list, new)
+            .await?
+            .ok_or_else(|| ApiError::Conflict(ERASED.to_owned()))?;
         tx.commit().await?;
         Ok(contact_to_api(contact)?)
     }
@@ -1090,10 +1095,12 @@ impl Operation for PreviewOp {
         let platform = cx.platform();
         let list = list_in(platform.db().read(), input.workspace_id, input.list_id).await?;
         let unsubscribe = crate::public::unsubscribe_url(platform, "preview")?;
+        let manage = crate::public::manage_preview_url(platform)?;
         let frame = Frame {
             list_name: &list.name,
             footer: list.footer.as_deref(),
             unsubscribe: Some(&unsubscribe),
+            manage: Some(&manage),
         };
         let merge = Merge { name: Some("Ada Lovelace"), email: "ada@example.com" };
         let mail = render::render(&frame, &input.subject, &input.body_md, &merge);
@@ -1279,7 +1286,7 @@ impl Operation for BroadcastsTest {
     // Only to members, so the endpoint can't mail anyone.
     const SUMMARY: &'static str = "Send a broadcast once to a workspace member";
     const SUCCESS: Success = Success::Created;
-    const ERRORS: &'static [StatusCode] = &[StatusCode::TOO_MANY_REQUESTS];
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT, StatusCode::TOO_MANY_REQUESTS];
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: TestBroadcast) -> Result<MailDelivery, ApiError> {
@@ -1289,6 +1296,9 @@ impl Operation for BroadcastsTest {
         let broadcast = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
         if !bizkit_core::members::is_member_email(&mut *tx, input.workspace_id, &to).await? {
             return Err(field_error("to", "must be the address of a workspace member"));
+        }
+        if suppress::erased(&mut *tx, input.workspace_id, &to).await? {
+            return Err(ApiError::Conflict(ERASED.to_owned()));
         }
         let hour_ago = cx.now().minus(Duration::from_hours(1));
         if store::tests_since(&mut *tx, input.workspace_id, hour_ago).await? >= TESTS_PER_HOUR {

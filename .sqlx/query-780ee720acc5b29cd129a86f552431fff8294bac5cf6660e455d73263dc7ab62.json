@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 FROM mailing_erasures WHERE workspace_id = ? AND email_hash = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "1",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "780ee720acc5b29cd129a86f552431fff8294bac5cf6660e455d73263dc7ab62"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT key FROM mailing_link_keys WHERE workspace_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "key",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_link_keys",
+            "name": "key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ba743bde1f4b1d8480469daeff7d02e8fdc1029a60a77137e1e229cc9a36d689"
+}

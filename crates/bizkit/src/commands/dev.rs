@@ -336,6 +336,7 @@ mod tests {
                 "SELECT COUNT(*) FROM mailing_enrollments",
                 "SELECT COUNT(*) FROM mailing_suppressions",
                 "SELECT COUNT(*) FROM mailing_deliveries WHERE event = 'bounced'",
+                "SELECT COUNT(*) FROM mailing_erasures",
                 "SELECT COUNT(*) FROM jobs",
             ] {
                 counts.push(sqlx::query_scalar::<_, i64>(sql).fetch_one(db.read()).await.unwrap());
@@ -346,11 +347,11 @@ mod tests {
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         let first = counts().await;
         assert_eq!(
-            first[..12],
-            [1, 1, 3, 5, 2, 8, 1, 3, 0, 2, 2, 1],
-            "lists, form links, subscribed, contacts, broadcasts, deliveries (3 broadcast, 5 step), \
-             sequences, steps, active and all enrollments, suppressions (one manual, one bounce), \
-             bounced deliveries"
+            first[..13],
+            [2, 1, 5, 7, 2, 8, 1, 3, 0, 2, 2, 1, 1],
+            "lists (Newsletter, Product updates), form links, subscribed (3 + 2), contacts (5 + 2), \
+             broadcasts, deliveries (3 broadcast, 5 step), sequences, steps, active and all \
+             enrollments, suppressions (one manual, one bounce), bounced deliveries, erasures"
         );
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         assert_eq!(counts().await, first, "a second run changes nothing and queues no mail");

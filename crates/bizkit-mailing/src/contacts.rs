@@ -11,7 +11,7 @@ use bizkit_core::time::UnixMillis;
 
 use crate::api::{ContactId, ContactStatus, DeliveryKind};
 use crate::store::{self, ContactRow, ListRow};
-use crate::{send, sequences};
+use crate::{send, sequences, suppress};
 
 /// Confirm mails a list sends per hour. Past it, new addresses stay pending
 /// without mail, so a script posting addresses to a public form can't turn
@@ -65,13 +65,20 @@ pub(crate) struct NewContact {
 ///   doesn't need to confirm;
 /// - pending: another confirm mail, at most once per [`RESEND_AFTER`];
 /// - subscribed: a missing name filled in, no mail;
-/// - unsubscribed: unchanged and no mail, from any source.
+/// - unsubscribed: unchanged and no mail, from any source;
+/// - erased from the workspace: `None`, nothing stored.
 pub(crate) async fn subscribe(
     platform: &Platform,
     tx: &mut WriteTx,
     list: &ListRow,
     input: NewContact,
-) -> anyhow::Result<ContactRow> {
+) -> anyhow::Result<Option<ContactRow>> {
+    if suppress::erased(&mut **tx, list.workspace_id, &input.email)
+        .await
+        .context("checking for an erasure")?
+    {
+        return Ok(None);
+    }
     let now = platform.now();
     let existing =
         store::find_contact_by_email(&mut **tx, list.workspace_id, list.id, &input.email)
@@ -108,11 +115,11 @@ pub(crate) async fn subscribe(
                 .await
                 .context("recording the confirm mail")?;
         }
-        return Ok(contact);
+        return Ok(Some(contact));
     };
     let mut changed = false;
     match ContactStatus::parse(&contact.status) {
-        Some(ContactStatus::Unsubscribed) | None => return Ok(contact),
+        Some(ContactStatus::Unsubscribed) | None => return Ok(Some(contact)),
         Some(ContactStatus::Pending) => {
             let due = contact.confirm_sent_at.is_none_or(|at| at <= now.minus(RESEND_AFTER));
             if due && send_confirm(platform, tx, list, &contact).await? {
@@ -130,7 +137,7 @@ pub(crate) async fn subscribe(
         contact.updated_at = now;
         store::update_contact(&mut **tx, &contact).await.context("updating the contact")?;
     }
-    Ok(contact)
+    Ok(Some(contact))
 }
 
 /// Queues a confirm mail unless the list is over [`CONFIRMS_PER_HOUR`].

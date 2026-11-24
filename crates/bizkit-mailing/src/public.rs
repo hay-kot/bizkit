@@ -1,7 +1,11 @@
-//! The confirm and unsubscribe pages and the provider event webhook, nested
-//! at `/m/mailing/public`. They sit outside authentication. GETs only show a button, so mail scanners
-//! that follow links don't confirm or unsubscribe anyone; the POSTs change
-//! state. Everything echoed is escaped.
+//! The confirm, unsubscribe and manage-subscriptions pages and the provider
+//! event webhook, nested at `/m/mailing/public`. They sit outside
+//! authentication. GETs only show a button, so mail scanners that follow
+//! links don't confirm or unsubscribe anyone; the POSTs change state.
+//! Everything echoed is escaped.
+
+use std::collections::HashSet;
+use std::fmt::Write as _;
 
 use anyhow::Context as _;
 use axum::body::Bytes;
@@ -15,8 +19,11 @@ use serde::Deserialize;
 use url::Url;
 use utoipa::OpenApi;
 
+use crate::api::{ContactStatus, ListId};
 use crate::contacts::{self, LinkOutcome};
+use crate::manage::{self, Change, Verified};
 use crate::render::escape;
+use crate::store::AddressContactRow;
 
 /// Pages post only to themselves and load nothing.
 const CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";
@@ -33,6 +40,11 @@ pub(crate) fn unsubscribe_url(platform: &Platform, token: &str) -> anyhow::Resul
     link(platform, "unsubscribe", token)
 }
 
+/// The placeholder manage link `mailing.preview` shows.
+pub(crate) fn manage_preview_url(platform: &Platform) -> anyhow::Result<Url> {
+    link(platform, "manage", "preview")
+}
+
 fn link(platform: &Platform, page: &str, token: &str) -> anyhow::Result<Url> {
     let mut url = platform
         .base_url()
@@ -47,6 +59,7 @@ pub(crate) fn router() -> Router {
     Router::new()
         .route("/confirm", get(confirm_page).post(confirm_post))
         .route("/unsubscribe", get(unsubscribe_page).post(unsubscribe_post))
+        .route("/manage", get(manage_page).post(manage_post))
         .route("/events/mailgun", post(crate::events::mailgun))
 }
 
@@ -127,6 +140,39 @@ const fn unsubscribe_page_docs() {}
 #[expect(dead_code, reason = "exists for its utoipa docs")]
 const fn unsubscribe_docs() {}
 
+#[utoipa::path(
+    get,
+    path = "/manage",
+    operation_id = "mailing.public.manage_page",
+    tag = "mailing",
+    summary = "Show the manage-subscriptions page",
+    description = "The address's lists in one project, with a box per list it still gets mail from. Changes nothing.",
+    params(("t" = String, Query, description = "The signed token from a list mail")),
+    responses(
+        (status = 200, description = "The page", content_type = "text/html", body = String),
+        (status = 404, description = "The link is unknown, forged or expired", content_type = "text/html", body = String),
+    )
+)]
+#[expect(dead_code, reason = "exists for its utoipa docs")]
+const fn manage_page_docs() {}
+
+#[utoipa::path(
+    post,
+    path = "/manage",
+    operation_id = "mailing.public.manage",
+    tag = "mailing",
+    summary = "Leave some or all of the lists",
+    description = "Form fields: `shown` (each list the page showed), `keep` (each ticked list) and `all=1` for unsubscribe from all. Unsubscribes the shown lists that aren't kept, or every list with `all`.",
+    params(("t" = String, Query, description = "The signed token from a list mail")),
+    request_body(content((String = "application/x-www-form-urlencoded")), description = "The page's form"),
+    responses(
+        (status = 200, description = "Saved; the page again", content_type = "text/html", body = String),
+        (status = 404, description = "The link is unknown, forged or expired", content_type = "text/html", body = String),
+    )
+)]
+#[expect(dead_code, reason = "exists for its utoipa docs")]
+const fn manage_docs() {}
+
 /// The docs for the public routes, relative to the nest.
 #[derive(OpenApi)]
 #[openapi(paths(
@@ -134,6 +180,8 @@ const fn unsubscribe_docs() {}
     confirm_docs,
     unsubscribe_page_docs,
     unsubscribe_docs,
+    manage_page_docs,
+    manage_docs,
     crate::events::mailgun_docs
 ))]
 pub(crate) struct PublicDocs;
@@ -319,4 +367,139 @@ async fn unsubscribe_post(
         (Ok(LinkOutcome::Expired | LinkOutcome::Invalid), false) => invalid(),
         (Err(err), _) => failed(&err),
     }
+}
+
+fn manage_expired() -> Response {
+    page(
+        StatusCode::NOT_FOUND,
+        "This link has expired",
+        "<p>Manage links work for 90 days. Use the unsubscribe link in any mail from us, \
+         or the manage link in a newer one.</p>",
+    )
+}
+
+/// The manage page for the rows `rows`, with `notice` on top.
+fn manage_view(
+    token: &str,
+    email: &str,
+    rows: &[AddressContactRow],
+    notice: Option<&str>,
+) -> Response {
+    match manage_body(token, email, rows, notice) {
+        Ok(body) => page(StatusCode::OK, "Your subscriptions", &body),
+        Err(err) => failed(&err.into()),
+    }
+}
+
+fn manage_body(
+    token: &str,
+    email: &str,
+    rows: &[AddressContactRow],
+    notice: Option<&str>,
+) -> Result<String, std::fmt::Error> {
+    let mut body = String::new();
+    if let Some(notice) = notice {
+        write!(body, "<p><strong>{}</strong></p>", escape(notice))?;
+    }
+    write!(body, "<p>Mail to <strong>{}</strong> from these lists:</p>", escape(email))?;
+    let mut boxes = String::new();
+    let mut gone = String::new();
+    for row in rows {
+        let id = escape(&row.contact.list_id.to_string());
+        let name = escape(&row.list_name);
+        match ContactStatus::parse(&row.contact.status) {
+            Some(ContactStatus::Unsubscribed) | None => {
+                write!(gone, "<li>{name}: unsubscribed</li>")?;
+            }
+            Some(status) => {
+                let pending =
+                    if status == ContactStatus::Pending { " (not confirmed yet)" } else { "" };
+                write!(
+                    boxes,
+                    "<p><input type=\"hidden\" name=\"shown\" value=\"{id}\">\
+                     <label><input type=\"checkbox\" name=\"keep\" value=\"{id}\" checked> \
+                     {name}{pending}</label></p>"
+                )?;
+            }
+        }
+    }
+    if boxes.is_empty() {
+        body.push_str("<p>You get no mail from these lists.</p>");
+    } else {
+        let mut target = String::from("manage?");
+        target.push_str(
+            &url::form_urlencoded::Serializer::new(String::new()).append_pair("t", token).finish(),
+        );
+        write!(
+            body,
+            "<form method=\"post\" action=\"{}\">{boxes}\
+             <p><button type=\"submit\">Save</button> \
+             <button type=\"submit\" name=\"all\" value=\"1\">Unsubscribe from all</button></p></form>",
+            escape(&target)
+        )?;
+    }
+    if !gone.is_empty() {
+        write!(body, "<ul>{gone}</ul>")?;
+    }
+    Ok(body)
+}
+
+async fn manage_page(
+    Extension(platform): Extension<Platform>,
+    Query(token): Query<Token>,
+) -> Response {
+    let result = async {
+        let mut conn = platform.db().read().acquire().await.context("opening a connection")?;
+        let contact = match manage::verify(&mut conn, &token.t, platform.now()).await? {
+            Verified::Contact(contact) => contact,
+            Verified::Expired => return Ok(manage_expired()),
+            Verified::Invalid => return Ok(invalid()),
+        };
+        let rows = manage::rows(&mut conn, &contact).await?;
+        anyhow::Ok(manage_view(&token.t, &contact.email, &rows, None))
+    }
+    .await;
+    result.unwrap_or_else(|err| failed(&err))
+}
+
+/// What the manage form posted.
+fn change(body: &[u8]) -> Change {
+    let mut shown = HashSet::new();
+    let mut keep = HashSet::new();
+    for (name, value) in url::form_urlencoded::parse(body) {
+        match (name.as_ref(), value.parse::<ListId>()) {
+            ("all", _) if value == "1" => return Change::All,
+            ("shown", Ok(id)) => {
+                shown.insert(id);
+            }
+            ("keep", Ok(id)) => {
+                keep.insert(id);
+            }
+            _ => {}
+        }
+    }
+    Change::Keep { shown, keep }
+}
+
+async fn manage_post(
+    Extension(platform): Extension<Platform>,
+    Query(token): Query<Token>,
+    body: Bytes,
+) -> Response {
+    let change = change(&body);
+    let result = async {
+        let now = platform.now();
+        let mut tx = platform.db().write().await?;
+        let contact = match manage::verify(&mut tx, &token.t, now).await? {
+            Verified::Contact(contact) => contact,
+            Verified::Expired => return Ok(manage_expired()),
+            Verified::Invalid => return Ok(invalid()),
+        };
+        manage::apply(&mut tx, &contact, &change, now).await?;
+        let rows = manage::rows(&mut tx, &contact).await?;
+        tx.commit().await?;
+        anyhow::Ok(manage_view(&token.t, &contact.email, &rows, Some("Saved.")))
+    }
+    .await;
+    result.unwrap_or_else(|err| failed(&err))
 }

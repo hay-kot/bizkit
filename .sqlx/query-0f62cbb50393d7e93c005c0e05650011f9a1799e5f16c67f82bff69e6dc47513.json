@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO mailing_link_keys (workspace_id, key, created_at) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "0f62cbb50393d7e93c005c0e05650011f9a1799e5f16c67f82bff69e6dc47513"
+}

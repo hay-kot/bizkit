@@ -15,6 +15,55 @@ export type Accepted = {
 };
 
 /**
+ * Everything mailing holds on one address in a workspace.
+ */
+export type AddressExport = {
+    /**
+     * Its contact rows, one per list.
+     */
+    contacts: Array<Contact>;
+    /**
+     * Every mail queued or sent to it, test sends included, newest first.
+     */
+    deliveries: Array<MailDelivery>;
+    /**
+     * The address, lower case.
+     */
+    email: string;
+    /**
+     * Its sequence runs.
+     */
+    enrollments: Array<Enrollment>;
+    /**
+     * The address was erased: a hashed record keeps it from mail and lists.
+     */
+    erased: boolean;
+    /**
+     * The lists of its contact rows.
+     */
+    lists: Array<AddressList>;
+    suppression?: Suppression | null;
+};
+
+/**
+ * A list an exported address is on.
+ */
+export type AddressList = {
+    /**
+     * The list ID.
+     */
+    id: ListId;
+    /**
+     * The list name.
+     */
+    name: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+};
+
+/**
  * One function or object a script can use.
  */
 export type ApiEntry = {
@@ -631,6 +680,24 @@ export type EnrollmentPage = {
  * Where a contact's run through a sequence stands.
  */
 export type EnrollmentStatus = 'active' | 'completed' | 'exited' | 'unsubscribed';
+
+/**
+ * What an erase removed.
+ */
+export type ErasedAddress = {
+    /**
+     * Contact rows deleted, with their sequence runs.
+     */
+    contacts: number;
+    /**
+     * Deliveries deleted from the send log.
+     */
+    deliveries: number;
+    /**
+     * A suppression row was replaced by the hashed record.
+     */
+    suppression: boolean;
+};
 
 /**
  * The body of every non-2xx response.
@@ -5698,6 +5765,108 @@ export type InvitationsRevokeResponses = {
 
 export type InvitationsRevokeResponse = InvitationsRevokeResponses[keyof InvitationsRevokeResponses];
 
+export type MailingAddressesEraseData = {
+    body: {
+        /**
+         * The address.
+         */
+        email: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/addresses/erase';
+};
+
+export type MailingAddressesEraseErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingAddressesEraseError = MailingAddressesEraseErrors[keyof MailingAddressesEraseErrors];
+
+export type MailingAddressesEraseResponses = {
+    /**
+     * OK
+     */
+    200: ErasedAddress;
+};
+
+export type MailingAddressesEraseResponse = MailingAddressesEraseResponses[keyof MailingAddressesEraseResponses];
+
+export type MailingAddressesExportData = {
+    body: {
+        /**
+         * The address.
+         */
+        email: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/addresses/export';
+};
+
+export type MailingAddressesExportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingAddressesExportError = MailingAddressesExportErrors[keyof MailingAddressesExportErrors];
+
+export type MailingAddressesExportResponses = {
+    /**
+     * OK
+     */
+    200: AddressExport;
+};
+
+export type MailingAddressesExportResponse = MailingAddressesExportResponses[keyof MailingAddressesExportResponses];
+
 export type MailingBroadcastsListData = {
     body?: never;
     path: {
@@ -6234,6 +6403,10 @@ export type MailingBroadcastsTestErrors = {
      * Not Found
      */
     404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
     /**
      * Unprocessable Entity
      */
@@ -8789,6 +8962,69 @@ export type MailingPublicMailgunEventsResponses = {
 };
 
 export type MailingPublicMailgunEventsResponse = MailingPublicMailgunEventsResponses[keyof MailingPublicMailgunEventsResponses];
+
+export type MailingPublicManagePageData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The signed token from a list mail
+         */
+        t: string;
+    };
+    url: '/m/mailing/public/manage';
+};
+
+export type MailingPublicManagePageErrors = {
+    /**
+     * The link is unknown, forged or expired
+     */
+    404: string;
+};
+
+export type MailingPublicManagePageError = MailingPublicManagePageErrors[keyof MailingPublicManagePageErrors];
+
+export type MailingPublicManagePageResponses = {
+    /**
+     * The page
+     */
+    200: string;
+};
+
+export type MailingPublicManagePageResponse = MailingPublicManagePageResponses[keyof MailingPublicManagePageResponses];
+
+export type MailingPublicManageData = {
+    /**
+     * The page's form
+     */
+    body: string;
+    path?: never;
+    query: {
+        /**
+         * The signed token from a list mail
+         */
+        t: string;
+    };
+    url: '/m/mailing/public/manage';
+};
+
+export type MailingPublicManageErrors = {
+    /**
+     * The link is unknown, forged or expired
+     */
+    404: string;
+};
+
+export type MailingPublicManageError = MailingPublicManageErrors[keyof MailingPublicManageErrors];
+
+export type MailingPublicManageResponses = {
+    /**
+     * Saved; the page again
+     */
+    200: string;
+};
+
+export type MailingPublicManageResponse = MailingPublicManageResponses[keyof MailingPublicManageResponses];
 
 export type MailingPublicUnsubscribePageData = {
     body?: never;

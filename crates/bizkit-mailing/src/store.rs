@@ -1235,6 +1235,260 @@ pub(crate) async fn contacts_by_email(
     .await
 }
 
+// ---------------------------------------------------------------- erasures
+
+/// Records an erased address by hash. False when it was recorded before.
+pub(crate) async fn insert_erasure(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email_hash: &str,
+    now: UnixMillis,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "INSERT OR IGNORE INTO mailing_erasures (workspace_id, email_hash, created_at)
+         VALUES (?, ?, ?)",
+        workspace_id,
+        email_hash,
+        now,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Whether the address with `email_hash` was erased from the workspace.
+pub(crate) async fn is_erased(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email_hash: &str,
+) -> sqlx::Result<bool> {
+    let found = sqlx::query_scalar!(
+        "SELECT 1 FROM mailing_erasures WHERE workspace_id = ? AND email_hash = ?",
+        workspace_id,
+        email_hash,
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(found.is_some())
+}
+
+// ---------------------------------------------------------------- privacy
+
+/// A contact row of an address with its list, for an export.
+#[derive(Debug, Clone)]
+pub(crate) struct AddressContactRow {
+    pub(crate) contact: ContactRow,
+    pub(crate) list_name: String,
+    pub(crate) project_id: ProjectId,
+}
+
+/// Every contact row with `email` in the workspace, with its list, by list
+/// name. With `project_id`, only rows on that project's lists.
+pub(crate) async fn address_contacts(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+    project_id: Option<ProjectId>,
+) -> sqlx::Result<Vec<AddressContactRow>> {
+    let rows = sqlx::query!(
+        r#"SELECT c.id AS "id: ContactId", c.workspace_id AS "workspace_id: WorkspaceId",
+                  c.list_id AS "list_id: ListId", c.email, c.name, c.tags, c.status, c.source,
+                  c.confirm_token, c.confirm_sent_at AS "confirm_sent_at: UnixMillis",
+                  c.unsubscribe_token, c.subscribed_at AS "subscribed_at: UnixMillis",
+                  c.unsubscribed_at AS "unsubscribed_at: UnixMillis",
+                  c.created_at AS "created_at: UnixMillis", c.updated_at AS "updated_at: UnixMillis",
+                  l.name AS list_name, l.project_id AS "project_id: ProjectId"
+           FROM mailing_contacts c
+           JOIN mailing_lists l ON l.id = c.list_id AND l.workspace_id = c.workspace_id
+           WHERE c.workspace_id = ?1 AND c.email = ?2 AND (?3 IS NULL OR l.project_id = ?3)
+           ORDER BY l.name, l.id"#,
+        workspace_id,
+        email,
+        project_id,
+    )
+    .fetch_all(exec)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| AddressContactRow {
+            contact: ContactRow {
+                id: r.id,
+                workspace_id: r.workspace_id,
+                list_id: r.list_id,
+                email: r.email,
+                name: r.name,
+                tags: r.tags,
+                status: r.status,
+                source: r.source,
+                confirm_token: r.confirm_token,
+                confirm_sent_at: r.confirm_sent_at,
+                unsubscribe_token: r.unsubscribe_token,
+                subscribed_at: r.subscribed_at,
+                unsubscribed_at: r.unsubscribed_at,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            },
+            list_name: r.list_name,
+            project_id: r.project_id,
+        })
+        .collect())
+}
+
+/// The sequence runs of every contact row with `email` in the workspace.
+pub(crate) async fn address_enrollments(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<Vec<EnrollmentView>> {
+    sqlx::query_as!(
+        EnrollmentView,
+        r#"SELECT e.id AS "id: EnrollmentId", e.sequence_id AS "sequence_id: SequenceId",
+                  e.contact_id AS "contact_id: ContactId", c.email, e.status,
+                  (SELECT COUNT(*) FROM mailing_deliveries d
+                   JOIN mailing_steps s ON s.id = d.step_id AND s.sequence_id = e.sequence_id
+                   WHERE d.workspace_id = e.workspace_id AND d.enrollment_id = e.id) AS "steps_done!: i64",
+                  e.next_run_at AS "next_run_at: UnixMillis",
+                  e.created_at AS "created_at: UnixMillis", e.updated_at AS "updated_at: UnixMillis"
+           FROM mailing_enrollments e
+           JOIN mailing_contacts c ON c.id = e.contact_id AND c.workspace_id = e.workspace_id
+           WHERE e.workspace_id = ? AND c.email = ?
+           ORDER BY e.id"#,
+        workspace_id,
+        email,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// Deliveries to the lower-case `email` in the workspace, test sends
+/// included, newest first.
+pub(crate) async fn address_deliveries(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<Vec<DeliveryRow>> {
+    sqlx::query_as!(
+        DeliveryRow,
+        r#"SELECT id AS "id: DeliveryId", workspace_id AS "workspace_id: WorkspaceId",
+                  list_id AS "list_id: ListId", contact_id AS "contact_id: ContactId", kind,
+                  broadcast_id AS "broadcast_id: BroadcastId",
+                  enrollment_id AS "enrollment_id: EnrollmentId", step_id AS "step_id: StepId",
+                  to_email, subject, status, error, attempts, resends,
+                  created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis",
+                  provider_id, event, event_at AS "event_at: UnixMillis"
+           FROM mailing_deliveries
+           WHERE workspace_id = ? AND to_email = ?
+           ORDER BY id DESC"#,
+        workspace_id,
+        email,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// Deletes every delivery to `email` in the workspace. Returns how many.
+pub(crate) async fn delete_address_deliveries(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "DELETE FROM mailing_deliveries WHERE workspace_id = ? AND to_email = ?",
+        workspace_id,
+        email,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+/// Deletes every contact row with `email` in the workspace; their sequence
+/// runs go with them. Returns how many.
+pub(crate) async fn delete_address_contacts(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "DELETE FROM mailing_contacts WHERE workspace_id = ? AND email = ?",
+        workspace_id,
+        email,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+/// Replaces every broadcast pause reason that quotes `email`. The breaker
+/// copies the last provider error there, and SMTP replies can name the
+/// recipient. Returns how many changed.
+pub(crate) async fn redact_pause_reasons(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+    replacement: &str,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "UPDATE mailing_broadcasts SET pause_reason = ?3
+         WHERE workspace_id = ?1 AND instr(lower(pause_reason), ?2) > 0",
+        workspace_id,
+        email,
+        replacement,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+/// The contact a manage link names, in any workspace. The link's signature
+/// is the secret; the ID alone grants nothing.
+pub(crate) async fn find_contact_any(
+    exec: impl SqliteExecutor<'_>,
+    id: ContactId,
+) -> sqlx::Result<Option<ContactRow>> {
+    sqlx::query_as!(
+        ContactRow,
+        r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
+                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
+                  subscribed_at AS "subscribed_at: UnixMillis",
+                  unsubscribed_at AS "unsubscribed_at: UnixMillis",
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM mailing_contacts WHERE id = ?"#,
+        id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// The workspace's manage-link key.
+pub(crate) async fn find_link_key(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+) -> sqlx::Result<Option<String>> {
+    sqlx::query_scalar!("SELECT key FROM mailing_link_keys WHERE workspace_id = ?", workspace_id)
+        .fetch_optional(exec)
+        .await
+}
+
+/// Stores `key` unless the workspace has one.
+pub(crate) async fn insert_link_key(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    key: &str,
+    now: UnixMillis,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT OR IGNORE INTO mailing_link_keys (workspace_id, key, created_at) VALUES (?, ?, ?)",
+        workspace_id,
+        key,
+        now,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------- webhook tokens
 
 /// Records a webhook token and drops tokens older than `cutoff`. False when

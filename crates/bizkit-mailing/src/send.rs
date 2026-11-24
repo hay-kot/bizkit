@@ -19,7 +19,7 @@ use crate::api::{
 };
 use crate::render::{self, Frame, Merge, Rendered};
 use crate::store::{self, BroadcastRow, ContactRow, DeliveryRow, ListRow};
-use crate::{public, suppress};
+use crate::{manage, public, suppress};
 
 /// The longest error text kept on a delivery.
 const ERROR_CHARS: usize = 300;
@@ -161,13 +161,39 @@ fn capped(text: &str) -> String {
     text.chars().take(ERROR_CHARS).collect()
 }
 
-/// The frame of a list's mail to `contact`.
-fn frame<'a>(list: &'a ListRow, unsubscribe: Option<&'a url::Url>) -> Frame<'a> {
-    Frame { list_name: &list.name, footer: list.footer.as_deref(), unsubscribe }
+/// The links a list mail to a contact carries.
+#[derive(Debug, Clone, Default)]
+struct Links {
+    unsubscribe: Option<url::Url>,
+    manage: Option<url::Url>,
+}
+
+impl Links {
+    /// The contact's links, or none for mail to someone who is no contact.
+    async fn of(platform: &Platform, contact: Option<&ContactRow>) -> anyhow::Result<Self> {
+        let Some(contact) = contact else {
+            return Ok(Self::default());
+        };
+        let key = manage::link_key(platform, contact.workspace_id).await?;
+        Ok(Self {
+            unsubscribe: Some(public::unsubscribe_url(platform, &contact.unsubscribe_token)?),
+            manage: Some(manage::manage_url(platform, &key, contact)?),
+        })
+    }
+}
+
+/// The frame of a list's mail.
+fn frame<'a>(list: &'a ListRow, links: &'a Links) -> Frame<'a> {
+    Frame {
+        list_name: &list.name,
+        footer: list.footer.as_deref(),
+        unsubscribe: links.unsubscribe.as_ref(),
+        manage: links.manage.as_ref(),
+    }
 }
 
 /// Renders a broadcast to one recipient.
-pub(crate) fn render_broadcast(
+pub(crate) async fn render_broadcast(
     platform: &Platform,
     list: &ListRow,
     broadcast: &BroadcastRow,
@@ -175,7 +201,7 @@ pub(crate) fn render_broadcast(
     to_email: &str,
 ) -> anyhow::Result<(Rendered, Option<url::Url>)> {
     let body = Body { subject: &broadcast.subject, md: &broadcast.body_md };
-    render_to(platform, list, body, contact, to_email)
+    render_to(platform, list, body, contact, to_email).await
 }
 
 /// A mail's source text.
@@ -185,20 +211,19 @@ struct Body<'a> {
     md: &'a str,
 }
 
-/// Renders a list mail to one recipient, with their unsubscribe link when
-/// they are a contact.
-fn render_to(
+/// Renders a list mail to one recipient, with their unsubscribe and manage
+/// links when they are a contact.
+async fn render_to(
     platform: &Platform,
     list: &ListRow,
     body: Body<'_>,
     contact: Option<&ContactRow>,
     to_email: &str,
 ) -> anyhow::Result<(Rendered, Option<url::Url>)> {
-    let unsubscribe =
-        contact.map(|c| public::unsubscribe_url(platform, &c.unsubscribe_token)).transpose()?;
+    let links = Links::of(platform, contact).await?;
     let merge = Merge { name: contact.and_then(|c| c.name.as_deref()), email: to_email };
-    let mail = render::render(&frame(list, unsubscribe.as_ref()), body.subject, body.md, &merge);
-    Ok((mail, unsubscribe))
+    let mail = render::render(&frame(list, &links), body.subject, body.md, &merge);
+    Ok((mail, links.unsubscribe))
 }
 
 /// A step delivery at send time: skipped once the contact left the
@@ -233,7 +258,8 @@ async fn prepare_step(
         return Ok(Prepared::Skip("the step was deleted"));
     };
     let body = Body { subject: &step.subject, md: &step.body_md };
-    let (mail, unsubscribe) = render_to(platform, list, body, Some(contact), &delivery.to_email)?;
+    let (mail, unsubscribe) =
+        render_to(platform, list, body, Some(contact), &delivery.to_email).await?;
     Ok(Prepared::Mail(to_mail(&delivery.to_email, mail, unsubscribe)))
 }
 
@@ -267,7 +293,7 @@ async fn prepare(
                 return Ok(Prepared::Skip("the contact has no confirm link"));
             };
             let url = public::confirm_url(platform, token)?;
-            let mail = render::confirm(&frame(list, None), &url);
+            let mail = render::confirm(&frame(list, &Links::default()), &url);
             Ok(Prepared::Mail(to_mail(&contact.email, mail, None)))
         }
         DeliveryKind::Broadcast | DeliveryKind::Test => {
@@ -285,7 +311,8 @@ async fn prepare(
             };
             let contact = contact.filter(|_| kind == DeliveryKind::Broadcast);
             let (mail, unsubscribe) =
-                render_broadcast(platform, list, &broadcast, contact.as_ref(), &delivery.to_email)?;
+                render_broadcast(platform, list, &broadcast, contact.as_ref(), &delivery.to_email)
+                    .await?;
             Ok(Prepared::Mail(to_mail(&delivery.to_email, mail, unsubscribe)))
         }
         DeliveryKind::Step => {
@@ -315,10 +342,9 @@ async fn suppressed(platform: &Platform, delivery: &DeliveryRow) -> anyhow::Resu
     if delivery.kind == DeliveryKind::Test.as_str() {
         return Ok(None);
     }
-    let reason =
-        suppress::suppressed(platform.db().read(), delivery.workspace_id, &delivery.to_email)
-            .await
-            .context("checking the suppression list")?;
+    let reason = suppress::blocked(platform.db().read(), delivery.workspace_id, &delivery.to_email)
+        .await
+        .context("checking the suppression list")?;
     Ok(reason.map(|r| format!("suppressed: {}", r.as_str())))
 }
 
@@ -423,6 +449,8 @@ impl JobHandler<Send> for SendHandler {
                 return Ok(());
             }
         }
+        // An erase that commits after this check still lets this one mail
+        // out: jobs hold no transaction across the send, by design.
         if let Some(reason) = suppressed(platform, &delivery).await? {
             DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
             delivery.error = Some(reason);
@@ -470,7 +498,11 @@ impl JobHandler<Send> for SendHandler {
                 status.as_str().clone_into(&mut delivery.status);
                 delivery.error = Some(error.clone());
                 mark_counting(platform, &delivery, failure).await?;
-                anyhow::bail!("sending to {} failed: {error}", delivery.to_email)
+                // The job error lands in core's jobs table, which an erase
+                // can't reach. Provider text can quote the recipient, so it
+                // stays on the delivery row, and the job error names only
+                // the delivery.
+                anyhow::bail!("sending delivery {} failed; its row holds the error", delivery.id)
             }
         }
     }

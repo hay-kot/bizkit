@@ -28,6 +28,8 @@ pub(crate) struct Frame<'a> {
     pub(crate) list_name: &'a str,
     pub(crate) footer: Option<&'a str>,
     pub(crate) unsubscribe: Option<&'a Url>,
+    /// The reader's manage-subscriptions page.
+    pub(crate) manage: Option<&'a Url>,
 }
 
 /// Renders a broadcast or step: the subject and body with merge fields
@@ -62,7 +64,7 @@ pub(crate) fn confirm(frame: &Frame<'_>, confirm_url: &Url) -> Rendered {
          If you didn't ask for this, ignore this mail and you won't hear from us again.",
         frame.list_name
     );
-    let frame = Frame { unsubscribe: None, ..*frame };
+    let frame = Frame { unsubscribe: None, manage: None, ..*frame };
     Rendered {
         subject: one_line(&format!("Confirm your subscription to {}", frame.list_name)),
         html: layout(&frame, &body),
@@ -140,12 +142,20 @@ fn layout(frame: &Frame<'_>, body: &str) -> String {
             escape(text.trim()).replace('\n', "<br>")
         );
     }
-    if let Some(url) = frame.unsubscribe {
-        let _ignored = write!(
-            footer,
-            "<p style=\"margin:0\"><a href=\"{}\" style=\"color:#6b7280\">Unsubscribe</a></p>",
-            escape(url.as_str())
-        );
+    let links: Vec<String> =
+        [(frame.unsubscribe, "Unsubscribe"), (frame.manage, "Manage subscriptions")]
+            .into_iter()
+            .filter_map(|(url, label)| {
+                url.map(|url| {
+                    format!(
+                        "<a href=\"{}\" style=\"color:#6b7280\">{label}</a>",
+                        escape(url.as_str())
+                    )
+                })
+            })
+            .collect();
+    if !links.is_empty() {
+        let _ignored = write!(footer, "<p style=\"margin:0\">{}</p>", links.join(" &middot; "));
     }
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\">\
@@ -168,6 +178,9 @@ fn with_text_footer(frame: &Frame<'_>, body: &str) -> String {
     }
     if let Some(url) = frame.unsubscribe {
         let _ignored = write!(text, "\nUnsubscribe: {url}");
+    }
+    if let Some(url) = frame.manage {
+        let _ignored = write!(text, "\nManage subscriptions: {url}");
     }
     text.push('\n');
     text
@@ -197,11 +210,19 @@ mod tests {
         Url::parse("https://app.example.com/m/mailing/public/unsubscribe?t=abc").unwrap()
     }
 
+    fn manage() -> &'static Url {
+        static URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
+            Url::parse("https://app.example.com/m/mailing/public/manage?t=def").unwrap()
+        });
+        &URL
+    }
+
     fn frame(url: &Url) -> Frame<'_> {
         Frame {
             list_name: "Newsletter",
             footer: Some("1 Main St\nSpringfield"),
             unsubscribe: Some(url),
+            manage: Some(manage()),
         }
     }
 

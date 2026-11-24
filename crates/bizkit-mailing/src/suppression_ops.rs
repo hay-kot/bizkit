@@ -12,7 +12,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::api::{Suppression, SuppressionPage, SuppressionReason};
-use crate::ops::{ADMIN, READ, TAGS, check_limit, check_text, page, trimmed};
+use crate::ops::{ADMIN, ERASED, READ, TAGS, check_limit, check_text, page, trimmed};
 use crate::store::{self, SuppressionFilter, SuppressionRow};
 use crate::suppress::{self, Suppress};
 
@@ -25,7 +25,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn suppression_to_api(row: SuppressionRow) -> anyhow::Result<Suppression> {
+pub(crate) fn suppression_to_api(row: SuppressionRow) -> anyhow::Result<Suppression> {
     Ok(Suppression {
         reason: SuppressionReason::parse(&row.reason)
             .with_context(|| format!("unknown suppression reason {:?}", row.reason))?,
@@ -148,6 +148,9 @@ impl Operation for SuppressionsCreate {
         let email = normalize_email(&input.email);
         let now = cx.now();
         let mut tx = cx.write().await?;
+        if suppress::erased(&mut *tx, input.workspace_id, &email).await? {
+            return Err(ApiError::Conflict(ERASED.to_owned()));
+        }
         let entry = Suppress {
             workspace_id: input.workspace_id,
             email: &email,

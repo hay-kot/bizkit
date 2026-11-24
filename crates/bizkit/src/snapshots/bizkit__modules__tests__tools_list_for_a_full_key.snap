@@ -2416,6 +2416,50 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Erase an address from every list and the send log of the workspace (GDPR erasure)",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "An address in the workspace. It goes in the body, not the path, so it\nstays out of request logs.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_addresses_erase"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Export everything mailing holds on an address in the workspace (GDPR access)",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "An address in the workspace. It goes in the body, not the path, so it\nstays out of request logs.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_addresses_export"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Cancel a scheduled broadcast, so it is a draft again",
       "inputSchema": {
         "$defs": {

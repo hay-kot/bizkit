@@ -8,4 +8,4 @@ expression: mail.html
 <li>one</li>
 <li><a href="https://example.com/two">two</a></li>
 </ul>
-</td></tr><tr><td style="padding:16px 28px;border-top:1px solid #e5e7eb;font:12px/1.5 system-ui,sans-serif;color:#6b7280"><p style="margin:0 0 8px">Newsletter</p><p style="margin:0 0 8px">1 Main St<br>Springfield</p><p style="margin:0"><a href="https://app.example.com/m/mailing/public/unsubscribe?t=abc" style="color:#6b7280">Unsubscribe</a></p></td></tr></table></td></tr></table></body></html>
+</td></tr><tr><td style="padding:16px 28px;border-top:1px solid #e5e7eb;font:12px/1.5 system-ui,sans-serif;color:#6b7280"><p style="margin:0 0 8px">Newsletter</p><p style="margin:0 0 8px">1 Main St<br>Springfield</p><p style="margin:0"><a href="https://app.example.com/m/mailing/public/unsubscribe?t=abc" style="color:#6b7280">Unsubscribe</a> &middot; <a href="https://app.example.com/m/mailing/public/manage?t=def" style="color:#6b7280">Manage subscriptions</a></p></td></tr></table></td></tr></table></body></html>

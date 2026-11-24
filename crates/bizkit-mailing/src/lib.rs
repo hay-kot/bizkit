@@ -6,7 +6,9 @@ mod capture;
 pub mod contacts;
 mod events;
 pub mod hooks;
+mod manage;
 mod ops;
+mod privacy;
 mod public;
 mod render;
 #[cfg(feature = "test-hooks")]
@@ -26,6 +28,7 @@ use bizkit_core::{Module, ModuleContext};
 use futures::future::BoxFuture;
 use utoipa::OpenApi as _;
 
+pub use crate::manage::MANAGE_TTL;
 pub use crate::ops::TESTS_PER_HOUR;
 pub use crate::sequence_ops::{MAX_DELAY_HOURS, MAX_STEPS};
 

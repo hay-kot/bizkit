@@ -22,10 +22,13 @@ async-trait.workspace = true
 axum.workspace = true
 bizkit-core.workspace = true
 futures.workspace = true
+hex.workspace = true
+hmac.workspace = true
 http.workspace = true
 pulldown-cmark.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 sqlx.workspace = true
 tracing.workspace = true
 url.workspace = true
@@ -34,10 +37,7 @@ utoipa.workspace = true
 [dev-dependencies]
 bizkit-forms.workspace = true
 bizkit-testkit.workspace = true
-hex.workspace = true
-hmac.workspace = true
 insta.workspace = true
-sha2.workspace = true
 tokio.workspace = true
 
 [lints]

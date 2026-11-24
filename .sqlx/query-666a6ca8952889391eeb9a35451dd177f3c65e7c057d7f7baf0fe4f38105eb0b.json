@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO mailing_erasures (workspace_id, email_hash, created_at)\n         VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "666a6ca8952889391eeb9a35451dd177f3c65e7c057d7f7baf0fe4f38105eb0b"
+}
