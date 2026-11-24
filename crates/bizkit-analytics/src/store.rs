@@ -148,19 +148,20 @@ pub(crate) async fn goal_exists(
     Ok(found.is_some())
 }
 
+/// Deletes a goal and returns its project, or `None` when there was none.
 pub(crate) async fn delete_goal(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     goal_id: GoalId,
-) -> sqlx::Result<bool> {
-    let result = sqlx::query!(
-        "DELETE FROM analytics_goals WHERE workspace_id = ? AND id = ?",
+) -> sqlx::Result<Option<ProjectId>> {
+    sqlx::query_scalar!(
+        r#"DELETE FROM analytics_goals WHERE workspace_id = ? AND id = ?
+           RETURNING project_id AS "project_id: ProjectId""#,
         workspace_id,
         goal_id
     )
-    .execute(exec)
-    .await?;
-    Ok(result.rows_affected() == 1)
+    .fetch_optional(exec)
+    .await
 }
 
 /// Goals by ID, for hook targets. Unknown IDs are left out.
@@ -234,6 +235,20 @@ pub(crate) async fn find_site_by_key(
         site_key,
     )
     .fetch_optional(exec)
+    .await
+}
+
+/// The projects in a workspace that have a site, oldest site first.
+pub(crate) async fn list_site_projects(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+) -> sqlx::Result<Vec<ProjectId>> {
+    sqlx::query_scalar!(
+        r#"SELECT project_id AS "project_id: ProjectId" FROM analytics_sites
+           WHERE workspace_id = ? ORDER BY created_at, project_id"#,
+        workspace_id,
+    )
+    .fetch_all(exec)
     .await
 }
 
@@ -455,8 +470,8 @@ pub(crate) async fn rekey_events(
     Ok(result.rows_affected())
 }
 
-/// Moves conversions to a person key, so the person's later conversions
-/// that day don't count as first ones. A conversion the person already has
+/// Moves conversions in the project file to a person key, so the person's
+/// later conversions that day don't count as first ones. A conversion the person already has
 /// stays under the old key.
 pub(crate) async fn rekey_conversions(
     exec: impl SqliteExecutor<'_>,
@@ -617,19 +632,34 @@ pub(crate) async fn prune_events(
     Ok(result.rows_affected())
 }
 
+/// Deletes conversions from days before `before`. A project file holds
+/// only its project's goals.
 pub(crate) async fn prune_conversions(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
-    project_id: ProjectId,
     before: &str,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "DELETE FROM analytics_conversions WHERE workspace_id = ? AND day < ? AND goal_id IN (
-           SELECT id FROM analytics_goals WHERE workspace_id = ? AND project_id = ?)",
+        "DELETE FROM analytics_conversions WHERE workspace_id = ? AND day < ?",
         workspace_id,
         before,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Deletes a goal's conversions from its project file; the goal row is in
+/// the app database, so no foreign key does this.
+pub(crate) async fn delete_goal_conversions(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    goal_id: GoalId,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM analytics_conversions WHERE workspace_id = ? AND goal_id = ?",
         workspace_id,
-        project_id,
+        goal_id,
     )
     .execute(exec)
     .await?;

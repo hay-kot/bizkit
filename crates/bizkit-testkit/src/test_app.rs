@@ -15,6 +15,7 @@ use bizkit_core::{App, Config, Deps, Module, ModuleContext};
 use http::StatusCode;
 use serde_json::json;
 use tempfile::TempDir;
+use tokio_util::sync::CancellationToken;
 
 use crate::fakes::{FakeClock, FakeHooks, FakeHttp, FakeMailer, MemBlobs};
 use crate::mcp_client::McpClient;
@@ -283,12 +284,48 @@ impl TestApp {
         token
     }
 
-    /// Runs every job due now.
+    /// Runs the app's real shutdown: serves on a free local port with a
+    /// token that has already fired, so HTTP stops at once, the worker
+    /// joins, modules stop and the database closes. The data dir is kept
+    /// and returned, so a test can open what the app left behind.
     ///
     /// # Panics
     ///
-    /// When the worker can't claim or finish a job.
+    /// When binding or serving fails.
+    pub async fn shut_down(self) -> TempDir {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap_or_else(|err| panic!("binding a port: {err}"));
+        let shutdown = CancellationToken::new();
+        shutdown.cancel();
+        let router = self.app.router();
+        self.app
+            .serve(router, listener, shutdown)
+            .await
+            .unwrap_or_else(|err| panic!("serving: {err:#}"));
+        self.dir
+    }
+
+    /// Writes every module's buffered work, as a timer or shutdown would.
+    ///
+    /// # Panics
+    ///
+    /// When a module flush fails.
+    pub async fn flush(&self) {
+        self.app
+            .platform()
+            .flush_modules()
+            .await
+            .unwrap_or_else(|err| panic!("flushing modules: {err:#}"));
+    }
+
+    /// Flushes module buffers, then runs every job due now.
+    ///
+    /// # Panics
+    ///
+    /// When a module flush fails, or the worker can't claim or finish a job.
     pub async fn drain_jobs(&self) -> RunStats {
+        self.flush().await;
         self.app
             .worker()
             .run_until_idle()

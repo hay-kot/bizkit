@@ -12,8 +12,10 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::api::{Goal, GoalId, GoalKind, GoalList, IdentityMode, Site};
+use crate::files::Files;
 use crate::ingest::Ingest;
 use crate::names;
+use crate::report::Scope as ReportScope;
 use crate::store::{self, GoalRow, SiteRow};
 
 const READ: Access = Access::Workspace(Scope::new("analytics", Level::Read));
@@ -370,9 +372,39 @@ impl Operation for GoalsDelete {
 
     async fn call(&self, cx: OpCtx, input: InGoal) -> Result<NoContent, ApiError> {
         let mut tx = cx.write().await?;
-        let deleted = store::delete_goal(&mut *tx, input.workspace_id, input.goal_id).await?;
+        let project_id = store::delete_goal(&mut *tx, input.workspace_id, input.goal_id)
+            .await?
+            .ok_or(ApiError::NotFound)?;
         tx.commit().await?;
         self.0.sites.clear();
-        if deleted { Ok(NoContent) } else { Err(ApiError::NotFound) }
+        let scope = ReportScope { workspace_id: input.workspace_id, project_id };
+        // The goal is gone once the app commits, so cleanup failures are
+        // logged rather than returned: a retry would only get a 404. A
+        // conversion left behind is skipped by the hook and later pruned.
+        if let Err(err) =
+            delete_conversions(&self.0.files, cx.platform(), scope, input.goal_id).await
+        {
+            tracing::error!(
+                error = format!("{err:#}"),
+                goal_id = %input.goal_id,
+                "removing a deleted goal's conversions failed"
+            );
+        }
+        Ok(NoContent)
     }
+}
+
+/// Flushes the project's queued events, which may convert the goal, then
+/// deletes its conversions from the project file.
+async fn delete_conversions(
+    files: &Files,
+    platform: &Platform,
+    scope: ReportScope,
+    goal_id: GoalId,
+) -> anyhow::Result<()> {
+    let Some(file) = files.get(platform, scope).await? else { return Ok(()) };
+    file.flush().await?;
+    let mut tx = file.db.write().await?;
+    store::delete_goal_conversions(&mut *tx, scope.workspace_id, goal_id).await?;
+    tx.commit().await.context("committing a goal's conversion cleanup")
 }

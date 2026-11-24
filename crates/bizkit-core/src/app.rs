@@ -27,7 +27,7 @@ use crate::deps::Deps;
 use crate::error::ApiError;
 use crate::hooks::Hooks;
 use crate::jobs::{Bus, Worker};
-use crate::module::{Module, Registration, register_all};
+use crate::module::{Lifecycle, Module, Registration, register_all};
 use crate::ops::{Registry, ScopeAreas};
 use crate::tenancy::workspaces;
 use crate::time::UnixMillis;
@@ -49,6 +49,7 @@ struct PlatformInner {
     scope_areas: ScopeAreas,
     modules: Vec<&'static str>,
     hooks: Hooks,
+    lifecycles: Vec<Arc<dyn Lifecycle>>,
 }
 
 impl Platform {
@@ -108,6 +109,25 @@ impl Platform {
 
     pub(crate) fn hooks(&self) -> &Hooks {
         &self.0.hooks
+    }
+
+    /// Runs every module's [`Lifecycle::flush`] in module order, so
+    /// buffered work becomes visible to reads and jobs.
+    ///
+    /// # Errors
+    ///
+    /// The first module flush that fails.
+    pub async fn flush_modules(&self) -> anyhow::Result<()> {
+        for lifecycle in &self.0.lifecycles {
+            lifecycle.flush().await?;
+        }
+        Ok(())
+    }
+
+    async fn stop_modules(&self) {
+        for lifecycle in &self.0.lifecycles {
+            lifecycle.stop().await;
+        }
     }
 
     /// How long a session lasts without use.
@@ -235,7 +255,7 @@ impl App {
                 }
             }
         }
-        let Registration { registry, handlers, routes, hooks } = registration;
+        let Registration { registry, handlers, routes, hooks, lifecycles, .. } = registration;
         let handlers = Arc::new(handlers);
         let bus = Bus::new(Arc::clone(&handlers), Arc::clone(&deps.clock));
         let platform = Platform(Arc::new(PlatformInner {
@@ -247,6 +267,7 @@ impl App {
             scope_areas: registry.areas().clone(),
             modules: names,
             hooks: hooks.finish(),
+            lifecycles,
             config,
         }));
         let worker = Worker::new(platform.clone(), handlers);
@@ -331,7 +352,8 @@ impl App {
     }
 
     /// Serves `router` (the bin's, with the fallback attached) and runs the
-    /// worker until `shutdown` fires, then lets the in-flight job finish.
+    /// worker until `shutdown` fires, then lets the in-flight job finish and
+    /// stops every module's [`Lifecycle`].
     ///
     /// # Errors
     ///
@@ -356,9 +378,12 @@ impl App {
                 .await
                 .context("serving HTTP");
         shutdown.cancel();
-        worker_task.await.context("joining the worker")?;
+        // Modules stop and the database closes even when the worker panicked,
+        // so buffered work is never left behind.
+        let joined = worker_task.await.context("joining the worker");
+        self.platform.stop_modules().await;
         self.platform.db().close().await;
-        served
+        served.and(joined)
     }
 }
 

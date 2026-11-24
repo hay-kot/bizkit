@@ -17,3 +17,9 @@ jobs:
 
       - name: Check
         run: mise run check
+        env:
+          # Full debug info for every test binary, built with and without
+          # test-hooks, fills the runner's disk. Line tables keep panic
+          # locations.
+          CARGO_PROFILE_DEV_DEBUG: line-tables-only
+          CARGO_PROFILE_TEST_DEBUG: line-tables-only

@@ -775,11 +775,13 @@ export type HookTargetKind = {
 export type IdentityMode = 'cookieless' | 'after_identify' | 'always';
 
 /**
- * How many events were recorded.
+ * How many events were accepted.
  */
 export type Ingested = {
     /**
-     * Events recorded, counting `$identify` calls.
+     * Events accepted, counting `$identify` calls. They are written in
+     * batches and show in reports within the flush window (100 ms by
+     * default).
      */
     accepted: number;
 };
@@ -2355,6 +2357,10 @@ export type AnalyticsEventsIngestErrors = {
      * Unprocessable Entity
      */
     422: ErrorBody;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorBody;
     /**
      * Internal Server Error
      */

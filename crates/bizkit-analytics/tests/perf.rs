@@ -6,7 +6,8 @@ mod perf {
     use std::time::{Duration, Instant};
 
     use bizkit_analytics::Analytics;
-    use bizkit_testkit::{Persona, TestApp};
+    use bizkit_analytics::testing::project_pool;
+    use bizkit_testkit::{Manifest, Persona, TestApp};
     use http::StatusCode;
     use serde_json::{Value, json};
 
@@ -17,7 +18,7 @@ mod perf {
     #[tokio::test]
     #[ignore = "slow; run with mise run analytics:perf"]
     async fn reports_stay_fast_over_a_million_events() {
-        let app = TestApp::builder().module(Analytics).build().await;
+        let app = TestApp::builder().module(Analytics::manual_flush()).build().await;
         let team = app.seed(Persona::Team, "perf").await;
         let admin = app.with_session(&team.accounts["admin"].session_token);
         let (ws, project) = (team.workspaces["main"].id, team.projects["site"].id.to_string());
@@ -29,41 +30,8 @@ mod perf {
 
         let now = app.app().platform().now().0;
         let start = now - DAYS * 86_400_000;
-        let platform = app.app().platform();
         let loading = Instant::now();
-        let mut tx = platform.db().write().await.unwrap();
-        sqlx::query(
-            "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < ? - 1)
-             INSERT INTO analytics_events (workspace_id, project_id, ts, day, name, path, referrer_host,
-                                           country, device, browser, os, visitor, person, source)
-             SELECT ?, ?, ? + (i % ?) * 86400000 + (i % 86400000),
-                    date((? + (i % ?) * 86400000) / 1000, 'unixepoch'),
-                    CASE WHEN i % 10 = 0 THEN 'signup' ELSE 'pageview' END,
-                    '/p' || (i % 300),
-                    CASE i % 4 WHEN 0 THEN 'google.com' WHEN 1 THEN 'news.ycombinator.com' ELSE NULL END,
-                    CASE i % 3 WHEN 0 THEN 'US' WHEN 1 THEN 'DE' ELSE 'GB' END,
-                    'desktop', 'Chrome', 'macOS',
-                    (i * 7919) % 5000,
-                    'v:' || ((i * 7919) % 5000),
-                    'web'
-             FROM n",
-        )
-        .bind(EVENTS)
-        .bind(ws.to_string())
-        .bind(&project)
-        .bind(start)
-        .bind(DAYS)
-        .bind(start)
-        .bind(DAYS)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-        sqlx::query("UPDATE analytics_sites SET last_event_day = date(? / 1000, 'unixepoch')")
-            .bind(start)
-            .execute(&mut *tx)
-            .await
-            .unwrap();
-        tx.commit().await.unwrap();
+        load_events(&app, &team, start).await;
         println!("loaded {EVENTS} events in {:?}", loading.elapsed());
 
         let from = time_of(start);
@@ -102,6 +70,50 @@ mod perf {
         let rolled = timed("summary", Some(BUDGET), || admin.get(&summary)).await;
         assert_eq!(raw["totals"], rolled["totals"], "rollups give the raw numbers");
         timed("breakdown", Some(BUDGET), || admin.get(&breakdown)).await;
+    }
+
+    /// Inserts [`EVENTS`] events over [`DAYS`] days from `start` straight
+    /// into the project's file, and marks the site as having events.
+    async fn load_events(app: &TestApp, team: &Manifest, start: i64) {
+        let ws = team.workspaces["main"].id;
+        let project = team.projects["site"].id.to_string();
+        let platform = app.app().platform();
+        let file = project_pool(app.data_dir(), team.projects["site"].id).await.unwrap();
+        let mut tx = file.begin().await.unwrap();
+        sqlx::query(
+            "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < ? - 1)
+             INSERT INTO analytics_events (workspace_id, project_id, ts, day, name, path, referrer_host,
+                                           country, device, browser, os, visitor, person, source)
+             SELECT ?, ?, ? + (i % ?) * 86400000 + (i % 86400000),
+                    date((? + (i % ?) * 86400000) / 1000, 'unixepoch'),
+                    CASE WHEN i % 10 = 0 THEN 'signup' ELSE 'pageview' END,
+                    '/p' || (i % 300),
+                    CASE i % 4 WHEN 0 THEN 'google.com' WHEN 1 THEN 'news.ycombinator.com' ELSE NULL END,
+                    CASE i % 3 WHEN 0 THEN 'US' WHEN 1 THEN 'DE' ELSE 'GB' END,
+                    'desktop', 'Chrome', 'macOS',
+                    (i * 7919) % 5000,
+                    'v:' || ((i * 7919) % 5000),
+                    'web'
+             FROM n",
+        )
+        .bind(EVENTS)
+        .bind(ws.to_string())
+        .bind(&project)
+        .bind(start)
+        .bind(DAYS)
+        .bind(start)
+        .bind(DAYS)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        let mut app_tx = platform.db().write().await.unwrap();
+        sqlx::query("UPDATE analytics_sites SET last_event_day = date(? / 1000, 'unixepoch')")
+            .bind(start)
+            .execute(&mut *app_tx)
+            .await
+            .unwrap();
+        app_tx.commit().await.unwrap();
     }
 
     fn time_of(millis: i64) -> String {

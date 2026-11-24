@@ -7,6 +7,7 @@ mod ingest {
 
     use bizkit_analytics::Analytics;
     use bizkit_analytics::hooks::GOAL_CONVERTED;
+    use bizkit_analytics::testing::project_pool;
     use bizkit_core::jobs::JobCtx;
     use bizkit_testkit::{FakeHooks, Manifest, Persona, RawBody, SpecClient, TestApp};
     use http::{HeaderName, Method, StatusCode, header};
@@ -42,7 +43,7 @@ mod ingest {
     async fn setup(mode: &str) -> Setup {
         let hooks = FakeHooks::default();
         let app = TestApp::builder()
-            .module(Analytics)
+            .module(Analytics::manual_flush())
             .hook_runner(hooks.clone())
             .config(|config| config.trusted_proxies = 1)
             .build()
@@ -96,18 +97,25 @@ mod ingest {
             self.raw(serde_json::to_vec(&beacon).unwrap(), CHROME, ip).await;
         }
 
+        /// Flushes queued events and opens the project's file.
+        async fn file(&self) -> sqlx::SqlitePool {
+            self.app.flush().await;
+            let project = self.team.projects["site"].id;
+            project_pool(self.app.data_dir(), project).await.unwrap()
+        }
+
         async fn events(&self) -> Vec<Event> {
             sqlx::query_as(
                 "SELECT name, path, person, referrer_host, utm_source, browser, os, device, anon_id, props
                  FROM analytics_events ORDER BY id",
             )
-            .fetch_all(self.app.app().platform().db().read())
+            .fetch_all(&self.file().await)
             .await
             .unwrap()
         }
 
         async fn count(&self, sql: &'static str) -> i64 {
-            sqlx::query_scalar(sql).fetch_one(self.app.app().platform().db().read()).await.unwrap()
+            sqlx::query_scalar(sql).fetch_one(&self.file().await).await.unwrap()
         }
     }
 
@@ -195,11 +203,11 @@ mod ingest {
         assert_ne!(people[0], people[2], "other address");
         assert_ne!(people[0], people[3], "other agent");
         assert_ne!(people[0], people[4], "next day");
-        assert_eq!(
-            s.count("SELECT count(*) FROM analytics_salts").await,
-            1,
-            "old salts are deleted"
-        );
+        let salts: i64 = sqlx::query_scalar("SELECT count(*) FROM analytics_salts")
+            .fetch_one(s.app.app().platform().db().read())
+            .await
+            .unwrap();
+        assert_eq!(salts, 1, "old salts are deleted");
     }
 
     #[tokio::test]
@@ -296,7 +304,7 @@ mod ingest {
         assert_eq!(&events[3].person, person, "the alias links later events");
         let traits: String =
             sqlx::query_scalar("SELECT traits FROM analytics_people WHERE user_id = 'user_1'")
-                .fetch_one(s.app.app().platform().db().read())
+                .fetch_one(&s.file().await)
                 .await
                 .unwrap();
         assert_eq!(traits, r#"{"email":"a@x.test"}"#);
@@ -466,7 +474,7 @@ mod ingest {
         assert_eq!(events[0].utm_source.as_deref(), Some("mail"));
         assert_eq!(events[0].browser, None);
         let source: String = sqlx::query_scalar("SELECT source FROM analytics_events")
-            .fetch_one(s.app.app().platform().db().read())
+            .fetch_one(&s.file().await)
             .await
             .unwrap();
         assert_eq!(source, "server");

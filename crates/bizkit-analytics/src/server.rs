@@ -7,7 +7,9 @@ use std::sync::Arc;
 use bizkit_core::ApiError;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::ops::{Access, Level, Method, OpCtx, Operation, Scope};
+use bizkit_core::time::UnixMillis;
 use bizkit_core::validate::{FieldErrors, Validate};
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
@@ -15,9 +17,10 @@ use utoipa::ToSchema;
 use crate::api::Day;
 use crate::beacon::{self, Name};
 use crate::enrich::{self, Attribution, Who};
+use crate::files::Submit;
 use crate::ingest::Ingest;
 use crate::store;
-use crate::write::{self, Incoming, Origin};
+use crate::write::{Incoming, Origin};
 
 /// The most events per call.
 pub(crate) const MAX_BATCH: usize = 100;
@@ -112,10 +115,12 @@ impl Validate for IngestEvents {
     }
 }
 
-/// How many events were recorded.
+/// How many events were accepted.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct Ingested {
-    /// Events recorded, counting `$identify` calls.
+    /// Events accepted, counting `$identify` calls. They are written in
+    /// batches and show in reports within the flush window (100 ms by
+    /// default).
     pub(crate) accepted: usize,
 }
 
@@ -130,6 +135,8 @@ impl Operation for EventsIngest {
     const ACCESS: Access = Access::Workspace(Scope::new("analytics", Level::Write));
     const SUMMARY: &'static str = "Record product events from your server";
     const TAGS: &'static [&'static str] = &["analytics"];
+    /// 429 when the project's write queue is full; retry after a second.
+    const ERRORS: &'static [StatusCode] = &[StatusCode::TOO_MANY_REQUESTS];
 
     async fn call(&self, cx: OpCtx, input: IngestEvents) -> Result<Ingested, ApiError> {
         let platform = cx.platform();
@@ -139,19 +146,28 @@ impl Operation for EventsIngest {
             .ok_or(ApiError::NotFound)?;
         let site =
             self.0.sites.get(db, &row.site_key, platform.now()).await?.ok_or(ApiError::NotFound)?;
-        let salt = self.0.salts.get(db, Day::of(platform.now())).await?;
+        let received = platform.now();
+        let salt = self.0.salts.get(db, Day::of(received)).await?;
         let accepted = input.events.len();
         let events: Vec<Incoming> = input
             .events
             .into_iter()
-            .map(|event| incoming(&salt, input.project_id, event))
+            .map(|event| incoming(&salt, input.project_id, received, event))
             .collect::<Result<_, _>>()?;
-        write::record(platform, &self.0.sites, &site, &events).await?;
-        Ok(Ingested { accepted })
+        match self.0.files.submit(platform, site, events).await {
+            Ok(()) => Ok(Ingested { accepted }),
+            Err(Submit::Full) => Err(ApiError::RateLimited { retry_after_secs: 1 }),
+            Err(Submit::Failed(err)) => Err(ApiError::Internal(err)),
+        }
     }
 }
 
-fn incoming(salt: &[u8; 32], project: ProjectId, event: ServerEvent) -> Result<Incoming, ApiError> {
+fn incoming(
+    salt: &[u8; 32],
+    project: ProjectId,
+    received: UnixMillis,
+    event: ServerEvent,
+) -> Result<Incoming, ApiError> {
     let name =
         Name::parse(&event.name).map_err(|_| ApiError::BadRequest("bad event name".to_owned()))?;
     let who = match (&event.user_id, &event.anon_id) {
@@ -180,6 +196,8 @@ fn incoming(salt: &[u8; 32], project: ProjectId, event: ServerEvent) -> Result<I
         props,
         traits,
         origin: Origin::Server,
+        received,
+        day: Day::of(received).to_string(),
     })
 }
 
@@ -197,7 +215,7 @@ mod tests {
             props: None,
             traits: None,
         };
-        let made = incoming(&[0; 32], ProjectId::new(), event).unwrap();
+        let made = incoming(&[0; 32], ProjectId::new(), UnixMillis(0), event).unwrap();
         assert_eq!(made.attribution, Attribution::default());
         assert_eq!(made.path, None);
     }

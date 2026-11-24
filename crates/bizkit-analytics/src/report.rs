@@ -12,6 +12,7 @@ use bizkit_core::ids::{ProjectId, WorkspaceId};
 use sqlx::SqliteExecutor;
 
 use crate::api::{Day, GoalId};
+use crate::store::GoalRow;
 
 /// Which days of a range come from rollups and which from raw events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -185,54 +186,55 @@ pub(crate) async fn hourly(
 }
 
 /// Conversions per goal: unique visitors per day who viewed the goal's page
-/// or sent its event.
+/// or sent its event. `goals` come from the app database; the counts from
+/// the project file `exec`.
 pub(crate) async fn goal_conversions<'e>(
     exec: impl SqliteExecutor<'e> + Copy,
     scope: Scope,
+    goals: &[GoalRow],
     split: Split,
 ) -> sqlx::Result<HashMap<GoalId, i64>> {
     let mut out: HashMap<GoalId, i64> = HashMap::new();
-    if let Some((from, to)) = split.rolled {
-        let (from, to) = (from.to_string(), to.to_string());
-        let rows = sqlx::query!(
-            r#"SELECT g.id AS "id!: GoalId", SUM(d.visitors) AS "visitors!: i64"
-               FROM analytics_goals g
-               JOIN analytics_daily d
-                 ON d.project_id = g.project_id AND d.dimension = g.kind AND d.value = g.match
-                AND d.day >= ? AND d.day <= ?
-               WHERE g.workspace_id = ? AND g.project_id = ?
-               GROUP BY g.id"#,
-            from,
-            to,
-            scope.workspace_id,
-            scope.project_id,
-        )
-        .fetch_all(exec)
-        .await?;
-        for row in rows {
-            *out.entry(row.id).or_default() += row.visitors;
+    for goal in goals {
+        let mut visitors = 0;
+        if let Some((from, to)) = split.rolled {
+            let (from, to) = (from.to_string(), to.to_string());
+            visitors += sqlx::query_scalar!(
+                r#"SELECT COALESCE(SUM(visitors), 0) AS "visitors!: i64" FROM analytics_daily
+                   WHERE workspace_id = ? AND project_id = ? AND dimension = ? AND value = ?
+                     AND day >= ? AND day <= ?"#,
+                scope.workspace_id,
+                scope.project_id,
+                goal.kind,
+                goal.matches,
+                from,
+                to,
+            )
+            .fetch_one(exec)
+            .await?;
         }
-    }
-    if let Some((from, to)) = split.raw {
-        let (from, to) = (from.to_string(), to.to_string());
-        let rows = sqlx::query!(
-            r#"SELECT g.id AS "id!: GoalId", COUNT(DISTINCT e.day || ':' || e.visitor) AS "visitors!: i64"
-               FROM analytics_goals g
-               JOIN analytics_events e
-                 ON e.project_id = g.project_id AND e.day >= ? AND e.day <= ?
-                AND ((g.kind = 'page' AND e.name = 'pageview' AND e.path = g.match)
-                  OR (g.kind = 'event' AND e.name = g.match))
-               WHERE g.workspace_id = ? AND g.project_id = ?
-               GROUP BY g.id"#,
-            from,
-            to,
-            scope.workspace_id,
-            scope.project_id,
-        )
-        .fetch_all(exec)
-        .await?;
-        for row in rows {
-            *out.entry(row.id).or_default() += row.visitors;
+        if let Some((from, to)) = split.raw {
+            let (from, to) = (from.to_string(), to.to_string());
+            visitors += sqlx::query_scalar!(
+                r#"SELECT COUNT(DISTINCT day || ':' || visitor) AS "visitors!: i64"
+                   FROM analytics_events
+                   WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?
+                     AND ((? = 'page' AND name = 'pageview' AND path = ?)
+                       OR (? = 'event' AND name = ?))"#,
+                scope.workspace_id,
+                scope.project_id,
+                from,
+                to,
+                goal.kind,
+                goal.matches,
+                goal.kind,
+                goal.matches,
+            )
+            .fetch_one(exec)
+            .await?;
+        }
+        if visitors > 0 {
+            out.insert(goal.id, visitors);
         }
     }
     Ok(out)

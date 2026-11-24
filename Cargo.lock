@@ -376,6 +376,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bizkit-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "bizkit-analytics",
+ "bizkit-core",
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "bizkit-core"
 version = "0.1.0"
 dependencies = [
@@ -481,6 +499,7 @@ dependencies = [
  "axum-test",
  "bizkit-core",
  "bytes",
+ "futures",
  "http",
  "jsonschema",
  "serde",

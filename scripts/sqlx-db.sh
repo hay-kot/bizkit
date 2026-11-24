@@ -19,6 +19,11 @@ dirs=("$root/crates/bizkit-core/migrations")
 for dir in "$root"/crates/*/migrations; do
   [[ "$dir" == "$root/crates/bizkit-core/migrations" ]] || dirs+=("$dir")
 done
+# Per-project file schemas (analytics' migrations-project) go last: the app
+# migrations drop the tables they recreate.
+for dir in "$root"/crates/*/migrations-*; do
+  [[ -d "$dir" ]] && dirs+=("$dir")
+done
 for dir in "${dirs[@]}"; do
   sqlx migrate run --source "$dir" --ignore-missing
 done

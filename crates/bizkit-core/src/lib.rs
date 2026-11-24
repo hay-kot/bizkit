@@ -30,7 +30,7 @@ pub use crate::auth::middleware::Authn;
 pub use crate::config::Config;
 pub use crate::deps::Deps;
 pub use crate::error::ApiError;
-pub use crate::module::{DemoSeed, Module, ModuleContext};
+pub use crate::module::{DemoSeed, Lifecycle, Module, ModuleContext};
 
 /// Projects, for modules that keep data per project.
 pub mod projects {
@@ -42,8 +42,8 @@ pub mod api {
     pub use crate::auth::ops::{ApiKey, ApiKeyList, CreatedApiKey};
     pub use crate::tenancy::ops::{
         Invitation, InvitationList, Me, Member, MemberList, Membership, MembershipList, Meta,
-        MyInvitation, MyInvitationList, Project, ProjectCreated, ProjectList, Workspace,
-        WorkspaceRef,
+        MyInvitation, MyInvitationList, Project, ProjectCreated, ProjectDeleted, ProjectList,
+        Workspace, WorkspaceRef,
     };
 }
 

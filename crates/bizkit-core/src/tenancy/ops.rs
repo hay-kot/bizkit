@@ -284,6 +284,21 @@ impl Event for ProjectCreated {
     const NAME: &'static str = "projects.created";
 }
 
+/// Published when a project is deleted, in the same transaction. Modules
+/// that keep project data outside the database (files) clean it up here;
+/// rows in the database go by foreign key.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDeleted {
+    /// The project's workspace.
+    pub workspace_id: WorkspaceId,
+    /// The deleted project.
+    pub project_id: ProjectId,
+}
+
+impl Event for ProjectDeleted {
+    const NAME: &'static str = "projects.deleted";
+}
+
 // ---------------------------------------------------------------- inputs
 
 /// Just the workspace from the path.
@@ -1054,6 +1069,11 @@ impl Operation for ProjectsDelete {
     async fn call(&self, cx: OpCtx, input: InProject) -> Result<NoContent, ApiError> {
         let mut tx = cx.write().await?;
         let deleted = projects::delete(&mut *tx, input.workspace_id, input.project_id).await?;
+        if deleted {
+            let event =
+                ProjectDeleted { workspace_id: input.workspace_id, project_id: input.project_id };
+            cx.platform().bus().publish(&mut tx, &event).await?;
+        }
         tx.commit().await?;
         if deleted { Ok(NoContent) } else { Err(ApiError::NotFound) }
     }

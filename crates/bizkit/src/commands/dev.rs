@@ -69,7 +69,8 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
             }
         }
         DevCommand::SeedDemo => {
-            bizkit_core::dev::demo::seed(&db, &modules, SystemClock.now()).await?;
+            let data_dir = config.data_dir.as_deref().context("data_dir is not set")?;
+            bizkit_core::dev::demo::seed(&db, &modules, SystemClock.now(), data_dir).await?;
             writeln!(
                 out,
                 "seeded the demo workspace; sign in as {}",
@@ -163,7 +164,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "analytics")]
+    #[cfg(all(feature = "analytics", feature = "test-hooks"))]
     #[tokio::test]
     async fn seed_demo_fills_analytics_once() {
         let dir = tempfile::tempdir().unwrap();
@@ -176,24 +177,71 @@ mod tests {
                 "SELECT COUNT(*) FROM analytics_sites",
                 "SELECT COUNT(*) FROM analytics_goals",
                 "SELECT COUNT(*) FROM analytics_funnels",
-                "SELECT COUNT(DISTINCT day) FROM analytics_events",
-                "SELECT COUNT(*) FROM analytics_people",
-                "SELECT COUNT(*) FROM analytics_conversions",
-                "SELECT COUNT(*) FROM analytics_events",
             ] {
                 counts.push(sqlx::query_scalar::<_, i64>(sql).fetch_one(db.read()).await.unwrap());
             }
+            let projects: Vec<bizkit_core::ids::ProjectId> =
+                sqlx::query_scalar("SELECT project_id FROM analytics_sites ORDER BY project_id")
+                    .fetch_all(db.read())
+                    .await
+                    .unwrap();
             db.close().await;
+            // Events, people and conversions live in each project's file.
+            let mut file_counts = [0_i64; 4];
+            for project in projects {
+                let file =
+                    bizkit_analytics::testing::project_pool(&data_dir, project).await.unwrap();
+                for (at, sql) in [
+                    "SELECT COUNT(DISTINCT day) FROM analytics_events",
+                    "SELECT COUNT(*) FROM analytics_people",
+                    "SELECT COUNT(*) FROM analytics_conversions",
+                    "SELECT COUNT(*) FROM analytics_events",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    file_counts[at] +=
+                        sqlx::query_scalar::<_, i64>(sql).fetch_one(&file).await.unwrap();
+                }
+                file.close().await;
+            }
+            counts.extend(file_counts);
             counts
         };
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         let first = counts().await;
-        assert_eq!(first[..4], [2, 2, 1, 14], "sites, goals, funnels, days: {first:?}");
+        assert_eq!(
+            first[..4],
+            [2, 2, 1, 28],
+            "sites, goals, funnels, days summed over two sites: {first:?}"
+        );
         assert!(
             first[4..].iter().all(|count| *count > 0),
             "people, conversions, events: {first:?}"
         );
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         assert_eq!(counts().await, first, "a second run changes nothing");
+
+        // The move to project files dropped the events and reset the day
+        // markers but kept the sites; a run after it refills the files.
+        std::fs::remove_dir_all(data_dir.join("analytics")).unwrap();
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let mut tx = db.write().await.unwrap();
+        sqlx::query("UPDATE analytics_sites SET last_event_day = NULL")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        db.close().await;
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        assert_eq!(counts().await, first, "a run after the upgrade refills the files");
+        let reopened = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let unmarked: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM analytics_sites WHERE last_event_day IS NULL")
+                .fetch_one(reopened.read())
+                .await
+                .unwrap();
+        reopened.close().await;
+        assert_eq!(unmarked, 0, "refilled sites report events");
     }
 }
