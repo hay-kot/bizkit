@@ -130,7 +130,17 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
-  const analyticsTabs = ['', '/events', '/funnels', '/people', '/retention', '/settings']
+  const analyticsTabs = [
+    '',
+    '/events',
+    '/insights',
+    '/insights/new',
+    '/dashboards',
+    '/funnels',
+    '/people',
+    '/retention',
+    '/settings',
+  ]
   for (const tab of analyticsTabs) {
     test(`the analytics${tab} page is clean`, async ({ page, world, baseURL }) => {
       const errors = trackPageErrors(page)
