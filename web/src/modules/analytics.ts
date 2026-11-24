@@ -3,7 +3,6 @@ import { computed } from 'vue'
 
 import AnalyticsLayout from '@/components/analytics/AnalyticsLayout.vue'
 import Dashboard from '@/pages/analytics/Dashboard.vue'
-import Dashboards from '@/pages/analytics/Dashboards.vue'
 import Events from '@/pages/analytics/Events.vue'
 import Funnel from '@/pages/analytics/Funnel.vue'
 import Funnels from '@/pages/analytics/Funnels.vue'
@@ -34,7 +33,14 @@ export default defineWebModule({
         { path: 'insights', component: Insights },
         { path: 'insights/new', component: NewInsight },
         { path: 'insights/:insightId', component: Insight },
-        { path: 'dashboards', component: Dashboards },
+        // Dashboards live on the Insights tab; old links and bookmarks land there.
+        {
+          path: 'dashboards',
+          redirect: (to) => ({
+            path: to.path.replace(/\/dashboards\/?$/, '/insights'),
+            query: to.query,
+          }),
+        },
         { path: 'dashboards/:dashboardId', component: Dashboard },
         { path: 'funnels', component: Funnels },
         { path: 'funnels/:funnelId', component: Funnel },
@@ -69,7 +75,6 @@ export default defineWebModule({
     return computed((): PaletteRow[] => [
       page('events', 'Events'),
       page('insights', 'Insights'),
-      page('dashboards', 'Dashboards'),
       page('funnels', 'Funnels'),
       page('people', 'People'),
       page('retention', 'Retention'),
@@ -92,7 +97,7 @@ export default defineWebModule({
         icon: Plus,
         kind: 'action',
         keywords: ['create', 'add', 'dashboard', 'analytics'],
-        to: `${base}/dashboards?new=1`,
+        to: `${base}/insights?new=1`,
       },
       {
         id: 'analytics:new-funnel',
