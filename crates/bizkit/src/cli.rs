@@ -25,6 +25,11 @@ pub(crate) struct GlobalArgs {
     #[arg(long, env = "LOG_LEVEL", value_enum, global = true)]
     pub(crate) log_level: Option<LogLevel>,
 
+    /// Log every SQL statement at debug. Without it, SQL logs only slow
+    /// statements and errors, as warnings
+    #[arg(long, env = "LOG_SQL", global = true)]
+    pub(crate) log_sql: bool,
+
     /// Disable colored output
     #[arg(long, env = "NO_COLOR", global = true)]
     pub(crate) no_color: bool,

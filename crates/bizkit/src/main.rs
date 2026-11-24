@@ -38,7 +38,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         None => config::Config::read()?,
     };
     let log_level = cli.global.log_level.or(config.log_level).unwrap_or_default();
-    logging::init(log_level, !cli.global.no_color)?;
+    logging::init(log_level, cli.global.log_sql, !cli.global.no_color)?;
     let ctx = commands::Context { config };
     let mut out = io::stdout().lock();
 
