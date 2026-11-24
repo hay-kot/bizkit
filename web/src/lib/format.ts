@@ -10,6 +10,7 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'medium',
 })
+const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' })
 const relativeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['second', 60],
@@ -62,6 +63,11 @@ export function isPast(value: string): boolean {
 /** `Nov 22, 2026, 8:04:12 PM`, for a hover title next to a relative time. */
 export function formatDateTime(value: string | null | undefined, fallback = '—'): string {
   return value ? dateTimeFormat.format(new Date(value)) : fallback
+}
+
+/** `8:04 PM`, for times listed under a date shown nearby. */
+export function formatTime(value: string): string {
+  return timeFormat.format(new Date(value))
 }
 
 /**

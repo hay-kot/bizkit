@@ -1,6 +1,7 @@
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
+import { formatTime } from '@/lib/format'
 import type { DropoffPage } from '@/queries/analytics'
 
 import FunnelDropoffs from './FunnelDropoffs.vue'
@@ -60,7 +61,7 @@ describe('FunnelDropoffs', () => {
     const rows = wrapper.findAll('tbody tr')
     expect(rows[0]!.text()).toContain('ada@x.test')
     expect(rows[1]!.text()).toContain('Anonymous visitor')
-    expect(rows[1]!.text()).toContain('09:00 UTC/pricing')
+    expect(rows[1]!.text()).toContain(`${formatTime('2026-01-01T09:00:00Z')}/pricing`)
     expect(rows[1]!.text()).toContain('faq_opened')
   })
 
