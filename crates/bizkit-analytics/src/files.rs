@@ -42,6 +42,11 @@ const READER_IDLE: Duration = Duration::from_mins(5);
 const FILE_IDLE: Duration = Duration::from_mins(10);
 /// How often `Files::get` looks for idle files.
 const SWEEP_EVERY: Duration = Duration::from_mins(1);
+/// How long removing a project's file waits for reads that still hold it.
+/// Longer than any report should run; past it the reads fail, the file goes.
+const REMOVE_WAIT: Duration = Duration::from_mins(1);
+/// How often that wait checks.
+const HOLDER_POLL: Duration = Duration::from_millis(20);
 
 /// The project-file migrations. Versions share one `_sqlx_migrations`
 /// table with the app migrations in the sqlx prepare database, so they
@@ -156,11 +161,16 @@ impl ProjectFile {
 
     /// Flushes and stops the writer, then closes the pools. Later submits fail.
     async fn stop(&self) {
+        self.stop_writer().await;
+        self.db.close().await;
+    }
+
+    /// Flushes and stops the writer and leaves the pools open. Later submits fail.
+    async fn stop_writer(&self) {
         let state = std::mem::replace(&mut *self.writer.lock().await, WriterState::Stopped);
         if let WriterState::Running(handle) = state {
             handle.stop().await;
         }
-        self.db.close().await;
     }
 }
 
@@ -418,8 +428,15 @@ impl Files {
         }
         if let Some(slot) = slot {
             slot.closed.store(true, Ordering::SeqCst);
-            if let Some(file) = opened(&slot).await {
-                file.stop().await;
+            let file = opened(&slot).await;
+            drop(slot);
+            if let Some(file) = file {
+                file.stop_writer().await;
+                // A report that started before the delete still reads the
+                // file; closing the pools under it would fail it with a 500.
+                // New gets find no site, so the holders only go down.
+                wait_for_holders(&file, REMOVE_WAIT).await;
+                file.db.close().await;
             }
         }
         let path = project_db_path(data_dir, project_id);
@@ -459,6 +476,21 @@ impl Files {
         for gate in gates {
             drop(gate.lock().await);
         }
+    }
+}
+
+/// Returns once `file` has no holder but the caller, or after `limit`.
+async fn wait_for_holders(file: &Arc<ProjectFile>, limit: Duration) {
+    let deadline = Instant::now() + limit;
+    while Arc::strong_count(file) > 1 {
+        if Instant::now() >= deadline {
+            tracing::warn!(
+                holders = Arc::strong_count(file) - 1,
+                "closing a deleted project's file while reads still hold it"
+            );
+            return;
+        }
+        tokio::time::sleep(HOLDER_POLL).await;
     }
 }
 
@@ -612,6 +644,39 @@ mod tests {
         }
         files.flush_all().await.unwrap();
         assert!(pool.is_closed(), "flush_all waited for the close");
+    }
+
+    #[tokio::test]
+    async fn remove_waits_for_reads_that_hold_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = Arc::new(files());
+        let project = ProjectId::new();
+        let reading = file(dir.path(), &project.to_string()).await;
+        let pool = reading.db.read().clone();
+        files.open.lock().await.slots.insert(project, slot(Some(Arc::clone(&reading)), 0));
+
+        let removing = tokio::spawn({
+            let files = Arc::clone(&files);
+            let data_dir = dir.path().to_owned();
+            async move { files.remove(&data_dir, project).await }
+        });
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(!removing.is_finished(), "remove waits while a read holds the file");
+        sqlx::query("SELECT 1").execute(reading.db.read()).await.unwrap();
+
+        drop(reading);
+        removing.await.unwrap().unwrap();
+        assert!(pool.is_closed(), "the file closes once the read lets go");
+    }
+
+    #[tokio::test]
+    async fn the_holder_wait_gives_up_after_its_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let held = file(dir.path(), "held").await;
+        let other = Arc::clone(&held);
+        wait_for_holders(&held, Duration::from_millis(50)).await;
+        assert_eq!(Arc::strong_count(&other), 2, "returned with the holder still there");
+        held.stop().await;
     }
 
     #[tokio::test]
