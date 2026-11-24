@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM mailing_deliveries\n           WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0a2bcc291efd3babec52f71a258d4a1d282aca1b61ac0d54661e7b2b2f5e3064"
+}

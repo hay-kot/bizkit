@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO mailing_list_forms (list_id, form_id, workspace_id)\n             VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "02addd83ca6f55c16a362b34a8dacf372c85fa51633d0d0c0fd1cdc5e8fdbe83"
+}

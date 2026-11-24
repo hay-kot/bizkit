@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_lists SET name = ?, description = ?, double_opt_in = ?, footer = ?,\n                                  updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "0f609011fac3c5a0e874f56b657e5d61dd8eb1279465dbf464c2385441bbbe86"
+}

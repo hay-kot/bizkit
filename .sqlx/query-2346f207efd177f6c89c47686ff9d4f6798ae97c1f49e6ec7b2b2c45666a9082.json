@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(SUM(status = 'pending'), 0) AS \"pending!: i64\",\n                  COALESCE(SUM(status = 'subscribed'), 0) AS \"subscribed!: i64\",\n                  COALESCE(SUM(status = 'unsubscribed'), 0) AS \"unsubscribed!: i64\"\n           FROM mailing_contacts WHERE workspace_id = ? AND list_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "pending!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "subscribed!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "unsubscribed!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2346f207efd177f6c89c47686ff9d4f6798ae97c1f49e6ec7b2b2c45666a9082"
+}

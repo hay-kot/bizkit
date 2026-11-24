@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM mailing_list_forms WHERE workspace_id = ? AND list_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "88c28e73985ec29ea080a89e6dfb45b5e3e639f72fd411c4f2b25b0bf004da03"
+}

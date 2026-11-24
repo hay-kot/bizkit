@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM mailing_deliveries\n           WHERE workspace_id = ? AND list_id = ? AND kind = 'confirm' AND created_at >= ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fa05dd786acbe09ac27891cb960db5df39bdc952f8605fc6fbf3109de39c8feb"
+}

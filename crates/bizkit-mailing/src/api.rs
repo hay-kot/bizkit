@@ -278,7 +278,7 @@ impl DeliveryStatus {
 
 /// One mail the module sent or will send.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Delivery {
+pub struct MailDelivery {
     /// The delivery ID.
     pub id: DeliveryId,
     /// What it was for.
@@ -305,9 +305,9 @@ pub struct Delivery {
 
 /// A page of deliveries, newest first.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct DeliveryPage {
+pub struct MailDeliveryPage {
     /// The deliveries.
-    pub items: Vec<Delivery>,
+    pub items: Vec<MailDelivery>,
     /// Pass as `before` for the next page; absent on the last one.
     pub next_before: Option<DeliveryId>,
 }

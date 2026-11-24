@@ -1,0 +1,194 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\"\n           FROM mailing_deliveries\n           WHERE workspace_id = ?1 AND kind != 'test'\n             AND (?2 IS NULL OR broadcast_id = ?2)\n             AND (?3 IS NULL OR contact_id = ?3)\n             AND (?4 IS NULL OR status = ?4)\n             AND (?5 IS NULL OR id < ?5)\n           ORDER BY id DESC LIMIT ?6",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: DeliveryId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "list_id: ListId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "list_id"
+          }
+        }
+      },
+      {
+        "name": "contact_id: ContactId",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "contact_id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "broadcast_id: BroadcastId",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "broadcast_id"
+          }
+        }
+      },
+      {
+        "name": "enrollment_id: EnrollmentId",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "enrollment_id"
+          }
+        }
+      },
+      {
+        "name": "step_id: StepId",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "step_id"
+          }
+        }
+      },
+      {
+        "name": "to_email",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "to_email"
+          }
+        }
+      },
+      {
+        "name": "subject",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "error",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "name": "attempts",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "sent_at: UnixMillis",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "sent_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "6d7979e8ef50b107317ddddb009f33d85f6ba43c50d2a56f04de6a0ae6051073"
+}

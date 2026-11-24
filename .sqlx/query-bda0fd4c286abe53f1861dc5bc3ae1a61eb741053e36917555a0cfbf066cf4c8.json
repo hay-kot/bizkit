@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT list_id AS \"list_id: ListId\", form_id FROM mailing_list_forms\n           WHERE workspace_id = ? AND list_id IN (SELECT value FROM json_each(?))\n           ORDER BY list_id, form_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "list_id: ListId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_list_forms",
+            "name": "list_id"
+          }
+        }
+      },
+      {
+        "name": "form_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_list_forms",
+            "name": "form_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "bda0fd4c286abe53f1861dc5bc3ae1a61eb741053e36917555a0cfbf066cf4c8"
+}

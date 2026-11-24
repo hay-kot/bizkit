@@ -1,0 +1,16 @@
+---
+source: crates/bizkit-mailing/src/render.rs
+expression: mail.text
+---
+Hi Ada,
+
+**News** for ada@example.com:
+
+- one
+- [two](https://example.com/two)
+
+-- 
+Newsletter
+1 Main St
+Springfield
+Unsubscribe: https://app.example.com/m/mailing/public/unsubscribe?t=abc
