@@ -119,6 +119,7 @@ function onSend() {
       title: `Send ${r.title}?`,
       message: `This mails a private signing link to ${count} ${count === 1 ? 'signer' : 'signers'}. The PDF and signers can't change after that.`,
       confirmLabel: 'Send',
+      danger: false,
     },
     run: () => send.mutateAsync({ path: path.value }),
     success: 'Sent',
