@@ -82,7 +82,7 @@ pub trait Lifecycle: Send + Sync + fmt::Debug + 'static {
 pub struct DemoSeed {
     /// The demo workspace.
     pub workspace_id: WorkspaceId,
-    /// Its projects by slug: `website` and `docs`.
+    /// Its projects by slug: `website`, `docs` and `bizkit`.
     pub project_ids: BTreeMap<String, ProjectId>,
     /// The demo user, an admin of the workspace.
     pub user_id: UserId,

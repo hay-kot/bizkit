@@ -18,7 +18,9 @@ use crate::time::UnixMillis;
 pub const DEMO_EMAIL: &str = "demo@bizkit.test";
 /// The demo workspace slug.
 pub const DEMO_WORKSPACE: &str = "demo";
-const PROJECTS: [(&str, &str); 2] = [("website", "Website"), ("docs", "Docs")];
+/// `bizkit` gets the dev stack's own usage (`self_usage` in `dev/bizkit.yaml`).
+const PROJECTS: [(&str, &str); 3] =
+    [("website", "Website"), ("docs", "Docs"), ("bizkit", "bizkit usage")];
 
 /// Seeds core's demo rows, then calls [`Module::seed_demo`] on each module.
 ///

@@ -15,3 +15,10 @@ server:
       - name: dev
         matches: ["*@bizkit.test"]
         sign_up: true
+  modules:
+    analytics:
+      # The stack reports its own usage (sign-ins, workspaces, API keys) to
+      # the demo workspace's `bizkit` project, which the seed creates.
+      self_usage:
+        workspace: demo
+        project: bizkit

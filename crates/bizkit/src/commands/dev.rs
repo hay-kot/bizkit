@@ -181,7 +181,7 @@ mod tests {
         let first = counts(&data_dir).await;
         assert_eq!(
             first,
-            [1, 1, 1, 2, 2, 5],
+            [1, 1, 1, 3, 2, 5],
             "users, workspaces, memberships, projects, forms, submissions"
         );
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
@@ -405,8 +405,8 @@ mod tests {
         let first = counts().await;
         assert_eq!(
             first[..4],
-            [2, 2, 2, 28],
-            "sites, goals, funnels, days summed over two sites: {first:?}"
+            [3, 2, 2, 42],
+            "sites, goals, funnels, days summed over three sites: {first:?}"
         );
         assert!(
             first[4..].iter().all(|count| *count > 0),
@@ -425,6 +425,13 @@ mod tests {
             .execute(&mut *tx)
             .await
             .unwrap();
+        // The usage project came after the move; its site marks a filled file.
+        sqlx::query(
+            "DELETE FROM analytics_sites WHERE project_id IN (SELECT id FROM projects WHERE slug = 'bizkit')",
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
         tx.commit().await.unwrap();
         db.close().await;
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
