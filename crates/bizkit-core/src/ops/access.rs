@@ -7,7 +7,10 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::app::Platform;
+use crate::error::ApiError;
 use crate::ids::{ApiKeyId, UserId, WorkspaceId};
+use crate::tenancy::members;
 
 /// How much a scope allows. `Admin` implies `Write`, which implies `Read`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -261,6 +264,41 @@ pub struct WorkspaceAccess {
     pub workspace_id: WorkspaceId,
     /// What the caller holds there.
     pub grant: Grant,
+}
+
+/// The workspace check of an `Access::Workspace` operation, for raw routes
+/// that take `{workspace_id}` in their path. Operations and raw routes share
+/// it, so they answer the same way.
+///
+/// # Errors
+///
+/// - [`ApiError::Unauthenticated`] without a `principal`.
+/// - [`ApiError::NotFound`] when `workspace_id` isn't a workspace ID, the
+///   user isn't a member, or the API key belongs to another workspace.
+/// - [`ApiError::Forbidden`] when the role or key doesn't allow `scope`.
+/// - [`ApiError::Internal`] when the membership lookup fails.
+pub async fn authorize_workspace(
+    platform: &Platform,
+    principal: Option<&Principal>,
+    workspace_id: &str,
+    scope: &Scope,
+) -> Result<WorkspaceAccess, ApiError> {
+    let Some(principal) = principal else { return Err(ApiError::Unauthenticated) };
+    let workspace_id: WorkspaceId = workspace_id.parse().map_err(|_| ApiError::NotFound)?;
+    let grant = match principal {
+        Principal::User(user) => {
+            let role = members::role_of(platform.db().read(), workspace_id, user.user_id).await?;
+            Grant::Role(role.ok_or(ApiError::NotFound)?)
+        }
+        Principal::ApiKey(key) if key.workspace_id == workspace_id => {
+            Grant::Scopes(key.scopes.clone())
+        }
+        Principal::ApiKey(_) => return Err(ApiError::NotFound),
+    };
+    if !grant.allows(scope) {
+        return Err(ApiError::Forbidden(format!("missing scope {scope}")));
+    }
+    Ok(WorkspaceAccess { workspace_id, grant })
 }
 
 #[cfg(test)]

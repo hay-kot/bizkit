@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context as _, bail};
+use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::{any, get};
@@ -28,13 +29,19 @@ use crate::error::ApiError;
 use crate::hooks::Hooks;
 use crate::jobs::{Bus, Worker};
 use crate::mail::MailRouter;
-use crate::module::{Lifecycle, Module, Registration, register_all};
+use crate::module::{
+    Lifecycle, MAX_UPLOAD_BYTES, Module, ModuleRoutes, Registration, RouteKind, register_all,
+};
 use crate::ops::{Registry, ScopeAreas};
 use crate::secrets::{SecretKey, Secrets};
 use crate::tenancy::workspaces;
 use crate::time::UnixMillis;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// Long enough for a full-size file over a 1 Mbit/s uplink (about 210 s).
+const UPLOAD_TIMEOUT: Duration = Duration::from_secs(300);
+/// Room for the multipart framing around a file of `MAX_UPLOAD_BYTES`.
+const UPLOAD_BODY_BYTES: usize = MAX_UPLOAD_BYTES + 64 * 1024;
 
 /// Shared platform state. Cheap to clone; modules capture clones.
 #[derive(Debug, Clone)]
@@ -162,7 +169,7 @@ pub struct App {
     registry: Arc<Registry>,
     worker: Worker,
     spec: serde_json::Value,
-    routes: Vec<crate::module::ModuleRoutes>,
+    routes: Vec<ModuleRoutes>,
     shutdown: CancellationToken,
 }
 
@@ -334,21 +341,44 @@ impl App {
             )
             .route("/api/{*rest}", any(not_found))
             .route("/mcp/{*rest}", any(not_found));
-        for routes in self.routes.iter().filter(|routes| !routes.public) {
+        for routes in self.routes_of(RouteKind::Authenticated) {
             router = router.nest(&routes.nest(), routes.router.clone());
         }
-        router = router.layer(middleware::from_fn_with_state(platform.clone(), authenticate));
-        // Merged after the authenticate layer, so it never wraps them.
-        for routes in self.routes.iter().filter(|routes| routes.public) {
-            router = router.nest(&routes.nest(), routes.router.clone());
+        // Each stage carries its own body limit and timeout, because an inner
+        // layer can't raise the limit an outer one already enforces. The
+        // authenticate layer goes inside each stage, so its session and key
+        // lookups run under that stage's timeout.
+        let authn = || middleware::from_fn_with_state(platform.clone(), authenticate);
+        router =
+            with_limits(router.layer(authn()), crate::ops::http::MAX_BODY_BYTES, REQUEST_TIMEOUT);
+        for routes in self.routes_of(RouteKind::Upload) {
+            let nested = Router::new().nest(&routes.nest(), routes.router.clone()).layer(authn());
+            // The tower-http limit alone bounds these bodies. A second limit
+            // from axum's extractors would wrap its error, and `Multipart`
+            // would then answer an oversized chunked body with 500, not 413.
+            router = router.merge(
+                with_limits(nested, UPLOAD_BODY_BYTES, UPLOAD_TIMEOUT)
+                    .layer(DefaultBodyLimit::disable()),
+            );
+        }
+        // Public routes never get the authenticate layer.
+        for routes in self.routes_of(RouteKind::Public) {
+            let nested = Router::new().nest(&routes.nest(), routes.router.clone());
+            router = router.merge(with_limits(
+                nested,
+                crate::ops::http::MAX_BODY_BYTES,
+                REQUEST_TIMEOUT,
+            ));
         }
         router
             .layer(Extension(platform.clone()))
-            .layer(RequestBodyLimitLayer::new(crate::ops::http::MAX_BODY_BYTES))
-            .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, REQUEST_TIMEOUT))
             .layer(TraceLayer::new_for_http())
             .layer(PropagateRequestIdLayer::x_request_id())
             .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+    }
+
+    fn routes_of(&self, kind: RouteKind) -> impl Iterator<Item = &ModuleRoutes> {
+        self.routes.iter().filter(move |routes| routes.kind == kind)
     }
 
     /// The operation registry.
@@ -418,6 +448,12 @@ impl App {
         self.platform.db().close().await;
         served.and(joined)
     }
+}
+
+fn with_limits(router: Router, body_bytes: usize, timeout: Duration) -> Router {
+    router
+        .layer(RequestBodyLimitLayer::new(body_bytes))
+        .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, timeout))
 }
 
 async fn not_found() -> Response {

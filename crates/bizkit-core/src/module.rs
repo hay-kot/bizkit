@@ -119,23 +119,48 @@ pub(crate) struct Registration {
     lifecycle_modules: Vec<&'static str>,
 }
 
+/// The largest file an upload route accepts. The body limit is this plus
+/// 64 KiB for multipart framing; handlers check the file part itself.
+pub const MAX_UPLOAD_BYTES: usize = 25 * 1024 * 1024;
+
+/// Where a module's raw routes sit in the router.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RouteKind {
+    /// Inside the authenticate layer, with the 1 MiB body limit.
+    Authenticated,
+    /// Outside the authenticate layer.
+    Public,
+    /// Inside the authenticate layer, with the upload body limit.
+    Upload,
+}
+
+impl RouteKind {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Authenticated => "routes",
+            Self::Public => "public routes",
+            Self::Upload => "upload routes",
+        }
+    }
+}
+
 /// A module's raw routes and their docs.
 #[derive(Debug)]
 pub(crate) struct ModuleRoutes {
     pub(crate) module: &'static str,
-    /// Public routes sit outside the authenticate layer.
-    pub(crate) public: bool,
+    pub(crate) kind: RouteKind,
     pub(crate) router: axum::Router,
     pub(crate) docs: serde_json::Value,
 }
 
 impl ModuleRoutes {
-    /// Where the router nests: `/m/<module>`, or `/m/<module>/public`.
+    /// Where the router nests: `/m/<module>`, `/m/<module>/public` or
+    /// `/m/<module>/upload`.
     pub(crate) fn nest(&self) -> String {
-        if self.public {
-            format!("/m/{}/public", self.module)
-        } else {
-            format!("/m/{}", self.module)
+        match self.kind {
+            RouteKind::Authenticated => format!("/m/{}", self.module),
+            RouteKind::Public => format!("/m/{}/public", self.module),
+            RouteKind::Upload => format!("/m/{}/upload", self.module),
         }
     }
 }
@@ -232,6 +257,9 @@ impl<'a> ModuleContext<'a> {
     /// Adds raw routes, nested at `/m/<module>`. `docs` describes them with
     /// paths relative to the nest. Handlers reach the platform through
     /// `Extension<Platform>` and the caller through `Extension<Authn>`.
+    /// `/public` and `/upload` under the nest are reserved for
+    /// [`Self::public_routes`] and [`Self::upload_routes`], so these routes
+    /// must not use them.
     ///
     /// # Errors
     ///
@@ -241,7 +269,7 @@ impl<'a> ModuleContext<'a> {
         router: axum::Router,
         docs: utoipa::openapi::OpenApi,
     ) -> anyhow::Result<()> {
-        self.add_routes(false, router, docs)
+        self.add_routes(RouteKind::Authenticated, router, docs)
     }
 
     /// Adds routes that third-party pages call, nested at
@@ -249,7 +277,8 @@ impl<'a> ModuleContext<'a> {
     /// authenticate layer: handlers get no `Extension<Authn>`, cookies and
     /// bearer tokens are never read, and the cookie CSRF check never
     /// applies. `docs` paths are relative to the nest. Handlers reach the
-    /// platform through `Extension<Platform>`.
+    /// platform through `Extension<Platform>`. The `/m/<module>/public`
+    /// prefix belongs to these routes alone.
     ///
     /// # Errors
     ///
@@ -259,22 +288,44 @@ impl<'a> ModuleContext<'a> {
         router: axum::Router,
         docs: utoipa::openapi::OpenApi,
     ) -> anyhow::Result<()> {
-        self.add_routes(true, router, docs)
+        self.add_routes(RouteKind::Public, router, docs)
+    }
+
+    /// Adds authenticated routes that take large bodies, such as file
+    /// uploads, nested at `/m/<module>/upload`. They sit inside the
+    /// authenticate layer like [`Self::routes`] (`Extension<Authn>`, the
+    /// cookie CSRF check), with a body limit of [`MAX_UPLOAD_BYTES`] plus
+    /// 64 KiB and a 300 s timeout, instead of 1 MiB and 30 s. The limit
+    /// covers every extractor (axum's `DefaultBodyLimit` is off there), and
+    /// a body over it gets 413. Read each file part with
+    /// [`crate::upload::read_file`], which holds the file itself to
+    /// [`MAX_UPLOAD_BYTES`]. Check access with
+    /// [`crate::ops::authorize_workspace`]. `docs` paths are relative to the
+    /// nest. The `/m/<module>/upload` prefix belongs to these routes alone.
+    ///
+    /// # Errors
+    ///
+    /// When the module already registered upload routes.
+    pub fn upload_routes(
+        &mut self,
+        router: axum::Router,
+        docs: utoipa::openapi::OpenApi,
+    ) -> anyhow::Result<()> {
+        self.add_routes(RouteKind::Upload, router, docs)
     }
 
     fn add_routes(
         &mut self,
-        public: bool,
+        kind: RouteKind,
         router: axum::Router,
         docs: utoipa::openapi::OpenApi,
     ) -> anyhow::Result<()> {
         let module = self.module;
-        if self.registration.routes.iter().any(|r| r.module == module && r.public == public) {
-            let kind = if public { "public routes" } else { "routes" };
-            bail!("module {module} registered {kind} twice");
+        if self.registration.routes.iter().any(|r| r.module == module && r.kind == kind) {
+            bail!("module {module} registered {} twice", kind.label());
         }
         let docs = serde_json::to_value(docs).context("serializing route docs")?;
-        self.registration.routes.push(ModuleRoutes { module, public, router, docs });
+        self.registration.routes.push(ModuleRoutes { module, kind, router, docs });
         Ok(())
     }
 

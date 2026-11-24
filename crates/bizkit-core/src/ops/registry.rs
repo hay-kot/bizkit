@@ -12,13 +12,11 @@ use axum::http::StatusCode;
 use serde_json::Value;
 
 use super::{
-    Access, Grant, Method, NoContent, NoInput, OpCtx, Operation, Principal, ScopeAreas, Success,
-    WorkspaceAccess,
+    Access, Method, NoContent, NoInput, OpCtx, Operation, Principal, ScopeAreas, Success,
+    authorize_workspace,
 };
 use crate::app::Platform;
 use crate::error::ApiError;
-use crate::ids::WorkspaceId;
-use crate::tenancy::members;
 use crate::validate::{Validate as _, from_json};
 
 /// What the registry knows about an operation, for docs and tests.
@@ -264,25 +262,10 @@ impl Registry {
                 _ => return Err(ApiError::Unauthenticated),
             },
             Access::Workspace(scope) => {
-                let Some(principal) = &principal else { return Err(ApiError::Unauthenticated) };
-                let workspace_id: WorkspaceId =
-                    workspace_id.and_then(|raw| raw.parse().ok()).ok_or(ApiError::NotFound)?;
-                let grant = match principal {
-                    Principal::User(user) => {
-                        let role =
-                            members::role_of(platform.db().read(), workspace_id, user.user_id)
-                                .await?;
-                        Grant::Role(role.ok_or(ApiError::NotFound)?)
-                    }
-                    Principal::ApiKey(key) if key.workspace_id == workspace_id => {
-                        Grant::Scopes(key.scopes.clone())
-                    }
-                    Principal::ApiKey(_) => return Err(ApiError::NotFound),
-                };
-                if !grant.allows(scope) {
-                    return Err(ApiError::Forbidden(format!("missing scope {scope}")));
-                }
-                Some(WorkspaceAccess { workspace_id, grant })
+                // An empty ID never parses, so a missing one still gives 401
+                // before 404.
+                let workspace_id = workspace_id.unwrap_or_default();
+                Some(authorize_workspace(platform, principal.as_ref(), workspace_id, scope).await?)
             }
         };
         Ok(OpCtx::new(platform.clone(), principal, workspace, request_id))
