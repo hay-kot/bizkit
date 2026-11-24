@@ -35,7 +35,7 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 | `FormPanel` | Create and edit forms, as a side panel or a dialog. |
 | `Tabs` | Route links in a page header's `tabs` slot, one route per tab, for a feature with several pages (Analytics). A full-width line runs under the row and the active tab is underlined in `primary` with `aria-current="page"`. A tab stays active on paths under it unless `exact`. |
 | `TabLayout`, `TabPage` | A feature with tabs is one parent route whose component wraps `TabLayout` (page, header and `Tabs` in the header, rendered once) with the tabs as child routes. Each tab's page renders a `TabPage`, which sets the header's title, description and actions, so a tab switch swaps only the content (Analytics, Mailing). Detail pages without tabs stay outside the parent. |
-| `DateRangePicker` | A report's range: a preset `Select` (Today to Last month) and two date fields for Custom. Days are `YYYY-MM-DD` in UTC; `presetRange` and `previousPeriod` in `lib/range.ts` do the math. |
+| `TimeRangePicker` | A report's range, like Grafana's: one 36px group with Previous, the range (its preset name, or its days from `formatDayRange`), Next, Zoom out and, after a divider, the page's own controls (the compare toggle, an icon button with `aria-pressed`). The range opens a popover with an absolute From and To on the left and grouped quick ranges on the right, the active one marked in `primary`; at phone width the panes stack. Days are `YYYY-MM-DD` in UTC and `lib/range.ts` does all the math: Previous and Next move by the range's length in days (`shiftRange`), Zoom out doubles the span around its middle (`zoomOut`), neither passes today, and Next is disabled once the range ends today. It takes `range` and `today` and emits one `apply`; the page keeps the state. |
 | `StatTiles` | A row of KPI tiles. With `previous` set, a tile shows the change as a percent with an arrow, green up and red down, or "new" when the previous value was 0. |
 | `TimeSeriesChart` | A line chart over time in hand-written SVG. Each `primary` series takes the next chart color (`chart-1` to `chart-4`: primary, secondary, accent, success) and the first gets an area; a `muted` series is the dashed previous period. Hover or arrow keys read a point. Empty data draws a flat baseline. |
 | `BarList` | A ranked list with a share bar behind each row (a `progress` element, so no width style), the top `limit` rows and a "Show all" button (`show-all`). |
@@ -75,8 +75,8 @@ Workspace settings, analytics settings.
 
 Analytics. A read-only page of numbers for a date range.
 
-- `Page` (wide) > `PageHeader` (with `Tabs` in its `tabs` slot when the feature has several pages) > a toolbar row with the `DateRangePicker` and the page's toggles (compare) > `StatTiles` > `TimeSeriesChart` > `ReportGrid` of `PageSection`s, each holding a `BarList`.
-- The range lives in the URL query, so a link shares the exact view. Pass `today` to `DateRangePicker` from one place, in UTC.
+- `Page` (wide) > `PageHeader` (with `Tabs` in its `tabs` slot when the feature has several pages) > a toolbar row with the `TimeRangePicker` (compare in its slot) and the page's filters > `StatTiles` > `TimeSeriesChart` > `ReportGrid` of `PageSection`s, each holding a `BarList`.
+- The range lives in the URL query, so a link shares the exact view. Pass `today` to `TimeRangePicker` from one place, in UTC.
 - Each panel loads and fails on its own: a panel shows its own skeleton or error alert, and the others still render.
 - A range with no data shows tiles at 0, a flat chart and "No data for this range" in each panel, not an empty-state card.
 - "Show all" opens the full list in a side panel, not a new page.

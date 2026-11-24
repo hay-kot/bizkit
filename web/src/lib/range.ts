@@ -3,7 +3,14 @@
  * inclusive, matching the analytics API.
  */
 
-export type RangePreset = 'today' | '7d' | '30d' | '90d' | 'month' | 'last-month' | 'custom'
+export type RangePreset =
+  'today' | 'yesterday' | '7d' | '14d' | '30d' | '90d' | 'month' | 'last-month' | 'custom'
+
+/**
+ * The presets a saved insight can keep. `yesterday` and `14d` live only in
+ * the URL, because the insights API stores the older set.
+ */
+export type SavedPreset = Exclude<RangePreset, 'yesterday' | '14d' | 'custom'>
 
 export interface DayRange {
   from: string
@@ -14,15 +21,40 @@ export interface DateRange extends DayRange {
   preset: RangePreset
 }
 
+export interface PresetOption {
+  value: Exclude<RangePreset, 'custom'>
+  label: string
+}
+
+/** The quick ranges, in the groups the picker shows them. */
+export const PRESET_GROUPS: PresetOption[][] = [
+  [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+  ],
+  [
+    { value: '7d', label: 'Last 7 days' },
+    { value: '14d', label: 'Last 14 days' },
+    { value: '30d', label: 'Last 30 days' },
+    { value: '90d', label: 'Last 90 days' },
+  ],
+  [
+    { value: 'month', label: 'This month' },
+    { value: 'last-month', label: 'Last month' },
+  ],
+]
+
 export const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: 'month', label: 'This month' },
-  { value: 'last-month', label: 'Last month' },
+  ...PRESET_GROUPS.flat(),
   { value: 'custom', label: 'Custom' },
 ]
+
+const SAVED_PRESETS: readonly RangePreset[] = ['today', '7d', '30d', '90d', 'month', 'last-month']
+
+/** `preset` when a saved insight can keep it, else undefined. */
+export function savedPreset(preset: RangePreset): SavedPreset | undefined {
+  return SAVED_PRESETS.includes(preset) ? (preset as SavedPreset) : undefined
+}
 
 const DAY_MS = 86_400_000
 
@@ -50,8 +82,14 @@ export function rangeLength({ from, to }: DayRange): number {
  */
 export function presetRange(preset: RangePreset, today: string): DayRange {
   switch (preset) {
+    case 'yesterday': {
+      const day = addDays(today, -1)
+      return { from: day, to: day }
+    }
     case '7d':
       return { from: addDays(today, -6), to: today }
+    case '14d':
+      return { from: addDays(today, -13), to: today }
     case '30d':
       return { from: addDays(today, -29), to: today }
     case '90d':
@@ -74,6 +112,39 @@ export function previousPeriod(range: DayRange): DayRange {
     from: addDays(range.from, -rangeLength(range)),
     to: addDays(range.from, -1),
   }
+}
+
+/**
+ * `range` moved one whole length back (`-1`) or forward (`1`), so the days
+ * just before or after it. A move never passes `today`: it stops there and
+ * keeps the length. The result is always `custom`, since its dates no longer
+ * follow today.
+ */
+export function shiftRange(range: DayRange, direction: -1 | 1, today: string): DateRange {
+  const length = rangeLength(range)
+  const to = minDay(addDays(range.to, direction * length), today)
+  return { preset: 'custom', from: addDays(to, 1 - length), to }
+}
+
+/**
+ * Twice the days of `range`, centered on it, like Grafana's zoom out. The
+ * extra odd day goes before it, so one day ending today widens to two days
+ * ending today. When the end would pass `today`, the range moves back to
+ * end today and keeps its doubled length.
+ */
+export function zoomOut(range: DayRange, today: string): DateRange {
+  const length = rangeLength(range)
+  const to = minDay(addDays(range.to, Math.floor(length / 2)), today)
+  return { preset: 'custom', from: addDays(to, 1 - 2 * length), to }
+}
+
+function minDay(a: string, b: string): string {
+  return a < b ? a : b
+}
+
+/** Milliseconds from `now` to the next UTC midnight, when `utcToday` changes. */
+export function msToNextUtcDay(now: Date = new Date()): number {
+  return toTime(utcToday(now)) + DAY_MS - now.getTime()
 }
 
 /** Today in UTC, as `YYYY-MM-DD`. */

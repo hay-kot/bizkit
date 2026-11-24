@@ -19,6 +19,9 @@ export async function expectCleanPage(page: Page, errors: Error[], { exclude = [
   const original = page.viewportSize()
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 })
+    // Popovers placed from script (Select, TimeRangePicker) move on the
+    // resize event's next render, so measure after two frames.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(0)
     const axe = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

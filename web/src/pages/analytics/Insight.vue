@@ -20,7 +20,7 @@ import MenuItem from '@/components/ui/MenuItem.vue'
 import Select from '@/components/ui/Select.vue'
 import { useReportRange } from '@/composables/useReportRange'
 import { runAction } from '@/lib/action'
-import { type DateRange, presetRange } from '@/lib/range'
+import { type DateRange, presetRange, savedPreset } from '@/lib/range'
 import {
   type InsightRange,
   useCreateDashboard,
@@ -60,7 +60,7 @@ const range = computed<DateRange>({
   get: () => {
     const saved = insight.value?.range
     if (route.query.range || !saved) return urlRange.value
-    return { preset: saved, ...presetRange(saved, today) }
+    return { preset: saved, ...presetRange(saved, today.value) }
   },
   set: (next) => (urlRange.value = next),
 })
@@ -76,8 +76,7 @@ watch(
   { immediate: true },
 )
 const savedRange = computed((): InsightRange => {
-  const preset = range.value.preset
-  return preset === 'custom' ? (insight.value?.range ?? '30d') : preset
+  return savedPreset(range.value.preset) ?? insight.value?.range ?? '30d'
 })
 const dirty = computed(() => {
   const saved = insight.value
@@ -228,8 +227,8 @@ function onDelete() {
       </DetailActions>
     </template>
     <ErrorAlert v-if="insightError" :error="insightError" />
-    <p v-if="range.preset === 'custom'" class="text-sm text-base-content/70">
-      Custom dates aren't saved. The insight opens on its saved range.
+    <p v-if="!savedPreset(range.preset)" class="text-sm text-base-content/70">
+      This range isn't saved. The insight opens on its saved range.
     </p>
     <form id="insight-form" class="contents" @submit.prevent="onSave">
       <InsightBuilder

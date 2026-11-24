@@ -4,6 +4,7 @@ import {
   formatCompactNumber,
   formatDate,
   formatDateTime,
+  formatDayRange,
   formatNumber,
   formatPercent,
   formatRelative,
@@ -21,6 +22,12 @@ describe('format', () => {
     const start = '2026-11-22T12:00:00'
     expect(formatTimeAfter('2026-11-22T20:04:00', start)).toBe('8:04 PM')
     expect(formatTimeAfter('2026-11-25T20:04:00', start)).toBe('Nov 25, 8:04 PM')
+  })
+
+  it('formats a UTC day range', () => {
+    expect(formatDayRange('2026-11-03', '2026-11-24')).toBe('Nov 3 to Nov 24, 2026')
+    expect(formatDayRange('2025-12-20', '2026-01-05')).toBe('Dec 20, 2025 to Jan 5, 2026')
+    expect(formatDayRange('2026-11-24', '2026-11-24')).toBe('Nov 24, 2026')
   })
 
   it('knows the past', () => {

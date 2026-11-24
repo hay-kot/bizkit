@@ -10,8 +10,8 @@ import DetailActions from '@/components/ui/DetailActions.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
 import { useReportRange } from '@/composables/useReportRange'
-import { rangeToQuery } from '@/lib/range'
-import { type InsightRange, useCreateInsight } from '@/queries/analytics'
+import { rangeToQuery, savedPreset } from '@/lib/range'
+import { useCreateInsight } from '@/queries/analytics'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
 const route = useRoute()
@@ -29,15 +29,15 @@ function openSave() {
 }
 
 async function onSave() {
-  const preset = range.value.preset
   const insight = await create.mutateAsync({
     path: { workspace_id: props.workspaceId },
     body: {
       project_id: props.projectId,
       name: name.value,
       query: queryOf(draft.value),
-      // A custom range would go stale, so the insight opens on 30 days.
-      range: (preset === 'custom' ? '30d' : preset) as InsightRange,
+      // A range the API can't keep (custom dates would go stale), so the
+      // insight opens on 30 days.
+      range: savedPreset(range.value.preset) ?? '30d',
     },
   })
   naming.value = false
@@ -64,6 +64,9 @@ async function onSave() {
         ]"
       />
     </template>
+    <p v-if="!savedPreset(range.preset)" class="text-sm text-base-content/70">
+      This range isn't saved. A saved insight opens on the last 30 days.
+    </p>
     <InsightBuilder
       v-model:range="range"
       v-model:draft="draft"
