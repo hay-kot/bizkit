@@ -24,6 +24,7 @@ mod tenancy;
 #[cfg(feature = "test-hooks")]
 pub mod test_hooks;
 pub mod time;
+pub mod usage;
 pub mod validate;
 
 pub use crate::app::{App, Platform, migrators, open_db, openapi, scope_areas};

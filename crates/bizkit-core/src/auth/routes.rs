@@ -21,6 +21,7 @@ use crate::error::{ApiError, ErrorBody};
 use crate::jobs::{Enqueue, SendMail};
 use crate::ops::http::{MAX_BODY_BYTES, request_id};
 use crate::tenancy::{invitations, members, workspaces};
+use crate::usage::{UsageKind, UsageReported};
 use crate::validate::{FieldErrors, from_json};
 
 const LINK_TTL: Duration = Duration::from_mins(15);
@@ -197,8 +198,8 @@ async fn verify_inner(
     let email = magic_links::consume(&mut *tx, &hash_token(&body.token), now)
         .await?
         .ok_or(ApiError::Unauthenticated)?;
-    let user = if let Some(user) = users::find_by_email(&mut *tx, &email).await? {
-        user
+    let (user, kind) = if let Some(user) = users::find_by_email(&mut *tx, &email).await? {
+        (user, UsageKind::SignedIn)
     } else {
         // Config or invitations may have changed since the link went out.
         if !admitted(platform, &mut tx, &email).await? {
@@ -206,9 +207,11 @@ async fn verify_inner(
         }
         let user = users::insert(&mut *tx, &email, now).await?;
         apply_policy_joins(platform, &mut tx, &email, user.id).await?;
-        user
+        (user, UsageKind::SignedUp)
     };
     users::touch_sign_in(&mut *tx, user.id, now).await?;
+    let usage = UsageReported { user_id: user.id, kind, workspace_id: None };
+    platform.bus().publish(&mut tx, &usage).await?;
     let token = random_token();
     let session = sessions::NewSession {
         token_hash: &hash_token(&token),

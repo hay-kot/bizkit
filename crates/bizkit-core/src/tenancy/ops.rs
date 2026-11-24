@@ -19,6 +19,7 @@ use crate::ops::{
     Access, Level, Method, NoContent, NoInput, OpCtx, Operation, Role, Scope, Success,
 };
 use crate::time::UnixMillis;
+use crate::usage::{self, UsageKind};
 use crate::validate::{FieldErrors, Validate, check_name, check_slug};
 
 const WORKSPACE_READ: Access = Access::Workspace(Scope::new("workspace", Level::Read));
@@ -596,6 +597,7 @@ impl Operation for WorkspacesCreate {
                 other => other?,
             };
         members::insert(&mut *tx, workspace.id, user_id, Role::Admin, now).await?;
+        usage::report(&cx, &mut tx, UsageKind::WorkspaceCreated, Some(workspace.id)).await?;
         tx.commit().await?;
         Ok(workspace.into())
     }
@@ -821,6 +823,7 @@ impl Operation for InvitationsCreate {
             id: None,
         };
         cx.platform().bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
+        usage::report(&cx, &mut tx, UsageKind::InvitationSent, Some(input.workspace_id)).await?;
         tx.commit().await?;
         Invitation::try_from(invitation).map_err(internal)
     }
@@ -931,6 +934,7 @@ impl Operation for InvitationsAccept {
             .ok_or(ApiError::NotFound)?;
         let workspace =
             workspaces::find(&mut *tx, invitation.workspace_id).await?.ok_or(ApiError::NotFound)?;
+        usage::report(&cx, &mut tx, UsageKind::MemberJoined, Some(workspace.id)).await?;
         tx.commit().await?;
         Ok(Membership { workspace: workspace.into(), role })
     }
@@ -1012,6 +1016,7 @@ impl Operation for ProjectsCreate {
         };
         let project = Project::from(row);
         cx.platform().bus().publish(&mut tx, &ProjectCreated { project: project.clone() }).await?;
+        usage::report(&cx, &mut tx, UsageKind::ProjectCreated, Some(project.workspace_id)).await?;
         tx.commit().await?;
         Ok(project)
     }
