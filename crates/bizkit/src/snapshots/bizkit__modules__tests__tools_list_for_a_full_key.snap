@@ -327,6 +327,64 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": true
       },
+      "description": "List the people who reached the step before a funnel step and stopped there",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "FunnelId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which drop-offs to list.",
+        "properties": {
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day people may enter, UTC."
+          },
+          "funnel_id": {
+            "$ref": "#/$defs/FunnelId",
+            "description": "The funnel."
+          },
+          "limit": {
+            "description": "At most this many people, 1-100. Default 25.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "step": {
+            "description": "The step they did not reach, 2 to the funnel's step count.",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day people may enter, UTC, inclusive."
+          }
+        },
+        "required": [
+          "funnel_id",
+          "from",
+          "to",
+          "step"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_funnels_dropoffs"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
       "description": "Show a funnel",
       "inputSchema": {
         "$defs": {

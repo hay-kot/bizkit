@@ -5,6 +5,8 @@
 //! funnel's window of the entry. Results read raw events by person key, so
 //! cookieless sites link only same-day steps (the visitor hash rotates).
 
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::sync::Arc;
 
 use bizkit_core::ApiError;
@@ -20,9 +22,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
 use utoipa::ToSchema;
 
-use crate::api::{Day, FunnelId, GoalKind};
+use crate::api::{Day, FunnelId, GoalKind, PersonId};
+use crate::explore::{EventItem, props_of};
 use crate::files::Files;
 use crate::names;
+use crate::people::display;
 use crate::report::Scope;
 use crate::stats::{check_range, site_scope};
 
@@ -40,7 +44,8 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>, files: &Arc<Files>) -> anyhow
     cx.op(FunnelsGet)?;
     cx.op(FunnelsUpdate)?;
     cx.op(FunnelsDelete)?;
-    cx.op(FunnelsResults(Arc::clone(files)))
+    cx.op(FunnelsResults(Arc::clone(files)))?;
+    cx.op(FunnelsDropoffs(Arc::clone(files)))
 }
 
 /// One funnel step.
@@ -503,6 +508,203 @@ impl Operation for FunnelsResults {
     }
 }
 
+/// Which drop-offs to list.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DropoffQuery {
+    /// The workspace.
+    workspace_id: WorkspaceId,
+    /// The funnel.
+    funnel_id: FunnelId,
+    /// The first day people may enter, UTC.
+    from: Day,
+    /// The last day people may enter, UTC, inclusive.
+    to: Day,
+    /// The step they did not reach, 2 to the funnel's step count.
+    step: u32,
+    /// At most this many people, 1-100. Default 25.
+    #[serde(default)]
+    limit: Option<u32>,
+}
+
+impl Validate for DropoffQuery {
+    fn validate(&self) -> Result<(), FieldErrors> {
+        let mut errors = FieldErrors::default();
+        check_range(&mut errors, self.from, self.to);
+        if self.limit.is_some_and(|limit| !(1..=MAX_DROPOFFS).contains(&limit)) {
+            errors.add("limit", format!("must be between 1 and {MAX_DROPOFFS}"));
+        }
+        errors.into_result()
+    }
+}
+
+const DEFAULT_DROPOFFS: u32 = 25;
+const MAX_DROPOFFS: u32 = 100;
+/// Events shown per person who dropped off.
+const DROPOFF_EVENTS: i64 = 20;
+
+/// Someone who reached the step before and not the step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct Dropoff {
+    /// Set for identified people; their page has the full timeline.
+    pub(crate) person_id: Option<PersonId>,
+    /// The site's ID for the user, when identified.
+    pub(crate) user_id: Option<String>,
+    /// The `email` or `name` trait, when there is one.
+    pub(crate) display: Option<String>,
+    /// Their first step-1 event in the range.
+    pub(crate) entered_at: UnixMillis,
+    /// Their last reached step's event.
+    pub(crate) last_step_at: UnixMillis,
+    /// Their events from entry to the end of their window, oldest first, at
+    /// most 20.
+    pub(crate) events: Vec<EventItem>,
+}
+
+/// The people who dropped off before a step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct DropoffPage {
+    /// The latest entries first.
+    pub(crate) items: Vec<Dropoff>,
+    /// Everyone who dropped there; the drop between the two steps in the
+    /// results.
+    pub(crate) total: i64,
+}
+
+/// A kept drop-off: entry time first, so the heap orders by it.
+type Kept = (i64, String, i64, i64);
+
+struct FunnelsDropoffs(Arc<Files>);
+impl Operation for FunnelsDropoffs {
+    type Input = DropoffQuery;
+    type Output = DropoffPage;
+    const ID: &'static str = "analytics.funnels.dropoffs";
+    const METHOD: Method = Method::Get;
+    const PATH: &'static str = "/workspaces/{workspace_id}/analytics/funnels/{funnel_id}/dropoffs";
+    const ACCESS: Access = READ;
+    const SUMMARY: &'static str =
+        "List the people who reached the step before a funnel step and stopped there";
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: DropoffQuery) -> Result<DropoffPage, ApiError> {
+        let db = cx.platform().db();
+        let funnel = to_api(find(db.read(), input.workspace_id, input.funnel_id).await?)?;
+        let steps = funnel.steps.len();
+        let step = usize::try_from(input.step).unwrap_or(usize::MAX);
+        if !(2..=steps).contains(&step) {
+            let mut errors = FieldErrors::default();
+            errors.add("step", format!("must be between 2 and {steps}"));
+            return Err(ApiError::Validation(errors));
+        }
+        let scope = Scope { workspace_id: input.workspace_id, project_id: funnel.project_id };
+        let file = self.0.for_op(cx.platform(), scope).await?;
+        let last = input.to.plus_days(funnel.window_days);
+        let entry_end = input.to.next().start().0;
+        let window = funnel.window_days * DAY_MS;
+        let limit = usize::try_from(input.limit.unwrap_or(DEFAULT_DROPOFFS)).unwrap_or(usize::MAX);
+        let mut total = 0;
+        let mut kept: BinaryHeap<Reverse<Kept>> = BinaryHeap::new();
+        let mut keep = |events: &[StepEvent]| {
+            let Some(walk) = walk(&funnel.steps, events, entry_end, window) else { return };
+            if walk.reached != step - 1 {
+                return;
+            }
+            total += 1;
+            let person = events.first().map_or_else(String::new, |e| e.person.clone());
+            kept.push(Reverse((walk.entered_at, person, walk.last_step_at, walk.deadline)));
+            if kept.len() > limit {
+                kept.pop();
+            }
+        };
+        let mut person: Vec<StepEvent> = Vec::new();
+        let mut rows = step_events(file.db.read(), scope, input.from, last, &funnel.steps);
+        while let Some(event) = rows.try_next().await? {
+            if person.last().is_some_and(|previous| previous.person != event.person) {
+                keep(&person);
+                person.clear();
+            }
+            person.push(event);
+        }
+        keep(&person);
+        drop(rows);
+        // Ascending `Reverse` is descending entry time.
+        let kept: Vec<Kept> = kept.into_sorted_vec().into_iter().map(|Reverse(k)| k).collect();
+        let items = dropoff_events(file.db.read(), scope, &kept).await?;
+        Ok(DropoffPage { items, total })
+    }
+}
+
+/// The kept people's events in their windows, in one query.
+async fn dropoff_events(
+    exec: impl SqliteExecutor<'_>,
+    scope: Scope,
+    kept: &[Kept],
+) -> Result<Vec<Dropoff>, ApiError> {
+    let keys: Vec<(&str, i64, i64)> = kept
+        .iter()
+        .map(|(entered, person, _, deadline)| (person.as_str(), *entered, *deadline))
+        .collect();
+    let keys = serde_json::to_string(&keys).map_err(anyhow::Error::from)?;
+    let rows = sqlx::query!(
+        r#"SELECT w.rank AS "rank!: i64", w.id AS "id!: i64", w.ts AS "ts!: UnixMillis",
+                  w.name AS "name!: String", w.path AS "path?: String", w.props AS "props?: String",
+                  w.source AS "source!: String",
+                  p.id AS "person_id?: PersonId", p.user_id AS "user_id?", p.traits AS "traits?"
+           FROM (
+             SELECT CAST(k.key AS INTEGER) AS rank, e.id, e.ts, e.name, e.path, e.props, e.source, e.person,
+                    ROW_NUMBER() OVER (PARTITION BY k.key ORDER BY e.ts, e.id) AS seq
+             FROM json_each(?) AS k
+             JOIN analytics_events AS e
+               ON e.workspace_id = ? AND e.project_id = ?
+              AND e.person = json_extract(k.value, '$[0]')
+              AND e.ts >= json_extract(k.value, '$[1]') AND e.ts <= json_extract(k.value, '$[2]')
+           ) AS w
+           LEFT JOIN analytics_people p ON p.id = substr(w.person, 3) AND substr(w.person, 1, 2) = 'p:'
+           WHERE w.seq <= ?
+           ORDER BY w.rank, w.ts, w.id"#,
+        keys,
+        scope.workspace_id,
+        scope.project_id,
+        DROPOFF_EVENTS,
+    )
+    .fetch_all(exec)
+    .await?;
+    let mut items: Vec<Dropoff> = kept
+        .iter()
+        .map(|(entered, _, last_step, _)| Dropoff {
+            person_id: None,
+            user_id: None,
+            display: None,
+            entered_at: UnixMillis(*entered),
+            last_step_at: UnixMillis(*last_step),
+            events: Vec::new(),
+        })
+        .collect();
+    for row in rows {
+        let Some(item) = usize::try_from(row.rank).ok().and_then(|rank| items.get_mut(rank)) else {
+            continue;
+        };
+        if item.events.is_empty() {
+            item.person_id = row.person_id;
+            item.user_id.clone_from(&row.user_id);
+            item.display = row.traits.as_deref().and_then(|traits| {
+                serde_json::from_str(traits).ok().and_then(|traits| display(&traits))
+            });
+        }
+        item.events.push(EventItem {
+            id: row.id,
+            ts: row.ts,
+            name: row.name,
+            path: row.path,
+            person_id: row.person_id,
+            user_id: row.user_id,
+            props: props_of(row.props),
+            source: row.source,
+        });
+    }
+    Ok(items)
+}
+
 /// An event that matches at least one step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepEvent {
@@ -566,22 +768,35 @@ fn count_person(
     entry_end: i64,
     window: i64,
 ) {
-    let depth = depth(steps, events, entry_end, window);
-    for count in counts.iter_mut().take(depth) {
+    let reached = walk(steps, events, entry_end, window).map_or(0, |walk| walk.reached);
+    for count in counts.iter_mut().take(reached) {
         *count += 1;
     }
 }
 
-/// The number of steps one person reached.
-fn depth(steps: &[Step], events: &[StepEvent], entry_end: i64, window: i64) -> usize {
-    let Some(first) = steps.first() else { return 0 };
-    let Some(entry) =
-        events.iter().position(|e| e.ts < entry_end && first.matches(&e.name, e.path.as_deref()))
-    else {
-        return 0;
-    };
-    let deadline = events.get(entry).map_or(0, |e| e.ts).saturating_add(window);
-    let mut reached = 1;
+/// How far one person got through a funnel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Walk {
+    /// Steps reached, at least 1.
+    reached: usize,
+    /// Their first step-1 event.
+    entered_at: i64,
+    /// Their last reached step's event.
+    last_step_at: i64,
+    /// The end of their window.
+    deadline: i64,
+}
+
+/// Walks one person's events, sorted by time, through the steps. `None`
+/// when they never entered before `entry_end`.
+fn walk(steps: &[Step], events: &[StepEvent], entry_end: i64, window: i64) -> Option<Walk> {
+    let first = steps.first()?;
+    let entry = events
+        .iter()
+        .position(|e| e.ts < entry_end && first.matches(&e.name, e.path.as_deref()))?;
+    let entered_at = events.get(entry)?.ts;
+    let deadline = entered_at.saturating_add(window);
+    let mut walk = Walk { reached: 1, entered_at, last_step_at: entered_at, deadline };
     let mut after = entry;
     for step in steps.iter().skip(1) {
         let next = events
@@ -590,11 +805,12 @@ fn depth(steps: &[Step], events: &[StepEvent], entry_end: i64, window: i64) -> u
             .skip(after + 1)
             .take_while(|(_, e)| e.ts <= deadline)
             .find(|(_, e)| step.matches(&e.name, e.path.as_deref()));
-        let Some((at, _)) = next else { break };
-        reached += 1;
+        let Some((at, event)) = next else { break };
+        walk.reached += 1;
+        walk.last_step_at = event.ts;
         after = at;
     }
-    reached
+    Some(walk)
 }
 
 fn share(part: i64, whole: i64) -> f64 {
@@ -671,6 +887,24 @@ mod tests {
             at("d", 501, "signup_started", None),
         ];
         assert_eq!(reached(&steps, &events, 100, 100), [3, 2, 1]);
+    }
+
+    #[test]
+    fn a_walk_records_entry_and_last_step() {
+        let steps = [page("/pricing"), event("signup_started"), event("signup")];
+        let events = [
+            at("a", 5, "pageview", Some("/pricing")),
+            at("a", 7, "pageview", Some("/pricing")),
+            at("a", 9, "signup_started", None),
+        ];
+        let walked = walk(&steps, &events, 100, 50);
+        assert_eq!(
+            walked,
+            Some(Walk { reached: 2, entered_at: 5, last_step_at: 9, deadline: 55 }),
+            "a drop before step 3 is reached == 2"
+        );
+        assert_eq!(walk(&steps, &events, 5, 50), None, "entered at or after entry_end");
+        assert_eq!(walk(&steps, &events[2..], 100, 50), None, "never entered");
     }
 
     #[test]

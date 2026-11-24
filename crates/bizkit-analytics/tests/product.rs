@@ -165,6 +165,63 @@ mod product {
     }
 
     #[tokio::test]
+    async fn dropoffs_list_who_stopped_before_a_step() {
+        let s = setup().await;
+        s.signups().await;
+        s.ingest(json!([
+            {"name": "$identify", "user_id": "bob", "traits": {"name": "Bob"}},
+            {"name": "pageview", "anon_id": "anon-1", "url": "https://x.test/pricing"},
+            {"name": "faq_opened", "anon_id": "anon-1"},
+        ]))
+        .await;
+        let steps = json!([
+            {"kind": "page", "match": "/pricing*"},
+            {"kind": "event", "match": "signup_started"},
+            {"kind": "event", "match": "signup"},
+        ]);
+        let body = json!({"project_id": s.project(), "name": "Signup", "steps": steps});
+        let funnel: Value =
+            s.admin.post(&s.path("funnels"), &body).await.expect(StatusCode::CREATED).json();
+        let id = funnel["id"].as_str().unwrap();
+        let range = format!("from={DAY1}&to={DAY1}");
+        let results = s.get(&format!("funnels/{id}/results?{range}")).await;
+        let people = |step: usize| results["steps"][step]["people"].as_i64().unwrap();
+
+        let second = s.get(&format!("funnels/{id}/dropoffs?{range}&step=2")).await;
+        assert_eq!(second["total"].as_i64(), Some(people(0) - people(1)));
+        assert_eq!(second["total"], 2, "cy and the anonymous visitor");
+        let anonymous = second["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["person_id"].is_null())
+            .unwrap();
+        let names: Vec<&str> = anonymous["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|event| event["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["pageview", "faq_opened"], "events from entry on");
+
+        let third = s.get(&format!("funnels/{id}/dropoffs?{range}&step=3")).await;
+        assert_eq!(third["total"], 1);
+        let bob = &third["items"][0];
+        assert!(bob["person_id"].is_string());
+        assert_eq!((bob["user_id"].as_str(), bob["display"].as_str()), (Some("bob"), Some("Bob")));
+        assert!(bob["last_step_at"].as_i64() >= bob["entered_at"].as_i64());
+
+        let one = s.get(&format!("funnels/{id}/dropoffs?{range}&step=2&limit=1")).await;
+        assert_eq!((one["items"].as_array().unwrap().len(), one["total"].as_i64()), (1, Some(2)));
+        for bad in ["step=1", "step=4", "step=2&limit=0"] {
+            s.member
+                .get(&s.path(&format!("funnels/{id}/dropoffs?{range}&{bad}")))
+                .await
+                .expect(StatusCode::UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    #[tokio::test]
     async fn people_and_their_timelines() {
         let s = setup().await;
         s.signups().await;
