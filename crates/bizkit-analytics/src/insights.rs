@@ -17,6 +17,8 @@ use utoipa::ToSchema;
 
 pub(crate) use self::query::InsightQuery;
 use self::query::InsightResult;
+#[cfg(feature = "test-hooks")]
+pub(crate) use self::saved::seed_dashboard;
 use crate::api::Day;
 use crate::files::Files;
 use crate::stats::{check_range, site_scope};

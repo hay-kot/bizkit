@@ -17,12 +17,15 @@ use crate::api::{Day, FunnelId, GoalId, PersonId};
 use crate::files::{ProjectDb, project_db_path};
 use crate::funnels::{self, FunnelRow};
 use crate::hooks::GOAL;
+use crate::insights::{InsightQuery, seed_dashboard};
+use crate::report::Scope;
 use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow, GoalRow, SiteRow};
 
 const DAYS: i64 = 14;
 const SIGNUP_GOAL: &str = "Signup";
 const ONBOARDING_FUNNEL: &str = "Onboarding";
+const ADOPTION_DASHBOARD: &str = "API adoption";
 /// The demo site (`bizkit dev demo-site`) is served from localhost.
 const DEMO_SITE_HOST: &str = "localhost";
 
@@ -417,6 +420,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             website_app_rows(db, seed, project_id).await.context("seeding the website site")?;
         }
         ensure_demo_site(db, seed, project_id).await.context("adding the demo site")?;
+        ensure_insights(db, seed, project_id).await.context("adding the demo insights")?;
         let goals = store::list_goals(db.read(), seed.workspace_id, project_id).await?;
         if let Some(file) = open_empty(seed, project_id).await? {
             let filled = async {
@@ -429,6 +433,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             file.close().await;
             filled?;
         }
+        token_traits(seed, project_id).await.context("adding api_tokens traits")?;
         if let Some(goal) = goals.into_iter().find(|goal| goal.name == SIGNUP_GOAL) {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
         }
@@ -500,6 +505,73 @@ async fn ensure_demo_site(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> an
         funnels::save(&mut *tx, &funnel).await?;
     }
     tx.commit().await
+}
+
+/// The demo insights: the design's three feature-usage questions, asked
+/// of Tallyho's events and traits, plus a breakdown.
+fn demo_insights() -> anyhow::Result<Vec<(&'static str, InsightQuery)>> {
+    let queries = [
+        (
+            "Token holders",
+            json!({"kind": "people", "filters": [{"key": "api_tokens", "op": "gt", "value": 0}],
+                   "breakdown": {"source": "trait", "key": "plan"}}),
+        ),
+        (
+            "Share opening projects",
+            json!({"kind": "events", "event": "project_opened", "measure": "share"}),
+        ),
+        (
+            "Projects opened per user",
+            json!({"kind": "events", "event": "project_opened", "measure": "per_user"}),
+        ),
+        (
+            "Signups by plan",
+            json!({"kind": "events", "event": "signup_completed",
+                   "breakdown": {"source": "property", "key": "plan"}}),
+        ),
+    ];
+    queries
+        .into_iter()
+        .map(|(name, query)| Ok((name, serde_json::from_value(query).context("a demo insight")?)))
+        .collect()
+}
+
+/// The demo insights on an "API adoption" dashboard, when the project has
+/// no insights yet, so stacks seeded before insights get them too.
+async fn ensure_insights(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+    let scope = Scope { workspace_id: seed.workspace_id, project_id };
+    let insights = demo_insights()?;
+    let mut tx = db.write().await?;
+    if seed_dashboard(&mut tx, scope, seed.now, ADOPTION_DASHBOARD, &insights).await? {
+        tx.commit().await?;
+    }
+    Ok(())
+}
+
+/// Gives each person without one an `api_tokens` trait of 0 to 2, from
+/// their user ID's last digit, for the Token holders insight. It writes
+/// people that already exist, unlike the event steps, which only fill an
+/// empty file: older stacks have their people and get the trait too. The
+/// running api may hold the file open; SQLite's locking covers the one
+/// short write.
+async fn token_traits(seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+    let file = ProjectDb::open(&project_db_path(&seed.data_dir, project_id)).await?;
+    let updated = async {
+        let mut tx = file.write().await?;
+        sqlx::query!(
+            "UPDATE analytics_people
+             SET traits = json_set(traits, '$.api_tokens', CAST(substr(user_id, -1) AS INTEGER) % 3)
+             WHERE workspace_id = ? AND project_id = ? AND json_type(traits, '$.api_tokens') IS NULL",
+            seed.workspace_id,
+            project_id,
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await.context("committing api_tokens traits")
+    }
+    .await;
+    file.close().await;
+    updated
 }
 
 /// The site key of the demo workspace's website project, for the demo
@@ -724,6 +796,17 @@ async fn docs_events(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_demo_insights_are_valid() {
+        let insights = demo_insights().unwrap();
+        assert_eq!(insights.len(), 4);
+        for (name, query) in insights {
+            let mut errors = bizkit_core::validate::FieldErrors::default();
+            query.check(&mut errors, "query");
+            assert!(errors.is_empty(), "{name}: {errors:?}");
+        }
+    }
 
     #[test]
     fn the_generator_is_deterministic_and_weighted() {

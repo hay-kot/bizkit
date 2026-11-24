@@ -9,6 +9,183 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Make a dashboard: a name and saved insights in order",
+      "inputSchema": {
+        "$defs": {
+          "InsightId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new dashboard.",
+        "properties": {
+          "insight_ids": {
+            "description": "Insights of the project, in order; at most 20.",
+            "items": {
+              "$ref": "#/$defs/InsightId"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_dashboards_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a dashboard; its insights stay",
+      "inputSchema": {
+        "$defs": {
+          "DashboardId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A dashboard of a workspace.",
+        "properties": {
+          "dashboard_id": {
+            "$ref": "#/$defs/DashboardId",
+            "description": "The dashboard."
+          }
+        },
+        "required": [
+          "dashboard_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_dashboards_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a dashboard and its insights in order",
+      "inputSchema": {
+        "$defs": {
+          "DashboardId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A dashboard of a workspace.",
+        "properties": {
+          "dashboard_id": {
+            "$ref": "#/$defs/DashboardId",
+            "description": "The dashboard."
+          }
+        },
+        "required": [
+          "dashboard_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_dashboards_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's dashboards",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project's insights or dashboards.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_dashboards_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Rename a dashboard or set its insights: the whole list, in order",
+      "inputSchema": {
+        "$defs": {
+          "DashboardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "InsightId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a dashboard. Absent fields stay as they are.",
+        "properties": {
+          "dashboard_id": {
+            "$ref": "#/$defs/DashboardId",
+            "description": "The dashboard."
+          },
+          "insight_ids": {
+            "description": "The whole new list of insights, in order; at most 20. Add, remove\nand reorder by sending the list.",
+            "items": {
+              "$ref": "#/$defs/InsightId"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "dashboard_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_dashboards_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Record product events from your server",
       "inputSchema": {
         "$defs": {
@@ -664,6 +841,729 @@ expression: tools
         "type": "object"
       },
       "name": "analytics_goals_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Save an insight: a name, an insight query and the range it opens with",
+      "inputSchema": {
+        "$defs": {
+          "BreakdownBy": {
+            "additionalProperties": false,
+            "description": "Split the result by one property or trait.",
+            "properties": {
+              "key": {
+                "description": "The property or trait name.",
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/BreakdownSource",
+                "description": "Where the value comes from."
+              }
+            },
+            "required": [
+              "source",
+              "key"
+            ],
+            "type": "object"
+          },
+          "BreakdownSource": {
+            "description": "Where a breakdown value comes from.",
+            "enum": [
+              "property",
+              "trait"
+            ],
+            "type": "string"
+          },
+          "FilterOp": {
+            "description": "A filter's comparison.",
+            "enum": [
+              "is",
+              "is_not",
+              "gt",
+              "lt",
+              "is_set"
+            ],
+            "type": "string"
+          },
+          "FilterValue": {
+            "description": "A filter value: text, a number or a boolean.",
+            "oneOf": [
+              {
+                "description": "A boolean.",
+                "type": "boolean"
+              },
+              {
+                "description": "A number.",
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "description": "Text. Text that reads as a number also compares as one.",
+                "type": "string"
+              }
+            ]
+          },
+          "InsightFilter": {
+            "additionalProperties": false,
+            "description": "One condition on an event property, or on a trait for the people kind.",
+            "properties": {
+              "key": {
+                "description": "The property or trait name.",
+                "type": "string"
+              },
+              "op": {
+                "$ref": "#/$defs/FilterOp",
+                "description": "The comparison."
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/FilterValue",
+                    "description": "The value: text for `is` and `is_not`, a number for `gt` and `lt`,\nnone for `is_set`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "op"
+            ],
+            "type": "object"
+          },
+          "InsightKind": {
+            "description": "What an insight counts.",
+            "enum": [
+              "events",
+              "people"
+            ],
+            "type": "string"
+          },
+          "InsightQuery": {
+            "additionalProperties": false,
+            "description": "A typed analytics question. Events insights read raw events, so they\nreach back only as far as raw retention (90 days by default); keep\nlifetime counts in traits and ask the people kind.",
+            "properties": {
+              "breakdown": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/BreakdownBy",
+                    "description": "Split by one property or trait: the top 10 values, then the rest.\nNot with `per_user`; people break down by trait only."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "event": {
+                "description": "The event name (`pageview` included). Required for events; absent\nfor people.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filters": {
+                "description": "All must match: event properties for events, traits for people.\nAt most 10.",
+                "items": {
+                  "$ref": "#/$defs/InsightFilter"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "$ref": "#/$defs/InsightKind",
+                "description": "Events or people."
+              },
+              "measure": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Measure",
+                    "description": "How events count; default `total`. Absent for people, which count\npeople."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          "InsightRange": {
+            "description": "The range an insight opens with, ending today. A dashboard's range\nreplaces it.",
+            "enum": [
+              "today",
+              "7d",
+              "30d",
+              "90d",
+              "month",
+              "last-month"
+            ],
+            "type": "string"
+          },
+          "Measure": {
+            "description": "How an events insight counts.",
+            "enum": [
+              "total",
+              "users",
+              "share",
+              "per_user"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new insight.",
+        "properties": {
+          "name": {
+            "description": "The display name.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "query": {
+            "$ref": "#/$defs/InsightQuery",
+            "description": "What it counts."
+          },
+          "range": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/InsightRange",
+                "description": "The range it opens with; default `30d`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_insights_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a saved insight; it leaves every dashboard it was on",
+      "inputSchema": {
+        "$defs": {
+          "InsightId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An insight of a workspace.",
+        "properties": {
+          "insight_id": {
+            "$ref": "#/$defs/InsightId",
+            "description": "The insight."
+          }
+        },
+        "required": [
+          "insight_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_insights_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a saved insight and the dashboards it is on",
+      "inputSchema": {
+        "$defs": {
+          "InsightId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An insight of a workspace.",
+        "properties": {
+          "insight_id": {
+            "$ref": "#/$defs/InsightId",
+            "description": "The insight."
+          }
+        },
+        "required": [
+          "insight_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_insights_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a project's saved insights",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A project's insights or dashboards.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_insights_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Run an insight query: events by total, users, share of active users or per-user count, or people by trait, with filters and an optional breakdown",
+      "inputSchema": {
+        "$defs": {
+          "BreakdownBy": {
+            "additionalProperties": false,
+            "description": "Split the result by one property or trait.",
+            "properties": {
+              "key": {
+                "description": "The property or trait name.",
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/BreakdownSource",
+                "description": "Where the value comes from."
+              }
+            },
+            "required": [
+              "source",
+              "key"
+            ],
+            "type": "object"
+          },
+          "BreakdownSource": {
+            "description": "Where a breakdown value comes from.",
+            "enum": [
+              "property",
+              "trait"
+            ],
+            "type": "string"
+          },
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "FilterOp": {
+            "description": "A filter's comparison.",
+            "enum": [
+              "is",
+              "is_not",
+              "gt",
+              "lt",
+              "is_set"
+            ],
+            "type": "string"
+          },
+          "FilterValue": {
+            "description": "A filter value: text, a number or a boolean.",
+            "oneOf": [
+              {
+                "description": "A boolean.",
+                "type": "boolean"
+              },
+              {
+                "description": "A number.",
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "description": "Text. Text that reads as a number also compares as one.",
+                "type": "string"
+              }
+            ]
+          },
+          "InsightFilter": {
+            "additionalProperties": false,
+            "description": "One condition on an event property, or on a trait for the people kind.",
+            "properties": {
+              "key": {
+                "description": "The property or trait name.",
+                "type": "string"
+              },
+              "op": {
+                "$ref": "#/$defs/FilterOp",
+                "description": "The comparison."
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/FilterValue",
+                    "description": "The value: text for `is` and `is_not`, a number for `gt` and `lt`,\nnone for `is_set`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "op"
+            ],
+            "type": "object"
+          },
+          "InsightKind": {
+            "description": "What an insight counts.",
+            "enum": [
+              "events",
+              "people"
+            ],
+            "type": "string"
+          },
+          "InsightQuery": {
+            "additionalProperties": false,
+            "description": "A typed analytics question. Events insights read raw events, so they\nreach back only as far as raw retention (90 days by default); keep\nlifetime counts in traits and ask the people kind.",
+            "properties": {
+              "breakdown": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/BreakdownBy",
+                    "description": "Split by one property or trait: the top 10 values, then the rest.\nNot with `per_user`; people break down by trait only."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "event": {
+                "description": "The event name (`pageview` included). Required for events; absent\nfor people.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filters": {
+                "description": "All must match: event properties for events, traits for people.\nAt most 10.",
+                "items": {
+                  "$ref": "#/$defs/InsightFilter"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "$ref": "#/$defs/InsightKind",
+                "description": "Events or people."
+              },
+              "measure": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Measure",
+                    "description": "How events count; default `total`. Absent for people, which count\npeople."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          "Measure": {
+            "description": "How an events insight counts.",
+            "enum": [
+              "total",
+              "users",
+              "share",
+              "per_user"
+            ],
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An insight query to run over a range.",
+        "properties": {
+          "from": {
+            "$ref": "#/$defs/Day",
+            "description": "The first day, UTC. People insights ignore the range."
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "query": {
+            "$ref": "#/$defs/InsightQuery",
+            "description": "What to count."
+          },
+          "to": {
+            "$ref": "#/$defs/Day",
+            "description": "The last day, UTC, inclusive. At most 400 days after `from`."
+          }
+        },
+        "required": [
+          "project_id",
+          "from",
+          "to",
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_insights_query"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a saved insight",
+      "inputSchema": {
+        "$defs": {
+          "BreakdownBy": {
+            "additionalProperties": false,
+            "description": "Split the result by one property or trait.",
+            "properties": {
+              "key": {
+                "description": "The property or trait name.",
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/BreakdownSource",
+                "description": "Where the value comes from."
+              }
+            },
+            "required": [
+              "source",
+              "key"
+            ],
+            "type": "object"
+          },
+          "BreakdownSource": {
+            "description": "Where a breakdown value comes from.",
+            "enum": [
+              "property",
+              "trait"
+            ],
+            "type": "string"
+          },
+          "FilterOp": {
+            "description": "A filter's comparison.",
+            "enum": [
+              "is",
+              "is_not",
+              "gt",
+              "lt",
+              "is_set"
+            ],
+            "type": "string"
+          },
+          "FilterValue": {
+            "description": "A filter value: text, a number or a boolean.",
+            "oneOf": [
+              {
+                "description": "A boolean.",
+                "type": "boolean"
+              },
+              {
+                "description": "A number.",
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "description": "Text. Text that reads as a number also compares as one.",
+                "type": "string"
+              }
+            ]
+          },
+          "InsightFilter": {
+            "additionalProperties": false,
+            "description": "One condition on an event property, or on a trait for the people kind.",
+            "properties": {
+              "key": {
+                "description": "The property or trait name.",
+                "type": "string"
+              },
+              "op": {
+                "$ref": "#/$defs/FilterOp",
+                "description": "The comparison."
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/FilterValue",
+                    "description": "The value: text for `is` and `is_not`, a number for `gt` and `lt`,\nnone for `is_set`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "op"
+            ],
+            "type": "object"
+          },
+          "InsightId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "InsightKind": {
+            "description": "What an insight counts.",
+            "enum": [
+              "events",
+              "people"
+            ],
+            "type": "string"
+          },
+          "InsightQuery": {
+            "additionalProperties": false,
+            "description": "A typed analytics question. Events insights read raw events, so they\nreach back only as far as raw retention (90 days by default); keep\nlifetime counts in traits and ask the people kind.",
+            "properties": {
+              "breakdown": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/BreakdownBy",
+                    "description": "Split by one property or trait: the top 10 values, then the rest.\nNot with `per_user`; people break down by trait only."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "event": {
+                "description": "The event name (`pageview` included). Required for events; absent\nfor people.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filters": {
+                "description": "All must match: event properties for events, traits for people.\nAt most 10.",
+                "items": {
+                  "$ref": "#/$defs/InsightFilter"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "$ref": "#/$defs/InsightKind",
+                "description": "Events or people."
+              },
+              "measure": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Measure",
+                    "description": "How events count; default `total`. Absent for people, which count\npeople."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          "InsightRange": {
+            "description": "The range an insight opens with, ending today. A dashboard's range\nreplaces it.",
+            "enum": [
+              "today",
+              "7d",
+              "30d",
+              "90d",
+              "month",
+              "last-month"
+            ],
+            "type": "string"
+          },
+          "Measure": {
+            "description": "How an events insight counts.",
+            "enum": [
+              "total",
+              "users",
+              "share",
+              "per_user"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to an insight. Absent fields stay as they are.",
+        "properties": {
+          "insight_id": {
+            "$ref": "#/$defs/InsightId",
+            "description": "The insight."
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "query": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/InsightQuery",
+                "description": "What it counts."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "range": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/InsightRange",
+                "description": "The range it opens with."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "insight_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_insights_update"
     },
     {
       "annotations": {

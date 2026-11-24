@@ -828,6 +828,546 @@
         "x-bizkit-scope": "workspace:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/analytics/dashboards": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List a project's dashboards",
+        "operationId": "analytics.dashboards.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Make a dashboard: a name and saved insights in order",
+        "operationId": "analytics.dashboards.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "name"
+                ],
+                "properties": {
+                  "insight_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/InsightId"
+                    },
+                    "description": "Insights of the project, in order; at most 20."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/dashboards/{dashboard_id}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Show a dashboard and its insights in order",
+        "operationId": "analytics.dashboards.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardId",
+              "description": "The dashboard."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "delete": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Delete a dashboard; its insights stay",
+        "operationId": "analytics.dashboards.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardId",
+              "description": "The dashboard."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      },
+      "patch": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Rename a dashboard or set its insights: the whole list, in order",
+        "operationId": "analytics.dashboards.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DashboardId",
+              "description": "The dashboard."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "insight_ids": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/InsightId"
+                    },
+                    "description": "The whole new list of insights, in order; at most 20. Add, remove\nand reorder by sending the list."
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The display name."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/analytics/events": {
       "get": {
         "tags": [
@@ -2409,6 +2949,693 @@
           }
         ],
         "x-bizkit-scope": "analytics:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/insights": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List a project's saved insights",
+        "operationId": "analytics.insights.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Save an insight: a name, an insight query and the range it opens with",
+        "operationId": "analytics.insights.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "name",
+                  "query"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The display name."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  },
+                  "query": {
+                    "$ref": "#/components/schemas/InsightQuery",
+                    "description": "What it counts."
+                  },
+                  "range": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/InsightRange",
+                        "description": "The range it opens with; default `30d`."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Insight"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/insights/query": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Run an insight query: events by total, users, share of active users or per-user count, or people by trait, with filters and an optional breakdown",
+        "operationId": "analytics.insights.query",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "from",
+                  "to",
+                  "query"
+                ],
+                "properties": {
+                  "from": {
+                    "$ref": "#/components/schemas/Day",
+                    "description": "The first day, UTC. People insights ignore the range."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project."
+                  },
+                  "query": {
+                    "$ref": "#/components/schemas/InsightQuery",
+                    "description": "What to count."
+                  },
+                  "to": {
+                    "$ref": "#/components/schemas/Day",
+                    "description": "The last day, UTC, inclusive. At most 400 days after `from`."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/insights/{insight_id}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Show a saved insight and the dashboards it is on",
+        "operationId": "analytics.insights.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "insight_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InsightId",
+              "description": "The insight."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Insight"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      },
+      "delete": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Delete a saved insight; it leaves every dashboard it was on",
+        "operationId": "analytics.insights.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "insight_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InsightId",
+              "description": "The insight."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
+      },
+      "patch": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Change a saved insight",
+        "operationId": "analytics.insights.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "insight_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InsightId",
+              "description": "The insight."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The display name."
+                  },
+                  "query": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/InsightQuery",
+                        "description": "What it counts."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "range": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/InsightRange",
+                        "description": "The range it opens with."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Insight"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:write"
       }
     },
     "/api/v1/workspaces/{workspace_id}/analytics/people": {
@@ -14176,6 +15403,25 @@
           }
         }
       },
+      "BreakdownBy": {
+        "type": "object",
+        "description": "Split the result by one property or trait.",
+        "required": [
+          "source",
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The property or trait name."
+          },
+          "source": {
+            "$ref": "#/components/schemas/BreakdownSource",
+            "description": "Where the value comes from."
+          }
+        },
+        "additionalProperties": false
+      },
       "BreakdownRow": {
         "type": "object",
         "description": "One row of a breakdown.",
@@ -14225,6 +15471,14 @@
             "description": "Unique visitors, summed per day. For goals, the conversions."
           }
         }
+      },
+      "BreakdownSource": {
+        "type": "string",
+        "description": "Where a breakdown value comes from.",
+        "enum": [
+          "property",
+          "trait"
+        ]
       },
       "Broadcast": {
         "type": "object",
@@ -14652,6 +15906,85 @@
           "token": {
             "type": "string",
             "description": "The bearer token, `bk_...`. Shown only now."
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "description": "A dashboard: insights in order, shown two to a row.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "insight_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was made."
+          },
+          "id": {
+            "$ref": "#/components/schemas/DashboardId",
+            "description": "The dashboard ID."
+          },
+          "insight_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InsightId"
+            },
+            "description": "Its insights, in order."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project."
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it last changed."
+          }
+        }
+      },
+      "DashboardId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "DashboardList": {
+        "type": "object",
+        "description": "A project's dashboards.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Dashboard"
+            },
+            "description": "Sorted by name."
+          }
+        }
+      },
+      "DashboardRef": {
+        "type": "object",
+        "description": "A dashboard an insight is on.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/DashboardId",
+            "description": "The dashboard ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
           }
         }
       },
@@ -15425,6 +16758,35 @@
         ],
         "description": "One field's submitted value."
       },
+      "FilterOp": {
+        "type": "string",
+        "description": "A filter's comparison.",
+        "enum": [
+          "is",
+          "is_not",
+          "gt",
+          "lt",
+          "is_set"
+        ]
+      },
+      "FilterValue": {
+        "oneOf": [
+          {
+            "type": "boolean",
+            "description": "A boolean."
+          },
+          {
+            "type": "number",
+            "format": "double",
+            "description": "A number."
+          },
+          {
+            "type": "string",
+            "description": "Text. Text that reads as a number also compares as one."
+          }
+        ],
+        "description": "A filter value: text, a number or a boolean."
+      },
       "Form": {
         "type": "object",
         "description": "A form that collects submissions from a site.",
@@ -15852,6 +17214,417 @@
           }
         }
       },
+      "Insight": {
+        "type": "object",
+        "description": "A saved insight.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "query",
+          "range",
+          "dashboards",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was made."
+          },
+          "dashboards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardRef"
+            },
+            "description": "The dashboards it is on, by name."
+          },
+          "id": {
+            "$ref": "#/components/schemas/InsightId",
+            "description": "The insight ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project."
+          },
+          "query": {
+            "$ref": "#/components/schemas/InsightQuery",
+            "description": "What it counts."
+          },
+          "range": {
+            "$ref": "#/components/schemas/InsightRange",
+            "description": "The range it opens with."
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it last changed."
+          }
+        }
+      },
+      "InsightFilter": {
+        "type": "object",
+        "description": "One condition on an event property, or on a trait for the people kind.",
+        "required": [
+          "key",
+          "op"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The property or trait name."
+          },
+          "op": {
+            "$ref": "#/components/schemas/FilterOp",
+            "description": "The comparison."
+          },
+          "value": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FilterValue",
+                "description": "The value: text for `is` and `is_not`, a number for `gt` and `lt`,\nnone for `is_set`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "InsightId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "InsightKind": {
+        "type": "string",
+        "description": "What an insight counts.",
+        "enum": [
+          "events",
+          "people"
+        ]
+      },
+      "InsightList": {
+        "type": "object",
+        "description": "A project's insights.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Insight"
+            },
+            "description": "Sorted by name."
+          }
+        }
+      },
+      "InsightPoint": {
+        "type": "object",
+        "description": "One chart point.",
+        "required": [
+          "start",
+          "value"
+        ],
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the hour or day starts."
+          },
+          "value": {
+            "type": "number",
+            "format": "double",
+            "description": "The measure: events, people, or a share from 0 to 1."
+          }
+        }
+      },
+      "InsightQuery": {
+        "type": "object",
+        "description": "A typed analytics question. Events insights read raw events, so they\nreach back only as far as raw retention (90 days by default); keep\nlifetime counts in traits and ask the people kind.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "breakdown": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BreakdownBy",
+                "description": "Split by one property or trait: the top 10 values, then the rest.\nNot with `per_user`; people break down by trait only."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The event name (`pageview` included). Required for events; absent\nfor people."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InsightFilter"
+            },
+            "description": "All must match: event properties for events, traits for people.\nAt most 10."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/InsightKind",
+            "description": "Events or people."
+          },
+          "measure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Measure",
+                "description": "How events count; default `total`. Absent for people, which count\npeople."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "InsightRange": {
+        "type": "string",
+        "description": "The range an insight opens with, ending today. A dashboard's range\nreplaces it.",
+        "enum": [
+          "today",
+          "7d",
+          "30d",
+          "90d",
+          "month",
+          "last-month"
+        ]
+      },
+      "InsightResult": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A measure over time: events without a breakdown.",
+            "required": [
+              "measure",
+              "interval",
+              "value",
+              "points",
+              "view"
+            ],
+            "properties": {
+              "active": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "For `share`: active people in the range."
+              },
+              "interval": {
+                "$ref": "#/components/schemas/Interval",
+                "description": "What one point covers."
+              },
+              "measure": {
+                "$ref": "#/components/schemas/Measure",
+                "description": "The measure."
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InsightPoint"
+                },
+                "description": "One point per hour or day."
+              },
+              "raw_since": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Day",
+                    "description": "Set when the range starts before the oldest raw events: days\nbefore this one have no data."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "value": {
+                "type": "number",
+                "format": "double",
+                "description": "The measure over the whole range (a share is people over active\npeople in the range, not a mean of points)."
+              },
+              "view": {
+                "type": "string",
+                "enum": [
+                  "series"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The measure split by one property or trait.",
+            "required": [
+              "value",
+              "rows",
+              "view"
+            ],
+            "properties": {
+              "active": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "For `share`: active people in the range. For people: everyone\nknown."
+              },
+              "measure": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Measure",
+                    "description": "The measure; none for people."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "other": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/InsightRow",
+                    "description": "Every other value as one row; distinct measures count each\nperson once."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "raw_since": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Day",
+                    "description": "As for `series`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InsightRow"
+                },
+                "description": "The top 10 values, largest first."
+              },
+              "value": {
+                "type": "number",
+                "format": "double",
+                "description": "The measure over everything matched."
+              },
+              "view": {
+                "type": "string",
+                "enum": [
+                  "breakdown"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Identified people by how many times they did the event.",
+            "required": [
+              "users",
+              "buckets",
+              "view"
+            ],
+            "properties": {
+              "buckets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TimesBucket"
+                },
+                "description": "1 to 5 times; the last bucket is 5 and more."
+              },
+              "raw_since": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Day",
+                    "description": "As for `series`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "users": {
+                "type": "integer",
+                "format": "int64",
+                "description": "People who did it at least once."
+              },
+              "view": {
+                "type": "string",
+                "enum": [
+                  "distribution"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A count of people.",
+            "required": [
+              "people",
+              "known",
+              "view"
+            ],
+            "properties": {
+              "known": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Everyone known in the project."
+              },
+              "people": {
+                "type": "integer",
+                "format": "int64",
+                "description": "People matching the filters."
+              },
+              "view": {
+                "type": "string",
+                "enum": [
+                  "count"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "An insight's numbers, shaped by how they are best shown."
+      },
+      "InsightRow": {
+        "type": "object",
+        "description": "One breakdown value.",
+        "required": [
+          "result"
+        ],
+        "properties": {
+          "result": {
+            "type": "number",
+            "format": "double",
+            "description": "The measure for this value."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The value as text; none for \"not set\"."
+          }
+        }
+      },
       "Interval": {
         "type": "string",
         "description": "How long one chart point covers.",
@@ -16245,6 +18018,16 @@
             "description": "The display name, if set."
           }
         }
+      },
+      "Measure": {
+        "type": "string",
+        "description": "How an events insight counts.",
+        "enum": [
+          "total",
+          "users",
+          "share",
+          "per_user"
+        ]
       },
       "Member": {
         "type": "object",
@@ -17808,6 +19591,31 @@
           "run": {
             "$ref": "#/components/schemas/Run",
             "description": "The recorded run, with what the script returned and logged."
+          }
+        }
+      },
+      "TimesBucket": {
+        "type": "object",
+        "description": "People who did the event this many times.",
+        "required": [
+          "times",
+          "or_more",
+          "users"
+        ],
+        "properties": {
+          "or_more": {
+            "type": "boolean",
+            "description": "Set on the last bucket, which holds `times` and more."
+          },
+          "times": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The number of times."
+          },
+          "users": {
+            "type": "integer",
+            "format": "int64",
+            "description": "People in the bucket."
           }
         }
       },

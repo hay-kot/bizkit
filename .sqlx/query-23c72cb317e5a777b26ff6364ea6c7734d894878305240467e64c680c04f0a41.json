@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM analytics_insights\n                         WHERE workspace_id = ? AND project_id = ?) AS \"has!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "has!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "23c72cb317e5a777b26ff6364ea6c7734d894878305240467e64c680c04f0a41"
+}

@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { analyticsEventsIngest, analyticsEventsQuery, analyticsEventsRecent, analyticsFunnelsCreate, analyticsFunnelsDelete, analyticsFunnelsDropoffs, analyticsFunnelsGet, analyticsFunnelsList, analyticsFunnelsResults, analyticsFunnelsUpdate, analyticsGoalsCreate, analyticsGoalsDelete, analyticsGoalsList, analyticsPeopleGet, analyticsPeopleList, analyticsPublicCollect, analyticsPublicScript, analyticsRetention, analyticsSiteCreate, analyticsSiteGet, analyticsSiteUpdate, analyticsStatsBreakdown, analyticsStatsSummary, apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, extensionsHooksList, extensionsRunsList, extensionsScriptsCreate, extensionsScriptsDelete, extensionsScriptsGet, extensionsScriptsList, extensionsScriptsTest, extensionsScriptsUpdate, extensionsSecretsDelete, extensionsSecretsList, extensionsSecretsPut, extensionsTargetsList, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, mailingAddressesErase, mailingAddressesExport, mailingBroadcastsCancel, mailingBroadcastsCreate, mailingBroadcastsDelete, mailingBroadcastsGet, mailingBroadcastsList, mailingBroadcastsResend, mailingBroadcastsResume, mailingBroadcastsSend, mailingBroadcastsTest, mailingBroadcastsUpdate, mailingContactsCreate, mailingContactsDelete, mailingContactsGet, mailingContactsList, mailingContactsUnsubscribe, mailingContactsUpdate, mailingDeliveriesList, mailingEnrollmentsCreate, mailingEnrollmentsExit, mailingEnrollmentsList, mailingFormsList, mailingListsCreate, mailingListsDelete, mailingListsGet, mailingListsList, mailingListsUpdate, mailingPreview, mailingPublicConfirm, mailingPublicConfirmPage, mailingPublicMailgunEvents, mailingPublicManage, mailingPublicManagePage, mailingPublicUnsubscribe, mailingPublicUnsubscribePage, mailingSequencesCreate, mailingSequencesDelete, mailingSequencesGet, mailingSequencesList, mailingSequencesUpdate, mailingSuppressionsCreate, mailingSuppressionsDelete, mailingSuppressionsList, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, webhooksEndpointsCreate, webhooksEndpointsDelete, webhooksEndpointsGet, webhooksEndpointsList, webhooksEndpointsUpdate, webhooksPublicCaptureDelete, webhooksPublicCaptureGet, webhooksPublicCapturePatch, webhooksPublicCapturePost, webhooksPublicCapturePut, webhooksRequestsGet, webhooksRequestsList, webhooksRequestsReplay, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
-import type { AnalyticsEventsIngestData, AnalyticsEventsIngestError, AnalyticsEventsIngestResponse, AnalyticsEventsQueryData, AnalyticsEventsQueryError, AnalyticsEventsQueryResponse, AnalyticsEventsRecentData, AnalyticsEventsRecentError, AnalyticsEventsRecentResponse, AnalyticsFunnelsCreateData, AnalyticsFunnelsCreateError, AnalyticsFunnelsCreateResponse, AnalyticsFunnelsDeleteData, AnalyticsFunnelsDeleteError, AnalyticsFunnelsDeleteResponse, AnalyticsFunnelsDropoffsData, AnalyticsFunnelsDropoffsError, AnalyticsFunnelsDropoffsResponse, AnalyticsFunnelsGetData, AnalyticsFunnelsGetError, AnalyticsFunnelsGetResponse, AnalyticsFunnelsListData, AnalyticsFunnelsListError, AnalyticsFunnelsListResponse, AnalyticsFunnelsResultsData, AnalyticsFunnelsResultsError, AnalyticsFunnelsResultsResponse, AnalyticsFunnelsUpdateData, AnalyticsFunnelsUpdateError, AnalyticsFunnelsUpdateResponse, AnalyticsGoalsCreateData, AnalyticsGoalsCreateError, AnalyticsGoalsCreateResponse, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteError, AnalyticsGoalsDeleteResponse, AnalyticsGoalsListData, AnalyticsGoalsListError, AnalyticsGoalsListResponse, AnalyticsPeopleGetData, AnalyticsPeopleGetError, AnalyticsPeopleGetResponse, AnalyticsPeopleListData, AnalyticsPeopleListError, AnalyticsPeopleListResponse, AnalyticsPublicCollectData, AnalyticsPublicScriptData, AnalyticsPublicScriptResponse, AnalyticsRetentionData, AnalyticsRetentionError, AnalyticsRetentionResponse, AnalyticsSiteCreateData, AnalyticsSiteCreateError, AnalyticsSiteCreateResponse, AnalyticsSiteGetData, AnalyticsSiteGetError, AnalyticsSiteGetResponse, AnalyticsSiteUpdateData, AnalyticsSiteUpdateError, AnalyticsSiteUpdateResponse, AnalyticsStatsBreakdownData, AnalyticsStatsBreakdownError, AnalyticsStatsBreakdownResponse, AnalyticsStatsSummaryData, AnalyticsStatsSummaryError, AnalyticsStatsSummaryResponse, ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, ExtensionsHooksListData, ExtensionsHooksListError, ExtensionsHooksListResponse, ExtensionsRunsListData, ExtensionsRunsListError, ExtensionsRunsListResponse, ExtensionsScriptsCreateData, ExtensionsScriptsCreateError, ExtensionsScriptsCreateResponse, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteError, ExtensionsScriptsDeleteResponse, ExtensionsScriptsGetData, ExtensionsScriptsGetError, ExtensionsScriptsGetResponse, ExtensionsScriptsListData, ExtensionsScriptsListError, ExtensionsScriptsListResponse, ExtensionsScriptsTestData, ExtensionsScriptsTestError, ExtensionsScriptsTestResponse, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateError, ExtensionsScriptsUpdateResponse, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteError, ExtensionsSecretsDeleteResponse, ExtensionsSecretsListData, ExtensionsSecretsListError, ExtensionsSecretsListResponse, ExtensionsSecretsPutData, ExtensionsSecretsPutError, ExtensionsSecretsPutResponse, ExtensionsTargetsListData, ExtensionsTargetsListError, ExtensionsTargetsListResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MailingAddressesEraseData, MailingAddressesEraseError, MailingAddressesEraseResponse, MailingAddressesExportData, MailingAddressesExportError, MailingAddressesExportResponse, MailingBroadcastsCancelData, MailingBroadcastsCancelError, MailingBroadcastsCancelResponse, MailingBroadcastsCreateData, MailingBroadcastsCreateError, MailingBroadcastsCreateResponse, MailingBroadcastsDeleteData, MailingBroadcastsDeleteError, MailingBroadcastsDeleteResponse, MailingBroadcastsGetData, MailingBroadcastsGetError, MailingBroadcastsGetResponse, MailingBroadcastsListData, MailingBroadcastsListError, MailingBroadcastsListResponse, MailingBroadcastsResendData, MailingBroadcastsResendError, MailingBroadcastsResendResponse, MailingBroadcastsResumeData, MailingBroadcastsResumeError, MailingBroadcastsResumeResponse, MailingBroadcastsSendData, MailingBroadcastsSendError, MailingBroadcastsSendResponse, MailingBroadcastsTestData, MailingBroadcastsTestError, MailingBroadcastsTestResponse, MailingBroadcastsUpdateData, MailingBroadcastsUpdateError, MailingBroadcastsUpdateResponse, MailingContactsCreateData, MailingContactsCreateError, MailingContactsCreateResponse, MailingContactsDeleteData, MailingContactsDeleteError, MailingContactsDeleteResponse, MailingContactsGetData, MailingContactsGetError, MailingContactsGetResponse, MailingContactsListData, MailingContactsListError, MailingContactsListResponse, MailingContactsUnsubscribeData, MailingContactsUnsubscribeError, MailingContactsUnsubscribeResponse, MailingContactsUpdateData, MailingContactsUpdateError, MailingContactsUpdateResponse, MailingDeliveriesListData, MailingDeliveriesListError, MailingDeliveriesListResponse, MailingEnrollmentsCreateData, MailingEnrollmentsCreateError, MailingEnrollmentsCreateResponse, MailingEnrollmentsExitData, MailingEnrollmentsExitError, MailingEnrollmentsExitResponse, MailingEnrollmentsListData, MailingEnrollmentsListError, MailingEnrollmentsListResponse, MailingFormsListData, MailingFormsListError, MailingFormsListResponse, MailingListsCreateData, MailingListsCreateError, MailingListsCreateResponse, MailingListsDeleteData, MailingListsDeleteError, MailingListsDeleteResponse, MailingListsGetData, MailingListsGetError, MailingListsGetResponse, MailingListsListData, MailingListsListError, MailingListsListResponse, MailingListsUpdateData, MailingListsUpdateError, MailingListsUpdateResponse, MailingPreviewData, MailingPreviewError, MailingPreviewResponse, MailingPublicConfirmData, MailingPublicConfirmError, MailingPublicConfirmPageData, MailingPublicConfirmPageError, MailingPublicConfirmPageResponse, MailingPublicConfirmResponse, MailingPublicMailgunEventsData, MailingPublicMailgunEventsError, MailingPublicMailgunEventsResponse, MailingPublicManageData, MailingPublicManageError, MailingPublicManagePageData, MailingPublicManagePageError, MailingPublicManagePageResponse, MailingPublicManageResponse, MailingPublicUnsubscribeData, MailingPublicUnsubscribeError, MailingPublicUnsubscribePageData, MailingPublicUnsubscribePageError, MailingPublicUnsubscribePageResponse, MailingPublicUnsubscribeResponse, MailingSequencesCreateData, MailingSequencesCreateError, MailingSequencesCreateResponse, MailingSequencesDeleteData, MailingSequencesDeleteError, MailingSequencesDeleteResponse, MailingSequencesGetData, MailingSequencesGetError, MailingSequencesGetResponse, MailingSequencesListData, MailingSequencesListError, MailingSequencesListResponse, MailingSequencesUpdateData, MailingSequencesUpdateError, MailingSequencesUpdateResponse, MailingSuppressionsCreateData, MailingSuppressionsCreateError, MailingSuppressionsCreateResponse, MailingSuppressionsDeleteData, MailingSuppressionsDeleteError, MailingSuppressionsDeleteResponse, MailingSuppressionsListData, MailingSuppressionsListError, MailingSuppressionsListResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WebhooksEndpointsCreateData, WebhooksEndpointsCreateError, WebhooksEndpointsCreateResponse, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteError, WebhooksEndpointsDeleteResponse, WebhooksEndpointsGetData, WebhooksEndpointsGetError, WebhooksEndpointsGetResponse, WebhooksEndpointsListData, WebhooksEndpointsListError, WebhooksEndpointsListResponse, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateError, WebhooksEndpointsUpdateResponse, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteError, WebhooksPublicCaptureDeleteResponse, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetError, WebhooksPublicCaptureGetResponse, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchError, WebhooksPublicCapturePatchResponse, WebhooksPublicCapturePostData, WebhooksPublicCapturePostError, WebhooksPublicCapturePostResponse, WebhooksPublicCapturePutData, WebhooksPublicCapturePutError, WebhooksPublicCapturePutResponse, WebhooksRequestsGetData, WebhooksRequestsGetError, WebhooksRequestsGetResponse, WebhooksRequestsListData, WebhooksRequestsListError, WebhooksRequestsListResponse, WebhooksRequestsReplayData, WebhooksRequestsReplayError, WebhooksRequestsReplayResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
+import { analyticsDashboardsCreate, analyticsDashboardsDelete, analyticsDashboardsGet, analyticsDashboardsList, analyticsDashboardsUpdate, analyticsEventsIngest, analyticsEventsQuery, analyticsEventsRecent, analyticsFunnelsCreate, analyticsFunnelsDelete, analyticsFunnelsDropoffs, analyticsFunnelsGet, analyticsFunnelsList, analyticsFunnelsResults, analyticsFunnelsUpdate, analyticsGoalsCreate, analyticsGoalsDelete, analyticsGoalsList, analyticsInsightsCreate, analyticsInsightsDelete, analyticsInsightsGet, analyticsInsightsList, analyticsInsightsQuery, analyticsInsightsUpdate, analyticsPeopleGet, analyticsPeopleList, analyticsPublicCollect, analyticsPublicScript, analyticsRetention, analyticsSiteCreate, analyticsSiteGet, analyticsSiteUpdate, analyticsStatsBreakdown, analyticsStatsSummary, apiKeysCreate, apiKeysList, apiKeysRevoke, authSignIn, authSignOut, authVerify, extensionsHooksList, extensionsRunsList, extensionsScriptsCreate, extensionsScriptsDelete, extensionsScriptsGet, extensionsScriptsList, extensionsScriptsTest, extensionsScriptsUpdate, extensionsSecretsDelete, extensionsSecretsList, extensionsSecretsPut, extensionsTargetsList, formsCreate, formsDelete, formsGet, formsList, formsPublicChallenge, formsPublicSubmit, formsSubmissionsDelete, formsSubmissionsExport, formsSubmissionsGet, formsSubmissionsList, formsSubmissionsUpdate, formsUpdate, invitationsAccept, invitationsCreate, invitationsDecline, invitationsList, invitationsMine, invitationsRevoke, mailingAddressesErase, mailingAddressesExport, mailingBroadcastsCancel, mailingBroadcastsCreate, mailingBroadcastsDelete, mailingBroadcastsGet, mailingBroadcastsList, mailingBroadcastsResend, mailingBroadcastsResume, mailingBroadcastsSend, mailingBroadcastsTest, mailingBroadcastsUpdate, mailingContactsCreate, mailingContactsDelete, mailingContactsGet, mailingContactsList, mailingContactsUnsubscribe, mailingContactsUpdate, mailingDeliveriesList, mailingEnrollmentsCreate, mailingEnrollmentsExit, mailingEnrollmentsList, mailingFormsList, mailingListsCreate, mailingListsDelete, mailingListsGet, mailingListsList, mailingListsUpdate, mailingPreview, mailingPublicConfirm, mailingPublicConfirmPage, mailingPublicMailgunEvents, mailingPublicManage, mailingPublicManagePage, mailingPublicUnsubscribe, mailingPublicUnsubscribePage, mailingSequencesCreate, mailingSequencesDelete, mailingSequencesGet, mailingSequencesList, mailingSequencesUpdate, mailingSuppressionsCreate, mailingSuppressionsDelete, mailingSuppressionsList, meGet, membersList, membersRemove, membersUpdate, type Options, platformMeta, projectsCreate, projectsDelete, projectsGet, projectsList, projectsUpdate, webhooksEndpointsCreate, webhooksEndpointsDelete, webhooksEndpointsGet, webhooksEndpointsList, webhooksEndpointsUpdate, webhooksPublicCaptureDelete, webhooksPublicCaptureGet, webhooksPublicCapturePatch, webhooksPublicCapturePost, webhooksPublicCapturePut, webhooksRequestsGet, webhooksRequestsList, webhooksRequestsReplay, workspacesCreate, workspacesGet, workspacesList, workspacesUpdate } from '../sdk.gen';
+import type { AnalyticsDashboardsCreateData, AnalyticsDashboardsCreateError, AnalyticsDashboardsCreateResponse, AnalyticsDashboardsDeleteData, AnalyticsDashboardsDeleteError, AnalyticsDashboardsDeleteResponse, AnalyticsDashboardsGetData, AnalyticsDashboardsGetError, AnalyticsDashboardsGetResponse, AnalyticsDashboardsListData, AnalyticsDashboardsListError, AnalyticsDashboardsListResponse, AnalyticsDashboardsUpdateData, AnalyticsDashboardsUpdateError, AnalyticsDashboardsUpdateResponse, AnalyticsEventsIngestData, AnalyticsEventsIngestError, AnalyticsEventsIngestResponse, AnalyticsEventsQueryData, AnalyticsEventsQueryError, AnalyticsEventsQueryResponse, AnalyticsEventsRecentData, AnalyticsEventsRecentError, AnalyticsEventsRecentResponse, AnalyticsFunnelsCreateData, AnalyticsFunnelsCreateError, AnalyticsFunnelsCreateResponse, AnalyticsFunnelsDeleteData, AnalyticsFunnelsDeleteError, AnalyticsFunnelsDeleteResponse, AnalyticsFunnelsDropoffsData, AnalyticsFunnelsDropoffsError, AnalyticsFunnelsDropoffsResponse, AnalyticsFunnelsGetData, AnalyticsFunnelsGetError, AnalyticsFunnelsGetResponse, AnalyticsFunnelsListData, AnalyticsFunnelsListError, AnalyticsFunnelsListResponse, AnalyticsFunnelsResultsData, AnalyticsFunnelsResultsError, AnalyticsFunnelsResultsResponse, AnalyticsFunnelsUpdateData, AnalyticsFunnelsUpdateError, AnalyticsFunnelsUpdateResponse, AnalyticsGoalsCreateData, AnalyticsGoalsCreateError, AnalyticsGoalsCreateResponse, AnalyticsGoalsDeleteData, AnalyticsGoalsDeleteError, AnalyticsGoalsDeleteResponse, AnalyticsGoalsListData, AnalyticsGoalsListError, AnalyticsGoalsListResponse, AnalyticsInsightsCreateData, AnalyticsInsightsCreateError, AnalyticsInsightsCreateResponse, AnalyticsInsightsDeleteData, AnalyticsInsightsDeleteError, AnalyticsInsightsDeleteResponse, AnalyticsInsightsGetData, AnalyticsInsightsGetError, AnalyticsInsightsGetResponse, AnalyticsInsightsListData, AnalyticsInsightsListError, AnalyticsInsightsListResponse, AnalyticsInsightsQueryData, AnalyticsInsightsQueryError, AnalyticsInsightsQueryResponse, AnalyticsInsightsUpdateData, AnalyticsInsightsUpdateError, AnalyticsInsightsUpdateResponse, AnalyticsPeopleGetData, AnalyticsPeopleGetError, AnalyticsPeopleGetResponse, AnalyticsPeopleListData, AnalyticsPeopleListError, AnalyticsPeopleListResponse, AnalyticsPublicCollectData, AnalyticsPublicScriptData, AnalyticsPublicScriptResponse, AnalyticsRetentionData, AnalyticsRetentionError, AnalyticsRetentionResponse, AnalyticsSiteCreateData, AnalyticsSiteCreateError, AnalyticsSiteCreateResponse, AnalyticsSiteGetData, AnalyticsSiteGetError, AnalyticsSiteGetResponse, AnalyticsSiteUpdateData, AnalyticsSiteUpdateError, AnalyticsSiteUpdateResponse, AnalyticsStatsBreakdownData, AnalyticsStatsBreakdownError, AnalyticsStatsBreakdownResponse, AnalyticsStatsSummaryData, AnalyticsStatsSummaryError, AnalyticsStatsSummaryResponse, ApiKeysCreateData, ApiKeysCreateError, ApiKeysCreateResponse, ApiKeysListData, ApiKeysListError, ApiKeysListResponse, ApiKeysRevokeData, ApiKeysRevokeError, ApiKeysRevokeResponse, AuthSignInData, AuthSignInError, AuthSignOutData, AuthSignOutError, AuthSignOutResponse, AuthVerifyData, AuthVerifyError, AuthVerifyResponse, ExtensionsHooksListData, ExtensionsHooksListError, ExtensionsHooksListResponse, ExtensionsRunsListData, ExtensionsRunsListError, ExtensionsRunsListResponse, ExtensionsScriptsCreateData, ExtensionsScriptsCreateError, ExtensionsScriptsCreateResponse, ExtensionsScriptsDeleteData, ExtensionsScriptsDeleteError, ExtensionsScriptsDeleteResponse, ExtensionsScriptsGetData, ExtensionsScriptsGetError, ExtensionsScriptsGetResponse, ExtensionsScriptsListData, ExtensionsScriptsListError, ExtensionsScriptsListResponse, ExtensionsScriptsTestData, ExtensionsScriptsTestError, ExtensionsScriptsTestResponse, ExtensionsScriptsUpdateData, ExtensionsScriptsUpdateError, ExtensionsScriptsUpdateResponse, ExtensionsSecretsDeleteData, ExtensionsSecretsDeleteError, ExtensionsSecretsDeleteResponse, ExtensionsSecretsListData, ExtensionsSecretsListError, ExtensionsSecretsListResponse, ExtensionsSecretsPutData, ExtensionsSecretsPutError, ExtensionsSecretsPutResponse, ExtensionsTargetsListData, ExtensionsTargetsListError, ExtensionsTargetsListResponse, FormsCreateData, FormsCreateError, FormsCreateResponse, FormsDeleteData, FormsDeleteError, FormsDeleteResponse, FormsGetData, FormsGetError, FormsGetResponse, FormsListData, FormsListError, FormsListResponse, FormsPublicChallengeData, FormsPublicChallengeError, FormsPublicChallengeResponse, FormsPublicSubmitData, FormsPublicSubmitError, FormsPublicSubmitResponse, FormsSubmissionsDeleteData, FormsSubmissionsDeleteError, FormsSubmissionsDeleteResponse, FormsSubmissionsExportData, FormsSubmissionsExportError, FormsSubmissionsExportResponse, FormsSubmissionsGetData, FormsSubmissionsGetError, FormsSubmissionsGetResponse, FormsSubmissionsListData, FormsSubmissionsListError, FormsSubmissionsListResponse, FormsSubmissionsUpdateData, FormsSubmissionsUpdateError, FormsSubmissionsUpdateResponse, FormsUpdateData, FormsUpdateError, FormsUpdateResponse, InvitationsAcceptData, InvitationsAcceptError, InvitationsAcceptResponse, InvitationsCreateData, InvitationsCreateError, InvitationsCreateResponse, InvitationsDeclineData, InvitationsDeclineError, InvitationsDeclineResponse, InvitationsListData, InvitationsListError, InvitationsListResponse, InvitationsMineData, InvitationsMineError, InvitationsMineResponse, InvitationsRevokeData, InvitationsRevokeError, InvitationsRevokeResponse, MailingAddressesEraseData, MailingAddressesEraseError, MailingAddressesEraseResponse, MailingAddressesExportData, MailingAddressesExportError, MailingAddressesExportResponse, MailingBroadcastsCancelData, MailingBroadcastsCancelError, MailingBroadcastsCancelResponse, MailingBroadcastsCreateData, MailingBroadcastsCreateError, MailingBroadcastsCreateResponse, MailingBroadcastsDeleteData, MailingBroadcastsDeleteError, MailingBroadcastsDeleteResponse, MailingBroadcastsGetData, MailingBroadcastsGetError, MailingBroadcastsGetResponse, MailingBroadcastsListData, MailingBroadcastsListError, MailingBroadcastsListResponse, MailingBroadcastsResendData, MailingBroadcastsResendError, MailingBroadcastsResendResponse, MailingBroadcastsResumeData, MailingBroadcastsResumeError, MailingBroadcastsResumeResponse, MailingBroadcastsSendData, MailingBroadcastsSendError, MailingBroadcastsSendResponse, MailingBroadcastsTestData, MailingBroadcastsTestError, MailingBroadcastsTestResponse, MailingBroadcastsUpdateData, MailingBroadcastsUpdateError, MailingBroadcastsUpdateResponse, MailingContactsCreateData, MailingContactsCreateError, MailingContactsCreateResponse, MailingContactsDeleteData, MailingContactsDeleteError, MailingContactsDeleteResponse, MailingContactsGetData, MailingContactsGetError, MailingContactsGetResponse, MailingContactsListData, MailingContactsListError, MailingContactsListResponse, MailingContactsUnsubscribeData, MailingContactsUnsubscribeError, MailingContactsUnsubscribeResponse, MailingContactsUpdateData, MailingContactsUpdateError, MailingContactsUpdateResponse, MailingDeliveriesListData, MailingDeliveriesListError, MailingDeliveriesListResponse, MailingEnrollmentsCreateData, MailingEnrollmentsCreateError, MailingEnrollmentsCreateResponse, MailingEnrollmentsExitData, MailingEnrollmentsExitError, MailingEnrollmentsExitResponse, MailingEnrollmentsListData, MailingEnrollmentsListError, MailingEnrollmentsListResponse, MailingFormsListData, MailingFormsListError, MailingFormsListResponse, MailingListsCreateData, MailingListsCreateError, MailingListsCreateResponse, MailingListsDeleteData, MailingListsDeleteError, MailingListsDeleteResponse, MailingListsGetData, MailingListsGetError, MailingListsGetResponse, MailingListsListData, MailingListsListError, MailingListsListResponse, MailingListsUpdateData, MailingListsUpdateError, MailingListsUpdateResponse, MailingPreviewData, MailingPreviewError, MailingPreviewResponse, MailingPublicConfirmData, MailingPublicConfirmError, MailingPublicConfirmPageData, MailingPublicConfirmPageError, MailingPublicConfirmPageResponse, MailingPublicConfirmResponse, MailingPublicMailgunEventsData, MailingPublicMailgunEventsError, MailingPublicMailgunEventsResponse, MailingPublicManageData, MailingPublicManageError, MailingPublicManagePageData, MailingPublicManagePageError, MailingPublicManagePageResponse, MailingPublicManageResponse, MailingPublicUnsubscribeData, MailingPublicUnsubscribeError, MailingPublicUnsubscribePageData, MailingPublicUnsubscribePageError, MailingPublicUnsubscribePageResponse, MailingPublicUnsubscribeResponse, MailingSequencesCreateData, MailingSequencesCreateError, MailingSequencesCreateResponse, MailingSequencesDeleteData, MailingSequencesDeleteError, MailingSequencesDeleteResponse, MailingSequencesGetData, MailingSequencesGetError, MailingSequencesGetResponse, MailingSequencesListData, MailingSequencesListError, MailingSequencesListResponse, MailingSequencesUpdateData, MailingSequencesUpdateError, MailingSequencesUpdateResponse, MailingSuppressionsCreateData, MailingSuppressionsCreateError, MailingSuppressionsCreateResponse, MailingSuppressionsDeleteData, MailingSuppressionsDeleteError, MailingSuppressionsDeleteResponse, MailingSuppressionsListData, MailingSuppressionsListError, MailingSuppressionsListResponse, MeGetData, MeGetError, MeGetResponse, MembersListData, MembersListError, MembersListResponse, MembersRemoveData, MembersRemoveError, MembersRemoveResponse, MembersUpdateData, MembersUpdateError, MembersUpdateResponse, PlatformMetaData, PlatformMetaError, PlatformMetaResponse, ProjectsCreateData, ProjectsCreateError, ProjectsCreateResponse, ProjectsDeleteData, ProjectsDeleteError, ProjectsDeleteResponse, ProjectsGetData, ProjectsGetError, ProjectsGetResponse, ProjectsListData, ProjectsListError, ProjectsListResponse, ProjectsUpdateData, ProjectsUpdateError, ProjectsUpdateResponse, WebhooksEndpointsCreateData, WebhooksEndpointsCreateError, WebhooksEndpointsCreateResponse, WebhooksEndpointsDeleteData, WebhooksEndpointsDeleteError, WebhooksEndpointsDeleteResponse, WebhooksEndpointsGetData, WebhooksEndpointsGetError, WebhooksEndpointsGetResponse, WebhooksEndpointsListData, WebhooksEndpointsListError, WebhooksEndpointsListResponse, WebhooksEndpointsUpdateData, WebhooksEndpointsUpdateError, WebhooksEndpointsUpdateResponse, WebhooksPublicCaptureDeleteData, WebhooksPublicCaptureDeleteError, WebhooksPublicCaptureDeleteResponse, WebhooksPublicCaptureGetData, WebhooksPublicCaptureGetError, WebhooksPublicCaptureGetResponse, WebhooksPublicCapturePatchData, WebhooksPublicCapturePatchError, WebhooksPublicCapturePatchResponse, WebhooksPublicCapturePostData, WebhooksPublicCapturePostError, WebhooksPublicCapturePostResponse, WebhooksPublicCapturePutData, WebhooksPublicCapturePutError, WebhooksPublicCapturePutResponse, WebhooksRequestsGetData, WebhooksRequestsGetError, WebhooksRequestsGetResponse, WebhooksRequestsListData, WebhooksRequestsListError, WebhooksRequestsListResponse, WebhooksRequestsReplayData, WebhooksRequestsReplayError, WebhooksRequestsReplayResponse, WorkspacesCreateData, WorkspacesCreateError, WorkspacesCreateResponse, WorkspacesGetData, WorkspacesGetError, WorkspacesGetResponse, WorkspacesListData, WorkspacesListError, WorkspacesListResponse, WorkspacesUpdateData, WorkspacesUpdateError, WorkspacesUpdateResponse } from '../types.gen';
 
 /**
  * Sends a sign-in link if the email may sign in. Always 202, so the response
@@ -226,6 +226,82 @@ export const workspacesUpdateMutation = (options?: Partial<Options<WorkspacesUpd
     }
 });
 
+export const analyticsDashboardsListQueryKey = (options: Options<AnalyticsDashboardsListData>) => createQueryKey('analyticsDashboardsList', options);
+
+/**
+ * List a project's dashboards
+ */
+export const analyticsDashboardsListQuery = defineQueryOptions<Options<AnalyticsDashboardsListData>, AnalyticsDashboardsListResponse, AnalyticsDashboardsListError>((options: Options<AnalyticsDashboardsListData>) => ({
+    key: analyticsDashboardsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsDashboardsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Make a dashboard: a name and saved insights in order
+ */
+export const analyticsDashboardsCreateMutation = (options?: Partial<Options<AnalyticsDashboardsCreateData>>): UseMutationOptions<AnalyticsDashboardsCreateResponse, Options<AnalyticsDashboardsCreateData>, AnalyticsDashboardsCreateError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsDashboardsCreate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Delete a dashboard; its insights stay
+ */
+export const analyticsDashboardsDeleteMutation = (options?: Partial<Options<AnalyticsDashboardsDeleteData>>): UseMutationOptions<AnalyticsDashboardsDeleteResponse, Options<AnalyticsDashboardsDeleteData>, AnalyticsDashboardsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsDashboardsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const analyticsDashboardsGetQueryKey = (options: Options<AnalyticsDashboardsGetData>) => createQueryKey('analyticsDashboardsGet', options);
+
+/**
+ * Show a dashboard and its insights in order
+ */
+export const analyticsDashboardsGetQuery = defineQueryOptions<Options<AnalyticsDashboardsGetData>, AnalyticsDashboardsGetResponse, AnalyticsDashboardsGetError>((options: Options<AnalyticsDashboardsGetData>) => ({
+    key: analyticsDashboardsGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsDashboardsGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Rename a dashboard or set its insights: the whole list, in order
+ */
+export const analyticsDashboardsUpdateMutation = (options?: Partial<Options<AnalyticsDashboardsUpdateData>>): UseMutationOptions<AnalyticsDashboardsUpdateResponse, Options<AnalyticsDashboardsUpdateData>, AnalyticsDashboardsUpdateError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsDashboardsUpdate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
 export const analyticsEventsRecentQueryKey = (options: Options<AnalyticsEventsRecentData>) => createQueryKey('analyticsEventsRecent', options);
 
 /**
@@ -421,6 +497,96 @@ export const analyticsGoalsCreateMutation = (options?: Partial<Options<Analytics
 export const analyticsGoalsDeleteMutation = (options?: Partial<Options<AnalyticsGoalsDeleteData>>): UseMutationOptions<AnalyticsGoalsDeleteResponse, Options<AnalyticsGoalsDeleteData>, AnalyticsGoalsDeleteError> => ({
     mutation: async (vars) => {
         const { data } = await analyticsGoalsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const analyticsInsightsListQueryKey = (options: Options<AnalyticsInsightsListData>) => createQueryKey('analyticsInsightsList', options);
+
+/**
+ * List a project's saved insights
+ */
+export const analyticsInsightsListQuery = defineQueryOptions<Options<AnalyticsInsightsListData>, AnalyticsInsightsListResponse, AnalyticsInsightsListError>((options: Options<AnalyticsInsightsListData>) => ({
+    key: analyticsInsightsListQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsInsightsList({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Save an insight: a name, an insight query and the range it opens with
+ */
+export const analyticsInsightsCreateMutation = (options?: Partial<Options<AnalyticsInsightsCreateData>>): UseMutationOptions<AnalyticsInsightsCreateResponse, Options<AnalyticsInsightsCreateData>, AnalyticsInsightsCreateError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsInsightsCreate({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Run an insight query: events by total, users, share of active users or per-user count, or people by trait, with filters and an optional breakdown
+ */
+export const analyticsInsightsQueryMutation = (options?: Partial<Options<AnalyticsInsightsQueryData>>): UseMutationOptions<AnalyticsInsightsQueryResponse, Options<AnalyticsInsightsQueryData>, AnalyticsInsightsQueryError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsInsightsQuery({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Delete a saved insight; it leaves every dashboard it was on
+ */
+export const analyticsInsightsDeleteMutation = (options?: Partial<Options<AnalyticsInsightsDeleteData>>): UseMutationOptions<AnalyticsInsightsDeleteResponse, Options<AnalyticsInsightsDeleteData>, AnalyticsInsightsDeleteError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsInsightsDelete({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const analyticsInsightsGetQueryKey = (options: Options<AnalyticsInsightsGetData>) => createQueryKey('analyticsInsightsGet', options);
+
+/**
+ * Show a saved insight and the dashboards it is on
+ */
+export const analyticsInsightsGetQuery = defineQueryOptions<Options<AnalyticsInsightsGetData>, AnalyticsInsightsGetResponse, AnalyticsInsightsGetError>((options: Options<AnalyticsInsightsGetData>) => ({
+    key: analyticsInsightsGetQueryKey(options),
+    query: async (context) => {
+        const { data } = await analyticsInsightsGet({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Change a saved insight
+ */
+export const analyticsInsightsUpdateMutation = (options?: Partial<Options<AnalyticsInsightsUpdateData>>): UseMutationOptions<AnalyticsInsightsUpdateResponse, Options<AnalyticsInsightsUpdateData>, AnalyticsInsightsUpdateError> => ({
+    mutation: async (vars) => {
+        const { data } = await analyticsInsightsUpdate({
             ...options,
             ...vars,
             throwOnError: true

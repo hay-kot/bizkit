@@ -11,6 +11,8 @@
 //! `share` and `per_user` leave `v:` out, as retention does, because a
 //! cookieless visitor can't be followed across days.
 
+use std::collections::HashMap;
+
 use bizkit_core::time::UnixMillis;
 use sqlx::SqlitePool;
 
@@ -244,7 +246,8 @@ async fn share_totals(pool: &SqlitePool, ask: &Ask<'_>) -> sqlx::Result<(i64, i6
     Ok((row.users, row.active))
 }
 
-/// The share of active people who did it, per bucket and over the range.
+/// The share of active people who did it, per bucket and over the range,
+/// from one pass that keeps a row per person and bucket.
 async fn share_series(
     pool: &SqlitePool,
     ask: &Ask<'_>,
@@ -252,8 +255,8 @@ async fn share_series(
 ) -> sqlx::Result<InsightResult> {
     let (origin, bucket) = (range.from.start(), range.bucket_ms());
     let rows = sqlx::query!(
-        r#"SELECT ? + ((ts - ?) / ?) * ? AS "start!: i64",
-                  COUNT(DISTINCT CASE WHEN name = ? AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (
+        r#"SELECT ? + ((ts - ?) / ?) * ? AS "start!: i64", person AS "person!: String",
+                  MAX(name = ? AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (
                CASE json_extract(f.value, '$.op')
                WHEN 'is_not' THEN NOT EXISTS (SELECT 1 FROM json_each(COALESCE(e.props, '{}')) x
                  WHERE x.key = json_extract(f.value, '$.k')
@@ -270,12 +273,11 @@ async fn share_series(
                    WHEN 'gt' THEN x.type IN ('integer', 'real') AND x.atom > json_extract(f.value, '$.n')
                    WHEN 'lt' THEN x.type IN ('integer', 'real') AND x.atom < json_extract(f.value, '$.n')
                    ELSE x.type <> 'null' END)
-               END)) THEN person END) AS "users!: i64",
-                  COUNT(DISTINCT person) AS "active!: i64"
+               END))) AS "did!: bool"
            FROM analytics_events e
            WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?
              AND substr(person, 1, 2) <> 'v:'
-           GROUP BY 1"#,
+           GROUP BY 1, 2"#,
         origin,
         origin,
         bucket,
@@ -289,13 +291,22 @@ async fn share_series(
     )
     .fetch_all(pool)
     .await?;
-    let (users, active) = share_totals(pool, ask).await?;
+    let mut per_bucket: HashMap<i64, (i64, i64)> = HashMap::new();
+    let mut people: HashMap<&str, bool> = HashMap::new();
+    for row in &rows {
+        let (users, active) = per_bucket.entry(row.start).or_default();
+        *active += 1;
+        *users += i64::from(row.did);
+        *people.entry(&row.person).or_default() |= row.did;
+    }
+    let active = i64::try_from(people.len()).unwrap_or(i64::MAX);
+    let users = i64::try_from(people.values().filter(|did| **did).count()).unwrap_or(i64::MAX);
     let points = range
         .starts()
         .into_iter()
         .map(|start| {
-            let row = rows.iter().find(|row| row.start == start.0);
-            InsightPoint { start, value: row.map_or(0.0, |row| ratio(row.users, row.active)) }
+            let (did, seen) = per_bucket.get(&start.0).copied().unwrap_or_default();
+            InsightPoint { start, value: ratio(did, seen) }
         })
         .collect();
     Ok(InsightResult::Series {

@@ -806,3 +806,52 @@ impl Operation for DashboardsDelete {
         if result.rows_affected() == 1 { Ok(NoContent) } else { Err(ApiError::NotFound) }
     }
 }
+
+/// Saves `insights` and a dashboard named `name` that shows them, unless
+/// the project has insights already. Returns whether it saved.
+#[cfg(feature = "test-hooks")]
+pub(crate) async fn seed_dashboard(
+    conn: &mut sqlx::SqliteConnection,
+    scope: crate::report::Scope,
+    now: UnixMillis,
+    name: &str,
+    insights: &[(&str, InsightQuery)],
+) -> anyhow::Result<bool> {
+    let has_insights = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM analytics_insights
+                         WHERE workspace_id = ? AND project_id = ?) AS "has!: bool""#,
+        scope.workspace_id,
+        scope.project_id,
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    if has_insights {
+        return Ok(false);
+    }
+    let mut ids = Vec::new();
+    for (insight_name, query) in insights {
+        let row = InsightRow {
+            id: InsightId::new(),
+            project_id: scope.project_id,
+            name: (*insight_name).to_owned(),
+            query: serde_json::to_string(query)?,
+            range: InsightRange::default().as_str().to_owned(),
+            created_at: now,
+            updated_at: now,
+        };
+        save_insight(&mut *conn, scope.workspace_id, &row).await?;
+        ids.push(row.id);
+    }
+    let board = DashboardRow {
+        id: DashboardId::new(),
+        project_id: scope.project_id,
+        name: name.to_owned(),
+        created_at: now,
+        updated_at: now,
+    };
+    save_dashboard(&mut *conn, scope.workspace_id, &board).await?;
+    set_tiles(conn, scope.workspace_id, &board, &ids)
+        .await
+        .map_err(|err| anyhow::anyhow!("seeding dashboard tiles: {err:?}"))?;
+    Ok(true)
+}

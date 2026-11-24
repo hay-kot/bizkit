@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE analytics_people\n             SET traits = json_set(traits, '$.api_tokens', CAST(substr(user_id, -1) AS INTEGER) % 3)\n             WHERE workspace_id = ? AND project_id = ? AND json_type(traits, '$.api_tokens') IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "973bbddd3c2d2f08d17a0a4de57a97642ffe24fd7eab2e16f17df6596722c0b0"
+}

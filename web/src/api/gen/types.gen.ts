@@ -155,6 +155,20 @@ export type Breakdown = {
 };
 
 /**
+ * Split the result by one property or trait.
+ */
+export type BreakdownBy = {
+    /**
+     * The property or trait name.
+     */
+    key: string;
+    /**
+     * Where the value comes from.
+     */
+    source: BreakdownSource;
+};
+
+/**
  * One row of a breakdown.
  */
 export type BreakdownRow = {
@@ -182,6 +196,11 @@ export type BreakdownRow = {
      */
     visitors: number;
 };
+
+/**
+ * Where a breakdown value comes from.
+ */
+export type BreakdownSource = 'property' | 'trait';
 
 /**
  * One mail to a list's subscribers.
@@ -422,6 +441,62 @@ export type CreatedApiKey = {
      * The bearer token, `bk_...`. Shown only now.
      */
     token: string;
+};
+
+/**
+ * A dashboard: insights in order, shown two to a row.
+ */
+export type Dashboard = {
+    /**
+     * When it was made.
+     */
+    created_at: Timestamp;
+    /**
+     * The dashboard ID.
+     */
+    id: DashboardId;
+    /**
+     * Its insights, in order.
+     */
+    insight_ids: Array<InsightId>;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * The project.
+     */
+    project_id: ProjectId;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+export type DashboardId = string;
+
+/**
+ * A project's dashboards.
+ */
+export type DashboardList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Dashboard>;
+};
+
+/**
+ * A dashboard an insight is on.
+ */
+export type DashboardRef = {
+    /**
+     * The dashboard ID.
+     */
+    id: DashboardId;
+    /**
+     * Its name.
+     */
+    name: string;
 };
 
 export type Day = string;
@@ -886,6 +961,16 @@ export type FieldKind = 'text' | 'email' | 'url' | 'number' | 'choice';
 export type FieldValue = string | Array<string>;
 
 /**
+ * A filter's comparison.
+ */
+export type FilterOp = 'is' | 'is_not' | 'gt' | 'lt' | 'is_set';
+
+/**
+ * A filter value: text, a number or a boolean.
+ */
+export type FilterValue = boolean | number | string;
+
+/**
  * A form that collects submissions from a site.
  */
 export type Form = {
@@ -1170,6 +1255,202 @@ export type Ingested = {
 };
 
 /**
+ * A saved insight.
+ */
+export type Insight = {
+    /**
+     * When it was made.
+     */
+    created_at: Timestamp;
+    /**
+     * The dashboards it is on, by name.
+     */
+    dashboards: Array<DashboardRef>;
+    /**
+     * The insight ID.
+     */
+    id: InsightId;
+    /**
+     * The display name.
+     */
+    name: string;
+    /**
+     * The project.
+     */
+    project_id: ProjectId;
+    /**
+     * What it counts.
+     */
+    query: InsightQuery;
+    /**
+     * The range it opens with.
+     */
+    range: InsightRange;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * One condition on an event property, or on a trait for the people kind.
+ */
+export type InsightFilter = {
+    /**
+     * The property or trait name.
+     */
+    key: string;
+    /**
+     * The comparison.
+     */
+    op: FilterOp;
+    value?: FilterValue | null;
+};
+
+export type InsightId = string;
+
+/**
+ * What an insight counts.
+ */
+export type InsightKind = 'events' | 'people';
+
+/**
+ * A project's insights.
+ */
+export type InsightList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<Insight>;
+};
+
+/**
+ * One chart point.
+ */
+export type InsightPoint = {
+    /**
+     * When the hour or day starts.
+     */
+    start: Timestamp;
+    /**
+     * The measure: events, people, or a share from 0 to 1.
+     */
+    value: number;
+};
+
+/**
+ * A typed analytics question. Events insights read raw events, so they
+ * reach back only as far as raw retention (90 days by default); keep
+ * lifetime counts in traits and ask the people kind.
+ */
+export type InsightQuery = {
+    breakdown?: BreakdownBy | null;
+    /**
+     * The event name (`pageview` included). Required for events; absent
+     * for people.
+     */
+    event?: string | null;
+    /**
+     * All must match: event properties for events, traits for people.
+     * At most 10.
+     */
+    filters?: Array<InsightFilter>;
+    /**
+     * Events or people.
+     */
+    kind: InsightKind;
+    measure?: Measure | null;
+};
+
+/**
+ * The range an insight opens with, ending today. A dashboard's range
+ * replaces it.
+ */
+export type InsightRange = 'today' | '7d' | '30d' | '90d' | 'month' | 'last-month';
+
+/**
+ * An insight's numbers, shaped by how they are best shown.
+ */
+export type InsightResult = {
+    /**
+     * For `share`: active people in the range.
+     */
+    active?: number | null;
+    /**
+     * What one point covers.
+     */
+    interval: Interval;
+    /**
+     * The measure.
+     */
+    measure: Measure;
+    /**
+     * One point per hour or day.
+     */
+    points: Array<InsightPoint>;
+    raw_since?: Day | null;
+    /**
+     * The measure over the whole range (a share is people over active
+     * people in the range, not a mean of points).
+     */
+    value: number;
+    view: 'series';
+} | {
+    /**
+     * For `share`: active people in the range. For people: everyone
+     * known.
+     */
+    active?: number | null;
+    measure?: Measure | null;
+    other?: InsightRow | null;
+    raw_since?: Day | null;
+    /**
+     * The top 10 values, largest first.
+     */
+    rows: Array<InsightRow>;
+    /**
+     * The measure over everything matched.
+     */
+    value: number;
+    view: 'breakdown';
+} | {
+    /**
+     * 1 to 5 times; the last bucket is 5 and more.
+     */
+    buckets: Array<TimesBucket>;
+    raw_since?: Day | null;
+    /**
+     * People who did it at least once.
+     */
+    users: number;
+    view: 'distribution';
+} | {
+    /**
+     * Everyone known in the project.
+     */
+    known: number;
+    /**
+     * People matching the filters.
+     */
+    people: number;
+    view: 'count';
+};
+
+/**
+ * One breakdown value.
+ */
+export type InsightRow = {
+    /**
+     * The measure for this value.
+     */
+    result: number;
+    /**
+     * The value as text; none for "not set".
+     */
+    value?: string | null;
+};
+
+/**
  * How long one chart point covers.
  */
 export type Interval = 'hour' | 'day';
@@ -1381,6 +1662,11 @@ export type Me = {
      */
     name?: string | null;
 };
+
+/**
+ * How an events insight counts.
+ */
+export type Measure = 'total' | 'users' | 'share' | 'per_user';
 
 /**
  * A workspace member.
@@ -2405,6 +2691,24 @@ export type TestResult = {
     run: Run;
 };
 
+/**
+ * People who did the event this many times.
+ */
+export type TimesBucket = {
+    /**
+     * Set on the last bucket, which holds `times` and more.
+     */
+    or_more: boolean;
+    /**
+     * The number of times.
+     */
+    times: number;
+    /**
+     * People in the bucket.
+     */
+    users: number;
+};
+
 export type Timestamp = string;
 
 /**
@@ -2944,6 +3248,276 @@ export type WorkspacesUpdateResponses = {
 };
 
 export type WorkspacesUpdateResponse = WorkspacesUpdateResponses[keyof WorkspacesUpdateResponses];
+
+export type AnalyticsDashboardsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/dashboards';
+};
+
+export type AnalyticsDashboardsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsDashboardsListError = AnalyticsDashboardsListErrors[keyof AnalyticsDashboardsListErrors];
+
+export type AnalyticsDashboardsListResponses = {
+    /**
+     * OK
+     */
+    200: DashboardList;
+};
+
+export type AnalyticsDashboardsListResponse = AnalyticsDashboardsListResponses[keyof AnalyticsDashboardsListResponses];
+
+export type AnalyticsDashboardsCreateData = {
+    body: {
+        /**
+         * Insights of the project, in order; at most 20.
+         */
+        insight_ids?: Array<InsightId>;
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/dashboards';
+};
+
+export type AnalyticsDashboardsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsDashboardsCreateError = AnalyticsDashboardsCreateErrors[keyof AnalyticsDashboardsCreateErrors];
+
+export type AnalyticsDashboardsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Dashboard;
+};
+
+export type AnalyticsDashboardsCreateResponse = AnalyticsDashboardsCreateResponses[keyof AnalyticsDashboardsCreateResponses];
+
+export type AnalyticsDashboardsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The dashboard.
+         */
+        dashboard_id: DashboardId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/dashboards/{dashboard_id}';
+};
+
+export type AnalyticsDashboardsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsDashboardsDeleteError = AnalyticsDashboardsDeleteErrors[keyof AnalyticsDashboardsDeleteErrors];
+
+export type AnalyticsDashboardsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AnalyticsDashboardsDeleteResponse = AnalyticsDashboardsDeleteResponses[keyof AnalyticsDashboardsDeleteResponses];
+
+export type AnalyticsDashboardsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The dashboard.
+         */
+        dashboard_id: DashboardId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/dashboards/{dashboard_id}';
+};
+
+export type AnalyticsDashboardsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsDashboardsGetError = AnalyticsDashboardsGetErrors[keyof AnalyticsDashboardsGetErrors];
+
+export type AnalyticsDashboardsGetResponses = {
+    /**
+     * OK
+     */
+    200: Dashboard;
+};
+
+export type AnalyticsDashboardsGetResponse = AnalyticsDashboardsGetResponses[keyof AnalyticsDashboardsGetResponses];
+
+export type AnalyticsDashboardsUpdateData = {
+    body: {
+        /**
+         * The whole new list of insights, in order; at most 20. Add, remove
+         * and reorder by sending the list.
+         */
+        insight_ids?: Array<InsightId> | null;
+        /**
+         * The display name.
+         */
+        name?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The dashboard.
+         */
+        dashboard_id: DashboardId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/dashboards/{dashboard_id}';
+};
+
+export type AnalyticsDashboardsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsDashboardsUpdateError = AnalyticsDashboardsUpdateErrors[keyof AnalyticsDashboardsUpdateErrors];
+
+export type AnalyticsDashboardsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Dashboard;
+};
+
+export type AnalyticsDashboardsUpdateResponse = AnalyticsDashboardsUpdateResponses[keyof AnalyticsDashboardsUpdateResponses];
 
 export type AnalyticsEventsRecentData = {
     body?: never;
@@ -3717,6 +4291,337 @@ export type AnalyticsGoalsDeleteResponses = {
 };
 
 export type AnalyticsGoalsDeleteResponse = AnalyticsGoalsDeleteResponses[keyof AnalyticsGoalsDeleteResponses];
+
+export type AnalyticsInsightsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/insights';
+};
+
+export type AnalyticsInsightsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsInsightsListError = AnalyticsInsightsListErrors[keyof AnalyticsInsightsListErrors];
+
+export type AnalyticsInsightsListResponses = {
+    /**
+     * OK
+     */
+    200: InsightList;
+};
+
+export type AnalyticsInsightsListResponse = AnalyticsInsightsListResponses[keyof AnalyticsInsightsListResponses];
+
+export type AnalyticsInsightsCreateData = {
+    body: {
+        /**
+         * The display name.
+         */
+        name: string;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * What it counts.
+         */
+        query: InsightQuery;
+        range?: InsightRange | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/insights';
+};
+
+export type AnalyticsInsightsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsInsightsCreateError = AnalyticsInsightsCreateErrors[keyof AnalyticsInsightsCreateErrors];
+
+export type AnalyticsInsightsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Insight;
+};
+
+export type AnalyticsInsightsCreateResponse = AnalyticsInsightsCreateResponses[keyof AnalyticsInsightsCreateResponses];
+
+export type AnalyticsInsightsQueryData = {
+    body: {
+        /**
+         * The first day, UTC. People insights ignore the range.
+         */
+        from: Day;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * What to count.
+         */
+        query: InsightQuery;
+        /**
+         * The last day, UTC, inclusive. At most 400 days after `from`.
+         */
+        to: Day;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/insights/query';
+};
+
+export type AnalyticsInsightsQueryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsInsightsQueryError = AnalyticsInsightsQueryErrors[keyof AnalyticsInsightsQueryErrors];
+
+export type AnalyticsInsightsQueryResponses = {
+    /**
+     * OK
+     */
+    200: InsightResult;
+};
+
+export type AnalyticsInsightsQueryResponse = AnalyticsInsightsQueryResponses[keyof AnalyticsInsightsQueryResponses];
+
+export type AnalyticsInsightsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The insight.
+         */
+        insight_id: InsightId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/insights/{insight_id}';
+};
+
+export type AnalyticsInsightsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsInsightsDeleteError = AnalyticsInsightsDeleteErrors[keyof AnalyticsInsightsDeleteErrors];
+
+export type AnalyticsInsightsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AnalyticsInsightsDeleteResponse = AnalyticsInsightsDeleteResponses[keyof AnalyticsInsightsDeleteResponses];
+
+export type AnalyticsInsightsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The insight.
+         */
+        insight_id: InsightId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/insights/{insight_id}';
+};
+
+export type AnalyticsInsightsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsInsightsGetError = AnalyticsInsightsGetErrors[keyof AnalyticsInsightsGetErrors];
+
+export type AnalyticsInsightsGetResponses = {
+    /**
+     * OK
+     */
+    200: Insight;
+};
+
+export type AnalyticsInsightsGetResponse = AnalyticsInsightsGetResponses[keyof AnalyticsInsightsGetResponses];
+
+export type AnalyticsInsightsUpdateData = {
+    body: {
+        /**
+         * The display name.
+         */
+        name?: string | null;
+        query?: InsightQuery | null;
+        range?: InsightRange | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The insight.
+         */
+        insight_id: InsightId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/analytics/insights/{insight_id}';
+};
+
+export type AnalyticsInsightsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsInsightsUpdateError = AnalyticsInsightsUpdateErrors[keyof AnalyticsInsightsUpdateErrors];
+
+export type AnalyticsInsightsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Insight;
+};
+
+export type AnalyticsInsightsUpdateResponse = AnalyticsInsightsUpdateResponses[keyof AnalyticsInsightsUpdateResponses];
 
 export type AnalyticsPeopleListData = {
     body?: never;
