@@ -313,6 +313,22 @@ pub(crate) async fn set_token(
     Ok(())
 }
 
+pub(crate) async fn set_download_token(
+    exec: impl SqliteExecutor<'_>,
+    signer: &SignerRow,
+    token_hash: &str,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE signing_signers SET download_token_hash = ? WHERE workspace_id = ? AND id = ?",
+        token_hash,
+        signer.workspace_id,
+        signer.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
 pub(crate) async fn insert_event(
     exec: impl SqliteExecutor<'_>,
     event: NewEvent<'_>,
@@ -370,8 +386,8 @@ pub(crate) async fn set_failed(
     Ok(result.rows_affected() == 1)
 }
 
-/// The signer whose link token hashes to `token_hash`: an unguessable key,
-/// so this is the one lookup without a workspace.
+/// The signer whose sign or download link token hashes to `token_hash`: an
+/// unguessable key, so this is the one lookup without a workspace.
 pub(crate) async fn signer_by_token(
     exec: impl SqliteExecutor<'_>,
     token_hash: &str,
@@ -381,7 +397,7 @@ pub(crate) async fn signer_by_token(
         r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
                   request_id AS "request_id: SigningRequestId", position, name, email, status,
                   signature, signed_at AS "signed_at: UnixMillis"
-           FROM signing_signers WHERE token_hash = ?"#,
+           FROM signing_signers WHERE token_hash = ?1 OR download_token_hash = ?1"#,
         token_hash,
     )
     .fetch_optional(exec)

@@ -41,6 +41,8 @@ CREATE TABLE signing_signers (
   email TEXT NOT NULL,
   -- SHA-256 of the link token; set when the request is sent.
   token_hash TEXT UNIQUE,
+  -- SHA-256 of the sealed PDF's download link token; set on completion.
+  download_token_hash TEXT UNIQUE,
   status TEXT NOT NULL CHECK (status IN ('pending', 'signed')),
   -- The signature as JSON: drawn strokes or a typed name.
   signature TEXT,

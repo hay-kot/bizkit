@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use anyhow::{Context as _, bail};
 use bizkit_core::time::UnixMillis;
-use der::asn1::{GeneralizedTime, ObjectIdentifier, OctetString, SetOfVec};
+use der::asn1::{GeneralizedTime, ObjectIdentifier, OctetString, SetOfVec, UtcTime};
 use der::{Any, Decode as _, Encode as _, Sequence, ValueOrd};
 use lopdf::{Dictionary, Document, Object, ObjectId, StringFormat, dictionary};
 use p256::ecdsa::signature::Signer as _;
@@ -147,9 +147,16 @@ impl BuilderProfile for SealProfile {
     }
 }
 
-fn generalized(at: UnixMillis) -> anyhow::Result<GeneralizedTime> {
+/// A certificate time: `UTCTime` through 2049, `GeneralizedTime` after, as
+/// RFC 5280 4.1.2.5 asks.
+fn cert_time(at: UnixMillis) -> anyhow::Result<Time> {
     let secs = u64::try_from(at.0 / 1000).context("a time before 1970")?;
-    GeneralizedTime::from_unix_duration(Duration::from_secs(secs)).context("encoding a time")
+    let since_epoch = Duration::from_secs(secs);
+    UtcTime::from_unix_duration(since_epoch).map(Time::UtcTime).or_else(|_| {
+        GeneralizedTime::from_unix_duration(since_epoch)
+            .map(Time::GeneralTime)
+            .context("encoding a time")
+    })
 }
 
 fn attribute(oid: ObjectIdentifier, value: Any) -> anyhow::Result<Attribute> {
@@ -182,8 +189,8 @@ impl SealKey {
         let subject =
             Name::from_str(&format!("CN={clean},O=bizkit")).context("the certificate name")?;
         let validity = Validity::new(
-            Time::GeneralTime(generalized(now)?),
-            Time::GeneralTime(generalized(now.plus(Duration::from_hours(CERT_YEARS * 365 * 24)))?),
+            cert_time(now)?,
+            cert_time(now.plus(Duration::from_hours(CERT_YEARS * 365 * 24)))?,
         );
         let spki =
             SubjectPublicKeyInfoOwned::from_key(key.verifying_key()).context("the public key")?;
@@ -470,6 +477,13 @@ mod tests {
 
         let reloaded = Document::load_mem(&out).unwrap();
         assert_eq!(reloaded.get_pages().len(), 2, "the pages survive");
+    }
+
+    #[test]
+    fn certificate_times_use_utc_time_until_2050() {
+        assert!(matches!(cert_time(NOW).unwrap(), Time::UtcTime(_)));
+        let in_2051 = UnixMillis(2_556_144_000_000);
+        assert!(matches!(cert_time(in_2051).unwrap(), Time::GeneralTime(_)));
     }
 
     #[test]

@@ -212,6 +212,14 @@ fn done_page(link: &Link, token: &str) -> Response {
 
 const PAD_SCRIPT: &str = include_str!("pad.js");
 
+/// The signer's name for the typed-signature field, when it would pass as one.
+fn typed_default(name: &str) -> String {
+    match Signature::from_form("typed", "", name) {
+        Ok(Signature::Typed { name }) => name,
+        _ => String::new(),
+    }
+}
+
 fn sign_form(link: &Link, token: &str, error: Option<&str>) -> Response {
     let request = &link.request;
     let mut body = vec![format!(
@@ -242,7 +250,7 @@ fn sign_form(link: &Link, token: &str, error: Option<&str>) -> Response {
          </fieldset>\
          <p><label><input type=\"checkbox\" name=\"consent\" value=\"yes\" required> {consent}</label></p>\
          <p><button type=\"submit\">Sign</button></p></form>",
-        name = escape(&link.signer.name),
+        name = escape(&typed_default(&link.signer.name)),
         consent = escape(CONSENT),
     ));
     let nonce = random_token();
@@ -259,6 +267,9 @@ async fn sign_page(
         Ok(None) => return gone(),
         Err(err) => return failed(&err),
     };
+    if link.request.status == RequestStatus::Voided.as_str() {
+        return gone();
+    }
     if link.signer.status == "signed" {
         return done_page(&link, &query.t);
     }
@@ -333,6 +344,9 @@ async fn sign_post(
         Ok(None) => return gone(),
         Err(err) => return failed(&err),
     };
+    if link.request.status == RequestStatus::Voided.as_str() {
+        return gone();
+    }
     if link.signer.status == "signed" {
         return done_page(&link, &form.t);
     }

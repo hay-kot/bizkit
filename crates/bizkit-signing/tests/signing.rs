@@ -166,6 +166,8 @@ mod signing {
         s.sign(&links[1], &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Grace")])
             .await
             .expect(StatusCode::NOT_FOUND);
+        // Nor does it promise Ada a signed copy.
+        s.app.client().get(&links[0]).await.expect(StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -220,8 +222,15 @@ mod signing {
             file.headers[header::CONTENT_DISPOSITION],
             "attachment; filename=\"agreement-signed.pdf\""
         );
-        // The old sign link was replaced by the download link.
-        s.app.client().get(&links[0]).await.expect(StatusCode::NOT_FOUND);
+        // The sign link still works and leads to the download.
+        let page = s.app.client().get(&links[0]).await;
+        page.expect(StatusCode::OK);
+        assert!(page.text.contains("Download the signed PDF"), "{}", page.text);
+        s.app
+            .client()
+            .get(&links[0].replace("/sign?", "/signed.pdf?"))
+            .await
+            .expect(StatusCode::OK);
     }
 
     #[tokio::test]

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, name, email, status,\n                  signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers WHERE token_hash = ?",
+  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, name, email, status,\n                  signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers WHERE token_hash = ?1 OR download_token_hash = ?1",
   "describe": {
     "columns": [
       {
@@ -118,5 +118,5 @@
       true
     ]
   },
-  "hash": "24081cde4898a5b15808d9db040c6e2857cb3da90b786f34545716858f39a0a3"
+  "hash": "2a4d036f34f168b07333f8629b7ee22516ae4d8e4c2c268773c870bc2e00a813"
 }

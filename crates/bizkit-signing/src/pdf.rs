@@ -7,7 +7,11 @@ use bizkit_core::time::UnixMillis;
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, ObjectId, Stream, StringFormat, dictionary};
 
+use crate::seal::{self, SealKey};
 use crate::signature::{PAD_HEIGHT, PAD_WIDTH, Signature};
+
+/// The time on an upload's dry-run seal; any time works.
+const DRY_RUN_AT: UnixMillis = UnixMillis(1_795_000_000_000);
 
 /// How long parsing an upload may take. Parsing runs off the async
 /// runtime; a hostile file that takes longer is refused.
@@ -16,14 +20,17 @@ const PARSE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Uploads parse one at a time: a small file can inflate a lot.
 static PARSING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 
-/// Checks that `bytes` is a PDF bizkit can add pages to. The error is a
+/// Checks that `bytes` is a PDF bizkit can add pages to and seal. The error is a
 /// message for the `pdf_base64` field.
 pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
     if !bytes.starts_with(b"%PDF-") {
         return Err("must be a PDF");
     }
-    let Ok(_permit) = PARSING.acquire().await else { return Err("must be a PDF that opens") };
+    // The permit moves into the parse, so a parse that outlives the timeout
+    // still holds it until it ends.
+    let Ok(permit) = PARSING.acquire().await else { return Err("must be a PDF that opens") };
     let parsed = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let doc = Document::load_mem(&bytes).map_err(|_| "must be a PDF that opens")?;
         // lopdf decrypts files with an empty password as it loads them, and
         // the copy it saves would drop the protection.
@@ -32,6 +39,14 @@ pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
         }
         if doc.get_pages().is_empty() {
             return Err("must have at least one page");
+        }
+        // Seal a copy with a throwaway key now, so a file that can't take the
+        // added pages or the seal is refused here instead of after everyone signed.
+        let sealed = SealKey::generate("bizkit", DRY_RUN_AT)
+            .and_then(|key| seal::seal(append(doc, &Record::dry_run())?, &key, DRY_RUN_AT));
+        if let Err(err) = sealed {
+            tracing::info!(error = format!("{err:#}"), "an upload can't be sealed");
+            return Err("must be a PDF bizkit can add pages to and seal");
         }
         Ok(())
     });
@@ -157,6 +172,29 @@ pub(crate) struct Record {
     pub(crate) original_sha256: String,
     pub(crate) signers: Vec<SignedBy>,
     pub(crate) audit: Vec<AuditLine>,
+}
+
+impl Record {
+    /// A record as long as a typical one, for the upload's dry run.
+    fn dry_run() -> Self {
+        let at = DRY_RUN_AT;
+        Self {
+            title: "Dry run".to_owned(),
+            file_name: "upload.pdf".to_owned(),
+            request_id: "dry-run".to_owned(),
+            sender: "sender@example.test".to_owned(),
+            original_sha256: "0".repeat(64),
+            signers: vec![SignedBy {
+                name: "Signer".to_owned(),
+                email: "signer@example.test".to_owned(),
+                signed_at: at,
+                signature: Signature::Drawn {
+                    strokes: vec![vec![[0, 0], [PAD_WIDTH, PAD_HEIGHT]]],
+                },
+            }],
+            audit: vec![AuditLine { at, what: "Signed".to_owned(), client: None }],
+        }
+    }
 }
 
 const PAGE_WIDTH: f32 = 612.0;
@@ -344,10 +382,25 @@ fn layout(record: &Record) -> Vec<Vec<Operation>> {
 
 /// Loads the original and appends the signatures and audit pages.
 pub(crate) fn assemble(original: &[u8], record: &Record) -> anyhow::Result<Document> {
-    let mut doc = Document::load_mem(original).context("reading the original PDF")?;
+    let doc = Document::load_mem(original).context("reading the original PDF")?;
+    append(doc, record)
+}
+
+/// Appends the signatures and audit pages to `doc`.
+fn append(mut doc: Document, record: &Record) -> anyhow::Result<Document> {
     let pages_id = match doc.catalog().context("the PDF has no catalog")?.get(b"Pages") {
         Ok(Object::Reference(id)) => *id,
         _ => anyhow::bail!("the PDF's page tree isn't a reference"),
+    };
+    let mut kids = match doc.get_dictionary(pages_id).context("reading the page tree")?.get(b"Kids")
+    {
+        Ok(Object::Array(kids)) => kids.clone(),
+        Ok(Object::Reference(id)) => doc
+            .get_object(*id)
+            .and_then(Object::as_array)
+            .context("reading the page tree's Kids")?
+            .clone(),
+        _ => anyhow::bail!("the page tree has no Kids array"),
     };
     let font = |target: &mut Document, base: &str| {
         target.add_object(dictionary! {
@@ -366,10 +419,15 @@ pub(crate) fn assemble(original: &[u8], record: &Record) -> anyhow::Result<Docum
     for ops in layout(record) {
         let content = Content { operations: ops }.encode().context("encoding a page")?;
         let stream = doc.add_object(Stream::new(dictionary! {}, content));
+        let media_box = || vec![0.into(), 0.into(), PAGE_WIDTH.into(), PAGE_HEIGHT.into()];
+        // Rotate and CropBox inherit from the page tree; set them so the
+        // original's values don't turn or clip the added pages.
         let page = doc.add_object(dictionary! {
             "Type" => "Page",
             "Parent" => pages_id,
-            "MediaBox" => vec![0.into(), 0.into(), PAGE_WIDTH.into(), PAGE_HEIGHT.into()],
+            "MediaBox" => media_box(),
+            "CropBox" => media_box(),
+            "Rotate" => 0,
             "Contents" => stream,
             "Resources" => resources,
         });
@@ -377,10 +435,6 @@ pub(crate) fn assemble(original: &[u8], record: &Record) -> anyhow::Result<Docum
     }
     let tree = doc.get_dictionary_mut(pages_id).context("reading the page tree")?;
     let count = tree.get(b"Count").and_then(Object::as_i64).unwrap_or(0);
-    let mut kids = match tree.get(b"Kids") {
-        Ok(Object::Array(kids)) => kids.clone(),
-        _ => anyhow::bail!("the page tree has no Kids array"),
-    };
     kids.extend(added.iter().map(|id| Object::Reference(*id)));
     tree.set("Kids", kids);
     tree.set("Count", count + i64::try_from(added.len()).unwrap_or(0));
@@ -438,6 +492,48 @@ mod tests {
         assert!(text.contains("Signatures"), "{text}");
         assert!(text.contains("Audit trail"), "{text}");
         assert!(text.contains("???? <p@example.test>"), "Cyrillic prints as ?: {text}");
+    }
+
+    /// `sample_pdf` with its page tree changed by `edit`.
+    fn edited(edit: impl FnOnce(&mut Document, ObjectId)) -> Vec<u8> {
+        let mut doc = Document::load_mem(&crate::testing::sample_pdf(&["One"])).unwrap();
+        let pages_id = doc.catalog().unwrap().get(b"Pages").unwrap().as_reference().unwrap();
+        edit(&mut doc, pages_id);
+        let mut out = Vec::new();
+        doc.save_to(&mut out).unwrap();
+        out
+    }
+
+    #[test]
+    fn added_pages_take_an_indirect_kids_array_and_ignore_inherited_rotation() {
+        let original = edited(|doc, pages_id| {
+            let kids = doc.get_dictionary(pages_id).unwrap().get(b"Kids").unwrap().clone();
+            let kids_id = doc.add_object(kids);
+            let tree = doc.get_dictionary_mut(pages_id).unwrap();
+            tree.set("Kids", kids_id);
+            tree.set("Rotate", 90);
+            tree.set("CropBox", vec![0.into(), 0.into(), 100.into(), 100.into()]);
+        });
+        let doc = assemble(&original, &record(1)).unwrap();
+        let pages = doc.get_pages();
+        assert_eq!(pages.len(), 3);
+        let added = doc.get_dictionary(pages[&3]).unwrap();
+        assert_eq!(added.get(b"Rotate").unwrap().as_i64().unwrap(), 0);
+        assert_eq!(added.get(b"CropBox").unwrap(), added.get(b"MediaBox").unwrap());
+    }
+
+    #[tokio::test]
+    async fn uploads_that_cant_be_sealed_are_refused() {
+        check(crate::testing::sample_pdf(&["One"])).await.unwrap();
+        let direct_tree = edited(|doc, pages_id| {
+            let tree = doc.get_dictionary(pages_id).unwrap().clone();
+            doc.catalog_mut().unwrap().set("Pages", tree);
+        });
+        assert_eq!(check(direct_tree).await, Err("must have at least one page"));
+        let no_kids = edited(|doc, pages_id| {
+            doc.get_dictionary_mut(pages_id).unwrap().set("Kids", 7);
+        });
+        assert!(check(no_kids).await.is_err());
     }
 
     #[test]
