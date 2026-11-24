@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr as _;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use anyhow::Context as _;
@@ -197,6 +197,9 @@ struct Slot {
     file: OnceCell<Arc<ProjectFile>>,
     /// Milliseconds after [`Files::epoch`].
     used: AtomicU64,
+    /// Set by `stop_all` and `remove` once the slot left the map. A get that
+    /// opened the file anyway stops it, so no writer outlives them.
+    closed: AtomicBool,
 }
 
 /// Why `get` has no file for a project.
@@ -284,6 +287,10 @@ impl Files {
         };
         let opened = slot.file.get_or_try_init(|| open_file(platform, scope)).await.cloned();
         match opened {
+            Ok(file) if slot.closed.load(Ordering::SeqCst) => {
+                file.stop().await;
+                Ok(None)
+            }
             Ok(file) => Ok(Some(file)),
             Err(unopened) => {
                 self.forget(project_id, &slot).await;
@@ -297,6 +304,10 @@ impl Files {
 
     /// At most once per [`SWEEP_EVERY`], moves the idle files to `closing`
     /// and stops each in its own task, so the caller doesn't wait for them.
+    ///
+    /// The stop is quick: after [`FILE_IDLE`] with no use, the timer has
+    /// written every queued event long ago, and side-effect retries end
+    /// within seconds, so the writer has nothing left for the app database.
     async fn sweep(&self, open: &mut Open, now: u64) {
         let last = self.swept.load(Ordering::Relaxed);
         if now.saturating_sub(last) < millis(SWEEP_EVERY) {
@@ -405,10 +416,11 @@ impl Files {
         if let Some(gate) = gate {
             drop(gate.lock().await);
         }
-        if let Some(slot) = slot
-            && let Some(file) = opened(&slot).await
-        {
-            file.stop().await;
+        if let Some(slot) = slot {
+            slot.closed.store(true, Ordering::SeqCst);
+            if let Some(file) = opened(&slot).await {
+                file.stop().await;
+            }
         }
         let path = project_db_path(data_dir, project_id);
         for suffix in ["", "-wal", "-shm"] {
@@ -436,6 +448,9 @@ impl Files {
             let slots: Vec<Arc<Slot>> = open.slots.drain().map(|(_, slot)| slot).collect();
             (slots, open.closing.drain().map(|(_, gate)| gate).collect::<Vec<Gate>>())
         };
+        for slot in &slots {
+            slot.closed.store(true, Ordering::SeqCst);
+        }
         for slot in slots {
             if let Some(file) = opened(&slot).await {
                 file.stop().await;
@@ -514,7 +529,11 @@ mod tests {
     }
 
     fn slot(file: Option<Arc<ProjectFile>>, used: u64) -> Arc<Slot> {
-        Arc::new(Slot { file: OnceCell::new_with(file), used: AtomicU64::new(used) })
+        Arc::new(Slot {
+            file: OnceCell::new_with(file),
+            used: AtomicU64::new(used),
+            closed: AtomicBool::new(false),
+        })
     }
 
     fn files() -> Files {

@@ -572,11 +572,13 @@ mod ingest {
         // A conversion owes the app database a hook event, which waits on `busy`.
         s.send(json!({"n": "pageview", "u": "https://example.com/done"}), "203.0.113.1").await;
         assert!(holds(&file, 2).await, "the converting event lands");
-        s.send(json!({"n": "pageview", "u": "https://example.com/after"}), "203.0.113.1").await;
-        assert!(holds(&file, 3).await, "later events land while the app database is busy");
-
-        drop(busy);
-        s.app.flush().await;
+        // An asked-for flush waits for the conversion, but not in the
+        // writer's loop: the next event still lands.
+        let ((), ()) = tokio::join!(s.app.flush(), async {
+            s.send(json!({"n": "pageview", "u": "https://example.com/after"}), "203.0.113.1").await;
+            assert!(holds(&file, 3).await, "later events land while the app database is busy");
+            drop(busy);
+        });
         s.app.drain_jobs().await;
         let points: Vec<_> = s.hooks.dispatches().iter().map(|dispatch| dispatch.point).collect();
         assert_eq!(points, [GOAL_CONVERTED.id], "the owed conversion lands once the app is free");

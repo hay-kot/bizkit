@@ -544,8 +544,9 @@ async fn mark_events(
         project_id,
     )
     .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
+    .await
+    .context("clearing the seeded site's rollup marker")?;
+    tx.commit().await.context("committing the seeded site's event day")?;
     let job = Rollup { workspace_id: seed.workspace_id, project_id };
     rollup::roll(db, file, &job, Day::of(seed.now)).await.context("rolling up the seeded days")?;
     Ok(())

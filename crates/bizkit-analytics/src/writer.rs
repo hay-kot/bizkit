@@ -12,7 +12,8 @@
 //! The app transaction runs in its own task, with its retries, so a busy
 //! app database never stops the queue from draining. One runs at a time,
 //! in flush order; what later flushes owe meanwhile merges into the next
-//! one. An asked-for flush and stop wait until nothing is owed.
+//! one. An asked-for flush is answered once the side effects it owes are
+//! done, while the loop goes on draining; stop waits until nothing is owed.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,6 +34,9 @@ use crate::write::{self, Incoming};
 
 /// Events in one flush before the window is up.
 pub(crate) const FLUSH_EVENTS: usize = 1_000;
+/// Conversions owed to the app database while it is busy; past this the
+/// newest are dropped with an error log, so an outage can't grow memory.
+const MAX_OWED_CONVERSIONS: usize = 10_000;
 /// Waits between attempts at a flush's app transaction.
 const SIDE_EFFECT_RETRIES: [Duration; 3] =
     [Duration::from_millis(100), Duration::from_millis(500), Duration::from_secs(2)];
@@ -151,6 +155,7 @@ impl Writer {
                 }
                 () = effects.finished() => {
                     effects.start(&self.platform, &self.sites);
+                    effects.answer_ready();
                     continue;
                 }
             };
@@ -169,12 +174,12 @@ impl Writer {
                 }
                 Some(Msg::Flush(answer)) => {
                     let result = self.flush(&mut pending, &mut count, &mut effects).await;
-                    effects.settle(&self.platform, &self.sites).await;
-                    answer.send(result).unwrap_or_default();
+                    effects.answer_when_done(answer, result);
                 }
                 Some(Msg::Stop(answer)) => {
                     self.flush(&mut pending, &mut count, &mut effects).await.unwrap_or_default();
                     effects.settle(&self.platform, &self.sites).await;
+                    effects.answer_ready();
                     answer.send(()).unwrap_or_default();
                     return;
                 }
@@ -183,6 +188,7 @@ impl Writer {
         }
         self.flush(&mut pending, &mut count, &mut effects).await.unwrap_or_default();
         effects.settle(&self.platform, &self.sites).await;
+        effects.answer_ready();
     }
 
     /// Commits `pending` and owes its side effects to `effects`. Failures
@@ -311,20 +317,22 @@ async fn app_write(
     conversions: &[GoalConverted],
 ) -> anyhow::Result<()> {
     let (workspace_id, project_id) = (site.row.workspace_id, site.row.project_id);
-    let mut tx = platform.db().write().await?;
+    let mut tx = platform.db().write().await.context("starting the app write")?;
     let advanced = match day {
-        Some(day) => store::advance_event_day(&mut *tx, workspace_id, project_id, day).await?,
+        Some(day) => store::advance_event_day(&mut *tx, workspace_id, project_id, day)
+            .await
+            .context("advancing the site's event day")?,
         None => false,
     };
     if advanced {
         let job = Rollup { workspace_id, project_id };
         let opts = Enqueue { run_at: Some(platform.now().plus(rollup::DELAY)) };
-        platform.bus().enqueue(&mut tx, &job, opts).await?;
+        platform.bus().enqueue(&mut tx, &job, opts).await.context("queuing the rollup")?;
     }
     for converted in conversions {
-        platform.bus().publish(&mut tx, converted).await?;
+        platform.bus().publish(&mut tx, converted).await.context("publishing a goal conversion")?;
     }
-    tx.commit().await?;
+    tx.commit().await.context("committing the app write")?;
     if advanced {
         sites.clear();
     }
@@ -332,25 +340,45 @@ async fn app_write(
 }
 
 /// A writer's side effects: at most one app transaction running, and what
-/// flushes owed since it started, merged.
+/// flushes owed since it started, merged. Flushes that owe something are
+/// numbered, so an asked-for flush is answered when its number is done,
+/// even while later flushes keep owing more.
 #[derive(Debug, Default)]
 struct Effects {
     running: Option<JoinHandle<anyhow::Result<()>>>,
     owed: Option<(Arc<CachedSite>, Flushed)>,
+    /// The last flush that owed something.
+    owed_through: u64,
+    /// The last flush the running transaction covers.
+    running_through: u64,
+    /// The last flush whose side effects are done.
+    done_through: u64,
+    /// Asked-for flushes: the flush they wait for, the answer and its result.
+    waiting: Vec<(u64, Answer, anyhow::Result<()>)>,
 }
+
+type Answer = oneshot::Sender<anyhow::Result<()>>;
 
 impl Effects {
     fn owe(&mut self, site: Arc<CachedSite>, flushed: Flushed) {
         if flushed.latest_day.is_none() && flushed.conversions.is_empty() {
             return;
         }
-        match &mut self.owed {
-            Some((owed_site, owed)) => {
-                *owed_site = site;
-                owed.latest_day = owed.latest_day.take().max(flushed.latest_day);
-                owed.conversions.extend(flushed.conversions);
-            }
-            None => self.owed = Some((site, flushed)),
+        self.owed_through += 1;
+        let (_, owed) = self.owed.get_or_insert_with(|| (Arc::clone(&site), Flushed::default()));
+        owed.latest_day = owed.latest_day.take().max(flushed.latest_day);
+        let room = MAX_OWED_CONVERSIONS.saturating_sub(owed.conversions.len());
+        let dropped = flushed.conversions.len().saturating_sub(room);
+        owed.conversions.extend(flushed.conversions.into_iter().take(room));
+        if dropped > 0 {
+            tracing::error!(
+                project_id = %site.row.project_id,
+                dropped,
+                "dropped goal hook events owed to a busy app database"
+            );
+        }
+        if let Some((owed_site, _)) = self.owed.as_mut() {
+            *owed_site = site;
         }
     }
 
@@ -363,6 +391,29 @@ impl Effects {
         if owes_app(&site, &flushed) {
             let task = side_effects(platform.clone(), Arc::clone(sites), site, flushed);
             self.running = Some(tokio::spawn(task));
+            self.running_through = self.owed_through;
+        } else {
+            self.done_through = self.owed_through;
+        }
+    }
+
+    /// Answers now when everything owed so far is done, else when it is.
+    fn answer_when_done(&mut self, answer: Answer, result: anyhow::Result<()>) {
+        if self.owed_through <= self.done_through {
+            answer.send(result).unwrap_or_default();
+        } else {
+            self.waiting.push((self.owed_through, answer, result));
+        }
+    }
+
+    /// Answers the asked-for flushes whose side effects are done.
+    fn answer_ready(&mut self) {
+        let done = self.done_through;
+        let (ready, waiting) =
+            std::mem::take(&mut self.waiting).into_iter().partition(|(flush, ..)| *flush <= done);
+        self.waiting = waiting;
+        for (_, answer, result) in ready {
+            answer.send(result).unwrap_or_default();
         }
     }
 
@@ -374,6 +425,7 @@ impl Effects {
         };
         let ended = running.await;
         self.running = None;
+        self.done_through = self.running_through;
         if let Err(err) = ended {
             tracing::error!(error = %err, "an analytics side-effect task panicked");
         }
