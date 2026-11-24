@@ -6,6 +6,8 @@ Guidance for coding agents working in this repository.
 
 Run `mise run check`. It is what CI runs, and it must pass: formatting, clippy with warnings as errors (with and without the `test-hooks` feature), tests, docs, cargo-deny, cargo-shear, typos, the sqlx query data (`db:check`), the generated API client (`gen:check`) and the web checks (`web:check`). CI also runs `mise run test:e2e`.
 
+A PR that changes the UI attaches screenshots to its body, and a recording when the change is a multi-step flow. The `pr-assets` skill (`.claude/skills/pr-assets`) uploads them with `pra` and has a sample `pr-record` scene.
+
 ## Layout
 
 - `crates/bizkit`: the binary. `main.rs` owns process concerns; `modules.rs` lists the compiled-in feature modules and holds the tests that sweep every operation.
