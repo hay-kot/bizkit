@@ -17,10 +17,11 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::api::{
-    Broadcast, BroadcastId, BroadcastList, BroadcastStatus, Contact, ContactCounts, ContactId,
-    ContactPage, ContactStatus, DeliveryCounts, DeliveryEvent, DeliveryId, DeliveryKind,
-    DeliveryStatus, ListId, MailDelivery, MailDeliveryPage, MailingForm, MailingFormList,
-    MailingList, MailingListList, Preview, ResendReport, SequenceId,
+    AttributeCondition, AttributeValue, Attributes, Audience, Broadcast, BroadcastId,
+    BroadcastList, BroadcastStatus, Contact, ContactCounts, ContactId, ContactPage, ContactStatus,
+    DeliveryCounts, DeliveryEvent, DeliveryId, DeliveryKind, DeliveryStatus, ListId, MailDelivery,
+    MailDeliveryPage, MailingForm, MailingFormList, MailingList, MailingListList, Preview,
+    ResendReport, Segment, SequenceId,
 };
 use crate::capture::FORM_KIND;
 use crate::contacts::{self, NewContact, Source};
@@ -62,6 +63,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(ContactsUpdate)?;
     cx.op(ContactsDelete)?;
     cx.op(ContactsUnsubscribe)?;
+    cx.op(ListsAudience)?;
     cx.op(PreviewOp)?;
     cx.op(BroadcastsList)?;
     cx.op(BroadcastsCreate)?;
@@ -166,6 +168,8 @@ pub(crate) fn contact_to_api(row: ContactRow) -> anyhow::Result<Contact> {
     Ok(Contact {
         tags: serde_json::from_str(&row.tags)
             .with_context(|| format!("decoding the tags of contact {}", row.id))?,
+        attributes: serde_json::from_str(&row.attributes)
+            .with_context(|| format!("decoding the attributes of contact {}", row.id))?,
         status: ContactStatus::parse(&row.status)
             .with_context(|| format!("unknown contact status {:?}", row.status))?,
         id: row.id,
@@ -191,12 +195,13 @@ fn broadcast_to_api(row: BroadcastRow) -> anyhow::Result<Broadcast> {
         stored
     };
     Ok(Broadcast {
+        segment: segment_from_json(&row.segment)
+            .with_context(|| format!("decoding the segment of broadcast {}", row.id))?,
         status,
         id: row.id,
         list_id: row.list_id,
         subject: row.subject,
         body_md: row.body_md,
-        tag: row.tag,
         recipients: count(row.recipients),
         sent_at: row.sent_at,
         send_at: row.send_at,
@@ -319,6 +324,94 @@ fn check_tags(errors: &mut FieldErrors, tags: &[String]) {
     if tags.iter().any(|tag| tag.trim().is_empty() || tag.chars().count() > MAX_TAG) {
         errors.add("tags", format!("each tag must be 1 to {MAX_TAG} characters"));
     }
+}
+
+const MAX_ATTRIBUTES: usize = 50;
+const MAX_ATTRIBUTE_KEY: usize = 40;
+const MAX_ATTRIBUTE_TEXT: usize = 500;
+const MAX_SEGMENT_TAGS: usize = 10;
+const MAX_SEGMENT_CONDITIONS: usize = 10;
+
+fn is_attribute_key(key: &str) -> bool {
+    key.len() <= MAX_ATTRIBUTE_KEY
+        && key.chars().next().is_some_and(|first| first.is_ascii_lowercase())
+        && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+fn check_attribute(errors: &mut FieldErrors, field: &str, key: &str, value: &AttributeValue) {
+    if !is_attribute_key(key) {
+        errors.add(field, format!("key {key:?} must match ^[a-z][a-z0-9_]{{0,39}}$"));
+    }
+    if let AttributeValue::Text(text) = value
+        && text.chars().count() > MAX_ATTRIBUTE_TEXT
+    {
+        errors.add(field, format!("{key} must be at most {MAX_ATTRIBUTE_TEXT} characters"));
+    }
+}
+
+fn check_attributes(errors: &mut FieldErrors, attributes: &Attributes) {
+    if attributes.0.len() > MAX_ATTRIBUTES {
+        errors.add("attributes", format!("at most {MAX_ATTRIBUTES} attributes"));
+    }
+    for (key, value) in &attributes.0 {
+        check_attribute(errors, "attributes", key, value);
+    }
+}
+
+fn check_segment(errors: &mut FieldErrors, segment: &Segment) {
+    if segment.tags.len() > MAX_SEGMENT_TAGS {
+        errors.add("segment.tags", format!("at most {MAX_SEGMENT_TAGS} tags"));
+    }
+    if segment.tags.iter().any(|tag| tag.trim().is_empty() || tag.chars().count() > MAX_TAG) {
+        errors.add("segment.tags", format!("each tag must be 1 to {MAX_TAG} characters"));
+    }
+    if segment.attributes.len() > MAX_SEGMENT_CONDITIONS {
+        errors.add("segment.attributes", format!("at most {MAX_SEGMENT_CONDITIONS} conditions"));
+    }
+    for condition in &segment.attributes {
+        check_attribute(errors, "segment.attributes", &condition.key, &condition.equals);
+    }
+    if let (Some(after), Some(before)) = (segment.joined_after, segment.joined_before)
+        && after >= before
+    {
+        errors.add("segment.joined_before", "must be after joined_after");
+    }
+}
+
+/// A segment as stored. The join bounds are unix milliseconds, because the
+/// fan-out compares them with `subscribed_at` in SQL; the API spells them
+/// as RFC 3339.
+#[derive(Debug, Default, serde::Serialize, Deserialize)]
+struct StoredSegment {
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    attributes: Vec<AttributeCondition>,
+    #[serde(default)]
+    joined_after: Option<i64>,
+    #[serde(default)]
+    joined_before: Option<i64>,
+}
+
+/// The segment as stored: tags trimmed and without repeats.
+fn segment_json(segment: &Segment) -> anyhow::Result<String> {
+    let stored = StoredSegment {
+        tags: clean_tags(&segment.tags),
+        attributes: segment.attributes.clone(),
+        joined_after: segment.joined_after.map(|at| at.0),
+        joined_before: segment.joined_before.map(|at| at.0),
+    };
+    serde_json::to_string(&stored).context("encoding the segment")
+}
+
+fn segment_from_json(json: &str) -> serde_json::Result<Segment> {
+    let stored: StoredSegment = serde_json::from_str(json)?;
+    Ok(Segment {
+        tags: stored.tags,
+        attributes: stored.attributes,
+        joined_after: stored.joined_after.map(UnixMillis),
+        joined_before: stored.joined_before.map(UnixMillis),
+    })
 }
 
 /// Trimmed and without repeats, in the order given.
@@ -506,6 +599,9 @@ pub(crate) struct CreateContact {
     /// Labels for sending to part of the list.
     #[serde(default)]
     tags: Vec<String>,
+    /// Values for `{{ attr.key }}` merge fields and segments.
+    #[serde(default)]
+    attributes: Attributes,
 }
 impl Validate for CreateContact {
     fn validate(&self) -> Result<(), FieldErrors> {
@@ -515,6 +611,7 @@ impl Validate for CreateContact {
         }
         check_text(&mut errors, "name", self.name.as_ref(), bizkit_core::contacts::MAX_NAME);
         check_tags(&mut errors, &self.tags);
+        check_attributes(&mut errors, &self.attributes);
         errors.into_result()
     }
 }
@@ -537,6 +634,9 @@ pub(crate) struct UpdateContact {
     /// Replaces the tags.
     #[serde(default)]
     tags: Option<Vec<String>>,
+    /// Replaces the attributes.
+    #[serde(default)]
+    attributes: Option<Attributes>,
 }
 impl Validate for UpdateContact {
     fn validate(&self) -> Result<(), FieldErrors> {
@@ -549,6 +649,9 @@ impl Validate for UpdateContact {
         );
         if let Some(tags) = &self.tags {
             check_tags(&mut errors, tags);
+        }
+        if let Some(attributes) = &self.attributes {
+            check_attributes(&mut errors, attributes);
         }
         errors.into_result()
     }
@@ -619,16 +722,16 @@ pub(crate) struct CreateBroadcast {
     /// The body in Markdown.
     #[serde(default)]
     body_md: String,
-    /// Only subscribers with this tag.
+    /// Which subscribers get it; absent: every subscriber.
     #[serde(default)]
-    tag: Option<String>,
+    segment: Segment,
 }
 impl Validate for CreateBroadcast {
     fn validate(&self) -> Result<(), FieldErrors> {
         let mut errors = FieldErrors::default();
         check_subject(&mut errors, &self.subject);
         check_body(&mut errors, &self.body_md);
-        check_text(&mut errors, "tag", self.tag.as_ref(), MAX_TAG);
+        check_segment(&mut errors, &self.segment);
         errors.into_result()
     }
 }
@@ -650,11 +753,9 @@ pub(crate) struct UpdateBroadcast {
     /// The body in Markdown.
     #[serde(default)]
     body_md: Option<String>,
-    /// Only subscribers with this tag; `null` sends to all.
-    #[serde(default, deserialize_with = "present")]
-    #[expect(clippy::option_option, reason = "absent keeps the tag, null removes it")]
-    #[schema(value_type = Option<String>)]
-    tag: Option<Option<String>>,
+    /// Replaces the segment.
+    #[serde(default)]
+    segment: Option<Segment>,
 }
 impl Validate for UpdateBroadcast {
     fn validate(&self) -> Result<(), FieldErrors> {
@@ -665,7 +766,9 @@ impl Validate for UpdateBroadcast {
         if let Some(body) = &self.body_md {
             check_body(&mut errors, body);
         }
-        check_text(&mut errors, "tag", self.tag.as_ref().and_then(Option::as_ref), MAX_TAG);
+        if let Some(segment) = &self.segment {
+            check_segment(&mut errors, segment);
+        }
         errors.into_result()
     }
 }
@@ -963,6 +1066,7 @@ impl Operation for ContactsCreate {
             email,
             name: trimmed(input.name.as_ref()),
             tags: clean_tags(&input.tags),
+            attributes: input.attributes,
             source,
         };
         let contact = contacts::subscribe(cx.platform(), &mut tx, &list, new)
@@ -1006,7 +1110,7 @@ impl Operation for ContactsUpdate {
     const PATH: &'static str =
         "/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts/{contact_id}";
     const ACCESS: Access = WRITE;
-    const SUMMARY: &'static str = "Change a contact's name or tags";
+    const SUMMARY: &'static str = "Change a contact's name, tags or attributes";
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: UpdateContact) -> Result<Contact, ApiError> {
@@ -1018,6 +1122,9 @@ impl Operation for ContactsUpdate {
         }
         if let Some(tags) = input.tags {
             row.tags = serde_json::to_string(&clean_tags(&tags)).map_err(anyhow::Error::from)?;
+        }
+        if let Some(attributes) = input.attributes {
+            row.attributes = serde_json::to_string(&attributes).map_err(anyhow::Error::from)?;
         }
         row.updated_at = cx.now();
         store::update_contact(&mut *tx, &row).await?;
@@ -1102,9 +1209,50 @@ impl Operation for PreviewOp {
             unsubscribe: Some(&unsubscribe),
             manage: Some(&manage),
         };
-        let merge = Merge { name: Some("Ada Lovelace"), email: "ada@example.com" };
+        let merge =
+            Merge { name: Some("Ada Lovelace"), email: "ada@example.com", attributes: None };
         let mail = render::render(&frame, &input.subject, &input.body_md, &merge);
         Ok(Preview { subject: mail.subject, html: mail.html, text: mail.text })
+    }
+}
+
+/// A segment to count on a list.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CountAudience {
+    /// The workspace.
+    workspace_id: WorkspaceId,
+    /// The list.
+    list_id: ListId,
+    /// The segment; absent: every subscriber.
+    #[serde(default)]
+    segment: Segment,
+}
+impl Validate for CountAudience {
+    fn validate(&self) -> Result<(), FieldErrors> {
+        let mut errors = FieldErrors::default();
+        check_segment(&mut errors, &self.segment);
+        errors.into_result()
+    }
+}
+
+struct ListsAudience;
+impl Operation for ListsAudience {
+    type Input = CountAudience;
+    type Output = Audience;
+    const ID: &'static str = "mailing.lists.audience";
+    const METHOD: Method = Method::Post;
+    const PATH: &'static str = "/workspaces/{workspace_id}/mailing/lists/{list_id}/audience";
+    const ACCESS: Access = READ;
+    const SUMMARY: &'static str = "Count the subscribers of a list that a segment matches";
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: CountAudience) -> Result<Audience, ApiError> {
+        let db = cx.platform().db().read();
+        let list = list_in(db, input.workspace_id, input.list_id).await?;
+        let segment = segment_json(&input.segment)?;
+        let subscribers = store::count_audience(db, list.workspace_id, list.id, &segment).await?;
+        Ok(Audience { subscribers: count(subscribers) })
     }
 }
 
@@ -1159,7 +1307,7 @@ impl Operation for BroadcastsCreate {
             list_id: list.id,
             subject: input.subject.trim().to_owned(),
             body_md: input.body_md,
-            tag: trimmed(input.tag.as_ref()),
+            segment: segment_json(&input.segment)?,
             status: BroadcastStatus::Draft.as_str().to_owned(),
             recipients: 0,
             sent_at: None,
@@ -1237,8 +1385,8 @@ impl Operation for BroadcastsUpdate {
         if let Some(body) = input.body_md {
             row.body_md = body;
         }
-        if let Some(tag) = input.tag {
-            row.tag = trimmed(tag.as_ref());
+        if let Some(segment) = input.segment {
+            row.segment = segment_json(&segment)?;
         }
         row.updated_at = cx.now();
         store::update_broadcast(&mut *tx, &row).await?;

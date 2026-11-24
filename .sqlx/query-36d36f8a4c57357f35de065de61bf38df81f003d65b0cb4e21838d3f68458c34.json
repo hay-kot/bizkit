@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mailing_contacts (id, workspace_id, list_id, email, name, tags, attributes,\n                                       status, source, confirm_token, confirm_sent_at,\n                                       unsubscribe_token, subscribed_at, unsubscribed_at,\n                                       created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "36d36f8a4c57357f35de065de61bf38df81f003d65b0cb4e21838d3f68458c34"
+}

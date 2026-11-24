@@ -6,6 +6,8 @@ use std::fmt::Write as _;
 use pulldown_cmark::{CowStr, Event, LinkType, Options, Parser, Tag, TagEnd, TextMergeStream};
 use url::Url;
 
+use crate::api::Attributes;
+
 /// A mail ready to send.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Rendered {
@@ -14,12 +16,13 @@ pub(crate) struct Rendered {
     pub(crate) text: String,
 }
 
-/// The values merge fields take: `{{ name }}` and `{{ email }}`. A missing
-/// name renders as nothing.
+/// The values merge fields take: `{{ name }}`, `{{ email }}` and
+/// `{{ attr.key }}`. A missing name or attribute renders as nothing.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Merge<'a> {
     pub(crate) name: Option<&'a str>,
     pub(crate) email: &'a str,
+    pub(crate) attributes: Option<&'a Attributes>,
 }
 
 /// What every mail of a list shows around the body.
@@ -72,12 +75,41 @@ pub(crate) fn confirm(frame: &Frame<'_>, confirm_url: &Url) -> Rendered {
     }
 }
 
+/// Replaces each `{{ field }}` with its value. Unknown fields stay as
+/// written, so a typo shows in the preview.
 fn fill(text: &str, merge: &Merge<'_>) -> String {
-    let name = merge.name.unwrap_or("");
-    text.replace("{{ name }}", name)
-        .replace("{{name}}", name)
-        .replace("{{ email }}", merge.email)
-        .replace("{{email}}", merge.email)
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some((before, opened)) = rest.split_once("{{") {
+        let Some((field, after)) = opened.split_once("}}") else { break };
+        out.push_str(before);
+        if let Some(value) = merge_value(field.trim(), merge) {
+            out.push_str(&value);
+        } else {
+            out.push_str("{{");
+            out.push_str(field);
+            out.push_str("}}");
+        }
+        rest = after;
+    }
+    out.push_str(rest);
+    out
+}
+
+fn merge_value(field: &str, merge: &Merge<'_>) -> Option<String> {
+    match field {
+        "name" => Some(merge.name.unwrap_or("").to_owned()),
+        "email" => Some(merge.email.to_owned()),
+        _ => {
+            let key = field.strip_prefix("attr.")?;
+            Some(
+                merge
+                    .attributes
+                    .and_then(|attributes| attributes.0.get(key))
+                    .map_or_else(String::new, ToString::to_string),
+            )
+        }
+    }
 }
 
 /// Header values can't hold line breaks.
@@ -205,6 +237,7 @@ pub(crate) fn escape(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::AttributeValue;
 
     fn unsubscribe() -> Url {
         Url::parse("https://app.example.com/m/mailing/public/unsubscribe?t=abc").unwrap()
@@ -226,7 +259,8 @@ mod tests {
         }
     }
 
-    const ADA: Merge<'static> = Merge { name: Some("Ada"), email: "ada@example.com" };
+    const ADA: Merge<'static> =
+        Merge { name: Some("Ada"), email: "ada@example.com", attributes: None };
 
     #[test]
     fn renders_markdown_in_the_layout() {
@@ -248,7 +282,11 @@ mod tests {
 
     #[test]
     fn merge_values_are_escaped() {
-        let merge = Merge { name: Some("<img src=x onerror=alert(1)>"), email: "a@example.com" };
+        let merge = Merge {
+            name: Some("<img src=x onerror=alert(1)>"),
+            email: "a@example.com",
+            attributes: None,
+        };
         let html = markdown_html("Hi {{ name }}", &merge);
         assert!(html.contains("&lt;img"), "{html}");
         assert!(!html.contains("<img"), "{html}");
@@ -279,9 +317,35 @@ mod tests {
     #[test]
     fn subjects_are_one_line() {
         let url = unsubscribe();
-        let merge = Merge { name: Some("Ada\r\nBcc: x@example.com"), email: "a@example.com" };
+        let merge = Merge {
+            name: Some("Ada\r\nBcc: x@example.com"),
+            email: "a@example.com",
+            attributes: None,
+        };
         let mail = render(&frame(&url), "Hi {{ name }}", "", &merge);
         assert!(!mail.subject.contains('\n') && !mail.subject.contains('\r'), "{:?}", mail.subject);
+    }
+
+    #[test]
+    fn fills_attributes() {
+        let attributes = Attributes(std::collections::BTreeMap::from([
+            ("plan".to_owned(), AttributeValue::Text("<b>Pro</b>".to_owned())),
+            ("seats".to_owned(), AttributeValue::Number(5.into())),
+            (
+                "ratio".to_owned(),
+                AttributeValue::Number(serde_json::Number::from_f64(1.5).unwrap()),
+            ),
+            ("trial".to_owned(), AttributeValue::Bool(false)),
+        ]));
+        let merge = Merge { attributes: Some(&attributes), ..ADA };
+        let text = fill(
+            "{{ attr.plan }}/{{attr.seats}}/{{ attr.ratio }}/{{ attr.trial }}/[{{ attr.missing }}]/{{ nope }}/{{ name",
+            &merge,
+        );
+        assert_eq!(text, "<b>Pro</b>/5/1.5/false/[]/{{ nope }}/{{ name", "text part");
+        let html = markdown_html("Plan: {{ attr.plan }}", &merge);
+        assert!(html.contains("&lt;b&gt;Pro&lt;/b&gt;"), "escaped in html: {html}");
+        assert_eq!(fill("{{ attr.plan }}", &ADA), "", "no attributes");
     }
 
     #[test]

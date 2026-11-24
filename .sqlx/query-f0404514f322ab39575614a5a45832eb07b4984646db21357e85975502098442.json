@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT c.id AS \"id: ContactId\", c.workspace_id AS \"workspace_id: WorkspaceId\",\n                  c.list_id AS \"list_id: ListId\", c.email, c.name, c.tags, c.status, c.source,\n                  c.confirm_token, c.confirm_sent_at AS \"confirm_sent_at: UnixMillis\",\n                  c.unsubscribe_token, c.subscribed_at AS \"subscribed_at: UnixMillis\",\n                  c.unsubscribed_at AS \"unsubscribed_at: UnixMillis\",\n                  c.created_at AS \"created_at: UnixMillis\", c.updated_at AS \"updated_at: UnixMillis\",\n                  l.name AS list_name, l.project_id AS \"project_id: ProjectId\"\n           FROM mailing_contacts c\n           JOIN mailing_lists l ON l.id = c.list_id AND l.workspace_id = c.workspace_id\n           WHERE c.workspace_id = ?1 AND c.email = ?2 AND (?3 IS NULL OR l.project_id = ?3)\n           ORDER BY l.name, l.id",
+  "query": "SELECT c.id AS \"id: ContactId\", c.workspace_id AS \"workspace_id: WorkspaceId\",\n                  c.list_id AS \"list_id: ListId\", c.email, c.name, c.tags, c.attributes, c.status,\n                  c.source,\n                  c.confirm_token, c.confirm_sent_at AS \"confirm_sent_at: UnixMillis\",\n                  c.unsubscribe_token, c.subscribed_at AS \"subscribed_at: UnixMillis\",\n                  c.unsubscribed_at AS \"unsubscribed_at: UnixMillis\",\n                  c.created_at AS \"created_at: UnixMillis\", c.updated_at AS \"updated_at: UnixMillis\",\n                  l.name AS list_name, l.project_id AS \"project_id: ProjectId\"\n           FROM mailing_contacts c\n           JOIN mailing_lists l ON l.id = c.list_id AND l.workspace_id = c.workspace_id\n           WHERE c.workspace_id = ?1 AND c.email = ?2 AND (?3 IS NULL OR l.project_id = ?3)\n           ORDER BY l.name, l.id",
   "describe": {
     "columns": [
       {
@@ -70,8 +70,19 @@
         }
       },
       {
-        "name": "status",
+        "name": "attributes",
         "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "attributes"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "source",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "confirm_token",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -104,7 +115,7 @@
       },
       {
         "name": "confirm_sent_at: UnixMillis",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -115,7 +126,7 @@
       },
       {
         "name": "unsubscribe_token",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -126,7 +137,7 @@
       },
       {
         "name": "subscribed_at: UnixMillis",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -137,7 +148,7 @@
       },
       {
         "name": "unsubscribed_at: UnixMillis",
-        "ordinal": 12,
+        "ordinal": 13,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -148,7 +159,7 @@
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 13,
+        "ordinal": 14,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -159,7 +170,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 14,
+        "ordinal": 15,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -170,7 +181,7 @@
       },
       {
         "name": "list_name",
-        "ordinal": 15,
+        "ordinal": 16,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -181,7 +192,7 @@
       },
       {
         "name": "project_id: ProjectId",
-        "ordinal": 16,
+        "ordinal": 17,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -203,6 +214,7 @@
       false,
       false,
       false,
+      false,
       true,
       true,
       false,
@@ -214,5 +226,5 @@
       false
     ]
   },
-  "hash": "31cacda255956bb58ac478aed8a939595627860a20cda2ffe52b037ffa6ca7e0"
+  "hash": "f0404514f322ab39575614a5a45832eb07b4984646db21357e85975502098442"
 }

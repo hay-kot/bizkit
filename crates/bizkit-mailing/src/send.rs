@@ -14,8 +14,8 @@ use bizkit_core::time::UnixMillis;
 use serde::{Deserialize, Serialize};
 
 use crate::api::{
-    BroadcastId, BroadcastStatus, ContactStatus, DeliveryId, DeliveryKind, DeliveryStatus,
-    EnrollmentStatus,
+    Attributes, BroadcastId, BroadcastStatus, ContactStatus, DeliveryId, DeliveryKind,
+    DeliveryStatus, EnrollmentStatus,
 };
 use crate::render::{self, Frame, Merge, Rendered};
 use crate::store::{self, BroadcastRow, ContactRow, DeliveryRow, ListRow};
@@ -221,7 +221,15 @@ async fn render_to(
     to_email: &str,
 ) -> anyhow::Result<(Rendered, Option<url::Url>)> {
     let links = Links::of(platform, contact).await?;
-    let merge = Merge { name: contact.and_then(|c| c.name.as_deref()), email: to_email };
+    let attributes: Option<Attributes> = contact
+        .map(|c| serde_json::from_str(&c.attributes))
+        .transpose()
+        .context("decoding the contact's attributes")?;
+    let merge = Merge {
+        name: contact.and_then(|c| c.name.as_deref()),
+        email: to_email,
+        attributes: attributes.as_ref(),
+    };
     let mail = render::render(&frame(list, &links), body.subject, body.md, &merge);
     Ok((mail, links.unsubscribe))
 }

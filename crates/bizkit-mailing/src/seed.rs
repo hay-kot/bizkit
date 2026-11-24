@@ -24,21 +24,39 @@ use crate::suppress::{self, Suppress};
 
 const LIST: &str = "Newsletter";
 
-/// Address, name, status and days since the address arrived.
-const CONTACTS: [(&str, Option<&str>, ContactStatus, u64); 5] = [
-    ("ada@bizkit.test", Some("Ada"), ContactStatus::Subscribed, 30),
-    ("grace@bizkit.test", Some("Grace"), ContactStatus::Subscribed, 21),
-    ("linus@bizkit.test", None, ContactStatus::Subscribed, 9),
-    ("margaret@bizkit.test", Some("Margaret"), ContactStatus::Pending, 0),
-    ("ken@bizkit.test", Some("Ken"), ContactStatus::Unsubscribed, 14),
+/// Address, name, status, days since the address arrived and attributes.
+const CONTACTS: [(&str, Option<&str>, ContactStatus, u64, &str); 5] = [
+    (
+        "ada@bizkit.test",
+        Some("Ada"),
+        ContactStatus::Subscribed,
+        30,
+        r#"{"city":"London","plan":"pro","seats":12}"#,
+    ),
+    (
+        "grace@bizkit.test",
+        Some("Grace"),
+        ContactStatus::Subscribed,
+        21,
+        r#"{"city":"Arlington","plan":"pro","seats":3}"#,
+    ),
+    (
+        "linus@bizkit.test",
+        None,
+        ContactStatus::Subscribed,
+        9,
+        r#"{"city":"Helsinki","plan":"free"}"#,
+    ),
+    ("margaret@bizkit.test", Some("Margaret"), ContactStatus::Pending, 0, r#"{"plan":"free"}"#),
+    ("ken@bizkit.test", Some("Ken"), ContactStatus::Unsubscribed, 14, r#"{"plan":"pro"}"#),
 ];
 
 const SENT_BODY: &str = "Hi {{ name }},\n\nTallyho now exports to **CSV** and keeps a full \
 history of every count. [See what changed](https://example.com/changelog).\n\nThanks for \
 reading,\nThe Tallyho team";
 
-const DRAFT_BODY: &str = "Hi {{ name }},\n\nAnnual billing is here: two months free when you \
-pay for a year.\n\n- Same features\n- One invoice\n- Cancel any time\n\n\
+const DRAFT_BODY: &str = "Hi {{ name }},\n\nAnnual billing is here for {{ attr.plan }} plans: two \
+months free when you pay for a year.\n\n- Same features\n- One invoice\n- Cancel any time\n\n\
 [Switch to annual](https://example.com/pricing)";
 
 const SEQUENCE: &str = "Welcome series";
@@ -164,6 +182,7 @@ async fn seed_privacy(
                 email: email.to_owned(),
                 name: Some(name.to_owned()),
                 tags: "[]".to_owned(),
+                attributes: "{}".to_owned(),
                 status: ContactStatus::Subscribed.as_str().to_owned(),
                 source: "seed".to_owned(),
                 confirm_token: None,
@@ -191,7 +210,7 @@ async fn seed_contacts(
     now: UnixMillis,
 ) -> anyhow::Result<Vec<ContactRow>> {
     let mut subscribed = Vec::new();
-    for (email, name, status, age) in CONTACTS {
+    for (email, name, status, age, attributes) in CONTACTS {
         let arrived = days_ago(now, age);
         let contact = ContactRow {
             id: ContactId::new(),
@@ -200,6 +219,7 @@ async fn seed_contacts(
             email: email.to_owned(),
             name: name.map(str::to_owned),
             tags: if age > 20 { r#"["early"]"# } else { "[]" }.to_owned(),
+            attributes: attributes.to_owned(),
             status: status.as_str().to_owned(),
             source: form.map_or_else(|| "seed".to_owned(), |form| format!("form:{form}")),
             confirm_token: Some(random_token()),
@@ -234,7 +254,7 @@ async fn seed_broadcasts(
         list_id: list.id,
         subject: "What's new in Tallyho".to_owned(),
         body_md: SENT_BODY.to_owned(),
-        tag: None,
+        segment: "{}".to_owned(),
         status: BroadcastStatus::Sent.as_str().to_owned(),
         recipients: i64::try_from(subscribed.len()).unwrap_or(0),
         sent_at: Some(sent_at),
@@ -258,6 +278,7 @@ async fn seed_broadcasts(
         id: BroadcastId::new(),
         subject: "Annual billing is here".to_owned(),
         body_md: DRAFT_BODY.to_owned(),
+        segment: r#"{"tags":[],"attributes":[{"key":"plan","equals":"pro"}],"joined_after":null,"joined_before":null}"#.to_owned(),
         status: BroadcastStatus::Draft.as_str().to_owned(),
         recipients: 0,
         sent_at: None,

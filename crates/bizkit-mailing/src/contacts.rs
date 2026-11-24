@@ -9,7 +9,7 @@ use bizkit_core::auth::random_token;
 use bizkit_core::db::WriteTx;
 use bizkit_core::time::UnixMillis;
 
-use crate::api::{ContactId, ContactStatus, DeliveryKind};
+use crate::api::{Attributes, ContactId, ContactStatus, DeliveryKind};
 use crate::store::{self, ContactRow, ListRow};
 use crate::{send, sequences, suppress};
 
@@ -56,6 +56,9 @@ pub(crate) struct NewContact {
     pub(crate) email: String,
     pub(crate) name: Option<String>,
     pub(crate) tags: Vec<String>,
+    /// Kept only for a new contact; an address already on the list keeps
+    /// its own.
+    pub(crate) attributes: Attributes,
     pub(crate) source: Source,
 }
 
@@ -93,6 +96,7 @@ pub(crate) async fn subscribe(
             email: input.email,
             name: input.name,
             tags: serde_json::to_string(&input.tags).context("encoding tags")?,
+            attributes: serde_json::to_string(&input.attributes).context("encoding attributes")?,
             status: if confirms { ContactStatus::Pending } else { ContactStatus::Subscribed }
                 .as_str()
                 .to_owned(),

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_contacts SET name = ?, tags = ?, attributes = ?, status = ?,\n                                     confirm_token = ?, confirm_sent_at = ?, subscribed_at = ?,\n                                     unsubscribed_at = ?, updated_at = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "8031db6dee2c447ffba16fc4ff37df3aacff9c49d4f2cd175685e4fc89da43fc"
+}

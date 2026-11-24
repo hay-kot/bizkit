@@ -22,7 +22,8 @@ pub(crate) struct ListRow {
     pub(crate) updated_at: UnixMillis,
 }
 
-/// A `mailing_contacts` row. `tags` stays JSON text and `status` stored text.
+/// A `mailing_contacts` row. `tags` and `attributes` stay JSON text and
+/// `status` stored text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ContactRow {
     pub(crate) id: ContactId,
@@ -31,6 +32,7 @@ pub(crate) struct ContactRow {
     pub(crate) email: String,
     pub(crate) name: Option<String>,
     pub(crate) tags: String,
+    pub(crate) attributes: String,
     pub(crate) status: String,
     pub(crate) source: String,
     pub(crate) confirm_token: Option<String>,
@@ -50,7 +52,8 @@ pub(crate) struct BroadcastRow {
     pub(crate) list_id: ListId,
     pub(crate) subject: String,
     pub(crate) body_md: String,
-    pub(crate) tag: Option<String>,
+    /// A JSON [`crate::api::Segment`].
+    pub(crate) segment: String,
     pub(crate) status: String,
     pub(crate) recipients: i64,
     pub(crate) sent_at: Option<UnixMillis>,
@@ -379,16 +382,18 @@ pub(crate) async fn insert_contact(
     row: &ContactRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "INSERT INTO mailing_contacts (id, workspace_id, list_id, email, name, tags, status, source,
-                                       confirm_token, confirm_sent_at, unsubscribe_token,
-                                       subscribed_at, unsubscribed_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO mailing_contacts (id, workspace_id, list_id, email, name, tags, attributes,
+                                       status, source, confirm_token, confirm_sent_at,
+                                       unsubscribe_token, subscribed_at, unsubscribed_at,
+                                       created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.list_id,
         row.email,
         row.name,
         row.tags,
+        row.attributes,
         row.status,
         row.source,
         row.confirm_token,
@@ -410,12 +415,13 @@ pub(crate) async fn update_contact(
     row: &ContactRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "UPDATE mailing_contacts SET name = ?, tags = ?, status = ?, confirm_token = ?,
-                                     confirm_sent_at = ?, subscribed_at = ?, unsubscribed_at = ?,
-                                     updated_at = ?
+        "UPDATE mailing_contacts SET name = ?, tags = ?, attributes = ?, status = ?,
+                                     confirm_token = ?, confirm_sent_at = ?, subscribed_at = ?,
+                                     unsubscribed_at = ?, updated_at = ?
          WHERE workspace_id = ? AND id = ?",
         row.name,
         row.tags,
+        row.attributes,
         row.status,
         row.confirm_token,
         row.confirm_sent_at,
@@ -438,7 +444,8 @@ pub(crate) async fn find_contact(
     sqlx::query_as!(
         ContactRow,
         r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  list_id AS "list_id: ListId", email, name, tags, attributes, status, source,
+                  confirm_token,
                   confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
                   subscribed_at AS "subscribed_at: UnixMillis",
                   unsubscribed_at AS "unsubscribed_at: UnixMillis",
@@ -461,7 +468,8 @@ pub(crate) async fn find_contact_by_email(
     sqlx::query_as!(
         ContactRow,
         r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  list_id AS "list_id: ListId", email, name, tags, attributes, status, source,
+                  confirm_token,
                   confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
                   subscribed_at AS "subscribed_at: UnixMillis",
                   unsubscribed_at AS "unsubscribed_at: UnixMillis",
@@ -483,7 +491,8 @@ pub(crate) async fn find_by_confirm_token(
     sqlx::query_as!(
         ContactRow,
         r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  list_id AS "list_id: ListId", email, name, tags, attributes, status, source,
+                  confirm_token,
                   confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
                   subscribed_at AS "subscribed_at: UnixMillis",
                   unsubscribed_at AS "unsubscribed_at: UnixMillis",
@@ -503,7 +512,8 @@ pub(crate) async fn find_by_unsubscribe_token(
     sqlx::query_as!(
         ContactRow,
         r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  list_id AS "list_id: ListId", email, name, tags, attributes, status, source,
+                  confirm_token,
                   confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
                   subscribed_at AS "subscribed_at: UnixMillis",
                   unsubscribed_at AS "unsubscribed_at: UnixMillis",
@@ -527,7 +537,8 @@ pub(crate) async fn list_contacts(
     sqlx::query_as!(
         ContactRow,
         r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  list_id AS "list_id: ListId", email, name, tags, attributes, status, source,
+                  confirm_token,
                   confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
                   subscribed_at AS "subscribed_at: UnixMillis",
                   unsubscribed_at AS "unsubscribed_at: UnixMillis",
@@ -567,7 +578,12 @@ pub(crate) async fn delete_contact(
 }
 
 /// Up to `limit` of the broadcast's recipients after `after` in ID order:
-/// its list's subscribed contacts, only those with its tag when it has one.
+/// its list's subscribed contacts that match its segment.
+///
+/// The segment arrives as one JSON parameter read through `json_each`, so
+/// nothing in it reaches SQL text. Attribute conditions match on
+/// `json_each`'s `key` column and a type class (numbers match numbers,
+/// whether integer or real). [`count_audience`] uses the same filter.
 pub(crate) async fn subscribed_after(
     exec: impl SqliteExecutor<'_>,
     broadcast: &BroadcastRow,
@@ -577,18 +593,68 @@ pub(crate) async fn subscribed_after(
     let rows = sqlx::query!(
         r#"SELECT id AS "id: ContactId", email FROM mailing_contacts c
            WHERE workspace_id = ?1 AND list_id = ?2 AND status = 'subscribed'
-             AND (?3 IS NULL OR EXISTS (SELECT 1 FROM json_each(c.tags) t WHERE t.value = ?3))
+             AND NOT EXISTS (
+               SELECT 1 FROM json_each(?3, '$.tags') want
+               WHERE NOT EXISTS (SELECT 1 FROM json_each(c.tags) t WHERE t.value = want.value))
+             AND NOT EXISTS (
+               SELECT 1 FROM json_each(?3, '$.attributes') cond
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM json_each(c.attributes) a
+                 WHERE a.key = json_extract(cond.value, '$.key')
+                   AND a.value = json_extract(cond.value, '$.equals')
+                   AND (CASE WHEN a.type IN ('integer', 'real') THEN 'number' ELSE a.type END)
+                     = (CASE WHEN json_type(cond.value, '$.equals') IN ('integer', 'real')
+                             THEN 'number' ELSE json_type(cond.value, '$.equals') END)))
+             AND (json_extract(?3, '$.joined_after') IS NULL
+                  OR subscribed_at >= json_extract(?3, '$.joined_after'))
+             AND (json_extract(?3, '$.joined_before') IS NULL
+                  OR subscribed_at < json_extract(?3, '$.joined_before'))
              AND (?4 IS NULL OR id > ?4)
            ORDER BY id LIMIT ?5"#,
         broadcast.workspace_id,
         broadcast.list_id,
-        broadcast.tag,
+        broadcast.segment,
         after,
         limit,
     )
     .fetch_all(exec)
     .await?;
     Ok(rows.into_iter().map(|r| (r.id, r.email)).collect())
+}
+
+/// How many subscribed contacts of the list match `segment` (JSON), with
+/// the filter of [`subscribed_after`].
+pub(crate) async fn count_audience(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    list_id: ListId,
+    segment: &str,
+) -> sqlx::Result<i64> {
+    sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!: i64" FROM mailing_contacts c
+           WHERE workspace_id = ?1 AND list_id = ?2 AND status = 'subscribed'
+             AND NOT EXISTS (
+               SELECT 1 FROM json_each(?3, '$.tags') want
+               WHERE NOT EXISTS (SELECT 1 FROM json_each(c.tags) t WHERE t.value = want.value))
+             AND NOT EXISTS (
+               SELECT 1 FROM json_each(?3, '$.attributes') cond
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM json_each(c.attributes) a
+                 WHERE a.key = json_extract(cond.value, '$.key')
+                   AND a.value = json_extract(cond.value, '$.equals')
+                   AND (CASE WHEN a.type IN ('integer', 'real') THEN 'number' ELSE a.type END)
+                     = (CASE WHEN json_type(cond.value, '$.equals') IN ('integer', 'real')
+                             THEN 'number' ELSE json_type(cond.value, '$.equals') END)))
+             AND (json_extract(?3, '$.joined_after') IS NULL
+                  OR subscribed_at >= json_extract(?3, '$.joined_after'))
+             AND (json_extract(?3, '$.joined_before') IS NULL
+                  OR subscribed_at < json_extract(?3, '$.joined_before'))"#,
+        workspace_id,
+        list_id,
+        segment,
+    )
+    .fetch_one(exec)
+    .await
 }
 
 // ---------------------------------------------------------------- broadcasts
@@ -598,7 +664,7 @@ pub(crate) async fn insert_broadcast(
     row: &BroadcastRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "INSERT INTO mailing_broadcasts (id, workspace_id, list_id, subject, body_md, tag, status,
+        "INSERT INTO mailing_broadcasts (id, workspace_id, list_id, subject, body_md, segment, status,
                                          recipients, sent_at, created_at, updated_at, send_at,
                                          paused_at, pause_reason, failures_in_row)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -607,7 +673,7 @@ pub(crate) async fn insert_broadcast(
         row.list_id,
         row.subject,
         row.body_md,
-        row.tag,
+        row.segment,
         row.status,
         row.recipients,
         row.sent_at,
@@ -629,14 +695,14 @@ pub(crate) async fn update_broadcast(
     row: &BroadcastRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "UPDATE mailing_broadcasts SET list_id = ?, subject = ?, body_md = ?, tag = ?, status = ?,
+        "UPDATE mailing_broadcasts SET list_id = ?, subject = ?, body_md = ?, segment = ?, status = ?,
                                        recipients = ?, sent_at = ?, updated_at = ?, send_at = ?,
                                        paused_at = ?, pause_reason = ?, failures_in_row = ?
          WHERE workspace_id = ? AND id = ?",
         row.list_id,
         row.subject,
         row.body_md,
-        row.tag,
+        row.segment,
         row.status,
         row.recipients,
         row.sent_at,
@@ -661,7 +727,7 @@ pub(crate) async fn find_broadcast(
     sqlx::query_as!(
         BroadcastRow,
         r#"SELECT id AS "id: BroadcastId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", subject, body_md, tag, status, recipients,
+                  list_id AS "list_id: ListId", subject, body_md, segment, status, recipients,
                   sent_at AS "sent_at: UnixMillis", created_at AS "created_at: UnixMillis",
                   updated_at AS "updated_at: UnixMillis", send_at AS "send_at: UnixMillis",
                   paused_at AS "paused_at: UnixMillis", pause_reason, failures_in_row
@@ -684,7 +750,7 @@ pub(crate) async fn list_broadcasts(
     sqlx::query_as!(
         BroadcastRow,
         r#"SELECT b.id AS "id: BroadcastId", b.workspace_id AS "workspace_id: WorkspaceId",
-                  b.list_id AS "list_id: ListId", b.subject, b.body_md, b.tag, b.status,
+                  b.list_id AS "list_id: ListId", b.subject, b.body_md, b.segment, b.status,
                   b.recipients, b.sent_at AS "sent_at: UnixMillis",
                   b.created_at AS "created_at: UnixMillis", b.updated_at AS "updated_at: UnixMillis",
                   b.send_at AS "send_at: UnixMillis", b.paused_at AS "paused_at: UnixMillis",
@@ -1292,7 +1358,8 @@ pub(crate) async fn address_contacts(
 ) -> sqlx::Result<Vec<AddressContactRow>> {
     let rows = sqlx::query!(
         r#"SELECT c.id AS "id: ContactId", c.workspace_id AS "workspace_id: WorkspaceId",
-                  c.list_id AS "list_id: ListId", c.email, c.name, c.tags, c.status, c.source,
+                  c.list_id AS "list_id: ListId", c.email, c.name, c.tags, c.attributes, c.status,
+                  c.source,
                   c.confirm_token, c.confirm_sent_at AS "confirm_sent_at: UnixMillis",
                   c.unsubscribe_token, c.subscribed_at AS "subscribed_at: UnixMillis",
                   c.unsubscribed_at AS "unsubscribed_at: UnixMillis",
@@ -1318,6 +1385,7 @@ pub(crate) async fn address_contacts(
                 email: r.email,
                 name: r.name,
                 tags: r.tags,
+                attributes: r.attributes,
                 status: r.status,
                 source: r.source,
                 confirm_token: r.confirm_token,
@@ -1449,7 +1517,8 @@ pub(crate) async fn find_contact_any(
     sqlx::query_as!(
         ContactRow,
         r#"SELECT id AS "id: ContactId", workspace_id AS "workspace_id: WorkspaceId",
-                  list_id AS "list_id: ListId", email, name, tags, status, source, confirm_token,
+                  list_id AS "list_id: ListId", email, name, tags, attributes, status, source,
+                  confirm_token,
                   confirm_sent_at AS "confirm_sent_at: UnixMillis", unsubscribe_token,
                   subscribed_at AS "subscribed_at: UnixMillis",
                   unsubscribed_at AS "unsubscribed_at: UnixMillis",

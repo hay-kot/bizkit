@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: ContactId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", email, name, tags, status, source, confirm_token,\n                  confirm_sent_at AS \"confirm_sent_at: UnixMillis\", unsubscribe_token,\n                  subscribed_at AS \"subscribed_at: UnixMillis\",\n                  unsubscribed_at AS \"unsubscribed_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_contacts c\n           WHERE workspace_id = ?1 AND list_id = ?2\n             AND (?3 IS NULL OR status = ?3)\n             AND (?4 IS NULL OR EXISTS (SELECT 1 FROM json_each(c.tags) t WHERE t.value = ?4))\n             AND (?5 IS NULL OR instr(email, ?5) > 0 OR instr(lower(COALESCE(name, '')), ?5) > 0)\n             AND (?6 IS NULL OR id < ?6)\n           ORDER BY id DESC LIMIT ?7",
+  "query": "SELECT id AS \"id: ContactId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", email, name, tags, attributes, status, source,\n                  confirm_token,\n                  confirm_sent_at AS \"confirm_sent_at: UnixMillis\", unsubscribe_token,\n                  subscribed_at AS \"subscribed_at: UnixMillis\",\n                  unsubscribed_at AS \"unsubscribed_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_contacts c\n           WHERE workspace_id = ?1 AND list_id = ?2\n             AND (?3 IS NULL OR status = ?3)\n             AND (?4 IS NULL OR EXISTS (SELECT 1 FROM json_each(c.tags) t WHERE t.value = ?4))\n             AND (?5 IS NULL OR instr(email, ?5) > 0 OR instr(lower(COALESCE(name, '')), ?5) > 0)\n             AND (?6 IS NULL OR id < ?6)\n           ORDER BY id DESC LIMIT ?7",
   "describe": {
     "columns": [
       {
@@ -70,8 +70,19 @@
         }
       },
       {
-        "name": "status",
+        "name": "attributes",
         "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "attributes"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "source",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "confirm_token",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -104,7 +115,7 @@
       },
       {
         "name": "confirm_sent_at: UnixMillis",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -115,7 +126,7 @@
       },
       {
         "name": "unsubscribe_token",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -126,7 +137,7 @@
       },
       {
         "name": "subscribed_at: UnixMillis",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -137,7 +148,7 @@
       },
       {
         "name": "unsubscribed_at: UnixMillis",
-        "ordinal": 12,
+        "ordinal": 13,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -148,7 +159,7 @@
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 13,
+        "ordinal": 14,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -159,7 +170,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 14,
+        "ordinal": 15,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -181,6 +192,7 @@
       false,
       false,
       false,
+      false,
       true,
       true,
       false,
@@ -190,5 +202,5 @@
       false
     ]
   },
-  "hash": "aca9da0d26184d0ad5b119ddedd5c8de1096a102205c09beb7ee6859dbf1f3bc"
+  "hash": "f30a175c25eccd13bd5160908d5c32b03a8a4019ce0df26612d6dda5e0ec0b30"
 }

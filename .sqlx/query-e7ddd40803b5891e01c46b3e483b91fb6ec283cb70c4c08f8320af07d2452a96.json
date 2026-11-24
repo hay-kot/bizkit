@@ -1,15 +1,15 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: ContactId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", email, name, tags, status, source, confirm_token,\n                  confirm_sent_at AS \"confirm_sent_at: UnixMillis\", unsubscribe_token,\n                  subscribed_at AS \"subscribed_at: UnixMillis\",\n                  unsubscribed_at AS \"unsubscribed_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_contacts WHERE unsubscribe_token = ?",
+  "query": "SELECT id AS \"id: BroadcastId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", subject, body_md, segment, status, recipients,\n                  sent_at AS \"sent_at: UnixMillis\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\", send_at AS \"send_at: UnixMillis\",\n                  paused_at AS \"paused_at: UnixMillis\", pause_reason, failures_in_row\n           FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
-        "name": "id: ContactId",
+        "name": "id: BroadcastId",
         "ordinal": 0,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
+            "table": "mailing_broadcasts",
             "name": "id"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
+            "table": "mailing_broadcasts",
             "name": "workspace_id"
           }
         }
@@ -31,41 +31,41 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
+            "table": "mailing_broadcasts",
             "name": "list_id"
           }
         }
       },
       {
-        "name": "email",
+        "name": "subject",
         "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
-            "name": "email"
+            "table": "mailing_broadcasts",
+            "name": "subject"
           }
         }
       },
       {
-        "name": "name",
+        "name": "body_md",
         "ordinal": 4,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
-            "name": "name"
+            "table": "mailing_broadcasts",
+            "name": "body_md"
           }
         }
       },
       {
-        "name": "tags",
+        "name": "segment",
         "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
-            "name": "tags"
+            "table": "mailing_broadcasts",
+            "name": "segment"
           }
         }
       },
@@ -75,120 +75,120 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
+            "table": "mailing_broadcasts",
             "name": "status"
           }
         }
       },
       {
-        "name": "source",
+        "name": "recipients",
         "ordinal": 7,
-        "type_info": "Text",
+        "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
-            "name": "source"
+            "table": "mailing_broadcasts",
+            "name": "recipients"
           }
         }
       },
       {
-        "name": "confirm_token",
+        "name": "sent_at: UnixMillis",
         "ordinal": 8,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "mailing_contacts",
-            "name": "confirm_token"
-          }
-        }
-      },
-      {
-        "name": "confirm_sent_at: UnixMillis",
-        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
-            "name": "confirm_sent_at"
-          }
-        }
-      },
-      {
-        "name": "unsubscribe_token",
-        "ordinal": 10,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "mailing_contacts",
-            "name": "unsubscribe_token"
-          }
-        }
-      },
-      {
-        "name": "subscribed_at: UnixMillis",
-        "ordinal": 11,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "mailing_contacts",
-            "name": "subscribed_at"
-          }
-        }
-      },
-      {
-        "name": "unsubscribed_at: UnixMillis",
-        "ordinal": 12,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "mailing_contacts",
-            "name": "unsubscribed_at"
+            "table": "mailing_broadcasts",
+            "name": "sent_at"
           }
         }
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 13,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
+            "table": "mailing_broadcasts",
             "name": "created_at"
           }
         }
       },
       {
         "name": "updated_at: UnixMillis",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "send_at: UnixMillis",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "send_at"
+          }
+        }
+      },
+      {
+        "name": "paused_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "paused_at"
+          }
+        }
+      },
+      {
+        "name": "pause_reason",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "pause_reason"
+          }
+        }
+      },
+      {
+        "name": "failures_in_row",
         "ordinal": 14,
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "mailing_contacts",
-            "name": "updated_at"
+            "table": "mailing_broadcasts",
+            "name": "failures_in_row"
           }
         }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
       false,
       false,
       false,
-      true,
       false,
       false,
       false,
+      false,
       true,
-      true,
+      false,
       false,
       true,
       true,
-      false,
+      true,
       false
     ]
   },
-  "hash": "ff7166f001214a53a1e96ca52bd402fb0353491d70f19e6f73549d74b1e0148e"
+  "hash": "e7ddd40803b5891e01c46b3e483b91fb6ec283cb70c4c08f8320af07d2452a96"
 }

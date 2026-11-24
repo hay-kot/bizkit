@@ -140,6 +140,43 @@ export type ApiKeyList = {
 };
 
 /**
+ * One attribute test of a segment.
+ */
+export type AttributeCondition = {
+    /**
+     * The value it must have, of the same type: text `"42"` doesn't
+     * match the number `42`.
+     */
+    equals: AttributeValue;
+    /**
+     * The attribute key.
+     */
+    key: string;
+};
+
+/**
+ * A contact attribute value: text, a number or a boolean.
+ */
+export type AttributeValue = string | number | boolean;
+
+/**
+ * A contact's attributes by key.
+ */
+export type Attributes = {
+    [key: string]: string | number | boolean;
+};
+
+/**
+ * How many subscribers a segment matches.
+ */
+export type Audience = {
+    /**
+     * The matching subscribers.
+     */
+    subscribers: number;
+};
+
+/**
  * How a request body is given.
  */
 export type BodyEncoding = 'utf8' | 'base64';
@@ -212,7 +249,8 @@ export type BreakdownSource = 'property' | 'trait';
  */
 export type Broadcast = {
     /**
-     * The body in Markdown. `{{ name }}` and `{{ email }}` are filled in.
+     * The body in Markdown. `{{ name }}`, `{{ email }}` and
+     * `{{ attr.key }}` are filled in.
      */
     body_md: string;
     /**
@@ -237,6 +275,10 @@ export type Broadcast = {
      * Subscribers it was queued for.
      */
     recipients: number;
+    /**
+     * Which subscribers of the list get it.
+     */
+    segment: Segment;
     send_at?: Timestamp | null;
     sent_at?: Timestamp | null;
     /**
@@ -247,10 +289,6 @@ export type Broadcast = {
      * The subject line.
      */
     subject: string;
-    /**
-     * Only subscribers with this tag, if set.
-     */
-    tag?: string | null;
     /**
      * When it last changed.
      */
@@ -358,6 +396,10 @@ export type Cohort = {
  * An address on a list.
  */
 export type Contact = {
+    /**
+     * Values for `{{ attr.key }}` merge fields and segments.
+     */
+    attributes: Attributes;
     /**
      * When the address arrived.
      */
@@ -2454,6 +2496,23 @@ export type SecretList = {
      * The secrets, by name.
      */
     items: Array<Secret>;
+};
+
+/**
+ * Which subscribers of a list a broadcast goes to. Every part that is set
+ * must match; an empty segment is every subscriber.
+ */
+export type Segment = {
+    /**
+     * Subscribers whose attributes match each condition.
+     */
+    attributes?: Array<AttributeCondition>;
+    joined_after?: Timestamp | null;
+    joined_before?: Timestamp | null;
+    /**
+     * Subscribers with every one of these tags.
+     */
+    tags?: Array<string>;
 };
 
 /**
@@ -7575,13 +7634,13 @@ export type MailingBroadcastsCreateData = {
          */
         list_id: ListId;
         /**
+         * Which subscribers get it; absent: every subscriber.
+         */
+        segment?: Segment;
+        /**
          * The subject line.
          */
         subject: string;
-        /**
-         * Only subscribers with this tag.
-         */
-        tag?: string | null;
     };
     path: {
         /**
@@ -7738,14 +7797,11 @@ export type MailingBroadcastsUpdateData = {
          */
         body_md?: string | null;
         list_id?: ListId | null;
+        segment?: Segment | null;
         /**
          * The subject line.
          */
         subject?: string | null;
-        /**
-         * Only subscribers with this tag; `null` sends to all.
-         */
-        tag?: string | null;
     };
     path: {
         /**
@@ -8478,6 +8534,61 @@ export type MailingListsUpdateResponses = {
 
 export type MailingListsUpdateResponse = MailingListsUpdateResponses[keyof MailingListsUpdateResponses];
 
+export type MailingListsAudienceData = {
+    body: {
+        /**
+         * The segment; absent: every subscriber.
+         */
+        segment?: Segment;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/audience';
+};
+
+export type MailingListsAudienceErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingListsAudienceError = MailingListsAudienceErrors[keyof MailingListsAudienceErrors];
+
+export type MailingListsAudienceResponses = {
+    /**
+     * OK
+     */
+    200: Audience;
+};
+
+export type MailingListsAudienceResponse = MailingListsAudienceResponses[keyof MailingListsAudienceResponses];
+
 export type MailingContactsListData = {
     body?: never;
     path: {
@@ -8545,6 +8656,10 @@ export type MailingContactsListResponse = MailingContactsListResponses[keyof Mai
 
 export type MailingContactsCreateData = {
     body: {
+        /**
+         * Values for `{{ attr.key }}` merge fields and segments.
+         */
+        attributes?: Attributes;
         /**
          * The address.
          */
@@ -8724,6 +8839,7 @@ export type MailingContactsGetResponse = MailingContactsGetResponses[keyof Maili
 
 export type MailingContactsUpdateData = {
     body: {
+        attributes?: Attributes | null;
         /**
          * The display name; `null` removes it.
          */

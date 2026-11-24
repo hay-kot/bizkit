@@ -5,6 +5,7 @@ use bizkit_core::auth::{is_plausible_email, normalize_email};
 use bizkit_core::contacts::ContactCaptured;
 use bizkit_core::jobs::{JobCtx, Lane, Subscriber};
 
+use crate::api::Attributes;
 use crate::contacts::{self, NewContact, Source};
 use crate::send::MAILING;
 use crate::store;
@@ -41,6 +42,7 @@ impl Subscriber<ContactCaptured> for CaptureSubscriber {
                 email: email.clone(),
                 name: event.name.clone(),
                 tags: Vec::new(),
+                attributes: Attributes::default(),
                 source: Source::Form(event.source.id.clone()),
             };
             contacts::subscribe(platform, &mut tx, list, input).await?;
