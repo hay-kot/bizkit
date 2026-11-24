@@ -13,7 +13,7 @@ import { useIsAdmin } from '@/composables/useIsAdmin'
 import { formatDate } from '@/lib/format'
 import { useCreateMailingList, useMailingLists } from '@/queries/mailing'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const router = useRouter()
 const isAdmin = useIsAdmin(() => props.workspaceId)
 const {

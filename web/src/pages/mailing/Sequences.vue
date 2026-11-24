@@ -17,7 +17,7 @@ import {
   useSequences,
 } from '@/queries/mailing'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const router = useRouter()
 const {
   data: sequences,

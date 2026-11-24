@@ -13,7 +13,7 @@ import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useBroadcasts, useCreateBroadcast, useMailingLists } from '@/queries/mailing'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const router = useRouter()
 const {
   data: broadcasts,

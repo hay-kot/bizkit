@@ -23,13 +23,17 @@ defineProps<{
 
 const header = reactive<TabHeader>({ title: '', width: 'wide' })
 const actions = ref<HTMLElement | null>(null)
-provide(TAB_LAYOUT, { header, actions })
+const withActions = ref(0)
+const leaving = ref(false)
+provide(TAB_LAYOUT, { header, actions, withActions, leaving })
 </script>
 
 <template>
   <Page :width="header.width">
     <PageHeader :section="section" :title="header.title" :description="header.description">
-      <div ref="actions" class="flex flex-wrap items-center gap-2" />
+      <template v-if="withActions > 0" #default>
+        <div ref="actions" class="flex flex-wrap items-center gap-2" />
+      </template>
     </PageHeader>
     <Tabs :tabs="tabs" :label="label" />
     <RouterView v-slot="{ Component, route }">
@@ -39,6 +43,8 @@ provide(TAB_LAYOUT, { header, actions })
         enter-from-class="translate-y-1 opacity-0"
         leave-active-class="transition duration-100 ease-in"
         leave-to-class="opacity-0"
+        @before-leave="leaving = true"
+        @after-leave="leaving = false"
       >
         <component :is="Component" :key="route.path" v-bind="childProps" />
       </Transition>

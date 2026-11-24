@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
 import { FolderX, Menu as MenuIcon, Search, X } from 'lucide-vue-next'
-import { ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { inject, ref, unref, watch } from 'vue'
+import { useRoute, viewDepthKey } from 'vue-router'
 
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -23,6 +23,8 @@ import { useWorkspace } from '@/queries/workspaces'
 
 const props = defineProps<{ workspaceId: string }>()
 const route = useRoute()
+// The depth of this layout's own RouterView, for keying its pages.
+const depth = unref(inject(viewDepthKey, 0))
 const { data: workspace, error } = useWorkspace(() => props.workspaceId)
 const isAdmin = useIsAdmin(() => props.workspaceId)
 // The palette's sources mount once the role is known: a remount when the
@@ -175,7 +177,7 @@ watch(
             >
               <component
                 :is="Component"
-                :key="routeKey(child, 1)"
+                :key="routeKey(child, depth)"
                 :workspace-id="workspaceId"
                 :workspace-name="workspace?.name ?? ''"
                 :project-name="project?.name ?? ''"
