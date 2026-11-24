@@ -397,6 +397,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             website_events(file, seed, project_id, &goals)
                 .await
                 .context("seeding website events")?;
+            mark_events(db, seed, project_id).await?;
         }
         if let Some(goal) = goals.into_iter().find(|goal| goal.name == SIGNUP_GOAL) {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
@@ -413,10 +414,22 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         let file = open_empty(seed, project_id).await?;
         if let Some(file) = &file {
             docs_events(file, seed, project_id).await.context("seeding docs events")?;
+            mark_events(db, seed, project_id).await?;
         }
         close(file).await;
     }
     Ok(())
+}
+
+/// Sets the site's event day to today. A site that survived the move to
+/// project files had it reset, and reports treat it as having no events.
+async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+    let mut tx = db.write().await?;
+    let today = Day::of(seed.now).to_string();
+    store::advance_event_day(&mut *tx, seed.workspace_id, project_id, &today)
+        .await
+        .context("marking the seeded site's event day")?;
+    tx.commit().await
 }
 
 /// The project's file when it has no events yet.

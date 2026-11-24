@@ -221,5 +221,27 @@ mod tests {
         );
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         assert_eq!(counts().await, first, "a second run changes nothing");
+
+        // The move to project files dropped the events and reset the day
+        // markers but kept the sites; a run after it refills the files.
+        std::fs::remove_dir_all(data_dir.join("analytics")).unwrap();
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let mut tx = db.write().await.unwrap();
+        sqlx::query("UPDATE analytics_sites SET last_event_day = NULL")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        db.close().await;
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        assert_eq!(counts().await, first, "a run after the upgrade refills the files");
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let unmarked: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM analytics_sites WHERE last_event_day IS NULL")
+                .fetch_one(db.read())
+                .await
+                .unwrap();
+        db.close().await;
+        assert_eq!(unmarked, 0, "refilled sites report events");
     }
 }
