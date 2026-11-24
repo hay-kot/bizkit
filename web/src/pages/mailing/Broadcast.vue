@@ -14,6 +14,17 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import {
+  type AttributeRow,
+  canonicalSegment,
+  conditionsToRows,
+  dateInput,
+  describeSegment,
+  fromDateInput,
+  isEveryone,
+  rowsToConditions,
+} from '@/components/mailing/attributes'
+import AttributesEditor from '@/components/mailing/AttributesEditor.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
 import Card from '@/components/ui/Card.vue'
 import DataTable from '@/components/ui/DataTable.vue'
@@ -33,6 +44,8 @@ import { useMe } from '@/queries/auth'
 import {
   type Preview,
   ROWS_SHOWN,
+  type Segment,
+  useAudience,
   useBroadcast,
   useCancelBroadcast,
   useDeleteBroadcast,
@@ -108,8 +121,27 @@ watch(
 )
 
 const subject = ref('')
-const tag = ref('')
 const body = ref('')
+const segmentTags = ref('')
+const conditions = ref<AttributeRow[]>([])
+const joinedAfter = ref('')
+const joinedBefore = ref('')
+const segment = computed<Segment>(() => ({
+  tags: segmentTags.value
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t !== ''),
+  attributes: rowsToConditions(conditions.value),
+  joined_after: fromDateInput(joinedAfter.value),
+  joined_before: fromDateInput(joinedBefore.value),
+}))
+
+function fillSegment(loaded: Segment) {
+  segmentTags.value = (loaded.tags ?? []).join(', ')
+  conditions.value = conditionsToRows(loaded.attributes)
+  joinedAfter.value = dateInput(loaded.joined_after)
+  joinedBefore.value = dateInput(loaded.joined_before)
+}
 // As in Script.vue: a refetch only replaces fields the user hasn't edited
 // since the last fill, so a save or a poll never loses typing.
 let synced: typeof broadcast.value
@@ -119,7 +151,9 @@ watch(
     if (!loaded) return
     const fresh = synced?.id !== loaded.id
     if (fresh || subject.value === synced?.subject) subject.value = loaded.subject
-    if (fresh || tag.value === (synced?.tag ?? '')) tag.value = loaded.tag ?? ''
+    if (fresh || canonicalSegment(segment.value) === canonicalSegment(synced?.segment)) {
+      fillSegment(loaded.segment)
+    }
     if (fresh || body.value === synced?.body_md) body.value = loaded.body_md
     synced = loaded
   },
@@ -137,7 +171,7 @@ const dirty = computed(
   () =>
     broadcast.value !== undefined &&
     (subject.value.trim() !== broadcast.value.subject ||
-      tag.value.trim() !== (broadcast.value.tag ?? '') ||
+      canonicalSegment(segment.value) !== canonicalSegment(broadcast.value.segment) ||
       body.value !== broadcast.value.body_md),
 )
 
@@ -180,14 +214,37 @@ watch(
   { immediate: true },
 )
 
+const counter = useAudience()
+const matching = ref<number | null>(null)
+const settledSegment = refDebounced(segment, 400)
+let countRun = 0
+watch(
+  [settledSegment, () => broadcast.value?.list_id, isDraft],
+  async ([wanted, listId, draft]) => {
+    if (!listId || !draft) return
+    const run = ++countRun
+    try {
+      const result = await counter.mutateAsync({
+        path: { workspace_id: props.workspaceId, list_id: listId },
+        body: { segment: wanted },
+      })
+      if (run === countRun) matching.value = result.subscribers
+    } catch {
+      if (run === countRun) matching.value = null
+    }
+  },
+  { immediate: true },
+)
+
+const plural = (count: number) => (count === 1 ? 'subscriber' : 'subscribers')
 const audience = computed(() => {
   const name = list.value?.name ?? 'the list'
-  const wanted = tag.value.trim()
-  if (wanted !== '') return `subscribers of ${name} tagged “${wanted}”`
-  const count = list.value?.counts?.subscribed
-  return count === undefined
-    ? `every subscriber of ${name}`
-    : `${formatNumber(count)} ${count === 1 ? 'subscriber' : 'subscribers'} of ${name}`
+  const everyone = isEveryone(segment.value)
+  const count = everyone ? list.value?.counts?.subscribed : (matching.value ?? undefined)
+  if (count === undefined) return everyone ? `every subscriber of ${name}` : `a segment of ${name}`
+  return everyone
+    ? `${formatNumber(count)} ${plural(count)} of ${name}`
+    : `${formatNumber(count)} ${plural(count)} of ${name} in this segment`
 })
 
 const failed = computed(() => broadcast.value?.deliveries?.failed ?? 0)
@@ -204,7 +261,7 @@ const facts = computed(() => {
   return [
     { key: 'list', label: 'List', value: list.value?.name ?? '' },
     { key: 'status', label: 'Status' },
-    { key: 'to', label: 'To', value: current.tag ? `Tagged “${current.tag}”` : 'Every subscriber' },
+    { key: 'to', label: 'To', value: describeSegment(current.segment) },
     { key: 'recipients', label: 'Recipients', value: recipientsText.value },
     current.status === 'scheduled'
       ? { key: 'sent', label: 'Sends', value: formatDateTime(current.send_at) }
@@ -213,7 +270,6 @@ const facts = computed(() => {
 })
 
 function save() {
-  const wanted = tag.value.trim()
   return runAction({
     run: () =>
       update.mutateAsync({
@@ -221,7 +277,7 @@ function save() {
         body: {
           subject: subject.value.trim(),
           body_md: body.value,
-          tag: wanted === '' ? null : wanted,
+          segment: segment.value,
         },
       }),
     success: 'Draft saved',
@@ -480,12 +536,9 @@ const columns = [
           <Field label="Subject" hint="{{ name }} fills in each subscriber’s name.">
             <input v-model="subject" name="broadcast-subject" required class="input w-full" />
           </Field>
-          <Field label="Tag" hint="Optional. Only subscribers with this tag get it.">
-            <input v-model="tag" name="broadcast-tag" class="input w-full" placeholder="vip" />
-          </Field>
           <Field
             label="Body"
-            hint="Markdown: **bold**, _italic_, [links](https://example.com), lists. {{ name }} and {{ email }} fill in."
+            hint="Markdown: **bold**, _italic_, [links](https://example.com), lists. {{ name }}, {{ email }} and {{ attr.key }} fill in."
           >
             <textarea
               v-model="body"
@@ -498,6 +551,53 @@ const columns = [
             {{ sendBlocked }} to send or test it.
           </p>
         </form>
+      </Card>
+
+      <Card
+        v-if="isDraft"
+        title="Recipients"
+        description="Subscribers who match every part you set. Leave it all empty to send to every subscriber."
+      >
+        <Field label="Tags" width="md" hint="Optional, comma separated. They need every tag.">
+          <input
+            v-model="segmentTags"
+            form="broadcast-form"
+            name="segment-tags"
+            class="input w-full"
+            placeholder="vip, beta"
+          />
+        </Field>
+        <AttributesEditor
+          v-model="conditions"
+          name="segment-condition"
+          label="Attribute equals"
+          add-label="Add condition"
+        />
+        <Field label="Joined on or after" width="md">
+          <input
+            v-model="joinedAfter"
+            form="broadcast-form"
+            type="date"
+            name="segment-joined-after"
+            class="input w-full"
+          />
+        </Field>
+        <Field label="Joined before" width="md">
+          <input
+            v-model="joinedBefore"
+            form="broadcast-form"
+            type="date"
+            name="segment-joined-before"
+            class="input w-full"
+          />
+        </Field>
+        <p role="status" class="text-sm text-base-content/80">
+          {{
+            matching === null
+              ? 'Counting…'
+              : `Matches ${formatNumber(matching)} ${plural(matching)}.`
+          }}
+        </p>
       </Card>
 
       <Card

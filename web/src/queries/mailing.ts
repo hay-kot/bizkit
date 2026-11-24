@@ -18,7 +18,9 @@ import {
   mailingContactsCreateMutation,
   mailingContactsDeleteMutation,
   mailingContactsListQuery,
+  mailingListsAudienceMutation,
   mailingContactsUnsubscribeMutation,
+  mailingContactsUpdateMutation,
   mailingDeliveriesListQuery,
   mailingEnrollmentsCreateMutation,
   mailingEnrollmentsExitMutation,
@@ -42,6 +44,9 @@ import {
 import { mailingAddressesExport } from '@/api/gen/sdk.gen'
 import type {
   AddressExport,
+  AttributeCondition,
+  Attributes,
+  AttributeValue,
   Broadcast,
   BroadcastStatus,
   Contact,
@@ -53,6 +58,7 @@ import type {
   MailDelivery,
   MailingList,
   Preview,
+  Segment,
   Sequence,
   SequenceStep,
   SequenceTrigger,
@@ -64,6 +70,9 @@ import { useInvalidate } from './keys'
 
 export type {
   AddressExport,
+  AttributeCondition,
+  Attributes,
+  AttributeValue,
   Broadcast,
   BroadcastStatus,
   Contact,
@@ -75,6 +84,7 @@ export type {
   MailDelivery,
   MailingList,
   Preview,
+  Segment,
   Sequence,
   SequenceStep,
   SequenceTrigger,
@@ -179,6 +189,19 @@ export function useAddContact() {
     ...mailingContactsCreateMutation(),
     onSettled: () => invalidate(...CONTACT_QUERIES),
   })
+}
+
+export function useUpdateContact() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingContactsUpdateMutation(),
+    onSettled: () => invalidate(...CONTACT_QUERIES),
+  })
+}
+
+/** Counts a list's subscribers that a segment matches. A POST, so it is a mutation. */
+export function useAudience() {
+  return useMutation(mailingListsAudienceMutation())
 }
 
 export function useUnsubscribeContact() {

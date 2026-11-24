@@ -5,6 +5,13 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import {
+  type AttributeRow,
+  attributesToRows,
+  describeAttributes,
+  rowsToAttributes,
+} from '@/components/mailing/attributes'
+import AttributesEditor from '@/components/mailing/AttributesEditor.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
@@ -31,6 +38,7 @@ import {
   useMailingForms,
   useMailingList,
   useUnsubscribeContact,
+  useUpdateContact,
   useUpdateMailingList,
 } from '@/queries/mailing'
 
@@ -77,8 +85,9 @@ const columns = [
   { key: 'name', label: 'Name' },
   { key: 'status', label: 'Status' },
   { key: 'tags', label: 'Tags' },
+  { key: 'attributes', label: 'Attributes' },
   { key: 'added', label: 'Added' },
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-24 text-right' },
+  { key: 'actions', label: 'Actions', hidden: true, interactive: true, class: 'w-24 text-right' },
 ]
 
 const formName = (id: string) => forms.value?.items.find((f) => f.id === id)?.name ?? id
@@ -106,25 +115,61 @@ const updateList = useUpdateMailingList()
 const deleteList = useDeleteMailingList()
 
 const addOpen = ref(false)
-const draft = ref({ email: '', name: '', tags: '' })
+const draft = ref({ email: '', name: '', tags: '', attributes: [] as AttributeRow[] })
+
+const splitTags = (text: string) =>
+  text
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t !== '')
 
 function openAdd() {
-  draft.value = { email: '', name: '', tags: '' }
+  draft.value = { email: '', name: '', tags: '', attributes: [] }
   addContact.reset()
   addOpen.value = true
 }
 
 async function onAdd() {
   const d = draft.value
-  const tags = d.tags
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t !== '')
   await addContact.mutateAsync({
     path: { workspace_id: props.workspaceId, list_id: props.listId },
-    body: { email: d.email, name: d.name.trim() === '' ? null : d.name.trim(), tags },
+    body: {
+      email: d.email,
+      name: d.name.trim() === '' ? null : d.name.trim(),
+      tags: splitTags(d.tags),
+      attributes: rowsToAttributes(d.attributes),
+    },
   })
   addOpen.value = false
+}
+
+const updateContact = useUpdateContact()
+const editing = ref<Contact | null>(null)
+const edit = ref({ name: '', tags: '', attributes: [] as AttributeRow[] })
+
+function openEdit(contact: Contact) {
+  edit.value = {
+    name: contact.name ?? '',
+    tags: contact.tags.join(', '),
+    attributes: attributesToRows(contact.attributes),
+  }
+  updateContact.reset()
+  editing.value = contact
+}
+
+async function onEdit() {
+  const contact = editing.value
+  if (!contact) return
+  const e = edit.value
+  await updateContact.mutateAsync({
+    path: { workspace_id: props.workspaceId, list_id: props.listId, contact_id: contact.id },
+    body: {
+      name: e.name.trim() === '' ? null : e.name.trim(),
+      tags: splitTags(e.tags),
+      attributes: rowsToAttributes(e.attributes),
+    },
+  })
+  editing.value = null
 }
 
 function onUnsubscribe(contact: Contact) {
@@ -266,6 +311,7 @@ const actions = computed(() => [
           title: 'No contacts',
           message: 'Link a form in Settings, or add an address by hand.',
         }"
+        @row-click="openEdit"
       >
         <template #cell-email="{ row }"
           ><span class="text-sm font-medium">{{ row.email }}</span></template
@@ -279,6 +325,11 @@ const actions = computed(() => [
             tag
           }}</span>
         </template>
+        <template #cell-attributes="{ row }"
+          ><span class="text-sm text-base-content/80">{{
+            describeAttributes(row.attributes)
+          }}</span></template
+        >
         <template #cell-added="{ row }"
           ><span class="text-sm whitespace-nowrap">{{ formatDate(row.created_at) }}</span></template
         >
@@ -334,7 +385,7 @@ const actions = computed(() => [
       <Field label="Name" hint="Optional. Fills {{ name }} in mail.">
         <input v-model="draft.name" name="contact-name" class="input w-full" />
       </Field>
-      <Field label="Tags" hint="Optional, comma separated. Send a broadcast to one tag.">
+      <Field label="Tags" hint="Optional, comma separated. Broadcasts can target tags.">
         <input
           v-model="draft.tags"
           name="contact-tags"
@@ -342,6 +393,34 @@ const actions = computed(() => [
           placeholder="vip, beta"
         />
       </Field>
+      <AttributesEditor
+        v-model="draft.attributes"
+        name="contact-attribute"
+        label="Attributes (optional; fill {{ attr.key }} in mail)"
+      />
+    </FormPanel>
+
+    <FormPanel
+      :open="editing !== null"
+      :title="editing?.email ?? ''"
+      description="Name, tags and attributes. Saving replaces the attributes with these rows."
+      submit-label="Save contact"
+      :pending="updateContact.asyncStatus.value === 'loading'"
+      :error="updateContact.error.value"
+      @close="editing = null"
+      @submit="onEdit"
+    >
+      <Field label="Name" hint="Optional. Fills {{ name }} in mail.">
+        <input v-model="edit.name" name="edit-contact-name" class="input w-full" />
+      </Field>
+      <Field label="Tags" hint="Optional, comma separated.">
+        <input v-model="edit.tags" name="edit-contact-tags" class="input w-full" />
+      </Field>
+      <AttributesEditor
+        v-model="edit.attributes"
+        name="edit-contact-attribute"
+        label="Attributes (fill {{ attr.key }} in mail)"
+      />
     </FormPanel>
 
     <FormPanel
