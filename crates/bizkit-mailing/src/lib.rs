@@ -4,6 +4,7 @@
 pub mod api;
 mod capture;
 pub mod contacts;
+mod events;
 pub mod hooks;
 mod ops;
 mod public;
@@ -14,6 +15,8 @@ pub mod send;
 mod sequence_ops;
 mod sequences;
 mod store;
+mod suppress;
+mod suppression_ops;
 
 #[cfg(feature = "test-hooks")]
 use bizkit_core::DemoSeed;

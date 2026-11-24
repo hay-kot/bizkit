@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT workspace_id AS \"workspace_id: WorkspaceId\", id AS \"id: DeliveryId\", to_email\n           FROM mailing_deliveries WHERE provider_id = ? ORDER BY id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "id: DeliveryId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "to_email",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "to_email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2cae25f9ac4e7233badff89074339b1b771566a87eed3e558a0315193b8f6811"
+}

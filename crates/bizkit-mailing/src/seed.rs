@@ -173,22 +173,8 @@ async fn seed_broadcasts(
     store::insert_broadcast(&mut **tx, &sent).await?;
     for contact in subscribed {
         let delivery = DeliveryRow {
-            id: DeliveryId::new(),
-            workspace_id: list.workspace_id,
-            list_id: list.id,
-            contact_id: Some(contact.id),
-            kind: DeliveryKind::Broadcast.as_str().to_owned(),
             broadcast_id: Some(sent.id),
-            enrollment_id: None,
-            step_id: None,
-            to_email: contact.email.clone(),
-            subject: sent.subject.clone(),
-            status: DeliveryStatus::Sent.as_str().to_owned(),
-            error: None,
-            attempts: 1,
-            resends: 0,
-            created_at: sent_at,
-            sent_at: Some(sent_at.plus(Duration::from_secs(2))),
+            ..sent_delivery(list, contact, DeliveryKind::Broadcast, &sent.subject, sent_at)
         };
         store::insert_delivery(&mut **tx, &delivery).await?;
     }
@@ -206,6 +192,37 @@ async fn seed_broadcasts(
     };
     store::insert_broadcast(&mut **tx, &draft).await?;
     Ok(())
+}
+
+/// A delivery the mail server took two seconds after `at`.
+fn sent_delivery(
+    list: &ListRow,
+    contact: &ContactRow,
+    kind: DeliveryKind,
+    subject: &str,
+    at: UnixMillis,
+) -> DeliveryRow {
+    DeliveryRow {
+        id: DeliveryId::new(),
+        workspace_id: list.workspace_id,
+        list_id: list.id,
+        contact_id: Some(contact.id),
+        kind: kind.as_str().to_owned(),
+        broadcast_id: None,
+        enrollment_id: None,
+        step_id: None,
+        to_email: contact.email.clone(),
+        subject: subject.to_owned(),
+        status: DeliveryStatus::Sent.as_str().to_owned(),
+        error: None,
+        attempts: 1,
+        resends: 0,
+        created_at: at,
+        sent_at: Some(at.plus(Duration::from_secs(2))),
+        provider_id: None,
+        event: None,
+        event_at: None,
+    }
 }
 
 /// Inserts the 3-step welcome sequence with one completed and one exited
@@ -268,22 +285,9 @@ async fn seed_sequence(tx: &mut WriteTx, list: &ListRow, now: UnixMillis) -> any
         for step in steps.iter().take(reached) {
             at = at.plus(Duration::from_hours(u64::try_from(step.delay_hours).unwrap_or(0)));
             let delivery = DeliveryRow {
-                id: DeliveryId::new(),
-                workspace_id: list.workspace_id,
-                list_id: list.id,
-                contact_id: Some(contact.id),
-                kind: DeliveryKind::Step.as_str().to_owned(),
-                broadcast_id: None,
                 enrollment_id: Some(enrollment.id),
                 step_id: Some(step.id),
-                to_email: contact.email.clone(),
-                subject: step.subject.clone(),
-                status: DeliveryStatus::Sent.as_str().to_owned(),
-                error: None,
-                attempts: 1,
-                resends: 0,
-                created_at: at,
-                sent_at: Some(at.plus(Duration::from_secs(2))),
+                ..sent_delivery(list, &contact, DeliveryKind::Step, &step.subject, at)
             };
             store::insert_delivery(&mut **tx, &delivery).await?;
         }

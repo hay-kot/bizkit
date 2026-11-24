@@ -631,7 +631,7 @@ mod mailing {
         let got: Value = s.member.get(&path).await.expect(StatusCode::OK).json();
         assert_eq!(
             got["deliveries"],
-            json!({"queued": 0, "sent": 0, "failed": 2, "skipped": 1}),
+            json!({"queued": 0, "sent": 0, "failed": 2, "skipped": 1, "bounced": 0, "complained": 0}),
             "two failed, one left the list"
         );
 

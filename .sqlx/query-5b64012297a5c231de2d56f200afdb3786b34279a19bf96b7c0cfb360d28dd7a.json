@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_deliveries SET status = ?, error = ?, attempts = ?, sent_at = ?,\n           provider_id = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "5b64012297a5c231de2d56f200afdb3786b34279a19bf96b7c0cfb360d28dd7a"
+}

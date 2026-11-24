@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM mailing_suppressions WHERE workspace_id = ? AND email = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6d7402bd546015f0d36e3c6d98188627f454c54edb830fc6dd48fa292b5e8c61"
+}

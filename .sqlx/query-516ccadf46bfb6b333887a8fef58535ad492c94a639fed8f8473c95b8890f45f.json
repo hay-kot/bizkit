@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT workspace_id AS \"workspace_id: WorkspaceId\", email, reason,\n                  delivery_id AS \"delivery_id: DeliveryId\", note,\n                  created_at AS \"created_at: UnixMillis\"\n           FROM mailing_suppressions\n           WHERE workspace_id = ?1\n             AND (?2 IS NULL OR instr(email, ?2) > 0)\n             AND (?3 IS NULL OR reason = ?3)\n             AND (?4 IS NULL OR email > ?4)\n           ORDER BY email LIMIT ?5",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "reason",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "name": "delivery_id: DeliveryId",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "delivery_id"
+          }
+        }
+      },
+      {
+        "name": "note",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "516ccadf46bfb6b333887a8fef58535ad492c94a639fed8f8473c95b8890f45f"
+}

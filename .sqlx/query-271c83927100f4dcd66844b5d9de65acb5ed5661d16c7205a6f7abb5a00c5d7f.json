@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO mailing_webhook_tokens (token, seen_at) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "271c83927100f4dcd66844b5d9de65acb5ed5661d16c7205a6f7abb5a00c5d7f"
+}

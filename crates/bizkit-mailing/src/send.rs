@@ -7,7 +7,7 @@ use std::time::Duration;
 use anyhow::Context as _;
 use bizkit_core::Platform;
 use bizkit_core::db::WriteTx;
-use bizkit_core::deps::Mail;
+use bizkit_core::deps::{Mail, MailError};
 use bizkit_core::ids::WorkspaceId;
 use bizkit_core::jobs::{Enqueue, Job, JobCtx, JobHandler, Lane};
 use serde::{Deserialize, Serialize};
@@ -16,9 +16,9 @@ use crate::api::{
     BroadcastId, BroadcastStatus, ContactStatus, DeliveryId, DeliveryKind, DeliveryStatus,
     EnrollmentStatus,
 };
-use crate::public;
 use crate::render::{self, Frame, Merge, Rendered};
 use crate::store::{self, BroadcastRow, ContactRow, DeliveryRow, ListRow};
+use crate::{public, suppress};
 
 /// The longest error text kept on a delivery.
 const ERROR_CHARS: usize = 300;
@@ -95,6 +95,9 @@ pub(crate) fn delivery(
         resends: 0,
         created_at: platform.now(),
         sent_at: None,
+        provider_id: None,
+        event: None,
+        event_at: None,
     }
 }
 
@@ -250,6 +253,19 @@ fn to_mail(to: &str, mail: Rendered, unsubscribe: Option<url::Url>) -> Mail {
     }
 }
 
+/// The suppression check every kind but `test` gets: a test send goes to
+/// a team member who asked for it.
+async fn suppressed(platform: &Platform, delivery: &DeliveryRow) -> anyhow::Result<Option<String>> {
+    if delivery.kind == DeliveryKind::Test.as_str() {
+        return Ok(None);
+    }
+    let reason =
+        suppress::suppressed(platform.db().read(), delivery.workspace_id, &delivery.to_email)
+            .await
+            .context("checking the suppression list")?;
+    Ok(reason.map(|r| format!("suppressed: {}", r.as_str())))
+}
+
 async fn mark(platform: &Platform, delivery: &DeliveryRow) -> anyhow::Result<()> {
     let mut tx = platform.db().write().await?;
     store::mark_delivery(&mut *tx, delivery).await.context("recording the delivery")?;
@@ -278,7 +294,12 @@ impl JobHandler<Send> for SendHandler {
         else {
             return Ok(());
         };
-        let mail = match prepare(platform, &list, &delivery).await? {
+        if let Some(reason) = suppressed(platform, &delivery).await? {
+            DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
+            delivery.error = Some(reason);
+            return mark(platform, &delivery).await;
+        }
+        let mut mail = match prepare(platform, &list, &delivery).await? {
             Prepared::Mail(mail) => mail,
             Prepared::Skip(reason) => {
                 DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
@@ -286,6 +307,7 @@ impl JobHandler<Send> for SendHandler {
                 return mark(platform, &delivery).await;
             }
         };
+        mail.id = Some(delivery.id.to_string());
         delivery.attempts = i64::from(cx.attempt);
         let final_attempt = cx.attempt >= Send::MAX_ATTEMPTS;
         if final_attempt {
@@ -296,14 +318,21 @@ impl JobHandler<Send> for SendHandler {
             mark(platform, &delivery).await?;
         }
         match platform.deps().mailer.send(&mail).await {
-            Ok(_) => {
+            Ok(provider_id) => {
                 DeliveryStatus::Sent.as_str().clone_into(&mut delivery.status);
                 delivery.error = None;
                 delivery.sent_at = Some(platform.now());
+                delivery.provider_id = provider_id;
                 mark(platform, &delivery).await
             }
-            Err(err) => {
-                let error = capped(&format!("{err:#}"));
+            // Retrying can't help, so the row fails now and the job ends.
+            Err(MailError::Permanent(err)) => {
+                DeliveryStatus::Failed.as_str().clone_into(&mut delivery.status);
+                delivery.error = Some(capped(&err));
+                mark(platform, &delivery).await
+            }
+            Err(err @ MailError::Transient(_)) => {
+                let error = capped(&err.to_string());
                 let status =
                     if final_attempt { DeliveryStatus::Failed } else { DeliveryStatus::Queued };
                 status.as_str().clone_into(&mut delivery.status);

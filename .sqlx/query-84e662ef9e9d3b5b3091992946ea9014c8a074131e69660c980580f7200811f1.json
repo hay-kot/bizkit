@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT workspace_id AS \"workspace_id: WorkspaceId\", email, reason,\n                  delivery_id AS \"delivery_id: DeliveryId\", note,\n                  created_at AS \"created_at: UnixMillis\"\n           FROM mailing_suppressions WHERE workspace_id = ? AND email = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "reason",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "name": "delivery_id: DeliveryId",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "delivery_id"
+          }
+        }
+      },
+      {
+        "name": "note",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_suppressions",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "84e662ef9e9d3b5b3091992946ea9014c8a074131e69660c980580f7200811f1"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: ContactId\" FROM mailing_contacts\n           WHERE workspace_id = ? AND email = ? ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ContactId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ca57adf8d5a4e3955a1bf500d46d627a51dde715da907d8fcd37c9eab7bdeabc"
+}

@@ -3861,6 +3861,117 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Suppress an address in the workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "An address to suppress.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          },
+          "note": {
+            "description": "Why, for the team.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_suppressions_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Remove a bounce or manual suppression",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A suppressed address.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_suppressions_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the workspace's suppressed addresses",
+      "inputSchema": {
+        "$defs": {
+          "SuppressionReason": {
+            "description": "Why an address is suppressed.",
+            "enum": [
+              "bounce",
+              "complaint",
+              "manual"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which suppressions to list.",
+        "properties": {
+          "after": {
+            "description": "Only addresses after this one, for the next page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only addresses that contain this text.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SuppressionReason",
+                "description": "Only suppressions with this reason."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "mailing_suppressions_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": true
       },
       "description": "List the members of a workspace",

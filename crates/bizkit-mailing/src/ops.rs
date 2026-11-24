@@ -17,9 +17,9 @@ use utoipa::ToSchema;
 
 use crate::api::{
     Broadcast, BroadcastId, BroadcastList, BroadcastStatus, Contact, ContactCounts, ContactId,
-    ContactPage, ContactStatus, DeliveryCounts, DeliveryId, DeliveryKind, DeliveryStatus, ListId,
-    MailDelivery, MailDeliveryPage, MailingForm, MailingFormList, MailingList, MailingListList,
-    Preview, ResendReport, SequenceId,
+    ContactPage, ContactStatus, DeliveryCounts, DeliveryEvent, DeliveryId, DeliveryKind,
+    DeliveryStatus, ListId, MailDelivery, MailDeliveryPage, MailingForm, MailingFormList,
+    MailingList, MailingListList, Preview, ResendReport, SequenceId,
 };
 use crate::capture::FORM_KIND;
 use crate::contacts::{self, NewContact, Source};
@@ -31,7 +31,7 @@ use crate::store::{
 
 pub(crate) const READ: Access = Access::Workspace(Scope::new("mailing", Level::Read));
 pub(crate) const WRITE: Access = Access::Workspace(Scope::new("mailing", Level::Write));
-const ADMIN: Access = Access::Workspace(Scope::new("mailing", Level::Admin));
+pub(crate) const ADMIN: Access = Access::Workspace(Scope::new("mailing", Level::Admin));
 pub(crate) const TAGS: &[&str] = &["mailing"];
 
 /// Test sends a workspace may queue per hour.
@@ -67,6 +67,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(BroadcastsResend)?;
     cx.op(DeliveriesList)?;
     cx.op(FormsList)?;
+    crate::suppression_ops::register(cx)?;
     crate::sequence_ops::register(cx)
 }
 
@@ -205,6 +206,15 @@ pub(crate) fn delivery_to_api(row: DeliveryRow) -> anyhow::Result<MailDelivery> 
         resends: u32::try_from(row.resends).unwrap_or(0),
         created_at: row.created_at,
         sent_at: row.sent_at,
+        event: row
+            .event
+            .as_deref()
+            .map(|e| {
+                DeliveryEvent::parse(e).with_context(|| format!("unknown delivery event {e:?}"))
+            })
+            .transpose()?,
+        provider_id: row.provider_id,
+        event_at: row.event_at,
     })
 }
 
@@ -1144,6 +1154,8 @@ impl Operation for BroadcastsGet {
             sent: count(counts.sent),
             failed: count(counts.failed),
             skipped: count(counts.skipped),
+            bounced: count(counts.bounced),
+            complained: count(counts.complained),
         });
         Ok(broadcast)
     }

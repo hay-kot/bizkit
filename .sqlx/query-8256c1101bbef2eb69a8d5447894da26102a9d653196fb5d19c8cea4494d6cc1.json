@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts, resends,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\"\n           FROM mailing_deliveries WHERE workspace_id = ? AND id = ?",
+  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts, resends,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\",\n                  provider_id, event, event_at AS \"event_at: UnixMillis\"\n           FROM mailing_deliveries\n           WHERE workspace_id = ?1 AND kind != 'test'\n             AND (?2 IS NULL OR broadcast_id = ?2)\n             AND (?3 IS NULL OR contact_id = ?3)\n             AND (?4 IS NULL OR status = ?4)\n             AND (?5 IS NULL OR id < ?5)\n             AND (?6 IS NULL OR enrollment_id IN\n                   (SELECT id FROM mailing_enrollments WHERE workspace_id = ?1 AND sequence_id = ?6))\n           ORDER BY id DESC LIMIT ?7",
   "describe": {
     "columns": [
       {
@@ -178,10 +178,43 @@
             "name": "sent_at"
           }
         }
+      },
+      {
+        "name": "provider_id",
+        "ordinal": 16,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "provider_id"
+          }
+        }
+      },
+      {
+        "name": "event",
+        "ordinal": 17,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "event"
+          }
+        }
+      },
+      {
+        "name": "event_at: UnixMillis",
+        "ordinal": 18,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "event_at"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 7
     },
     "nullable": [
       false,
@@ -199,8 +232,11 @@
       false,
       false,
       false,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "b26ce7e9fb75e8fabf98a9a55d5f64c54c5cd1a65475546f1d85465ea47d8aec"
+  "hash": "8256c1101bbef2eb69a8d5447894da26102a9d653196fb5d19c8cea4494d6cc1"
 }

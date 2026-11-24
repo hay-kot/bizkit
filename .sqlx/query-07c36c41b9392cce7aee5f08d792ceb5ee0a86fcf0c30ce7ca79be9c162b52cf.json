@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_deliveries SET event = ?3, event_at = ?4\n         WHERE workspace_id = ?1 AND id = ?2\n           AND (event IS NULL OR (event = 'bounced' AND ?3 = 'complained'))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "07c36c41b9392cce7aee5f08d792ceb5ee0a86fcf0c30ce7ca79be9c162b52cf"
+}
