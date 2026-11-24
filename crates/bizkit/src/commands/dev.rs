@@ -165,6 +165,33 @@ mod tests {
     }
 
     #[cfg(all(feature = "analytics", feature = "test-hooks"))]
+    /// The website site takes the demo site's host and key, and its file
+    /// has onboarding events, none in the future.
+    async fn demo_site_is_ready(data_dir: &std::path::Path) {
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let (project, hostnames): (bizkit_core::ids::ProjectId, String) = sqlx::query_as(
+            "SELECT s.project_id, s.hostnames FROM analytics_sites s
+             JOIN projects p ON p.id = s.project_id WHERE p.slug = 'website'",
+        )
+        .fetch_one(db.read())
+        .await
+        .unwrap();
+        assert!(hostnames.contains("\"localhost\""), "{hostnames}");
+        assert!(bizkit_analytics::demo_site_key(&db).await.unwrap().is_some());
+        db.close().await;
+        let file = bizkit_analytics::testing::project_pool(data_dir, project).await.unwrap();
+        let (onboarded, latest): (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*) FILTER (WHERE name = 'report_viewed'), MAX(ts) FROM analytics_events",
+        )
+        .fetch_one(&file)
+        .await
+        .unwrap();
+        file.close().await;
+        assert!(onboarded > 0, "some people finish onboarding");
+        let now = SystemClock.now().0;
+        assert!(latest <= now, "no event after the seed ran: {latest} > {now}");
+    }
+
     #[tokio::test]
     async fn seed_demo_fills_analytics_once() {
         let dir = tempfile::tempdir().unwrap();
@@ -212,7 +239,7 @@ mod tests {
         let first = counts().await;
         assert_eq!(
             first[..4],
-            [2, 2, 1, 28],
+            [2, 2, 2, 28],
             "sites, goals, funnels, days summed over two sites: {first:?}"
         );
         assert!(
@@ -221,6 +248,7 @@ mod tests {
         );
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         assert_eq!(counts().await, first, "a second run changes nothing");
+        demo_site_is_ready(&data_dir).await;
 
         // The move to project files dropped the events and reset the day
         // markers but kept the sites; a run after it refills the files.

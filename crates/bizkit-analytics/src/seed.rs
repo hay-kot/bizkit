@@ -21,6 +21,9 @@ use crate::store::{self, EventRow, GoalRow, SiteRow};
 
 const DAYS: i64 = 14;
 const SIGNUP_GOAL: &str = "Signup";
+const ONBOARDING_FUNNEL: &str = "Onboarding";
+/// The demo site (`bizkit dev demo-site`) is served from localhost.
+const DEMO_SITE_HOST: &str = "localhost";
 
 /// A small deterministic generator, so every seeded stack looks alike.
 struct Rng(u64);
@@ -207,7 +210,7 @@ fn website_visit(rng: &mut Rng, site: &Site, day: Day, now: UnixMillis, age: i64
     let mut at = arrival(rng, day, now);
     let mut events = Vec::new();
     let mut push = |r: &mut Rng, name: &str, path: &str, props: Option<Value>| {
-        let mut event = site.event(at, name, path);
+        let mut event = site.event(UnixMillis(at.0.min(now.0)), name, path);
         event.visitor = visitor;
         event.person = format!("v:{day}:{visitor}");
         event.country = country.map(str::to_owned);
@@ -251,12 +254,33 @@ fn website_visit(rng: &mut Rng, site: &Site, day: Day, now: UnixMillis, age: i64
                 "plan": plan,
             });
             signed_up = Some((user_id, traits));
+            onboard(rng, &mut push);
         }
     }
     Visit { events, signed_up, agent: (device, browser, os), country, age }
 }
 
-/// An identified person's events on a day they come back to the app.
+/// The onboarding steps right after a signup, each with its pageview. Some
+/// people stop at each step, so the Onboarding funnel has drop-off.
+fn onboard(rng: &mut Rng, push: &mut impl FnMut(&mut Rng, &str, &str, Option<Value>)) {
+    let steps: [(u64, &str, &str, Value); 3] = [
+        (80, "project_created", "/onboarding/project", json!({ "template": "blank" })),
+        (55, "invite_sent", "/onboarding/invite", json!({ "role": "member" })),
+        (70, "report_viewed", "/onboarding/report", json!({ "report": "weekly" })),
+    ];
+    for (percent, name, path, props) in steps {
+        push(rng, "pageview", path, None);
+        if !rng.chance(percent) {
+            return;
+        }
+        push(rng, name, path, Some(props));
+    }
+    push(rng, "pageview", "/app", None);
+}
+
+/// An identified person's events on a day they come back to the app. The
+/// actions are not onboarding events, so returns don't move people through
+/// the Onboarding funnel.
 fn return_visit(
     rng: &mut Rng,
     site: &Site,
@@ -268,9 +292,9 @@ fn return_visit(
     let visitor = rng.visitor();
     let mut out = Vec::new();
     let actions: [(u64, (&str, &str, &str)); 4] = [
-        (4, ("project_created", "/app/projects/new", r#"{"template":"blank"}"#)),
-        (3, ("report_viewed", "/app/reports", r#"{"report":"weekly"}"#)),
-        (2, ("invite_sent", "/app/team", r#"{"role":"member"}"#)),
+        (4, ("project_opened", "/app/projects", r#"{"template":"blank"}"#)),
+        (3, ("report_exported", "/app/reports", r#"{"report":"weekly"}"#)),
+        (2, ("comment_added", "/app/team", r#"{"thread":"launch"}"#)),
         (1, ("invoice_paid", "/app/billing", r#"{"amount":49,"plan":"pro"}"#)),
     ];
     let mut add = |r: &mut Rng, name: &str, path: &str, props: Option<&str>| {
@@ -391,6 +415,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
             website_app_rows(db, seed, project_id).await.context("seeding the website site")?;
         }
+        ensure_demo_site(db, seed, project_id).await.context("adding the demo site")?;
         let goals = store::list_goals(db.read(), seed.workspace_id, project_id).await?;
         let file = open_empty(seed, project_id).await?;
         if let Some(file) = &file {
@@ -421,6 +446,73 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// What the demo site needs on the website project, for stacks seeded
+/// before it existed too: `localhost` among the hostnames and the
+/// Onboarding funnel. App rows only; onboarding events come with a fresh
+/// project file.
+async fn ensure_demo_site(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+    let mut tx = db.write().await?;
+    let Some(mut site) = store::find_site(&mut *tx, seed.workspace_id, project_id).await? else {
+        return Ok(());
+    };
+    let mut hosts: Vec<String> = serde_json::from_str(&site.hostnames).unwrap_or_default();
+    if !hosts.iter().any(|host| host == DEMO_SITE_HOST) {
+        hosts.push(DEMO_SITE_HOST.to_owned());
+        site.hostnames = json!(hosts).to_string();
+        site.updated_at = seed.now;
+        store::update_site_settings(&mut *tx, &site).await?;
+    }
+    let has_funnel = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM analytics_funnels
+                         WHERE workspace_id = ? AND project_id = ? AND name = ?) AS "has!: bool""#,
+        seed.workspace_id,
+        project_id,
+        ONBOARDING_FUNNEL,
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if !has_funnel {
+        let funnel = FunnelRow {
+            id: FunnelId::new(),
+            workspace_id: seed.workspace_id,
+            project_id,
+            name: ONBOARDING_FUNNEL.to_owned(),
+            steps: json!([
+                { "kind": "event", "match": "signup_completed" },
+                { "kind": "event", "match": "project_created" },
+                { "kind": "event", "match": "invite_sent" },
+                { "kind": "event", "match": "report_viewed" },
+            ])
+            .to_string(),
+            window_days: 7,
+            created_at: seed.now,
+            updated_at: seed.now,
+        };
+        funnels::save(&mut *tx, &funnel).await?;
+    }
+    tx.commit().await
+}
+
+/// The site key of the demo workspace's website project, for the demo
+/// site's snippet tag. `None` before `seed-demo` has run.
+///
+/// # Errors
+///
+/// When the query fails.
+pub async fn demo_site_key(db: &Db) -> anyhow::Result<Option<String>> {
+    let key = sqlx::query_scalar!(
+        "SELECT s.site_key FROM analytics_sites s
+         JOIN projects p ON p.id = s.project_id
+         JOIN workspaces w ON w.id = s.workspace_id
+         WHERE w.slug = ? AND p.slug = 'website'",
+        bizkit_core::dev::demo::DEMO_WORKSPACE,
+    )
+    .fetch_optional(db.read())
+    .await
+    .context("finding the demo site")?;
+    Ok(key)
+}
+
 /// Sets the site's event day to today. A site that survived the move to
 /// project files had it reset, and reports treat it as having no events.
 async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
@@ -429,6 +521,14 @@ async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow:
     store::advance_event_day(&mut *tx, seed.workspace_id, project_id, &today)
         .await
         .context("marking the seeded site's event day")?;
+    // A rollup marker from an earlier file would hide the refilled days.
+    sqlx::query!(
+        "UPDATE analytics_sites SET rolled_through = NULL WHERE workspace_id = ? AND project_id = ?",
+        seed.workspace_id,
+        project_id,
+    )
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await
 }
 
