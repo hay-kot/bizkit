@@ -75,21 +75,25 @@ async fn fill_once(
     Ok(())
 }
 
-fn insights() -> anyhow::Result<Vec<(&'static str, InsightQuery)>> {
+fn insights() -> anyhow::Result<Vec<(&'static str, InsightQuery, u8)>> {
     [
         (
             "API key holders",
             json!({"kind": "people", "filters": [{"key": "api_keys", "op": "gt", "value": 0}],
                    "breakdown": {"source": "trait", "key": "api_keys"}}),
+            4,
         ),
         (
             "Share creating API keys",
             json!({"kind": "events", "event": "api_key_created", "measure": "share"}),
+            8,
         ),
-        ("Sign-ins", json!({"kind": "events", "event": "signed_in", "measure": "users"})),
+        ("Sign-ins", json!({"kind": "events", "event": "signed_in", "measure": "users"}), 12),
     ]
     .into_iter()
-    .map(|(name, query)| Ok((name, serde_json::from_value(query).context("a usage insight")?)))
+    .map(|(name, query, width)| {
+        Ok((name, serde_json::from_value(query).context("a usage insight")?, width))
+    })
     .collect()
 }
 

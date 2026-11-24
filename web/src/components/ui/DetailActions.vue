@@ -10,6 +10,8 @@ export interface DetailAction {
   icon: Component
   run: () => void
   disabled?: boolean
+  /** The one action that ends a mode the page is in (Done in edit mode). */
+  primary?: boolean
 }
 
 /** The Save of a page that edits its entity inline. */
@@ -48,6 +50,7 @@ const saveState = computed(() => {
       :key="index"
       type="button"
       class="btn gap-1.5 btn-sm"
+      :class="{ 'btn-primary': action.primary }"
       :disabled="action.disabled"
       @click="action.run()"
     >

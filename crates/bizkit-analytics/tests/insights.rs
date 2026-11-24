@@ -340,32 +340,33 @@ mod insights {
             (Some("All signups"), Some("7d"))
         );
 
-        let body = json!({"project_id": s.project(), "name": "Growth", "insight_ids": [a_id]});
+        let body = json!({"project_id": s.project(), "name": "Growth",
+                          "tiles": [{"insight_id": a_id, "width": 6}]});
         let board: Value =
             s.member.post(&s.path("dashboards"), &body).await.expect(StatusCode::CREATED).json();
         let board_id = board["id"].as_str().unwrap().to_owned();
-        assert_eq!(board["insight_ids"], json!([a_id]));
+        assert_eq!(board["tiles"], json!([{"insight_id": a_id, "width": 6}]));
 
         let got: Value =
             s.member.get(&s.path(&format!("insights/{a_id}"))).await.expect(StatusCode::OK).json();
         assert_eq!(got["dashboards"], json!([{"id": board_id, "name": "Growth"}]));
 
         let board_path = s.path(&format!("dashboards/{board_id}"));
+        let laid_out = json!([{"insight_id": b_id, "width": 12}, {"insight_id": a_id, "width": 4}]);
         let reordered: Value = s
             .member
-            .patch(&board_path, &json!({"insight_ids": [b_id, a_id]}))
+            .patch(&board_path, &json!({"tiles": laid_out}))
             .await
             .expect(StatusCode::OK)
             .json();
-        assert_eq!(reordered["insight_ids"], json!([b_id, a_id]));
-        s.member
-            .patch(&board_path, &json!({"insight_ids": [a_id, a_id]}))
-            .await
-            .expect(StatusCode::UNPROCESSABLE_ENTITY);
-
+        assert_eq!(reordered["tiles"], laid_out);
         s.member.delete(&s.path(&format!("insights/{a_id}"))).await.expect(StatusCode::NO_CONTENT);
         let after: Value = s.member.get(&board_path).await.expect(StatusCode::OK).json();
-        assert_eq!(after["insight_ids"], json!([b_id]), "a deleted insight leaves its dashboards");
+        assert_eq!(
+            after["tiles"],
+            json!([{"insight_id": b_id, "width": 12}]),
+            "a deleted insight leaves its dashboards"
+        );
         let list: Value = s
             .member
             .get(&s.path(&format!("dashboards?project_id={}", s.project())))
@@ -387,6 +388,78 @@ mod insights {
     }
 
     #[tokio::test]
+    async fn dashboard_tiles_are_unique_known_widths_up_to_the_cap() {
+        let s = setup().await;
+        let insight: Value = s
+            .member
+            .post(
+                &s.path("insights"),
+                &json!({"project_id": s.project(), "name": "People", "query": {"kind": "people"}}),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        let id = insight["id"].as_str().unwrap().to_owned();
+        for width in [0, 3, 5, 7, 13] {
+            let body = json!({"project_id": s.project(), "name": "Odd",
+                              "tiles": [{"insight_id": id, "width": width}]});
+            let refused: Value = s
+                .member
+                .post(&s.path("dashboards"), &body)
+                .await
+                .expect(StatusCode::UNPROCESSABLE_ENTITY)
+                .json();
+            assert!(refused.to_string().contains("tiles[0].width"), "width {width}: {refused}");
+        }
+        let repeated = json!({"project_id": s.project(), "name": "Twice",
+                              "tiles": [{"insight_id": id, "width": 6}, {"insight_id": id, "width": 6}]});
+        s.member
+            .post(&s.path("dashboards"), &repeated)
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+        for width in [4, 6, 8, 12] {
+            let tiles = json!([{"insight_id": id, "width": width}]);
+            let body =
+                json!({"project_id": s.project(), "name": format!("W{width}"), "tiles": tiles});
+            let board: Value = s
+                .member
+                .post(&s.path("dashboards"), &body)
+                .await
+                .expect(StatusCode::CREATED)
+                .json();
+            let board_path = s.path(&format!("dashboards/{}", board["id"].as_str().unwrap()));
+            let renamed: Value = s
+                .member
+                .patch(&board_path, &json!({"name": "Renamed"}))
+                .await
+                .expect(StatusCode::OK)
+                .json();
+            assert_eq!(renamed["tiles"], tiles, "a rename keeps the tiles and their widths");
+        }
+        let mut ids = Vec::new();
+        for n in 0..=20 {
+            let made: Value = s
+                .member
+                .post(
+                    &s.path("insights"),
+                    &json!({"project_id": s.project(), "name": format!("I{n}"),
+                            "query": {"kind": "people"}}),
+                )
+                .await
+                .expect(StatusCode::CREATED)
+                .json();
+            ids.push(made["id"].as_str().unwrap().to_owned());
+        }
+        let tiles = |count: usize| -> Vec<Value> {
+            ids[..count].iter().map(|each| json!({"insight_id": each, "width": 4})).collect()
+        };
+        let full = json!({"project_id": s.project(), "name": "Full", "tiles": tiles(20)});
+        s.member.post(&s.path("dashboards"), &full).await.expect(StatusCode::CREATED);
+        let over = json!({"project_id": s.project(), "name": "Over", "tiles": tiles(21)});
+        s.member.post(&s.path("dashboards"), &over).await.expect(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
     async fn dashboards_only_hold_their_projects_insights() {
         let s = setup().await;
         let app_project = s.team.projects["app"].id.to_string();
@@ -403,8 +476,8 @@ mod insights {
             .await
             .expect(StatusCode::CREATED)
             .json();
-        let body =
-            json!({"project_id": s.project(), "name": "Mixed", "insight_ids": [other["id"]]});
+        let body = json!({"project_id": s.project(), "name": "Mixed",
+                          "tiles": [{"insight_id": other["id"], "width": 6}]});
         s.member.post(&s.path("dashboards"), &body).await.expect(StatusCode::UNPROCESSABLE_ENTITY);
         let none: Value = s
             .member

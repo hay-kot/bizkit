@@ -11,7 +11,8 @@ import { insightView } from './insightView'
 
 /**
  * An insight's numbers: the headline, then a chart over time or a ranked
- * list, by the result's `view`. `compact` is for dashboard tiles.
+ * list, by the result's `view`. `compact` is for dashboard tiles: the
+ * chart grows to fill a tile that a taller neighbour stretches.
  */
 const props = withDefaults(
   defineProps<{
@@ -29,7 +30,12 @@ const view = computed(() => (props.result ? insightView(props.result) : undefine
 <template>
   <ErrorAlert v-if="error" :error="error" />
   <SkeletonRows v-else-if="loading && !view" :rows="compact ? 3 : 5" />
-  <div v-else-if="view" class="flex flex-col gap-4" :aria-busy="loading">
+  <div
+    v-else-if="view"
+    class="flex flex-col gap-4"
+    :class="{ 'flex-1': compact }"
+    :aria-busy="loading"
+  >
     <div class="flex flex-col gap-1">
       <p class="text-sm text-base-content/70">{{ view.headline.label }}</p>
       <p class="font-semibold tabular-nums" :class="compact ? 'text-2xl' : 'text-3xl'">
@@ -45,7 +51,7 @@ const view = computed(() => (props.result ? insightView(props.result) : undefine
       v-if="view.chart"
       :points="view.chart.points"
       :series="view.chart.series"
-      :height="compact ? 160 : undefined"
+      :fill="compact"
     />
     <BarList
       v-if="view.bars"

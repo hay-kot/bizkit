@@ -136,7 +136,7 @@ function insightCount(n: number): string {
               </span>
             </template>
             <template #meta>
-              {{ insightCount(item.insight_ids.length) }} · Updated
+              {{ insightCount(item.tiles.length) }} · Updated
               {{ formatRelative(item.updated_at) }}
             </template>
           </LinkCard>

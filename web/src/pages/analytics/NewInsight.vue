@@ -10,8 +10,9 @@ import DetailActions from '@/components/ui/DetailActions.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
 import { useReportRange } from '@/composables/useReportRange'
+import { runAction } from '@/lib/action'
 import { rangeToQuery, savedPreset } from '@/lib/range'
-import { useCreateInsight } from '@/queries/analytics'
+import { useCreateInsight, useDashboards, useUpdateDashboard } from '@/queries/analytics'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
 const route = useRoute()
@@ -19,6 +20,14 @@ const router = useRouter()
 const { today, range } = useReportRange()
 const draft = ref(draftFromLink(route.query))
 const create = useCreateInsight()
+// Opened from a dashboard's Add insight panel: the saved insight joins that
+// dashboard and the user goes back to it.
+const dashboardId = typeof route.query.dashboard === 'string' ? route.query.dashboard : undefined
+const dashboards = useDashboards(
+  () => props.workspaceId,
+  () => props.projectId,
+)
+const updateDashboard = useUpdateDashboard()
 const naming = ref(false)
 const name = ref('')
 
@@ -40,6 +49,27 @@ async function onSave() {
       range: savedPreset(range.value.preset) ?? '30d',
     },
   })
+  const board = dashboards.data.value?.items.find((item) => item.id === dashboardId)
+  // The insight is saved either way; if the dashboard refuses it (full),
+  // the toast says why and the user lands on the insight instead.
+  const added =
+    board &&
+    (await runAction({
+      run: () =>
+        updateDashboard.mutateAsync({
+          path: { workspace_id: props.workspaceId, dashboard_id: board.id },
+          body: { tiles: [...board.tiles, { insight_id: insight.id, width: 6 }] },
+        }),
+      success: `Added to ${board.name}`,
+    }))
+  if (board && added) {
+    naming.value = false
+    await router.push({
+      path: `/w/${props.workspaceId}/p/${props.projectId}/analytics/dashboards/${board.id}`,
+      query: rangeToQuery(range.value),
+    })
+    return
+  }
   naming.value = false
   await router.push({
     path: `/w/${props.workspaceId}/p/${props.projectId}/analytics/insights/${insight.id}`,
@@ -79,7 +109,7 @@ async function onSave() {
       variant="dialog"
       title="Save insight"
       submit-label="Save insight"
-      :pending="create.isLoading.value"
+      :pending="create.isLoading.value || updateDashboard.isLoading.value"
       :error="create.error.value"
       @close="naming = false"
       @submit="onSave"
