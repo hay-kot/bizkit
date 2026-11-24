@@ -164,10 +164,10 @@ function onRemove(row: Suppression) {
           name="suppression-search"
           aria-label="Search suppressions"
           placeholder="Search"
-          class="input w-36 input-sm sm:w-48"
+          class="input h-9 w-36 sm:w-48"
         />
         <div class="w-36 sm:w-40">
-          <Select v-model="reason" :options="reasonOptions" label="Reason" size="sm" />
+          <Select v-model="reason" :options="reasonOptions" label="Reason" size="toolbar" />
         </div>
       </template>
       <DataTable

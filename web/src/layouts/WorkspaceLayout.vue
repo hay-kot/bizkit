@@ -106,7 +106,7 @@ watch(
         <div class="px-2 pt-2">
           <button
             type="button"
-            class="flex h-9 w-full items-center gap-2.5 rounded-field border border-base-300 bg-base-100 px-3 text-sm text-base-content/70 transition-colors hover:bg-raised"
+            class="flex h-9 w-full items-center gap-2.5 rounded-field border border-base-300 bg-base-100 px-3 text-sm text-base-content/70 transition-colors hover:border-base-content/60 hover:bg-raised"
             aria-keyshortcuts="Meta+K Control+K"
             data-testid="open-palette"
             @click="openPalette()"

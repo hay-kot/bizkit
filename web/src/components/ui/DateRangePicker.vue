@@ -37,14 +37,14 @@ function setDay(end: 'from' | 'to', event: Event) {
         :model-value="model.preset"
         :options="RANGE_PRESETS"
         label="Date range"
-        size="sm"
+        size="toolbar"
         @update:model-value="pickPreset"
       />
     </div>
     <template v-if="model.preset === 'custom'">
       <input
         type="date"
-        class="input w-auto input-sm"
+        class="input h-9 w-auto"
         aria-label="From"
         :value="model.from"
         :max="today"
@@ -53,7 +53,7 @@ function setDay(end: 'from' | 'to', event: Event) {
       <span class="text-sm text-base-content/60" aria-hidden="true">to</span>
       <input
         type="date"
-        class="input w-auto input-sm"
+        class="input h-9 w-auto"
         aria-label="To"
         :value="model.to"
         :max="today"

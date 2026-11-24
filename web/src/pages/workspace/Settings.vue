@@ -43,7 +43,7 @@ async function onSave() {
             <input
               :value="workspace?.slug"
               readonly
-              class="input w-full bg-base-200"
+              class="input w-full bg-base-300/50"
               aria-readonly="true"
             />
             <CopyButton v-if="workspace" :text="workspace.slug" label="Copy slug" />
@@ -54,7 +54,7 @@ async function onSave() {
             <input
               :value="workspaceId"
               readonly
-              class="input w-full bg-base-200 font-mono text-sm"
+              class="input w-full bg-base-300/50 font-mono text-sm"
               aria-readonly="true"
             />
             <CopyButton :text="workspaceId" label="Copy workspace ID" />

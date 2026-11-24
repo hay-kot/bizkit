@@ -124,8 +124,8 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | A choice | `Select` | `<select>`, `input[type=radio]` and DaisyUI `select*` classes are errors |
   | A tick box | `Checkbox` | `input[type=checkbox]` and DaisyUI `checkbox`/`toggle` classes are errors |
   | A create or edit form | `FormPanel` (side panel, or `variant="dialog"`), `Field`, `SubmitButton` | Pages can't import `Overlay`; DaisyUI `modal` classes are errors |
-  | A settings card's fields | `Field width="md"` inside a full-width `Card` | `max-w-*` is an error in `src/pages` |
-  | A toolbar row | `Select size="sm"`, `input-sm` and `btn h-9`: all 36px; form controls are 40px | |
+  | A field's width | `Field` caps its control (`lg` default, `md` for short values, `full`); pages stay full width | `max-w-*` is an error in `src/pages` |
+  | A toolbar row | `Select size="toolbar"`, `input h-9` and `btn h-9`: all 36px; form controls are 40px, controls in table rows 32px (`Select size="sm"`, `input-sm`) | |
   | A menu | `Menu` and `MenuItem` | DaisyUI `dropdown` classes are errors |
   | Waiting | `SubmitButton` `pending`, `SkeletonRows`, `Spinner` | DaisyUI `loading` classes are errors |
   | Confirm, run, report | `runAction({ confirm, run, success })` | Pages can't import `lib/confirm`; `alert`/`confirm`/`prompt` are errors |

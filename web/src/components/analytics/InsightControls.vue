@@ -83,20 +83,20 @@ const filterWhat = computed(() => (draft.value.kind === 'people' ? 'Trait' : 'Pr
 <template>
   <div class="flex flex-col gap-3">
     <div class="flex flex-wrap items-center gap-2">
-      <Select v-model="kind" :options="KINDS" label="Kind" size="sm" name="insight-kind" />
+      <Select v-model="kind" :options="KINDS" label="Kind" size="toolbar" name="insight-kind" />
       <template v-if="draft.kind === 'events'">
         <Select
           v-model="event"
           :options="eventOptions"
           label="Event"
-          size="sm"
+          size="toolbar"
           name="insight-event"
         />
         <Select
           v-model="measure"
           :options="MEASURES"
           label="Measure"
-          size="sm"
+          size="toolbar"
           name="insight-measure"
         />
       </template>
@@ -105,14 +105,14 @@ const filterWhat = computed(() => (draft.value.kind === 'people' ? 'Trait' : 'Pr
           v-model="breakdownSource"
           :options="breakdownOptions"
           label="Breakdown"
-          size="sm"
+          size="toolbar"
           name="insight-breakdown"
         />
         <input
           v-if="draft.breakdownSource"
           :value="draft.breakdownKey"
           name="insight-breakdown-key"
-          class="input w-40 input-sm"
+          class="input h-9 w-40"
           :placeholder="draft.breakdownSource === 'trait' ? 'plan' : 'property'"
           :aria-label="
             draft.breakdownSource === 'trait'
@@ -128,7 +128,7 @@ const filterWhat = computed(() => (draft.value.kind === 'people' ? 'Trait' : 'Pr
       <li v-for="(filter, at) in draft.filters" :key="at" class="flex flex-wrap items-center gap-2">
         <input
           :value="filter.key"
-          class="input w-40 input-sm"
+          class="input h-9 w-40"
           :placeholder="draft.kind === 'people' ? 'api_tokens' : 'plan'"
           :aria-label="`${filterWhat} name, filter ${at + 1}`"
           @input="setFilter(at, { key: ($event.target as HTMLInputElement).value })"
@@ -137,13 +137,13 @@ const filterWhat = computed(() => (draft.value.kind === 'people' ? 'Trait' : 'Pr
           :model-value="filter.op"
           :options="FILTER_OPS"
           :label="`Comparison, filter ${at + 1}`"
-          size="sm"
+          size="toolbar"
           @update:model-value="(op: FilterOp) => setFilter(at, { op })"
         />
         <input
           v-if="filter.op !== 'is_set'"
           :value="filter.value"
-          class="input w-40 input-sm"
+          class="input h-9 w-40"
           :placeholder="filter.op === 'gt' || filter.op === 'lt' ? '0' : 'pro'"
           :aria-label="`Value, filter ${at + 1}`"
           @input="setFilter(at, { value: ($event.target as HTMLInputElement).value })"

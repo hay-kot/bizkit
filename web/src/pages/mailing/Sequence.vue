@@ -390,7 +390,7 @@ const logColumns = [
             <fieldset
               v-for="(step, index) in steps"
               :key="step.key"
-              class="flex flex-col gap-3 rounded-box border border-base-300 bg-base-200 p-4"
+              class="flex flex-col gap-3 rounded-box border border-base-300 bg-raised p-4"
               :aria-label="`Step ${index + 1}`"
             >
               <div class="flex items-center justify-between gap-2">

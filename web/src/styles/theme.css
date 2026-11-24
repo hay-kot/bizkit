@@ -87,7 +87,10 @@
 /*
  * The theme blocks set --bk-* and these expose them as Tailwind colors
  * (bg-raised, bg-field, border-field-border) that switch with the theme.
- * Chart series take theme colors in a fixed order so lines stay apart.
+ * Chart series take theme colors in a fixed order so lines stay apart:
+ * orange, blue, teal, green. Each is 3:1 or more on the panel in both
+ * themes (light warning is under 2:1 on white, and info is too close to
+ * secondary in hue).
  */
 @theme inline {
   --color-raised: var(--bk-raised);
@@ -96,7 +99,7 @@
   --color-chart-1: var(--color-primary);
   --color-chart-2: var(--color-secondary);
   --color-chart-3: var(--color-accent);
-  --color-chart-4: var(--color-warning);
+  --color-chart-4: var(--color-success);
 }
 
 /*
@@ -115,7 +118,7 @@
  * DaisyUI's components sit in sublayers of Tailwind's utilities layer.
  * These rules sit in that layer outside the sublayers, so they beat
  * DaisyUI; `:where` gives them no specificity, so a real utility still wins
- * (`bg-base-200` on a readonly input).
+ * (`bg-base-300/50` on a readonly input).
  */
 @layer utilities {
   :where(.tabs-border > .tab-active)::before {
@@ -133,13 +136,6 @@
     --input-color: var(--bk-field-border);
 
     background-color: var(--bk-field);
-  }
-
-  /* input-sm is the toolbar size: the same 36px as Select size="sm" and with
-     body-sized text, so a toolbar row has one height. */
-  :where(.input-sm) {
-    --in-size-mul: 9;
-    --font-size-min: 0.875rem;
   }
 
   :where(:focus-visible) {
