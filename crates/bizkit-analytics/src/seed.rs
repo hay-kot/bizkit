@@ -17,6 +17,7 @@ use crate::api::{Day, FunnelId, GoalId, PersonId};
 use crate::files::{ProjectDb, project_db_path};
 use crate::funnels::{self, FunnelRow};
 use crate::hooks::GOAL;
+use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow, GoalRow, SiteRow};
 
 const DAYS: i64 = 14;
@@ -417,17 +418,20 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         }
         ensure_demo_site(db, seed, project_id).await.context("adding the demo site")?;
         let goals = store::list_goals(db.read(), seed.workspace_id, project_id).await?;
-        let file = open_empty(seed, project_id).await?;
-        if let Some(file) = &file {
-            website_events(file, seed, project_id, &goals)
-                .await
-                .context("seeding website events")?;
-            mark_events(db, seed, project_id).await?;
+        if let Some(file) = open_empty(seed, project_id).await? {
+            let filled = async {
+                website_events(&file, seed, project_id, &goals)
+                    .await
+                    .context("seeding website events")?;
+                mark_events(db, &file, seed, project_id).await
+            }
+            .await;
+            file.close().await;
+            filled?;
         }
         if let Some(goal) = goals.into_iter().find(|goal| goal.name == SIGNUP_GOAL) {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
         }
-        close(file).await;
     }
     if let Some(&project_id) = seed.project_ids.get("docs") {
         if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
@@ -436,12 +440,15 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             store::insert_site(&mut *tx, &row).await.context("seeding the docs site")?;
             tx.commit().await?;
         }
-        let file = open_empty(seed, project_id).await?;
-        if let Some(file) = &file {
-            docs_events(file, seed, project_id).await.context("seeding docs events")?;
-            mark_events(db, seed, project_id).await?;
+        if let Some(file) = open_empty(seed, project_id).await? {
+            let filled = async {
+                docs_events(&file, seed, project_id).await.context("seeding docs events")?;
+                mark_events(db, &file, seed, project_id).await
+            }
+            .await;
+            file.close().await;
+            filled?;
         }
-        close(file).await;
     }
     Ok(())
 }
@@ -515,9 +522,16 @@ pub async fn demo_site_key(db: &Db) -> anyhow::Result<Option<String>> {
     Ok(key)
 }
 
-/// Sets the site's event day to today. A site that survived the move to
-/// project files had it reset, and reports treat it as having no events.
-async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+/// Sets the site's event day to today, then rolls up the seeded days before
+/// today, as the rollup job would at the next UTC midnight. A site that
+/// survived the move to project files had its day reset, and reports treat
+/// it as having no events.
+async fn mark_events(
+    db: &Db,
+    file: &ProjectDb,
+    seed: &DemoSeed,
+    project_id: ProjectId,
+) -> anyhow::Result<()> {
     let mut tx = db.write().await?;
     let today = Day::of(seed.now).to_string();
     store::advance_event_day(&mut *tx, seed.workspace_id, project_id, &today)
@@ -530,8 +544,12 @@ async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow:
         project_id,
     )
     .execute(&mut *tx)
-    .await?;
-    tx.commit().await
+    .await
+    .context("clearing the seeded site's rollup marker")?;
+    tx.commit().await.context("committing the seeded site's event day")?;
+    let job = Rollup { workspace_id: seed.workspace_id, project_id };
+    rollup::roll(db, file, &job, Day::of(seed.now)).await.context("rolling up the seeded days")?;
+    Ok(())
 }
 
 /// The project's file when it has no events yet.
@@ -548,12 +566,6 @@ async fn open_empty(seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<Op
         return Ok(None);
     }
     Ok(Some(file))
-}
-
-async fn close(file: Option<ProjectDb>) {
-    if let Some(file) = file {
-        file.close().await;
-    }
 }
 
 async fn website_app_rows(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {

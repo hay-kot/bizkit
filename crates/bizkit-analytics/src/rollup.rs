@@ -77,7 +77,12 @@ impl JobHandler<Rollup> for RollupHandler {
 
 /// Rolls every closed day after `rolled_through` and returns the new
 /// `rolled_through`.
-async fn roll(db: &Db, file: &ProjectDb, job: &Rollup, today: Day) -> anyhow::Result<Option<Day>> {
+pub(crate) async fn roll(
+    db: &Db,
+    file: &ProjectDb,
+    job: &Rollup,
+    today: Day,
+) -> anyhow::Result<Option<Day>> {
     let Some(site) = store::find_site(db.read(), job.workspace_id, job.project_id).await? else {
         return Ok(None);
     };

@@ -41,9 +41,13 @@ mod ingest {
     }
 
     async fn setup(mode: &str) -> Setup {
+        setup_with(Analytics::manual_flush(), mode).await
+    }
+
+    async fn setup_with(analytics: Analytics, mode: &str) -> Setup {
         let hooks = FakeHooks::default();
         let app = TestApp::builder()
-            .module(Analytics::manual_flush())
+            .module(analytics)
             .hook_runner(hooks.clone())
             .config(|config| config.trusted_proxies = 1)
             .build()
@@ -531,5 +535,53 @@ mod ingest {
             .await
             .expect(StatusCode::NOT_FOUND);
         assert_eq!(s.events().await.len(), 0);
+    }
+
+    /// Waits up to two seconds for the file to hold `events` events.
+    async fn holds(file: &sqlx::SqlitePool, events: i64) -> bool {
+        for _ in 0..100 {
+            let stored: i64 = sqlx::query_scalar("SELECT count(*) FROM analytics_events")
+                .fetch_one(file)
+                .await
+                .unwrap();
+            if stored >= events {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        false
+    }
+
+    /// Builds with the flush timer, unlike the other tests: what it checks
+    /// is that timer flushes go on while the app database is busy.
+    #[tokio::test]
+    async fn a_busy_app_database_does_not_hold_up_ingest() {
+        let s = setup_with(Analytics::default(), "cookieless").await;
+        s.admin
+            .post(
+                &s.path("goals"),
+                &s.body(&json!({"name": "done", "kind": "page", "match": "/done"})),
+            )
+            .await
+            .expect(StatusCode::CREATED);
+        let file = project_pool(s.app.data_dir(), s.team.projects["site"].id).await.unwrap();
+        s.send(json!({"n": "pageview", "u": "https://example.com/"}), "203.0.113.1").await;
+        assert!(holds(&file, 1).await, "the first event lands");
+
+        let busy = s.app.app().platform().db().write().await.unwrap();
+        // A conversion owes the app database a hook event, which waits on `busy`.
+        s.send(json!({"n": "pageview", "u": "https://example.com/done"}), "203.0.113.1").await;
+        assert!(holds(&file, 2).await, "the converting event lands");
+        // An asked-for flush waits for the conversion, but not in the
+        // writer's loop: the next event still lands.
+        let ((), ()) = tokio::join!(s.app.flush(), async {
+            s.send(json!({"n": "pageview", "u": "https://example.com/after"}), "203.0.113.1").await;
+            assert!(holds(&file, 3).await, "later events land while the app database is busy");
+            drop(busy);
+        });
+        s.app.drain_jobs().await;
+        let points: Vec<_> = s.hooks.dispatches().iter().map(|dispatch| dispatch.point).collect();
+        assert_eq!(points, [GOAL_CONVERTED.id], "the owed conversion lands once the app is free");
+        file.close().await;
     }
 }
