@@ -136,6 +136,8 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 
 The `demo-site` service (`bizkit dev demo-site`) serves a small tracked product, "Tallyho", at the Demo site link: landing, pricing, signup and three onboarding steps, with the website project's snippet. Walk it to see live events, people and funnel drop-off in the Website project's analytics. Seeded onboarding events come only with a fresh project file; to refill an old stack, stop the api, delete `.svx/<stack>/data/analytics/<website project id>.db` and run `svx restart api seed`.
 
+`mise run demo:traffic -- --site <demo site url> --api <api url> [--visitors 200]` (`e2e/demo-traffic.ts`) drives headless browsers through the demo site with drop-off at each step, so the funnels fill from real ingest. Pass the `localhost` demo site URL and the api URL from `svx status`. It sends beacons straight to the api with a made-up `X-Forwarded-For` per visitor (through Vite every visitor would be one client) and runs 4 visitors at a time, which stays under the per-site ingest limit. Each run adds events for today, so run it by hand.
+
 ## Tests
 
 - Unit tests go in a `#[cfg(test)] mod tests` block in the same file. Integration tests that run the binary go in `tests/`.
