@@ -79,7 +79,7 @@ function onDelete(project: Project) {
       }"
     >
       <template #item="{ item }">
-        <ListItem :to="`/w/${workspaceId}/p/${item.id}`" :title="item.name">
+        <ListItem :to="`/w/${workspaceId}/p/${item.id}`" :title="item.name" selectable-description>
           <template #description
             ><code>{{ item.slug }}</code></template
           >

@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import EntitySections from '@/components/EntitySections.vue'
 import FieldsEditor from '@/components/forms/FieldsEditor.vue'
 import { fetchSnippet, htmlSnippet } from '@/components/forms/embed'
+import { fieldText, preview, sender } from '@/components/forms/submission'
 import Avatar from '@/components/ui/Avatar.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
@@ -22,8 +23,8 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
-import { formatDate, formatRelative } from '@/lib/format'
-import type { BotCheck, FieldDef, FieldValue, Submission, SubmissionStatus } from '@/queries/forms'
+import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
+import type { BotCheck, FieldDef, Submission, SubmissionStatus } from '@/queries/forms'
 import {
   downloadExport,
   SUBMISSIONS_SHOWN,
@@ -80,41 +81,7 @@ const botChecks = [
   },
 ]
 
-function text(value: FieldValue | undefined): string {
-  if (value === undefined) return ''
-  return Array.isArray(value) ? value.join(', ') : value
-}
-
-function fieldNames(submission: Submission): string[] {
-  return form.value?.fields.length
-    ? form.value.fields.map((f) => f.name)
-    : Object.keys(submission.data)
-}
-
-/**
- * The field that says who sent it: an email field, else one named like a
- * name, else none. Forms are free-form, so this is a guess.
- */
-function senderField(submission: Submission): string | undefined {
-  const filled = fieldNames(submission).filter((name) => text(submission.data[name]).length > 0)
-  const email = form.value?.fields.find((f) => f.kind === 'email' && filled.includes(f.name))
-  return email?.name ?? filled.find((name) => /e-?mail|name/i.test(name))
-}
-
-function sender(submission: Submission): string {
-  const field = senderField(submission)
-  return field ? text(submission.data[field]) : 'Anonymous'
-}
-
-function preview(submission: Submission): string {
-  const skip = senderField(submission)
-  return fieldNames(submission)
-    .filter((name) => name !== skip)
-    .map((name) => text(submission.data[name]))
-    .filter((value) => value.length > 0)
-    .slice(0, 3)
-    .join(' · ')
-}
+const fields = computed(() => form.value?.fields ?? [])
 
 function labelOf(name: string): string {
   return form.value?.fields.find((f) => f.name === name)?.label ?? name
@@ -317,17 +284,24 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       >
         <template #item="{ item }">
           <ListItem
-            :title="sender(item)"
-            :description="preview(item) || '(empty)'"
+            :title="sender(fields, item)"
+            :description="preview(fields, item) || undefined"
+            :label="`${sender(fields, item)}, received ${formatDateTime(item.created_at)}`"
             @select="viewing = item"
           >
-            <template #leading><Avatar :name="sender(item)" /></template>
+            <template #leading><Avatar :name="sender(fields, item)" /></template>
             <template #meta>
               <span class="flex items-center gap-2 whitespace-nowrap">
                 <span v-if="item.status === 'spam'" class="badge badge-ghost badge-sm">{{
                   item.spam_reason ?? 'marked'
                 }}</span>
-                {{ formatRelative(item.created_at) }}
+                <!-- relative lifts it above the row's hit area, so its title shows. -->
+                <time
+                  class="relative"
+                  :datetime="item.created_at"
+                  :title="formatDateTime(item.created_at)"
+                  >{{ formatRelative(item.created_at) }}</time
+                >
               </span>
             </template>
             <template #trailing>
@@ -378,7 +352,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       <dl v-if="viewing" class="flex flex-col gap-3 text-sm">
         <div v-for="(value, name) in viewing.data" :key="name">
           <dt class="font-medium">{{ labelOf(String(name)) }}</dt>
-          <dd class="break-words whitespace-pre-wrap">{{ text(value) }}</dd>
+          <dd class="break-words whitespace-pre-wrap">{{ fieldText(value) }}</dd>
         </div>
         <div v-if="viewing.spam_reason">
           <dt class="font-medium">Spam reason</dt>

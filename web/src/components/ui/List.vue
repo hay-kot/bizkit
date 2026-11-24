@@ -19,8 +19,10 @@ withDefaults(
     error?: unknown
     empty?: { title: string; message?: string; icon?: Component }
     label?: string
+    /** Renders an `ol`, for entries whose order means something (newest first). */
+    ordered?: boolean
   }>(),
-  { loading: false, error: undefined, empty: undefined, label: undefined },
+  { loading: false, error: undefined, empty: undefined, label: undefined, ordered: false },
 )
 
 defineSlots<{
@@ -41,13 +43,14 @@ defineSlots<{
   >
     <slot name="empty-action" />
   </EmptyState>
-  <ul
-    v-else
+  <component
+    :is="ordered ? 'ol' : 'ul'"
+    v-else-if="items?.length"
     class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-100"
     :aria-label="label"
   >
     <li v-for="item in items" :key="itemKey(item)" class="group/list-item">
       <slot name="item" :item="item" />
     </li>
-  </ul>
+  </component>
 </template>

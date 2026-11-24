@@ -14,11 +14,25 @@ const props = withDefaults(
   defineProps<{
     title?: string
     description?: string
+    /**
+     * Lifts the description above the row's hit area, so its text can be
+     * selected (a slug, an ID). Clicks on it don't open the row.
+     */
+    selectableDescription?: boolean
     to?: RouteLocationRaw
+    /** The link's or button's accessible name, when the title alone repeats across rows. */
+    label?: string
     /** Declared as a prop, not an emit, so the row knows whether it is clickable. */
     onSelect?: () => void
   }>(),
-  { title: '', description: undefined, to: undefined, onSelect: undefined },
+  {
+    title: '',
+    description: undefined,
+    selectableDescription: false,
+    to: undefined,
+    label: undefined,
+    onSelect: undefined,
+  },
 )
 
 defineSlots<{
@@ -40,7 +54,13 @@ const clickable = computed(() => props.to !== undefined || props.onSelect !== un
   >
     <slot name="leading" />
     <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-      <RouterLink v-if="to !== undefined" :to="to" class="truncate" :class="stretchedTarget">
+      <RouterLink
+        v-if="to !== undefined"
+        :to="to"
+        class="truncate"
+        :class="stretchedTarget"
+        :aria-label="label"
+      >
         <slot name="title">{{ title }}</slot>
       </RouterLink>
       <button
@@ -48,6 +68,7 @@ const clickable = computed(() => props.to !== undefined || props.onSelect !== un
         type="button"
         class="cursor-pointer truncate text-start"
         :class="stretchedTarget"
+        :aria-label="label"
         @click="onSelect()"
       >
         <slot name="title">{{ title }}</slot>
@@ -58,6 +79,7 @@ const clickable = computed(() => props.to !== undefined || props.onSelect !== un
       <span
         v-if="description !== undefined || $slots.description"
         class="truncate text-sm text-base-content/70"
+        :class="selectableDescription ? 'relative self-start' : ''"
         ><slot name="description">{{ description }}</slot></span
       >
     </div>

@@ -53,6 +53,22 @@ describe('List', () => {
     expect(empty.find('button').text()).toBe('Add one')
     expect(empty.find('ul').exists()).toBe(false)
   })
+
+  it('renders nothing for no items without an empty state', () => {
+    const wrapper = mount(List<Item>, { props: { items: [], itemKey: (i) => i.id } })
+    expect(wrapper.find('ul').exists()).toBe(false)
+    expect(wrapper.find('ol').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+  })
+
+  it('renders an ordered list when ordered', () => {
+    const wrapper = mount(List<Item>, {
+      props: { items, itemKey: (i) => i.id, ordered: true },
+      slots: { item: ({ item }: { item: Item }) => h('b', item.name) },
+    })
+    expect(wrapper.find('ul').exists()).toBe(false)
+    expect(wrapper.findAll('ol > li')).toHaveLength(2)
+  })
 })
 
 describe('ListItem', () => {
@@ -108,6 +124,28 @@ describe('ListItem', () => {
     expect(button.classes()).toContain('after:absolute')
     await button.trigger('click')
     expect(onSelect).toHaveBeenCalledOnce()
+  })
+
+  it('lifts a selectable description above the hit area, and only then', async () => {
+    const router = await withRouter()
+    const plain = mount(ListItem, {
+      props: { title: 'Site', description: 'site', to: '/items/1' },
+      global: { plugins: [router] },
+    })
+    const lifted = mount(ListItem, {
+      props: { title: 'Site', description: 'site', to: '/items/1', selectableDescription: true },
+      global: { plugins: [router] },
+    })
+    const description = (w: typeof plain) => w.findAll('span').find((s) => s.text() === 'site')!
+    expect(description(plain).classes()).not.toContain('relative')
+    expect(description(lifted).classes()).toContain('relative')
+  })
+
+  it('names the target with label when given', () => {
+    const wrapper = mount(ListItem, {
+      props: { title: 'Ada', label: 'Ada, received Nov 22', onSelect: () => {} },
+    })
+    expect(wrapper.find('button').attributes('aria-label')).toBe('Ada, received Nov 22')
   })
 
   it('puts the title slot inside the link', async () => {

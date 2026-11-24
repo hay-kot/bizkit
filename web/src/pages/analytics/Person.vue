@@ -108,6 +108,7 @@ function eventDetail(event: EventItem): string | undefined {
           :items="group.events"
           :item-key="(e) => String(e.id)"
           :label="formatUtcDay(group.day)"
+          ordered
         >
           <template #item="{ item }">
             <ListItem :title="eventTitle(item)" :description="eventDetail(item)">
