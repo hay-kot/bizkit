@@ -17,12 +17,17 @@ import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
 import { useIsAdmin } from '@/composables/useIsAdmin'
 import { closePalette, openPalette, paletteOpen } from '@/palette/state'
+import { useMe } from '@/queries/auth'
 import { useWorkspace } from '@/queries/workspaces'
 
 const props = defineProps<{ workspaceId: string }>()
 const route = useRoute()
 const { data: workspace, error } = useWorkspace(() => props.workspaceId)
 const isAdmin = useIsAdmin(() => props.workspaceId)
+// The palette's sources mount once the role is known: a remount when the
+// admin flag flips would cancel their list requests mid-flight, and the
+// palette would miss those rows.
+const { data: me } = useMe()
 const visible = (items: NavItem[]) => items.filter((item) => !item.adminOnly || isAdmin.value)
 const {
   projects,
@@ -181,6 +186,7 @@ watch(
       </main>
     </div>
     <PaletteRows
+      v-if="me"
       :key="`${workspaceId}:${project?.id}:${isAdmin}`"
       :workspace-id="workspaceId"
       :project-id="project?.id"

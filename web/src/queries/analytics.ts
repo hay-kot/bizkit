@@ -2,7 +2,13 @@ import { useMutation, useQuery } from '@pinia/colada'
 import type { MaybeRefOrGetter } from 'vue'
 import { toValue } from 'vue'
 
+import { analyticsInsightsQuery } from '@/api/gen'
 import {
+  analyticsDashboardsCreateMutation,
+  analyticsDashboardsDeleteMutation,
+  analyticsDashboardsGetQuery,
+  analyticsDashboardsListQuery,
+  analyticsDashboardsUpdateMutation,
   analyticsEventsQueryQuery,
   analyticsEventsRecentQuery,
   analyticsFunnelsCreateMutation,
@@ -15,6 +21,11 @@ import {
   analyticsGoalsCreateMutation,
   analyticsGoalsDeleteMutation,
   analyticsGoalsListQuery,
+  analyticsInsightsCreateMutation,
+  analyticsInsightsDeleteMutation,
+  analyticsInsightsGetQuery,
+  analyticsInsightsListQuery,
+  analyticsInsightsUpdateMutation,
   analyticsPeopleGetQuery,
   analyticsPeopleListQuery,
   analyticsRetentionQuery,
@@ -26,16 +37,26 @@ import {
 } from '@/api/gen/@pinia/colada.gen'
 import type {
   BreakdownRow,
+  BreakdownSource,
   Cohort,
+  Dashboard,
   Dimension,
   Dropoff,
   DropoffPage,
   EventItem,
   EventName,
+  FilterOp,
   Funnel,
   Goal,
   GoalKind,
   IdentityMode,
+  Insight,
+  InsightFilter,
+  InsightKind,
+  InsightQuery,
+  InsightRange,
+  InsightResult,
+  Measure,
   PersonSummary,
   Site,
   Step,
@@ -48,16 +69,26 @@ import { useInvalidate } from './keys'
 
 export type {
   BreakdownRow,
+  BreakdownSource,
   Cohort,
+  Dashboard,
   Dimension,
   Dropoff,
   DropoffPage,
   EventItem,
   EventName,
+  FilterOp,
   Funnel,
   Goal,
   GoalKind,
   IdentityMode,
+  Insight,
+  InsightFilter,
+  InsightKind,
+  InsightQuery,
+  InsightRange,
+  InsightResult,
+  Measure,
   PersonSummary,
   Site,
   Step,
@@ -343,4 +374,136 @@ export function useRetention(
       },
     }),
   )
+}
+
+/**
+ * An insight query's numbers. The operation is a POST (the query is a JSON
+ * body), so this builds its own cached query instead of a generated one.
+ * Idle while `enabled` is false.
+ */
+export function useInsightResult(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+  range: MaybeRefOrGetter<DayRange>,
+  query: MaybeRefOrGetter<InsightQuery>,
+  enabled: MaybeRefOrGetter<boolean> = true,
+) {
+  return useQuery(() => {
+    const path = { workspace_id: toValue(workspaceId) }
+    const { from, to } = toValue(range)
+    const body = { project_id: toValue(projectId), from, to, query: toValue(query) }
+    return {
+      key: [{ _id: 'analyticsInsightsQuery', path, body: JSON.parse(JSON.stringify(body)) }],
+      query: async ({ signal }) => {
+        const { data } = await analyticsInsightsQuery({ path, body, signal, throwOnError: true })
+        return data
+      },
+      enabled: toValue(enabled),
+    }
+  })
+}
+
+const INSIGHT_QUERIES = [
+  'analyticsInsightsList',
+  'analyticsInsightsGet',
+  'analyticsDashboardsList',
+  'analyticsDashboardsGet',
+]
+
+export function useInsights(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    analyticsInsightsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId) },
+    }),
+  )
+}
+
+export function useInsight(
+  workspaceId: MaybeRefOrGetter<string>,
+  insightId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    analyticsInsightsGetQuery({
+      path: { workspace_id: toValue(workspaceId), insight_id: toValue(insightId) },
+    }),
+  )
+}
+
+export function useCreateInsight() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...analyticsInsightsCreateMutation(),
+    onSettled: () => invalidate(...INSIGHT_QUERIES),
+  })
+}
+
+export function useUpdateInsight() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...analyticsInsightsUpdateMutation(),
+    onSettled: () => invalidate(...INSIGHT_QUERIES),
+  })
+}
+
+export function useDeleteInsight() {
+  const invalidate = useInvalidate()
+  // Not the insight itself: its page is still mounted, and refetching it
+  // would flash a 404 before the page leaves.
+  return useMutation({
+    ...analyticsInsightsDeleteMutation(),
+    onSettled: () =>
+      invalidate('analyticsInsightsList', 'analyticsDashboardsList', 'analyticsDashboardsGet'),
+  })
+}
+
+export function useDashboards(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    analyticsDashboardsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId) },
+    }),
+  )
+}
+
+export function useDashboard(
+  workspaceId: MaybeRefOrGetter<string>,
+  dashboardId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(() =>
+    analyticsDashboardsGetQuery({
+      path: { workspace_id: toValue(workspaceId), dashboard_id: toValue(dashboardId) },
+    }),
+  )
+}
+
+export function useCreateDashboard() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...analyticsDashboardsCreateMutation(),
+    onSettled: () => invalidate(...INSIGHT_QUERIES),
+  })
+}
+
+export function useUpdateDashboard() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...analyticsDashboardsUpdateMutation(),
+    onSettled: () => invalidate(...INSIGHT_QUERIES),
+  })
+}
+
+export function useDeleteDashboard() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...analyticsDashboardsDeleteMutation(),
+    onSettled: () =>
+      invalidate('analyticsDashboardsList', 'analyticsInsightsList', 'analyticsInsightsGet'),
+  })
 }
