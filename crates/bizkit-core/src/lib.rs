@@ -34,7 +34,7 @@ pub use crate::auth::middleware::Authn;
 pub use crate::config::Config;
 pub use crate::deps::Deps;
 pub use crate::error::ApiError;
-pub use crate::module::{DemoSeed, Lifecycle, Module, ModuleContext};
+pub use crate::module::{DemoSeed, Lifecycle, MAX_UPLOAD_BYTES, Module, ModuleContext};
 
 /// Projects, for modules that keep data per project.
 pub mod projects {

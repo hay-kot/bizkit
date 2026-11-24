@@ -19,7 +19,7 @@ use utoipa::openapi::{RefOr, Schema};
 
 pub use self::access::{
     Access, Grant, KeyPrincipal, Level, Principal, Role, Scope, ScopeAreas, ScopeError,
-    UserPrincipal, WorkspaceAccess,
+    UserPrincipal, WorkspaceAccess, authorize_workspace,
 };
 pub(crate) use self::openapi::document as openapi_document;
 pub use self::registry::{OpMeta, Registry};

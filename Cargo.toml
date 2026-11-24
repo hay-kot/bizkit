@@ -33,7 +33,7 @@ bizkit-web = { path = "crates/bizkit-web" }
 
 anyhow = "1.0.104"
 async-trait = "0.1.92"
-axum = { version = "0.8.9", features = ["macros"] }
+axum = { version = "0.8.9", features = ["macros", "multipart"] }
 axum-test = "21.1.0"
 base64 = "0.23.1"
 bolero = "0.13.7"
