@@ -279,25 +279,29 @@ const summary = computed(() => {
       No data for this range
     </p>
     <p class="sr-only" aria-live="polite">{{ activeText }}</p>
-    <table class="sr-only">
-      <caption>
-        {{
-          series.map((s) => s.name).join(' and ')
-        }}
-        over time
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">Time</th>
-          <th v-for="s in series" :key="s.name" scope="col">{{ s.name }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="point in points" :key="point.t">
-          <th scope="row">{{ point.label }}</th>
-          <td v-for="(s, i) in series" :key="s.name">{{ formatNumber(point.values[i] ?? 0) }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Tables ignore sr-only's 1px box: the wrapper clips it, or the table
+         keeps its full height and stretches the page. -->
+    <div class="sr-only">
+      <table>
+        <caption>
+          {{
+            series.map((s) => s.name).join(' and ')
+          }}
+          over time
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th v-for="s in series" :key="s.name" scope="col">{{ s.name }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="point in points" :key="point.t">
+            <th scope="row">{{ point.label }}</th>
+            <td v-for="(s, i) in series" :key="s.name">{{ formatNumber(point.values[i] ?? 0) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>

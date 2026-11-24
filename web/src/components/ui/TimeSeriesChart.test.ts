@@ -30,8 +30,11 @@ describe('TimeSeriesChart', () => {
 
   it('has a hidden data table', () => {
     const wrapper = mount(TimeSeriesChart, { props: { points, series } })
+    // sr-only must sit on a wrapper: on the table itself it keeps the
+    // table's full height and stretches the page.
+    expect(wrapper.find('table.sr-only').exists()).toBe(false)
     const rows = wrapper
-      .findAll('table.sr-only tbody tr')
+      .findAll('div.sr-only > table tbody tr')
       .map((r) => r.findAll('th, td').map((c) => c.text()))
     expect(rows).toEqual([
       ['Mar 13', '10', '8'],
