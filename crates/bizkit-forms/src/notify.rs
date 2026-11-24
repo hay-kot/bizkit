@@ -42,6 +42,8 @@ pub fn mail(
         html: None,
         unsubscribe: None,
         id: None,
+        workspace_id: None,
+        reply_to: None,
     }
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE workspace_mail SET verified_at = ? WHERE workspace_id = ? AND updated_at = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "c2e1adca21919272948c7e04af25bd59f22c6f622c5eac7ca7dd19a0618563e2"
+}

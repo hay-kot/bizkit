@@ -824,6 +824,8 @@ impl Operation for InvitationsCreate {
             html: None,
             unsubscribe: None,
             id: None,
+            workspace_id: None,
+            reply_to: None,
         };
         cx.platform().bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
         usage::report(&cx, &mut tx, Report::new(UsageKind::InvitationSent, input.workspace_id))

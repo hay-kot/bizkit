@@ -92,6 +92,11 @@ pub(crate) async fn serve(
         anyhow::ensure!(!key.trim().is_empty(), "${var}, the mail webhook signing key, is empty");
         config.mail.webhook_signing_key = Some(key);
     }
+    if let Some(var) = &config.secrets_key_env {
+        let key =
+            std::env::var(var).with_context(|| format!("reading the secrets key from ${var}"))?;
+        config.secrets_key = Some(key);
+    }
     let listen = match config.listen {
         Some(listen) => listen,
         None => DEFAULT_LISTEN.parse().context("parsing the default listen address")?,

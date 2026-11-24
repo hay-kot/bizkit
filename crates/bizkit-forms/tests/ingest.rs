@@ -359,6 +359,8 @@ mod ingest {
         assert_eq!(recipients.len(), 2, "one mail per recipient, none for spam: {recipients:?}");
         assert_eq!(sent[0].subject, "New submission: Contact", "subject");
         assert!(sent[0].text.contains("message: Hello"), "{}", sent[0].text);
+        let workspace = Some(s.team.workspaces["main"].id);
+        assert!(sent.iter().all(|m| m.workspace_id == workspace), "workspace mail");
 
         for n in 1..bizkit_forms::ingest::NOTIFY_PER_HOUR {
             s.post(&form, RawBody::new(FORM, format!("name=n{n}"))).await;

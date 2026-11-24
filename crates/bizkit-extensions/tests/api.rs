@@ -334,6 +334,7 @@ mod api {
         assert_eq!(sent.len(), 3, "three per run: {sent:?}");
         assert_eq!(sent[0].subject, "New Ada 0", "subject");
         assert_eq!(sent[0].html.as_deref(), Some("<p>hi</p>"), "html");
+        assert!(sent[0].workspace_id.is_some(), "workspace mail");
         assert_eq!(s.runs(&script).await[0]["logs"], json!(["a run can send at most 3 mails"]));
 
         // Fill the hour's cap: 3 sent above plus 47 more.

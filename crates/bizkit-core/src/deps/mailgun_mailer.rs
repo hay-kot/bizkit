@@ -22,6 +22,7 @@ pub struct MailgunMailer {
     endpoint: Url,
     authorization: String,
     from: Mailbox,
+    reply_to: Option<Mailbox>,
 }
 
 impl MailgunMailer {
@@ -38,17 +39,19 @@ impl MailgunMailer {
     ) -> anyhow::Result<Self> {
         let key = env::var(&config.api_key_env)
             .with_context(|| format!("reading the Mailgun API key from ${}", config.api_key_env))?;
-        Self::with_key(http, config, from, &key)
+        let from: Mailbox = from.parse().with_context(|| format!("parsing mail.from {from:?}"))?;
+        Self::with_key(http, &config.domain, config.region, from, &key)
     }
 
-    fn with_key(
+    /// A mailer for one account: its domain, region, sender and API key.
+    pub(crate) fn with_key(
         http: Arc<dyn HttpClient>,
-        config: &MailgunConfig,
-        from: &str,
+        domain: &str,
+        region: MailgunRegion,
+        from: Mailbox,
         key: &str,
     ) -> anyhow::Result<Self> {
-        let from: Mailbox = from.parse().with_context(|| format!("parsing mail.from {from:?}"))?;
-        let host = match config.region {
+        let host = match region {
             MailgunRegion::Us => "api.mailgun.net",
             MailgunRegion::Eu => "api.eu.mailgun.net",
         };
@@ -58,13 +61,26 @@ impl MailgunMailer {
             .path_segments_mut()
             .map_err(|()| anyhow::anyhow!("the Mailgun endpoint has no path"))?
             .pop_if_empty()
-            .push(&config.domain)
+            .push(domain)
             .push("messages");
         let authorization = format!("Basic {}", STANDARD.encode(format!("api:{key}")));
-        Ok(Self { http, endpoint, authorization, from })
+        Ok(Self { http, endpoint, authorization, from, reply_to: None })
     }
 
-    fn form(&self, mail: &Mail) -> String {
+    /// Sets the `Reply-To` for mail that doesn't name its own.
+    #[must_use]
+    pub(crate) fn replying_to(mut self, reply_to: Option<Mailbox>) -> Self {
+        self.reply_to = reply_to;
+        self
+    }
+
+    fn form(&self, mail: &Mail) -> Result<String, MailError> {
+        let reply_to = match &mail.reply_to {
+            Some(text) => Some(text.parse::<Mailbox>().map_err(|err| {
+                MailError::Permanent(format!("parsing reply-to {text:?}: {err}"))
+            })?),
+            None => self.reply_to.clone(),
+        };
         let mut form = url::form_urlencoded::Serializer::new(String::new());
         form.append_pair("from", &self.from.to_string())
             .append_pair("to", &mail.to)
@@ -72,6 +88,9 @@ impl MailgunMailer {
             .append_pair("text", &mail.text);
         if let Some(html) = &mail.html {
             form.append_pair("html", html);
+        }
+        if let Some(reply_to) = &reply_to {
+            form.append_pair("h:Reply-To", &reply_to.to_string());
         }
         if let Some(id) = &mail.id {
             form.append_pair("h:Message-Id", &format!("<{id}@{}>", self.from.email.domain()))
@@ -81,7 +100,7 @@ impl MailgunMailer {
             form.append_pair("h:List-Unsubscribe", &format!("<{url}>"))
                 .append_pair("h:List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
         }
-        form.finish()
+        Ok(form.finish())
     }
 }
 
@@ -96,7 +115,7 @@ impl Mailer for MailgunMailer {
         let request = http::Request::post(self.endpoint.as_str())
             .header(http::header::AUTHORIZATION, &self.authorization)
             .header(http::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Bytes::from(self.form(mail)))
+            .body(Bytes::from(self.form(mail)?))
             .map_err(|err| MailError::Permanent(format!("building the Mailgun request: {err}")))?;
         let response = self
             .http
@@ -168,15 +187,11 @@ mod tests {
         body: &'static str,
     ) -> (MailgunMailer, Arc<Canned>) {
         let http = Arc::new(Canned { status, body, seen: Mutex::new(Vec::new()) });
-        let config = MailgunConfig {
-            domain: "mg.example.com".to_owned(),
-            region,
-            api_key_env: "UNUSED".to_owned(),
-        };
         let mailer = MailgunMailer::with_key(
             Arc::<Canned>::clone(&http),
-            &config,
-            "Tallyho <news@mg.example.com>",
+            "mg.example.com",
+            region,
+            "Tallyho <news@mg.example.com>".parse().unwrap(),
             "key-123",
         )
         .unwrap();
@@ -191,6 +206,8 @@ mod tests {
             html: Some("<p>Hi</p>".to_owned()),
             unsubscribe: Some(Url::parse("https://hub.example.com/u?t=abc").unwrap()),
             id: Some("0190-abc".to_owned()),
+            reply_to: Some("Ada <ada@example.org>".to_owned()),
+            ..Mail::new("", "", "")
         }
     }
 
@@ -234,6 +251,10 @@ mod tests {
             (
                 "html",
                 "<p>Hi</p>",
+            ),
+            (
+                "h:Reply-To",
+                "Ada <ada@example.org>",
             ),
             (
                 "h:Message-Id",

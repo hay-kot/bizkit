@@ -115,6 +115,34 @@ pub fn check_url(url: &Url) -> Result<(), EgressError> {
     }
 }
 
+/// Checks a bare host name or IP address the way [`check_url`] checks a
+/// URL's host, for services reached without a URL (SMTP). IPv6 may come
+/// with or without brackets.
+///
+/// # Errors
+///
+/// When the host is empty, isn't a valid host, or is a non-public IP literal.
+pub fn check_host(host: &str) -> Result<(), EgressError> {
+    let host = host.trim();
+    if host.is_empty() {
+        return Err(EgressError::NoHost);
+    }
+    let bare = host.trim_start_matches('[').trim_end_matches(']');
+    let ip = match bare.parse::<IpAddr>() {
+        Ok(ip) => Some(ip),
+        Err(_) => match url::Host::parse(host) {
+            Ok(url::Host::Ipv4(ip)) => Some(IpAddr::V4(ip)),
+            Ok(url::Host::Ipv6(ip)) => Some(IpAddr::V6(ip)),
+            Ok(url::Host::Domain(_)) => None,
+            Err(_) => return Err(EgressError::Blocked { host: host.to_owned() }),
+        },
+    };
+    match ip {
+        Some(ip) if !is_public_ip(ip) => Err(EgressError::Blocked { host: ip.to_string() }),
+        _ => Ok(()),
+    }
+}
+
 /// A reqwest resolver that keeps only public addresses. The client connects
 /// to what this returns, so a name that resolves differently on a second
 /// lookup (DNS rebinding) can't reach an internal address.
@@ -295,6 +323,18 @@ mod tests {
         assert!(matches!(check("http://[::1]/"), Err(EgressError::Blocked { .. })), "v6 loopback");
         assert!(matches!(check("http://0x7f000001/"), Err(EgressError::Blocked { .. })), "hex IP");
         assert!(matches!(check("http://2130706433/"), Err(EgressError::Blocked { .. })), "int IP");
+    }
+
+    #[test]
+    fn checks_bare_hosts() {
+        for good in ["smtp.example.com", "8.8.8.8", "2606:4700:4700::1111", "[2606:4700::1]"] {
+            assert_eq!(check_host(good), Ok(()), "{good}");
+        }
+        for bad in ["127.0.0.1", "::1", "[::1]", "10.1.2.3", "0x7f000001", "169.254.169.254"] {
+            assert!(matches!(check_host(bad), Err(EgressError::Blocked { .. })), "{bad}");
+        }
+        assert_eq!(check_host(" "), Err(EgressError::NoHost), "empty");
+        assert!(check_host("bad host/name").is_err(), "not a host");
     }
 
     fn forwarded(values: &[&str]) -> HeaderMap {

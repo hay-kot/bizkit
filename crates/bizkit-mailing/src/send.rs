@@ -260,12 +260,12 @@ async fn prepare_step(
     let body = Body { subject: &step.subject, md: &step.body_md };
     let (mail, unsubscribe) =
         render_to(platform, list, body, Some(contact), &delivery.to_email).await?;
-    Ok(Prepared::Mail(to_mail(&delivery.to_email, mail, unsubscribe)))
+    Ok(Prepared::Mail(Box::new(to_mail(&delivery.to_email, mail, unsubscribe))))
 }
 
 /// What a delivery turns into at send time.
 enum Prepared {
-    Mail(Mail),
+    Mail(Box<Mail>),
     Skip(&'static str),
 }
 
@@ -294,7 +294,7 @@ async fn prepare(
             };
             let url = public::confirm_url(platform, token)?;
             let mail = render::confirm(&frame(list, &Links::default()), &url);
-            Ok(Prepared::Mail(to_mail(&contact.email, mail, None)))
+            Ok(Prepared::Mail(Box::new(to_mail(&contact.email, mail, None))))
         }
         DeliveryKind::Broadcast | DeliveryKind::Test => {
             if kind == DeliveryKind::Broadcast && status != Some(ContactStatus::Subscribed) {
@@ -313,7 +313,7 @@ async fn prepare(
             let (mail, unsubscribe) =
                 render_broadcast(platform, list, &broadcast, contact.as_ref(), &delivery.to_email)
                     .await?;
-            Ok(Prepared::Mail(to_mail(&delivery.to_email, mail, unsubscribe)))
+            Ok(Prepared::Mail(Box::new(to_mail(&delivery.to_email, mail, unsubscribe))))
         }
         DeliveryKind::Step => {
             let Some(contact) = contact.filter(|_| status == Some(ContactStatus::Subscribed))
@@ -333,6 +333,8 @@ fn to_mail(to: &str, mail: Rendered, unsubscribe: Option<url::Url>) -> Mail {
         html: Some(mail.html),
         unsubscribe,
         id: None,
+        workspace_id: None,
+        reply_to: None,
     }
 }
 
@@ -457,7 +459,7 @@ impl JobHandler<Send> for SendHandler {
             return mark(platform, &delivery).await;
         }
         let mut mail = match prepare(platform, &list, &delivery).await? {
-            Prepared::Mail(mail) => mail,
+            Prepared::Mail(mail) => *mail,
             Prepared::Skip(reason) => {
                 DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
                 delivery.error = Some(reason.to_owned());
@@ -465,6 +467,7 @@ impl JobHandler<Send> for SendHandler {
             }
         };
         mail.id = Some(delivery.id.to_string());
+        mail.workspace_id = Some(delivery.workspace_id);
         delivery.attempts = i64::from(cx.attempt);
         let final_attempt = cx.attempt >= Send::MAX_ATTEMPTS;
         if final_attempt {
@@ -477,7 +480,7 @@ impl JobHandler<Send> for SendHandler {
         // The breaker counts deliveries, not attempts: only a first attempt
         // that fails adds to it.
         let failure = if cx.attempt == 1 { Count::Failure } else { Count::Nothing };
-        match platform.deps().mailer.send(&mail).await {
+        match platform.mail().send(platform, &mail).await {
             Ok(provider_id) => {
                 DeliveryStatus::Sent.as_str().clone_into(&mut delivery.status);
                 delivery.error = None;

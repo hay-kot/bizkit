@@ -17,9 +17,11 @@ pub mod error;
 pub mod hooks;
 pub mod ids;
 pub mod jobs;
+pub mod mail;
 mod module;
 pub mod net;
 pub mod ops;
+pub mod secrets;
 mod tenancy;
 #[cfg(feature = "test-hooks")]
 pub mod test_hooks;
@@ -47,6 +49,9 @@ pub mod members {
 /// The API types core's operations return.
 pub mod api {
     pub use crate::auth::ops::{ApiKey, ApiKeyList, CreatedApiKey};
+    pub use crate::mail::ops::{
+        MailSettings, MailTestResult, MailgunSettings, SmtpSettings, WorkspaceMail,
+    };
     pub use crate::tenancy::ops::{
         Invitation, InvitationList, Me, Member, MemberList, Membership, MembershipList, Meta,
         MyInvitation, MyInvitationList, Project, ProjectCreated, ProjectDeleted, ProjectList,

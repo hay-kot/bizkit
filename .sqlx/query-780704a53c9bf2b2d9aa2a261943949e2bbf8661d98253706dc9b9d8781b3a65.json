@@ -1,0 +1,194 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT workspace_id AS \"workspace_id: WorkspaceId\", provider, from_name, from_address,\n                  reply_to, smtp_host, smtp_port, smtp_security, smtp_username, mailgun_domain,\n                  mailgun_region, secrets, verified_at AS \"verified_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM workspace_mail WHERE workspace_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "provider",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "name": "from_name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "from_name"
+          }
+        }
+      },
+      {
+        "name": "from_address",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "from_address"
+          }
+        }
+      },
+      {
+        "name": "reply_to",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "reply_to"
+          }
+        }
+      },
+      {
+        "name": "smtp_host",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "smtp_host"
+          }
+        }
+      },
+      {
+        "name": "smtp_port",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "smtp_port"
+          }
+        }
+      },
+      {
+        "name": "smtp_security",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "smtp_security"
+          }
+        }
+      },
+      {
+        "name": "smtp_username",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "smtp_username"
+          }
+        }
+      },
+      {
+        "name": "mailgun_domain",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "mailgun_domain"
+          }
+        }
+      },
+      {
+        "name": "mailgun_region",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "mailgun_region"
+          }
+        }
+      },
+      {
+        "name": "secrets",
+        "ordinal": 11,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "secrets"
+          }
+        }
+      },
+      {
+        "name": "verified_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "verified_at"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "780704a53c9bf2b2d9aa2a261943949e2bbf8661d98253706dc9b9d8781b3a65"
+}

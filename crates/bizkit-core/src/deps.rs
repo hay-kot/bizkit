@@ -26,6 +26,8 @@ pub use self::smtp_mailer::SmtpMailer;
 pub use self::system_clock::SystemClock;
 pub use self::throttle::ThrottledMailer;
 use crate::config::{Config, MailProvider};
+use crate::ids::WorkspaceId;
+use crate::mail::{MailTransports, ProviderTransports};
 use crate::time::UnixMillis;
 
 /// The platform's side effects.
@@ -33,8 +35,11 @@ use crate::time::UnixMillis;
 pub struct Deps {
     /// The current time.
     pub clock: Arc<dyn Clock>,
-    /// Outgoing mail.
+    /// The instance mailer: system mail, and workspaces without their own
+    /// account.
     pub mailer: Arc<dyn Mailer>,
+    /// Builds mailers for workspace accounts.
+    pub mail_transports: Arc<dyn MailTransports>,
     /// Outbound HTTP to public addresses only; see [`HttpClient`].
     pub http: Arc<dyn HttpClient>,
     /// Blob storage.
@@ -55,6 +60,7 @@ impl Deps {
         Ok(Self {
             clock: Arc::new(SystemClock),
             mailer,
+            mail_transports: Arc::new(ProviderTransports::new(Arc::clone(&http))),
             http,
             blobs: Arc::new(FsBlobs::new(data_dir.join("blobs"))),
         })
@@ -114,6 +120,31 @@ pub struct Mail {
     /// events find the mail again. `None` lets the mailer pick an ID.
     #[serde(default)]
     pub id: Option<String>,
+    /// The workspace the mail is for. Its own mail account sends it when it
+    /// has one; `None` (sign-in, invitations) always uses the instance
+    /// mailer. See [`crate::mail::MailRouter`].
+    #[serde(default)]
+    pub workspace_id: Option<WorkspaceId>,
+    /// The `Reply-To` address, overriding the account's default.
+    #[serde(default)]
+    pub reply_to: Option<String>,
+}
+
+impl Mail {
+    /// A plain-text mail to `to` with no extras.
+    #[must_use]
+    pub fn new(to: impl Into<String>, subject: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            to: to.into(),
+            subject: subject.into(),
+            text: text.into(),
+            html: None,
+            unsubscribe: None,
+            id: None,
+            workspace_id: None,
+            reply_to: None,
+        }
+    }
 }
 
 /// Why a mail wasn't sent.

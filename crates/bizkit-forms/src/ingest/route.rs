@@ -18,6 +18,7 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use bizkit_core::auth::is_plausible_email;
 use bizkit_core::contacts::{self, CaptureSource, ContactCaptured};
+use bizkit_core::deps::Mail;
 use bizkit_core::error::ErrorBody;
 use bizkit_core::hooks::{HookResult, HookTarget};
 use bizkit_core::jobs::{Enqueue, SendMail};
@@ -411,7 +412,10 @@ async fn store_submission(
                 .join(&format!("/w/{}/p/{}/forms/{}", form.workspace_id, form.project_id, form.id))
                 .map_err(anyhow::Error::from)?;
             for to in ops::decode_notify(form)? {
-                let mail = notify::mail(&form.name, &defs, &decision.data, &link, &to);
+                let mail = Mail {
+                    workspace_id: Some(form.workspace_id),
+                    ..notify::mail(&form.name, &defs, &decision.data, &link, &to)
+                };
                 platform.bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
             }
         } else {

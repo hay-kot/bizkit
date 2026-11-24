@@ -118,7 +118,7 @@ fn check(message: Message) -> Result<Mail, String> {
             return Err(format!("mail.send: {name} is over {} KiB", MAX_MAIL_BODY_BYTES >> 10));
         }
     }
-    Ok(Mail { to, subject, text, html, unsubscribe: None, id: None })
+    Ok(Mail { html, ..Mail::new(to, subject, text) })
 }
 
 /// What [`enqueue`] did.
@@ -136,8 +136,9 @@ async fn enqueue(
     platform: &Platform,
     workspace_id: WorkspaceId,
     script_id: ScriptId,
-    mail: Mail,
+    mut mail: Mail,
 ) -> anyhow::Result<Queued> {
+    mail.workspace_id = Some(workspace_id);
     let now = platform.now();
     let since = now.minus(MAIL_WINDOW);
     let mut tx = platform.db().write().await.context("starting the mail transaction")?;
