@@ -4,6 +4,7 @@ import { provide, reactive, ref } from 'vue'
 import Page from './Page.vue'
 import PageHeader from './PageHeader.vue'
 import Tabs, { type Tab } from './Tabs.vue'
+import { usePageCrumbs } from './pageHeader'
 import { TAB_LAYOUT, type TabHeader } from './tabLayout'
 
 /**
@@ -26,11 +27,17 @@ const actions = ref<HTMLElement | null>(null)
 const withActions = ref(0)
 const leaving = ref(false)
 provide(TAB_LAYOUT, { header, actions, withActions, leaving })
+// The tabs name the current page, so the breadcrumb stops at the module.
+const crumbs = usePageCrumbs(() => '', false)
 </script>
 
 <template>
   <Page>
-    <PageHeader :title="header.title" :description="header.description">
+    <PageHeader
+      :title="header.title"
+      :description="header.description"
+      :crumbs="crumbs.length ? crumbs : undefined"
+    >
       <template v-if="withActions > 0" #default>
         <div ref="actions" class="flex flex-wrap items-center gap-2" />
       </template>

@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { ExternalLink } from 'lucide-vue-next'
-import { computed, inject, type Component } from 'vue'
-import { routeLocationKey } from 'vue-router'
+import { computed, type Component } from 'vue'
 
-import { defaultCrumbs, PAGE_CONTEXT, type Crumb } from './pageHeader'
+import { usePageCrumbs, usePageRoute, type Crumb } from './pageHeader'
 
 /**
  * The top of a page: a breadcrumb row, the module icon and title with the
@@ -17,30 +15,32 @@ const props = defineProps<{
   description?: string
   icon?: Component
   crumbs?: Crumb[]
-  /** A docs URL, linked after the description. */
-  docs?: string
 }>()
 defineSlots<{ default?: () => unknown; tabs?: () => unknown }>()
 
-// Optional so the header renders outside a router, in unit tests.
-const route = inject(routeLocationKey, undefined)
-const context = inject(PAGE_CONTEXT, undefined)
-
-const icon = computed(() => props.icon ?? route?.meta.nav?.icon)
+const page = usePageRoute()
+const defaults = usePageCrumbs(() => props.title)
+const icon = computed(() => props.icon ?? page?.nav?.icon)
 const trail = computed(() => {
-  const crumbs = props.crumbs ?? defaultCrumbs(context, route?.meta.nav, props.title)
+  const crumbs = props.crumbs ?? defaults.value
   return crumbs.map((crumb, i) => (i === crumbs.length - 1 ? { label: crumb.label } : crumb))
 })
 </script>
 
 <template>
   <header class="flex flex-col gap-2">
-    <nav v-if="trail.length > 1" aria-label="Breadcrumb" class="min-w-0">
-      <ol class="flex flex-wrap items-center gap-x-1.5 text-sm text-base-content/70">
+    <nav v-if="trail.length > 0" aria-label="Breadcrumb" class="min-w-0">
+      <ol class="flex h-5 flex-wrap items-center gap-x-1.5 text-sm text-base-content/70">
         <li v-for="(crumb, i) in trail" :key="i" class="flex min-w-0 items-center gap-1.5">
           <span v-if="i > 0" aria-hidden="true">/</span>
+          <span
+            v-if="!crumb.label"
+            class="h-3.5 w-20 animate-pulse rounded-field bg-base-300"
+            aria-label="Loading"
+            data-testid="crumb-skeleton"
+          ></span>
           <RouterLink
-            v-if="crumb.to"
+            v-else-if="crumb.to"
             :to="crumb.to"
             class="truncate transition-colors hover:text-base-content"
             >{{ crumb.label }}</RouterLink
@@ -62,17 +62,7 @@ const trail = computed(() => {
       </div>
       <div v-if="$slots.default" class="flex flex-wrap items-center gap-2"><slot /></div>
     </div>
-    <p v-if="description || docs" class="max-w-prose text-sm text-base-content/80">
-      {{ description }}
-      <a
-        v-if="docs"
-        :href="docs"
-        target="_blank"
-        rel="noopener"
-        class="inline-flex items-center gap-1 text-primary hover:underline"
-        >Documentation<ExternalLink class="size-3.5" aria-hidden="true"
-      /></a>
-    </p>
+    <p v-if="description" class="max-w-prose text-sm text-base-content/80">{{ description }}</p>
     <div v-if="$slots.tabs" class="mt-2"><slot name="tabs" /></div>
   </header>
 </template>

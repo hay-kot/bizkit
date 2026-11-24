@@ -39,7 +39,6 @@ import {
 const props = defineProps<{
   workspaceId: string
   projectId: string
-  projectName: string
   scriptId: string
 }>()
 const router = useRouter()

@@ -23,7 +23,7 @@ import {
   useSecrets,
 } from '@/queries/extensions'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const { data: hooks } = useHooks(() => props.workspaceId)
 const {
   data: scripts,

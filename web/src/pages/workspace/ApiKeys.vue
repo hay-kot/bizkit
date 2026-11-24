@@ -15,7 +15,7 @@ import type { ApiKey } from '@/queries/apiKeys'
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '@/queries/apiKeys'
 import { useMeta } from '@/queries/auth'
 
-const props = defineProps<{ workspaceId: string; workspaceName: string }>()
+const props = defineProps<{ workspaceId: string }>()
 const { data: keys, isPending, error } = useApiKeys(() => props.workspaceId)
 const { data: meta } = useMeta()
 const create = useCreateApiKey()

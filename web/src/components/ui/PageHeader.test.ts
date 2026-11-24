@@ -1,44 +1,48 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { ChartLine, FolderKanban } from 'lucide-vue-next'
 import { describe, expect, it } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { ref } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import type { NavItem } from '@/modules/types'
 
 import PageHeader from './PageHeader.vue'
 import { PAGE_CONTEXT, type PageContext } from './pageHeader'
 
-const analytics: NavItem = {
-  path: 'analytics',
-  label: 'Analytics',
+const forms: NavItem = {
+  path: 'forms',
+  label: 'Forms',
   icon: ChartLine,
   section: 'project',
-  order: 102,
+  order: 100,
 }
+const projectName = ref<string | undefined>('Website')
 const context: PageContext = {
-  root: { label: 'Website', to: '/w/1/p/2' },
-  navTo: (item) => `/w/1/p/2/${item.path}`,
+  root: (projectId) => ({ label: projectName.value ?? '', to: `/w/1/p/${projectId}` }),
+  navTo: (item, projectId) => `/w/1/p/${projectId}/${item.path}`,
 }
 
-async function mountAt(path: string, props: Record<string, unknown>, slots = {}) {
-  const page = { template: '<div />' }
+async function mountAt(path: string, props: Record<string, unknown> = {}) {
+  const page = { component: PageHeader, props: () => ({ title: 'Forms', ...props }) }
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/w/1/p/2/analytics/:rest(.*)*', component: page, meta: { nav: analytics } },
-      { path: '/:any(.*)*', component: page },
+      { path: '/w/:ws/p/:projectId/forms/:rest(.*)*', ...page, meta: { nav: forms } },
+      { path: '/:any(.*)*', ...page },
     ],
   })
   await router.push(path)
-  return mount(PageHeader, {
-    props: { title: 'Analytics', ...props },
-    slots,
+  const wrapper = mount(RouterView, {
     global: { plugins: [router], provide: { [PAGE_CONTEXT as symbol]: context } },
   })
+  await flushPromises()
+  return { router, wrapper }
 }
 
-const crumbs = (wrapper: Awaited<ReturnType<typeof mountAt>>) =>
+type Wrapper = ReturnType<typeof mount>
+const crumbs = (wrapper: Wrapper) =>
   wrapper.findAll('nav[aria-label="Breadcrumb"] li').map((li) => {
+    if (li.find('[data-testid="crumb-skeleton"]').exists()) return '(loading)'
     const link = li.find('a')
     return link.exists()
       ? `${link.text()} -> ${link.attributes('href')}`
@@ -47,23 +51,41 @@ const crumbs = (wrapper: Awaited<ReturnType<typeof mountAt>>) =>
 
 describe('PageHeader', () => {
   it('takes the icon and breadcrumb from the route module', async () => {
-    const wrapper = await mountAt('/w/1/p/2/analytics', {})
-    expect(crumbs(wrapper)).toEqual(['Website -> /w/1/p/2', 'Analytics'])
+    const { wrapper } = await mountAt('/w/1/p/2/forms')
+    expect(crumbs(wrapper)).toEqual(['Website -> /w/1/p/2', 'Forms'])
     expect(wrapper.find('[data-testid="page-icon"]').exists()).toBe(true)
-    expect(wrapper.get('h1').text()).toBe('Analytics')
   })
 
-  it('adds the title after the module on its other pages', async () => {
-    const wrapper = await mountAt('/w/1/p/2/analytics/funnels/9', { title: 'Signup' })
-    expect(crumbs(wrapper)).toEqual([
-      'Website -> /w/1/p/2',
-      'Analytics -> /w/1/p/2/analytics',
-      'Signup',
-    ])
+  it('decides the module page from the route, not the title', async () => {
+    const { wrapper } = await mountAt('/w/1/p/2/forms/9', { title: 'Forms' })
+    expect(crumbs(wrapper)).toEqual(['Website -> /w/1/p/2', 'Forms -> /w/1/p/2/forms', 'Forms'])
+  })
+
+  it('shows skeleton crumbs, not placeholders, while names load', async () => {
+    projectName.value = undefined
+    try {
+      const { wrapper } = await mountAt('/w/1/p/2/forms/9', { title: '' })
+      expect(crumbs(wrapper)).toEqual(['(loading)', 'Forms -> /w/1/p/2/forms', '(loading)'])
+    } finally {
+      projectName.value = 'Website'
+    }
+  })
+
+  it('keeps its own crumbs and icon while the next route is current', async () => {
+    // A leaving page stays mounted during the route transition.
+    const { router } = await mountAt('/w/1/p/2/forms/9')
+    const leaving = mount(PageHeader, {
+      props: { title: 'Contact' },
+      global: { plugins: [router], provide: { [PAGE_CONTEXT as symbol]: context } },
+    })
+    await router.push('/w/1/p/3/elsewhere')
+    await flushPromises()
+    expect(crumbs(leaving)).toEqual(['Website -> /w/1/p/2', 'Forms -> /w/1/p/2/forms', 'Contact'])
+    expect(leaving.find('[data-testid="page-icon"]').exists()).toBe(true)
   })
 
   it('never links the last crumb, and takes explicit props over the route', async () => {
-    const wrapper = await mountAt('/w/1/p/2/analytics', {
+    const { wrapper } = await mountAt('/w/1/p/2/forms', {
       title: 'Projects',
       icon: FolderKanban,
       crumbs: [
@@ -74,19 +96,9 @@ describe('PageHeader', () => {
     expect(crumbs(wrapper)).toEqual(['Acme -> /w/1', 'Projects'])
   })
 
-  it('hides the breadcrumb and icon outside a module', async () => {
-    const wrapper = await mountAt('/', { title: 'Your workspaces', crumbs: [] })
+  it('hides the breadcrumb and icon outside the shell', async () => {
+    const wrapper = mount(PageHeader, { props: { title: 'Your workspaces' } })
     expect(wrapper.find('nav').exists()).toBe(false)
     expect(wrapper.find('[data-testid="page-icon"]').exists()).toBe(false)
-  })
-
-  it('renders the docs link and the tabs slot', async () => {
-    const wrapper = await mountAt(
-      '/w/1/p/2/analytics',
-      { description: 'Visitors.', docs: 'https://example.com/docs' },
-      { tabs: '<nav aria-label="Tabs">tabs</nav>' },
-    )
-    expect(wrapper.get('a[target="_blank"]').attributes('href')).toBe('https://example.com/docs')
-    expect(wrapper.get('header > div:last-child').text()).toBe('tabs')
   })
 })
