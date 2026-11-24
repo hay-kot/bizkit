@@ -24,30 +24,53 @@ const PROJECT: &str = "bizkit";
 const DASHBOARD: &str = "bizkit usage";
 const PEOPLE: u64 = 40;
 
-/// The site, the seeded usage and the dashboard, once. The file is filled
-/// before the site exists: the running api starts sending live usage as
-/// soon as the site does, and the fill must not race it.
+/// The site, the seeded usage and the dashboard. The fill runs while the
+/// file holds no seeded people, so live usage from the running api (which
+/// starts once the site exists) can't make it skip, and a failed run
+/// after the fill doesn't fill twice.
 pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get(PROJECT) else { return Ok(()) };
-    if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
-        let file = ProjectDb::open(&project_db_path(&seed.data_dir, project_id)).await?;
-        let filled = fill(&file, seed, project_id).await;
-        if filled.is_ok() {
-            let mut tx = db.write().await?;
-            store::insert_site(&mut *tx, &site_row(seed, project_id, &json!([]), "always")).await?;
-            tx.commit().await?;
-        }
-        let marked = match filled {
-            Ok(()) => mark_events(db, &file, seed, project_id).await,
-            Err(err) => Err(err),
-        };
-        file.close().await;
-        marked.context("seeding bizkit usage")?;
-    }
+    let file = ProjectDb::open(&project_db_path(&seed.data_dir, project_id))
+        .await
+        .context("opening the bizkit usage file")?;
+    let seeded = fill_once(db, &file, seed, project_id).await;
+    file.close().await;
+    seeded?;
     let scope = Scope { workspace_id: seed.workspace_id, project_id };
-    let mut tx = db.write().await?;
-    if seed_dashboard(&mut tx, scope, seed.now, DASHBOARD, &insights()?).await? {
-        tx.commit().await?;
+    let mut tx = db.write().await.context("starting the usage dashboard write")?;
+    if seed_dashboard(&mut tx, scope, seed.now, DASHBOARD, &insights()?)
+        .await
+        .context("adding the usage dashboard")?
+    {
+        tx.commit().await.context("committing the usage dashboard")?;
+    }
+    Ok(())
+}
+
+async fn fill_once(
+    db: &Db,
+    file: &ProjectDb,
+    seed: &DemoSeed,
+    project_id: ProjectId,
+) -> anyhow::Result<()> {
+    let filled: bool = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM analytics_people WHERE user_id LIKE 'seed_user_%') AS "filled!: bool""#,
+    )
+    .fetch_one(file.read())
+    .await
+    .context("checking for seeded usage")?;
+    if !filled {
+        fill(file, seed, project_id).await?;
+    }
+    if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
+        let mut tx = db.write().await.context("starting the usage site write")?;
+        store::insert_site(&mut *tx, &site_row(seed, project_id, &json!([]), "always"))
+            .await
+            .context("adding the usage site")?;
+        tx.commit().await.context("committing the usage site")?;
+    }
+    if !filled {
+        mark_events(db, file, seed, project_id).await?;
     }
     Ok(())
 }
@@ -57,7 +80,7 @@ fn insights() -> anyhow::Result<Vec<(&'static str, InsightQuery)>> {
         (
             "API key holders",
             json!({"kind": "people", "filters": [{"key": "api_keys", "op": "gt", "value": 0}],
-                   "breakdown": {"source": "trait", "key": "workspaces"}}),
+                   "breakdown": {"source": "trait", "key": "api_keys"}}),
         ),
         (
             "Share creating API keys",
@@ -81,7 +104,7 @@ struct User {
 async fn fill(file: &ProjectDb, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
     let today = Day::of(seed.now);
     let mut rng = Rng(0x5eed_0b12);
-    let mut tx = file.write().await?;
+    let mut tx = file.write().await.context("starting the usage fill")?;
     let mut users: Vec<(i64, User)> = (0..PEOPLE)
         .map(|n| {
             let signup_age =
@@ -140,13 +163,15 @@ async fn fill(file: &ProjectDb, seed: &DemoSeed, project_id: ProjectId) -> anyho
         let id = store::upsert_person(&mut *tx, seed.workspace_id, project_id, &user_id, event.ts)
             .await?;
         event.person = format!("p:{id}");
-        store::insert_event(&mut *tx, event).await?;
+        store::insert_event(&mut *tx, event).await.context("adding a usage event")?;
         people.insert(user_id, id);
     }
     for (_, user) in &users {
         let Some(&id) = people.get(&user.id) else { continue };
         let traits = json!({ "workspaces": user.workspaces, "api_keys": user.api_keys });
-        store::set_person_traits(&mut *tx, seed.workspace_id, id, &traits.to_string()).await?;
+        store::set_person_traits(&mut *tx, seed.workspace_id, id, &traits.to_string())
+            .await
+            .context("setting usage traits")?;
     }
     tx.commit().await.context("committing bizkit usage")
 }

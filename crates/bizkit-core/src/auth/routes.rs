@@ -198,21 +198,20 @@ async fn verify_inner(
     let email = magic_links::consume(&mut *tx, &hash_token(&body.token), now)
         .await?
         .ok_or(ApiError::Unauthenticated)?;
-    let (user, kind) = if let Some(user) = users::find_by_email(&mut *tx, &email).await? {
-        (user, UsageKind::SignedIn)
+    let user = if let Some(user) = users::find_by_email(&mut *tx, &email).await? {
+        report_sign_in(platform, &mut tx, user.id, UsageKind::SignedIn).await?;
+        user
     } else {
         // Config or invitations may have changed since the link went out.
         if !admitted(platform, &mut tx, &email).await? {
             return Err(ApiError::Unauthenticated);
         }
         let user = users::insert(&mut *tx, &email, now).await?;
+        report_sign_in(platform, &mut tx, user.id, UsageKind::SignedUp).await?;
         apply_policy_joins(platform, &mut tx, &email, user.id).await?;
-        (user, UsageKind::SignedUp)
+        user
     };
     users::touch_sign_in(&mut *tx, user.id, now).await?;
-    let usage =
-        UsageReported { user_id: user.id, kind, workspace_id: None, at: now, affected: Vec::new() };
-    usage::publish(platform.bus(), &mut tx, &usage).await?;
     let token = random_token();
     let session = sessions::NewSession {
         token_hash: &hash_token(&token),
@@ -223,6 +222,22 @@ async fn verify_inner(
     sessions::insert(&mut *tx, session, now).await?;
     tx.commit().await?;
     Ok(token)
+}
+
+async fn report_sign_in(
+    platform: &Platform,
+    tx: &mut WriteTx,
+    user_id: crate::ids::UserId,
+    kind: UsageKind,
+) -> anyhow::Result<()> {
+    let usage = UsageReported {
+        user_id: Some(user_id),
+        kind,
+        workspace_id: None,
+        at: platform.now(),
+        affected: Vec::new(),
+    };
+    usage::publish(platform.bus(), tx, &usage).await
 }
 
 /// Joins a new account to the existing workspaces its policy names. Joins run
@@ -236,7 +251,16 @@ async fn apply_policy_joins(
     let Some(policy) = platform.policies().match_email(email) else { return Ok(()) };
     for join in &policy.join {
         if let Some(workspace) = workspaces::find_by_slug(&mut **tx, &join.workspace).await? {
-            members::insert(&mut **tx, workspace.id, user_id, join.role, platform.now()).await?;
+            if members::insert(&mut **tx, workspace.id, user_id, join.role, platform.now()).await? {
+                let usage = UsageReported {
+                    user_id: Some(user_id),
+                    kind: UsageKind::MemberJoined,
+                    workspace_id: Some(workspace.id),
+                    at: platform.now(),
+                    affected: Vec::new(),
+                };
+                usage::publish(platform.bus(), tx, &usage).await?;
+            }
         } else {
             tracing::warn!(policy = %policy.name, workspace = %join.workspace, "policy join names no workspace; skipped");
         }

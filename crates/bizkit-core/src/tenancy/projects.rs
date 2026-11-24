@@ -126,3 +126,25 @@ pub(crate) async fn delete(
             .await?;
     Ok(result.rows_affected() == 1)
 }
+
+/// The workspace and project IDs of the project with these slugs.
+///
+/// # Errors
+///
+/// When the query fails.
+pub async fn find_by_slugs(
+    exec: impl SqliteExecutor<'_>,
+    workspace_slug: &str,
+    project_slug: &str,
+) -> sqlx::Result<Option<(WorkspaceId, ProjectId)>> {
+    let row = sqlx::query!(
+        r#"SELECT w.id AS "workspace_id: WorkspaceId", p.id AS "project_id: ProjectId"
+           FROM projects p JOIN workspaces w ON w.id = p.workspace_id
+           WHERE w.slug = ? AND p.slug = ?"#,
+        workspace_slug,
+        project_slug,
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(row.map(|row| (row.workspace_id, row.project_id)))
+}

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT w.id AS \"workspace_id: WorkspaceId\", p.id AS \"project_id: ProjectId\"\n           FROM projects p JOIN workspaces w ON w.id = p.workspace_id\n           WHERE w.slug = ? AND p.slug = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c8e4723d10b9ac1d57f31ccb4617059055e3218b8d7bd8405185a3295ab85784"
+}

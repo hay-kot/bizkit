@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM analytics_people WHERE user_id LIKE 'seed_user_%') AS \"filled!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "filled!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b94276a38a0d78edd6b7c4cedb3077e8abf1d1cf22c03d0e5454835846b73d92"
+}

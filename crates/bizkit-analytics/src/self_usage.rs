@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use anyhow::Context as _;
+use bizkit_core::ApiError;
 use bizkit_core::db::Db;
 use bizkit_core::ids::UserId;
 use bizkit_core::jobs::{JobCtx, Subscriber};
@@ -51,22 +52,36 @@ impl Subscriber<UsageReported> for SendUsage {
             );
             return Ok(());
         };
-        let mut events = vec![ServerEvent::from_server(
-            event.kind.event_name(),
-            &event.user_id.to_string(),
-            event.workspace_id.map(|id| {
+        let mut events = Vec::new();
+        if let Some(user) = event.user_id {
+            let props = event.workspace_id.map(|id| {
                 Map::from_iter([("workspace_id".to_owned(), Value::from(id.to_string()))])
-            }),
-            None,
-        )];
-        for user in std::iter::once(event.user_id).chain(event.affected) {
-            events.push(identify(platform.db(), user).await?);
+            });
+            events.push(ServerEvent::from_server(
+                event.kind.event_name(),
+                &user.to_string(),
+                props,
+                None,
+            ));
+        }
+        for user in event.user_id.into_iter().chain(event.affected) {
+            events.push(identify(platform.db(), user).await.context("reading usage traits")?);
         }
         let now = platform.now();
         // A late delivery keeps its day; one from an earlier day takes now,
         // since reports read that day from the rollup, which won't see it.
         let at = if Day::of(event.at) == Day::of(now) { event.at } else { now };
-        server::record(&self.ingest, platform, &site, at, events).await.context("sending usage")
+        match server::record(&self.ingest, platform, &site, at, events).await {
+            Ok(()) => Ok(()),
+            Err(err @ (ApiError::RateLimited { .. } | ApiError::Internal(_))) => {
+                Err(anyhow::Error::new(err).context("sending usage"))
+            }
+            // A retry can't fix a bad event or a site deleted since the lookup.
+            Err(err) => {
+                tracing::warn!(error = %err, "usage not sent");
+                Ok(())
+            }
+        }
     }
 }
 
@@ -81,7 +96,14 @@ async fn identify(db: &Db, user: UserId) -> anyhow::Result<ServerEvent> {
 }
 
 async fn find_site(db: &Db, config: &SelfUsageConfig) -> anyhow::Result<Option<SiteRow>> {
-    store::find_site_by_slugs(db.read(), &config.workspace, &config.project)
+    let Some((workspace_id, project_id)) =
+        bizkit_core::projects::find_by_slugs(db.read(), &config.workspace, &config.project)
+            .await
+            .context("finding the self-usage project")?
+    else {
+        return Ok(None);
+    };
+    store::find_site(db.read(), workspace_id, project_id)
         .await
-        .context("finding the self-usage project")
+        .context("finding the self-usage site")
 }

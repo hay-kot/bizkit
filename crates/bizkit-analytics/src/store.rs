@@ -73,28 +73,6 @@ pub(crate) async fn find_site(
     .await
 }
 
-/// The site of the project with these slugs.
-pub(crate) async fn find_site_by_slugs(
-    exec: impl SqliteExecutor<'_>,
-    workspace_slug: &str,
-    project_slug: &str,
-) -> sqlx::Result<Option<SiteRow>> {
-    sqlx::query_as!(
-        SiteRow,
-        r#"SELECT s.project_id AS "project_id: ProjectId", s.workspace_id AS "workspace_id: WorkspaceId",
-                  s.site_key, s.hostnames, s.identity_mode, s.last_event_day, s.rolled_through,
-                  s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
-           FROM analytics_sites s
-           JOIN workspaces w ON w.id = s.workspace_id
-           JOIN projects p ON p.id = s.project_id AND p.workspace_id = s.workspace_id
-           WHERE w.slug = ? AND p.slug = ?"#,
-        workspace_slug,
-        project_slug,
-    )
-    .fetch_optional(exec)
-    .await
-}
-
 /// Writes the settings columns of `row`, matched by workspace and project.
 pub(crate) async fn update_site_settings(
     exec: impl SqliteExecutor<'_>,

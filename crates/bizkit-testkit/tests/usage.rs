@@ -122,7 +122,7 @@ mod usage {
             ],
             "a second revoke of the same key reports nothing"
         );
-        assert!(events.iter().all(|event| event.user_id == admin_id), "the admin acted");
+        assert!(events.iter().all(|event| event.user_id == Some(admin_id)), "the admin acted");
         let new_ws = created["id"].as_str().unwrap();
         assert_eq!(events[0].workspace_id.map(|id| id.to_string()).as_deref(), Some(new_ws));
         assert!(events[1..].iter().all(|event| event.workspace_id == Some(ws)), "{events:?}");
@@ -160,5 +160,34 @@ mod usage {
         .expect(StatusCode::CREATED);
         app.drain_jobs().await;
         assert_eq!(seen.take(), [], "no person to count");
+    }
+
+    #[tokio::test]
+    async fn an_api_key_revoke_refreshes_the_creator_only() {
+        let seen = Seen::default();
+        let app = app(&seen).await;
+        let team = app.seed(Persona::Team, "u5").await;
+        let ws = team.workspaces["main"].id;
+        let admin = app.with_session(&team.accounts["admin"].session_token);
+        let created = admin
+            .post(
+                &format!("/api/v1/workspaces/{ws}/api-keys"),
+                &json!({ "name": "ci", "scopes": ["projects:read"] }),
+            )
+            .await;
+        created.expect(StatusCode::CREATED);
+        let key_id = created["key"]["id"].as_str().unwrap().to_owned();
+        app.drain_jobs().await;
+        seen.take();
+
+        let key = app.with_key(&team.api_keys["full"].token);
+        key.delete(&format!("/api/v1/workspaces/{ws}/api-keys/{key_id}"))
+            .await
+            .expect(StatusCode::NO_CONTENT);
+        app.drain_jobs().await;
+        let events = seen.take();
+        assert_eq!(kinds(&events), [UsageKind::ApiKeyRevoked]);
+        assert_eq!(events[0].user_id, None, "a key is no person");
+        assert_eq!(events[0].affected, [team.accounts["admin"].id], "the creator's count changed");
     }
 }

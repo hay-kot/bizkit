@@ -36,7 +36,7 @@ pub use crate::module::{DemoSeed, Lifecycle, Module, ModuleContext};
 
 /// Projects, for modules that keep data per project.
 pub mod projects {
-    pub use crate::tenancy::projects::exists;
+    pub use crate::tenancy::projects::{exists, find_by_slugs};
 }
 
 /// Workspace members, for modules that check an address against them.

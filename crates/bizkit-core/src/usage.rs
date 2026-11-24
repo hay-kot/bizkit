@@ -60,8 +60,9 @@ impl UsageKind {
 /// Published in the transaction of a user's action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UsageReported {
-    /// Who acted.
-    pub user_id: UserId,
+    /// Who acted. `None` when an API key acted: there is no person to
+    /// count the event for, and only `affected` users get fresh traits.
+    pub user_id: Option<UserId>,
     /// What they did.
     pub kind: UsageKind,
     /// The workspace they did it in, if any.
@@ -134,16 +135,24 @@ impl Report {
     }
 }
 
-/// Publishes `report` in `tx` for the signed-in user. Nothing for API keys
-/// and anonymous calls: they have no person to count the action for.
+/// Publishes `report` in `tx`. An API key or anonymous caller counts no
+/// event, but the users it affected still get fresh traits.
 pub(crate) async fn report(cx: &OpCtx, tx: &mut WriteTx, report: Report) -> anyhow::Result<()> {
-    let Some(Principal::User(user)) = cx.principal() else { return Ok(()) };
+    let user_id = match cx.principal() {
+        Some(Principal::User(user)) => Some(user.user_id),
+        _ => None,
+    };
+    let affected: Vec<UserId> =
+        report.affected.into_iter().filter(|id| Some(*id) != user_id).collect();
+    if user_id.is_none() && affected.is_empty() {
+        return Ok(());
+    }
     let event = UsageReported {
-        user_id: user.user_id,
+        user_id,
         kind: report.kind,
         workspace_id: Some(report.workspace_id),
         at: cx.now(),
-        affected: report.affected.into_iter().filter(|id| *id != user.user_id).collect(),
+        affected,
     };
     publish(cx.platform().bus(), tx, &event).await
 }

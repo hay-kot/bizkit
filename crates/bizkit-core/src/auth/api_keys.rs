@@ -116,8 +116,8 @@ pub(crate) async fn touch(
     Ok(())
 }
 
-/// Revokes an unrevoked key in `workspace_id`. False when there is none.
-/// Revokes a working key. `None` when there is none; else who created it.
+/// Revokes an unrevoked key in `workspace_id`. `None` when there is none;
+/// else who created it.
 pub(crate) async fn revoke(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
