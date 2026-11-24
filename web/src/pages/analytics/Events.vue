@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Activity, X } from 'lucide-vue-next'
+import { Activity, Lightbulb, X } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
+import { linkFromExplorer } from '@/components/analytics/insightDraft'
 import RangeToolbar from '@/components/analytics/RangeToolbar.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import DataTable from '@/components/ui/DataTable.vue'
@@ -36,6 +37,17 @@ const filter = computed((): EventFilter => {
   )
   return { name, props: list }
 })
+
+/** A new insight that starts from this filter. */
+const saveAsInsight = computed(() => ({
+  path: `/w/${props.workspaceId}/p/${props.projectId}/analytics/insights/new`,
+  query: {
+    ...linkFromExplorer(filter.value.name, filter.value.props),
+    range: route.query.range,
+    from: route.query.from,
+    to: route.query.to,
+  },
+}))
 
 function setFilter(next: EventFilter) {
   void router.replace({
@@ -146,6 +158,11 @@ const viewingFacts = computed(() => {
     title="Events"
     description="Custom events sent with bizkit.track or the server API."
   >
+    <template #actions>
+      <RouterLink :to="saveAsInsight" class="btn gap-1.5 btn-sm">
+        <Lightbulb class="size-4" aria-hidden="true" />Save as insight
+      </RouterLink>
+    </template>
     <RangeToolbar v-model:range="range" :today="today">
       <Select v-model="selectedName" :options="nameOptions" label="Event name" size="sm" />
       <form class="flex items-center gap-2" @submit.prevent="addProp">
