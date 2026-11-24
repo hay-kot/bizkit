@@ -4,14 +4,15 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
-import InsightBuilder from '@/components/analytics/InsightBuilder.vue'
 import {
-  draftOf,
-  emptyInsight,
-  type InsightDraft,
-  isRunnable,
-  queryOf,
-} from '@/components/analytics/insightDraft'
+  canonicalQuery,
+  currentQuery,
+  editorOfDraft,
+  editorOfQuery,
+  type InsightEditorState,
+  saveBlocker,
+} from '@/components/analytics/insightCode'
+import InsightEditor from '@/components/analytics/InsightEditor.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import DetailActions from '@/components/ui/DetailActions.vue'
 import Field from '@/components/ui/Field.vue'
@@ -65,13 +66,13 @@ const range = computed<DateRange>({
   set: (next) => (urlRange.value = next),
 })
 
-const draft = ref<InsightDraft>(emptyInsight())
-// Seed the draft once per insight: refetches after a rename or a pin must
+const editor = ref<InsightEditorState>(editorOfDraft())
+// Seed the editor once per insight: refetches after a rename or a pin must
 // not throw away edits that aren't saved yet.
 watch(
   () => insight.value?.id,
   (id) => {
-    if (id && insight.value) draft.value = draftOf(insight.value.query)
+    if (id && insight.value) editor.value = editorOfQuery(insight.value.query)
   },
   { immediate: true },
 )
@@ -81,19 +82,23 @@ const savedRange = computed((): InsightRange => {
 const dirty = computed(() => {
   const saved = insight.value
   if (!saved) return false
+  const query = currentQuery(editor.value)
   return (
-    JSON.stringify(queryOf(draft.value)) !== JSON.stringify(queryOf(draftOf(saved.query))) ||
+    !query.ok ||
+    canonicalQuery(query.value) !== canonicalQuery(saved.query) ||
     savedRange.value !== saved.range
   )
 })
 
 const update = useUpdateInsight()
 function onSave() {
+  const query = currentQuery(editor.value)
+  if (!query.ok) return
   return runAction({
     run: () =>
       update.mutateAsync({
         path: { workspace_id: props.workspaceId, insight_id: props.insightId },
-        body: { query: queryOf(draft.value), range: savedRange.value },
+        body: { query: query.value, range: savedRange.value },
       }),
     success: 'Insight saved',
   })
@@ -213,7 +218,7 @@ function onDelete() {
           form: 'insight-form',
           dirty,
           pending: update.isLoading.value && !renaming,
-          blocked: isRunnable(draft) ? undefined : 'Pick an event first.',
+          blocked: saveBlocker(editor),
         }"
       >
         <template #menu>
@@ -230,16 +235,17 @@ function onDelete() {
     <p v-if="!savedPreset(range.preset)" class="text-sm text-base-content/70">
       This range isn't saved. The insight opens on its saved range.
     </p>
-    <form id="insight-form" class="contents" @submit.prevent="onSave">
-      <InsightBuilder
-        v-if="insight"
-        v-model:range="range"
-        v-model:draft="draft"
-        :workspace-id="workspaceId"
-        :project-id="projectId"
-        :today="today"
-      />
-    </form>
+    <!-- Save submits this form from the header. The editor stays outside it,
+         so Enter in a builder field never saves. -->
+    <form id="insight-form" class="hidden" @submit.prevent="onSave" />
+    <InsightEditor
+      v-if="insight"
+      v-model:range="range"
+      v-model:editor="editor"
+      :workspace-id="workspaceId"
+      :project-id="projectId"
+      :today="today"
+    />
 
     <FormPanel
       :open="renaming"

@@ -37,7 +37,7 @@ test('build a per-user insight, save it and pin it to a new dashboard', async ({
   await page.getByRole('combobox', { name: 'Event' }).click()
   await page.getByRole('option', { name: 'workspace_created' }).click()
   await page.getByRole('combobox', { name: 'Measure' }).click()
-  await page.getByRole('option', { name: /Per-user distribution/ }).click()
+  await page.getByRole('option', { name: /Times per user/ }).click()
   const bars = page.getByRole('listitem').filter({ hasText: /times?/ })
   await expect(bars).toHaveText(
     ['1 time Users: 1', '2 times Users: 0', '3 times Users: 1', '4 times Users: 0', '5+ times Users: 0'],

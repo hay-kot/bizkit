@@ -24,9 +24,12 @@ export interface InsightDraft {
   breakdownKey: string
 }
 
+/** The most filters a query takes; the server refuses more. */
+export const MAX_FILTERS = 10
+
 export const MEASURES: { value: Measure; label: string; description: string }[] = [
-  { value: 'total', label: 'Events', description: 'How many times it happened' },
-  { value: 'users', label: 'Users', description: 'How many people did it' },
+  { value: 'total', label: 'Total events', description: 'How many times it happened' },
+  { value: 'users', label: 'Unique users', description: 'How many people did it' },
   {
     value: 'share',
     label: 'Share of active users',
@@ -34,18 +37,45 @@ export const MEASURES: { value: Measure; label: string; description: string }[] 
   },
   {
     value: 'per_user',
-    label: 'Per-user distribution',
+    label: 'Times per user',
     description: 'People with a stored ID by how many times they did it',
   },
 ]
 
-export const FILTER_OPS: { value: FilterOp; label: string }[] = [
-  { value: 'is', label: 'is' },
-  { value: 'is_not', label: 'is not' },
-  { value: 'gt', label: '>' },
-  { value: 'lt', label: '<' },
-  { value: 'is_set', label: 'is set' },
+export const FILTER_OPS: { value: FilterOp; label: string; short: string }[] = [
+  { value: 'is', label: 'is', short: 'is' },
+  { value: 'is_not', label: 'is not', short: 'is not' },
+  { value: 'gt', label: 'greater than', short: '>' },
+  { value: 'lt', label: 'less than', short: '<' },
+  { value: 'is_set', label: 'is set', short: 'is set' },
 ]
+
+/**
+ * The comparisons that fit a key whose values take `types`. `gt` and `lt`
+ * never match text, so they only show when the key has numbers; a key the
+ * schema doesn't know (`undefined`) gets every comparison.
+ */
+export function opsFor(types: string[] | undefined): typeof FILTER_OPS {
+  if (!types || types.includes('number')) return FILTER_OPS
+  return FILTER_OPS.filter((o) => o.value !== 'gt' && o.value !== 'lt')
+}
+
+/**
+ * The comparisons to offer for a key: those that fit its types, plus the
+ * ones in `keep` (the filter's saved op and the current choice). The type
+ * check only narrows new choices; it never hides or replaces an op the
+ * filter already has.
+ */
+export function opsForChoice(types: string[] | undefined, keep: FilterOp[]): typeof FILTER_OPS {
+  const fit = new Set(opsFor(types).map((o) => o.value))
+  return FILTER_OPS.filter((o) => fit.has(o.value) || keep.includes(o.value))
+}
+
+/** A filter as a chip reads it: `plan is pro`, `seats > 3`, `beta is set`. */
+export function describeFilter(filter: FilterDraft): string {
+  const op = FILTER_OPS.find((o) => o.value === filter.op)?.short ?? filter.op
+  return filter.op === 'is_set' ? `${filter.key} ${op}` : `${filter.key} ${op} ${filter.value}`
+}
 
 export function emptyInsight(): InsightDraft {
   return {
@@ -65,11 +95,13 @@ export function emptyFilter(): FilterDraft {
 function filterOf(draft: FilterDraft): InsightFilter {
   const key = draft.key.trim()
   if (draft.op === 'is_set') return { key, op: draft.op }
+  // gt and lt compare numbers. is and is_not send the text exactly as
+  // typed (a stored " pro " is a different value from "pro"), and the
+  // server also compares it as a number when it reads as one.
+  if (draft.op === 'is' || draft.op === 'is_not') return { key, op: draft.op, value: draft.value }
   const text = draft.value.trim()
   const number = Number(text)
-  // gt and lt compare numbers; is and is_not send text, which the server
-  // also compares as a number when it reads as one.
-  const numeric = (draft.op === 'gt' || draft.op === 'lt') && text !== '' && Number.isFinite(number)
+  const numeric = text !== '' && Number.isFinite(number)
   return { key, op: draft.op, value: numeric ? number : text }
 }
 
@@ -78,7 +110,7 @@ function filterOf(draft: FilterDraft): InsightFilter {
  * one (a number for gt and lt). Rows still being filled in are left out of
  * the query, so the result doesn't fail or drop to zero while typing.
  */
-function isComplete(draft: FilterDraft): boolean {
+export function isComplete(draft: FilterDraft): boolean {
   if (draft.key.trim() === '') return false
   if (draft.op === 'is_set') return true
   const text = draft.value.trim()
@@ -95,7 +127,33 @@ export function queryOf(draft: InsightDraft): InsightQuery {
       ? { source: draft.kind === 'people' ? ('trait' as const) : draft.breakdownSource, key }
       : null
   if (draft.kind === 'people') return { kind: 'people', filters, breakdown }
-  return { kind: 'events', event: draft.event.trim(), filters, measure: draft.measure, breakdown }
+  return { kind: 'events', event: draft.event, filters, measure: draft.measure, breakdown }
+}
+
+const BREAKDOWN_SOURCES: readonly BreakdownSource[] = ['property', 'trait']
+
+/** The breakdown picker's value for a source and key: `property:plan`. */
+export function breakdownChoice(source: BreakdownSource | '', key: string): string {
+  return source && key ? `${source}:${key}` : ''
+}
+
+/**
+ * The breakdown a picker value asks for. A listed value carries its source
+ * (`trait:plan`); anything else is a key typed by hand, which breaks down
+ * by the kind's own source: an event property for events, a trait for
+ * people.
+ */
+export function breakdownOfChoice(
+  value: string,
+  kind: InsightKind,
+): Pick<InsightDraft, 'breakdownSource' | 'breakdownKey'> {
+  if (value.trim() === '') return { breakdownSource: '', breakdownKey: '' }
+  const at = value.indexOf(':')
+  const source = BREAKDOWN_SOURCES.find((s) => s === value.slice(0, at))
+  if (at > 0 && source && value.length > at + 1) {
+    return { breakdownSource: source, breakdownKey: value.slice(at + 1) }
+  }
+  return { breakdownSource: kind === 'people' ? 'trait' : 'property', breakdownKey: value.trim() }
 }
 
 /** True when the draft can run: an events insight needs an event name. */
@@ -149,7 +207,7 @@ const MEASURE_WORDS: Record<Measure, string> = {
   total: 'Events',
   users: 'Users',
   share: 'Share of active users',
-  per_user: 'Per user',
+  per_user: 'Times per user',
 }
 
 /** A short line that says what an insight counts, for lists. */
