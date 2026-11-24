@@ -47,6 +47,8 @@ const SWEEP_EVERY: Duration = Duration::from_mins(1);
 const REMOVE_WAIT: Duration = Duration::from_mins(1);
 /// How often that wait checks.
 const HOLDER_POLL: Duration = Duration::from_millis(20);
+/// How long closing a removed file's pools may take.
+const CLOSE_WAIT: Duration = Duration::from_secs(10);
 
 /// The project-file migrations. Versions share one `_sqlx_migrations`
 /// table with the app migrations in the sqlx prepare database, so they
@@ -295,10 +297,23 @@ impl Files {
             drop(open);
             break slot;
         };
-        let opened = slot.file.get_or_try_init(|| open_file(platform, scope)).await.cloned();
+        let opened_here = AtomicBool::new(false);
+        let opened = slot
+            .file
+            .get_or_try_init(|| {
+                opened_here.store(true, Ordering::SeqCst);
+                open_file(platform, scope)
+            })
+            .await
+            .cloned();
         match opened {
             Ok(file) if slot.closed.load(Ordering::SeqCst) => {
-                file.stop().await;
+                // `remove` or `stop_all` closed the slot. A file opened
+                // before that is theirs to close, after waiting for its
+                // readers; only one opened after they looked is ours.
+                if opened_here.load(Ordering::SeqCst) {
+                    file.stop().await;
+                }
                 Ok(None)
             }
             Ok(file) => Ok(Some(file)),
@@ -432,11 +447,22 @@ impl Files {
             drop(slot);
             if let Some(file) = file {
                 file.stop_writer().await;
+                self.sites.clear();
                 // A report that started before the delete still reads the
                 // file; closing the pools under it would fail it with a 500.
                 // New gets find no site, so the holders only go down.
-                wait_for_holders(&file, REMOVE_WAIT).await;
-                file.db.close().await;
+                if !wait_for_holders(&file, REMOVE_WAIT).await {
+                    tracing::warn!(
+                        project = %project_id,
+                        holders = Arc::strong_count(&file) - 1,
+                        "closing a deleted project's file while reads still hold it"
+                    );
+                }
+                // Close waits for checked-out connections; a stuck read
+                // mustn't keep the delete past its job timeout.
+                if tokio::time::timeout(CLOSE_WAIT, file.db.close()).await.is_err() {
+                    tracing::warn!(project = %project_id, "a deleted project's file didn't close in time");
+                }
             }
         }
         let path = project_db_path(data_dir, project_id);
@@ -479,19 +505,17 @@ impl Files {
     }
 }
 
-/// Returns once `file` has no holder but the caller, or after `limit`.
-async fn wait_for_holders(file: &Arc<ProjectFile>, limit: Duration) {
+/// Waits until `file` has no holder but the caller. False when `limit`
+/// passed first.
+async fn wait_for_holders(file: &Arc<ProjectFile>, limit: Duration) -> bool {
     let deadline = Instant::now() + limit;
     while Arc::strong_count(file) > 1 {
         if Instant::now() >= deadline {
-            tracing::warn!(
-                holders = Arc::strong_count(file) - 1,
-                "closing a deleted project's file while reads still hold it"
-            );
-            return;
+            return false;
         }
         tokio::time::sleep(HOLDER_POLL).await;
     }
+    true
 }
 
 /// The slot's file, after waiting for an open in progress. Opens nothing
@@ -674,7 +698,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let held = file(dir.path(), "held").await;
         let other = Arc::clone(&held);
-        wait_for_holders(&held, Duration::from_millis(50)).await;
+        assert!(!wait_for_holders(&held, Duration::from_millis(50)).await);
         assert_eq!(Arc::strong_count(&other), 2, "returned with the holder still there");
         held.stop().await;
     }

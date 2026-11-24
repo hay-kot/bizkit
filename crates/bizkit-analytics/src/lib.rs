@@ -42,7 +42,7 @@ use anyhow::Context as _;
 #[cfg(feature = "test-hooks")]
 use bizkit_core::DemoSeed;
 use bizkit_core::api::ProjectDeleted;
-use bizkit_core::jobs::{JobCtx, Subscriber};
+use bizkit_core::jobs::{JobCtx, Lane, Subscriber};
 use bizkit_core::usage::UsageReported;
 use bizkit_core::{Lifecycle, Module, ModuleContext};
 use futures::future::BoxFuture;
@@ -140,6 +140,9 @@ struct DeleteProjectFile(Arc<Files>);
 
 impl Subscriber<ProjectDeleted> for DeleteProjectFile {
     const NAME: &'static str = "analytics";
+    /// Removing waits for reports that still read the file, up to a
+    /// minute, so it gets a lane of its own instead of holding up mail.
+    const LANE: Lane = Lane { name: "analytics-delete", concurrency: 1 };
 
     async fn handle(&self, cx: JobCtx, event: ProjectDeleted) -> anyhow::Result<()> {
         let data_dir = cx.platform.config().data_dir.as_deref().context("data_dir is not set")?;
