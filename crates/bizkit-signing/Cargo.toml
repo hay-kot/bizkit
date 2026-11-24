@@ -1,0 +1,45 @@
+[package]
+name = "bizkit-signing"
+description = "The bizkit doc signing module: signature requests, a public signing page, and sealed PDFs with an audit trail"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[features]
+# The demo seed for the dev stack; needs core's dev helpers.
+test-hooks = ["bizkit-core/test-hooks"]
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+base64.workspace = true
+bizkit-core.workspace = true
+bytes.workspace = true
+cms.workspace = true
+futures.workspace = true
+http.workspace = true
+lopdf.workspace = true
+p256.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sha2-010.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+url.workspace = true
+utoipa.workspace = true
+x509-cert.workspace = true
+
+[dev-dependencies]
+bizkit-testkit.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

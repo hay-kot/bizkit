@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM signing_requests WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b576b3b4d736aff62de53bfa28a4cbda02bacb129d02f3c1d0c40adb852fc087"
+}

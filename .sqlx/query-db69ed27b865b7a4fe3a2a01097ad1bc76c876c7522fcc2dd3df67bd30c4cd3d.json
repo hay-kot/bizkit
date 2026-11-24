@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE signing_requests SET signed_sha256 = ? WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "db69ed27b865b7a4fe3a2a01097ad1bc76c876c7522fcc2dd3df67bd30c4cd3d"
+}

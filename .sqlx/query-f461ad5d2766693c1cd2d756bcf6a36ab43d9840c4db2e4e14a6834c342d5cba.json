@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO signing_files (request_id, workspace_id, kind, bytes) VALUES (?, ?, ?, ?)\n         ON CONFLICT (request_id, kind) DO UPDATE SET bytes = excluded.bytes",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "f461ad5d2766693c1cd2d756bcf6a36ab43d9840c4db2e4e14a6834c342d5cba"
+}
