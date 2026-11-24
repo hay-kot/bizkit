@@ -27,8 +27,10 @@ use crate::deps::Deps;
 use crate::error::ApiError;
 use crate::hooks::Hooks;
 use crate::jobs::{Bus, Worker};
+use crate::mail::MailRouter;
 use crate::module::{Lifecycle, Module, Registration, register_all};
 use crate::ops::{Registry, ScopeAreas};
+use crate::secrets::{SecretKey, Secrets};
 use crate::tenancy::workspaces;
 use crate::time::UnixMillis;
 
@@ -50,6 +52,8 @@ struct PlatformInner {
     modules: Vec<&'static str>,
     hooks: Hooks,
     lifecycles: Vec<Arc<dyn Lifecycle>>,
+    secrets: Option<Secrets>,
+    mail: MailRouter,
 }
 
 impl Platform {
@@ -75,6 +79,20 @@ impl Platform {
     #[must_use]
     pub fn deps(&self) -> &Deps {
         &self.0.deps
+    }
+
+    /// Seals and opens secrets at rest, or `None` when the instance has no
+    /// secrets key.
+    #[must_use]
+    pub fn secrets(&self) -> Option<&Secrets> {
+        self.0.secrets.as_ref()
+    }
+
+    /// Picks the mailer for each mail. Send workspace mail through this,
+    /// never through `deps().mailer`.
+    #[must_use]
+    pub fn mail(&self) -> &MailRouter {
+        &self.0.mail
     }
 
     /// Writes jobs and events into write transactions.
@@ -231,6 +249,13 @@ impl App {
             tracing::warn!("config: {warning}");
         }
         let base_url = config.base_url.clone().context("base_url is not set")?;
+        let secrets = config
+            .secrets_key
+            .as_deref()
+            .map(SecretKey::from_base64)
+            .transpose()
+            .context("reading the secrets key (secrets_key_env)")?
+            .map(|key| Secrets::new(&key));
         let names: Vec<&'static str> = modules.iter().map(|module| module.name()).collect();
         for key in config.modules.keys() {
             if !names.contains(&key.as_str()) {
@@ -268,6 +293,8 @@ impl App {
             modules: names,
             hooks: hooks.finish(),
             lifecycles,
+            secrets,
+            mail: MailRouter::default(),
             config,
         }));
         let worker = Worker::new(platform.clone(), handlers);

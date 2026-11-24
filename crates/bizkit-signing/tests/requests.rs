@@ -117,6 +117,7 @@ mod requests {
         assert_eq!(mails.len(), 2);
         let ada = mails.iter().find(|mail| mail.to == "ada@example.test").unwrap();
         assert_eq!(ada.subject, "Please sign: Services agreement");
+        assert_eq!(ada.workspace_id, Some(s.team.workspaces["main"].id), "workspace mail");
         assert!(ada.text.contains("Please sign by Friday."), "{}", ada.text);
         let link = ada
             .text

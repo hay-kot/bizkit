@@ -17,7 +17,7 @@ use serde_json::json;
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
 
-use crate::fakes::{FakeClock, FakeHooks, FakeHttp, FakeMailer, MemBlobs};
+use crate::fakes::{FakeClock, FakeHooks, FakeHttp, FakeMailer, FakeTransports, MemBlobs};
 use crate::mcp_client::McpClient;
 use crate::spec_client::{SpecChecker, SpecClient, session_from};
 
@@ -30,8 +30,10 @@ pub const BASE_URL: &str = "http://localhost:8484";
 pub struct TestApp {
     /// The app's clock.
     pub clock: FakeClock,
-    /// The app's mailer.
+    /// The app's instance mailer.
     pub mail: FakeMailer,
+    /// Workspace mail accounts.
+    pub workspace_mail: FakeTransports,
     /// The app's outbound HTTP.
     pub http: FakeHttp,
     /// The app's blob store.
@@ -102,11 +104,13 @@ impl TestAppBuilder {
         config.data_dir = Some(dir.path().to_path_buf());
         let clock = FakeClock::default();
         let mail = FakeMailer::default();
+        let workspace_mail = FakeTransports::default();
         let http = FakeHttp::default();
         let blobs = MemBlobs::default();
         let deps = Deps {
             clock: Arc::new(clock.clone()),
             mailer: Arc::new(mail.clone()),
+            mail_transports: Arc::new(workspace_mail.clone()),
             http: Arc::new(http.clone()),
             blobs: Arc::new(blobs.clone()),
         };
@@ -115,13 +119,14 @@ impl TestAppBuilder {
             .unwrap_or_else(|err| panic!("building the app: {err:#}"));
         let checker = Arc::new(SpecChecker::new(app.openapi_json().clone()));
         let server = Arc::new(TestServer::new(app.router()));
-        TestApp { clock, mail, http, blobs, app, server, checker, dir }
+        TestApp { clock, mail, workspace_mail, http, blobs, app, server, checker, dir }
     }
 }
 
 impl TestApp {
     /// An app with core only and the default test config: one `sign_up`
-    /// policy, `test`, that admits `*@example.com`.
+    /// policy, `test`, that admits `*@example.com`, and a fresh secrets
+    /// key.
     ///
     /// # Panics
     ///
@@ -139,6 +144,7 @@ impl TestApp {
     pub fn builder() -> TestAppBuilder {
         let mut config = Config {
             base_url: Some(BASE_URL.parse().unwrap_or_else(|err| panic!("{err}"))),
+            secrets_key: Some(bizkit_core::secrets::SecretKey::generate().to_base64()),
             ..Config::default()
         };
         config.auth.policies = vec![PolicyConfig {

@@ -58,6 +58,8 @@ mod tests {
             html: None,
             unsubscribe: None,
             id: None,
+            workspace_id: None,
+            reply_to: None,
         }
     }
 

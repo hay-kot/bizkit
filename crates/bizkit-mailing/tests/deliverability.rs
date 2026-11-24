@@ -43,7 +43,11 @@ mod deliverability {
     }
 
     fn sign(timestamp: &str, token: &str) -> String {
-        let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(KEY.as_bytes()).unwrap();
+        sign_with(KEY, timestamp, token)
+    }
+
+    fn sign_with(key: &str, timestamp: &str, token: &str) -> String {
+        let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(key.as_bytes()).unwrap();
         mac.update(timestamp.as_bytes());
         mac.update(token.as_bytes());
         hex::encode(mac.finalize().into_bytes())
@@ -367,6 +371,117 @@ mod deliverability {
                 .await
                 .expect(StatusCode::UNAUTHORIZED);
         }
+    }
+
+    fn signed(key: &str, timestamp: i64, token: &str, event_data: &Value) -> String {
+        let timestamp = timestamp.to_string();
+        json!({
+            "signature": {
+                "timestamp": timestamp,
+                "token": token,
+                "signature": sign_with(key, &timestamp, token),
+            },
+            "event-data": event_data,
+        })
+        .to_string()
+    }
+
+    /// A delivery in a second workspace, sent by the instance mailer.
+    async fn other_workspace_delivery(s: &Setup) -> (Manifest, Value) {
+        let other = s.app.seed(Persona::Team, "other").await;
+        let other_admin = s.app.with_session(&other.accounts["admin"].session_token);
+        let other_ws = format!("/api/v1/workspaces/{}/mailing", other.workspaces["main"].id);
+        let other_list: Value = other_admin
+            .post(
+                &format!("{other_ws}/lists"),
+                &json!({"name": "N", "project_id": other.projects["site"].id.to_string(), "double_opt_in": false}),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        other_admin
+            .post(
+                &format!("{other_ws}/lists/{}/contacts", id(&other_list)),
+                &json!({"email": "bob@example.com"}),
+            )
+            .await
+            .expect(StatusCode::CREATED);
+        let other_broadcast: Value = other_admin
+            .post(
+                &format!("{other_ws}/broadcasts"),
+                &json!({"list_id": id(&other_list), "subject": "Hi", "body_md": "Hi"}),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        other_admin
+            .post(&format!("{other_ws}/broadcasts/{}/send", id(&other_broadcast)), &json!({}))
+            .await
+            .expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let other_delivery: Value = other_admin
+            .get(&format!("{other_ws}/deliveries?broadcast_id={}", id(&other_broadcast)))
+            .await
+            .expect(StatusCode::OK)
+            .json::<Value>()["items"][0]
+            .clone();
+        (other, other_delivery)
+    }
+
+    #[tokio::test]
+    async fn a_workspace_account_sends_its_mail_and_takes_its_own_events() {
+        let s = setup().await;
+        let ws = s.team.workspaces["main"].id;
+        let settings = json!({
+            "provider": "mailgun",
+            "from_name": "Deliv",
+            "from_address": "news@mg.deliv.example",
+            "mailgun": {"domain": "mg.deliv.example", "api_key": "k", "webhook_signing_key": "ws-key"},
+        });
+        let saved = s
+            .admin
+            .send(Method::PUT, &format!("/api/v1/workspaces/{ws}/mail/settings"), Some(&settings))
+            .await;
+        saved.expect(StatusCode::OK);
+        let hook = format!("/m/mailing/public/events/mailgun/{ws}");
+        assert_eq!(saved["mailgun"]["webhook_url"], format!("http://localhost:8484{hook}"), "url");
+
+        let list = s.list("News").await;
+        s.subscribed(&list, "ada@example.com").await;
+        let broadcast = s.send(&list).await;
+        let delivery = s.deliveries(&broadcast).await.remove(0);
+        assert!(s.app.mail.sent().is_empty(), "nothing through the instance mailer");
+        let sent = s.app.workspace_mail.sent();
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(sent[0].from, "Deliv <news@mg.deliv.example>", "workspace sender");
+        assert_eq!(delivery["provider_id"], format!("{}@account", id(&delivery)), "provider id");
+
+        let (other, other_delivery) = other_workspace_delivery(&s).await;
+
+        let client = s.app.client();
+        let post = |body: String| {
+            client.send_body(Method::POST, &hook, RawBody::new("application/json", body))
+        };
+        let now = s.now_secs();
+        post(signed(KEY, now, "w0", &failed(&delivery))).await.expect(StatusCode::UNAUTHORIZED);
+        post(signed("ws-key", now, "w1", &failed(&other_delivery))).await.expect(StatusCode::OK);
+        assert!(s.suppressions("").await["items"].as_array().unwrap().is_empty(), "not its mail");
+        post(signed("ws-key", now, "w2", &failed(&delivery))).await.expect(StatusCode::OK);
+        assert_eq!(s.deliveries(&broadcast).await[0]["event"], "bounced", "its own mail");
+
+        let none = format!("/m/mailing/public/events/mailgun/{}", other.workspaces["main"].id);
+        s.app
+            .client()
+            .send_body(
+                Method::POST,
+                &none,
+                RawBody::new(
+                    "application/json",
+                    signed("ws-key", now, "w3", &failed(&other_delivery)),
+                ),
+            )
+            .await
+            .expect(StatusCode::UNAUTHORIZED);
     }
 
     fn at(s: &Setup, ahead: Duration) -> Value {

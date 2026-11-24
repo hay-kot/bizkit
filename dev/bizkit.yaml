@@ -10,6 +10,10 @@ server:
     # svx sets this variable for the api, so the Mailgun event webhook at
     # /m/mailing/public/events/mailgun takes requests signed with it.
     webhook_signing_key_env: MAILGUN_WEBHOOK_KEY
+  # svx sets this dev-only key, so workspaces can save their own mail
+  # settings. In development builds a workspace SMTP host may be loopback,
+  # so the stack's Mailpit works as a workspace account.
+  secrets_key_env: BIZKIT_SECRETS_KEY
   auth:
     policies:
       - name: dev

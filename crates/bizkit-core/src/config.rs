@@ -34,6 +34,15 @@ pub struct Config {
     pub trusted_proxies: u8,
     /// Each module's own section, keyed by module name.
     pub modules: BTreeMap<String, serde_json::Value>,
+    /// The name of the environment variable that holds the instance secrets
+    /// key: 32 random bytes in standard base64 (`openssl rand -base64 32`).
+    /// It seals credentials at rest, such as workspace mail passwords.
+    /// Without it, workspaces can't save their own mail settings.
+    pub secrets_key_env: Option<String>,
+    /// The secrets key itself, read from `secrets_key_env` by `serve`.
+    /// Never read from the file.
+    #[serde(skip)]
+    pub secrets_key: Option<String>,
 }
 
 /// Outgoing mail settings.
@@ -103,7 +112,9 @@ pub struct MailgunConfig {
 }
 
 /// The Mailgun region, which picks the API host.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, serde::Serialize, utoipa::ToSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum MailgunRegion {
     /// `api.mailgun.net`.

@@ -9,7 +9,10 @@ pub mod test_app;
 
 pub use bizkit_core::dev::personas::{Manifest, Persona};
 
-pub use crate::fakes::{Dispatch, FakeClock, FakeHooks, FakeHttp, FakeMailer, MemBlobs, SyncCall};
+pub use crate::fakes::{
+    AccountMail, Dispatch, FakeClock, FakeHooks, FakeHttp, FakeMailer, FakeTransports, MemBlobs,
+    SyncCall,
+};
 pub use crate::mcp_client::McpClient;
 pub use crate::spec_client::{ApiResponse, RawBody, SpecChecker, SpecClient, Typed};
 pub use crate::test_app::{BASE_URL, TestApp, TestAppBuilder};

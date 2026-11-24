@@ -141,6 +141,8 @@ async fn sign_in_inner(platform: &Platform, request_id: &str, body: &[u8]) -> Re
         html: None,
         unsubscribe: None,
         id: None,
+        workspace_id: None,
+        reply_to: None,
     };
     platform.bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
     tx.commit().await?;

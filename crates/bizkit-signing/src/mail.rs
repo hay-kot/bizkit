@@ -21,6 +21,8 @@ pub(crate) fn sign_request(request: &RequestRow, signer: &SignerRow, link: &Url)
         html: None,
         unsubscribe: None,
         id: None,
+        workspace_id: Some(request.workspace_id),
+        reply_to: None,
     }
 }
 
@@ -38,6 +40,8 @@ pub(crate) fn completed(request: &RequestRow, to: &str, link: &Url, sha256: &str
         html: None,
         unsubscribe: None,
         id: None,
+        workspace_id: Some(request.workspace_id),
+        reply_to: None,
     }
 }
 

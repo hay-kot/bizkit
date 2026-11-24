@@ -8428,6 +8428,438 @@
         "x-bizkit-scope": "workspace:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mail/settings": {
+      "get": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Show the workspace's mail account and sender, without secrets",
+        "operationId": "mail.settings.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceMail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "workspace:admin"
+      },
+      "put": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Set the workspace's own mail account (SMTP or Mailgun) and sender; secrets are write-only",
+        "operationId": "mail.settings.put",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "from_name",
+                  "from_address"
+                ],
+                "properties": {
+                  "from_address": {
+                    "type": "string",
+                    "description": "The sender's address. The account must be allowed to send from it."
+                  },
+                  "from_name": {
+                    "type": "string",
+                    "description": "The sender's display name, 1-120 characters."
+                  },
+                  "mailgun": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/MailgunInput",
+                        "description": "Required with `provider: mailgun`."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "provider": {
+                    "$ref": "#/components/schemas/AccountProvider",
+                    "description": "Which service sends."
+                  },
+                  "reply_to": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Where replies go, when not to the sender."
+                  },
+                  "smtp": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/SmtpInput",
+                        "description": "Required with `provider: smtp`."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "workspace:admin"
+      },
+      "delete": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Remove the workspace's mail account; the instance mailer sends its mail again",
+        "operationId": "mail.settings.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "workspace:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mail/settings/test": {
+      "post": {
+        "tags": [
+          "mail"
+        ],
+        "summary": "Send a test mail to yourself through the workspace's mail account",
+        "operationId": "mail.settings.test",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "workspace:admin"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/mailing/addresses/erase": {
       "post": {
         "tags": [
@@ -15134,6 +15566,90 @@
         }
       }
     },
+    "/m/mailing/public/events/mailgun/{workspace_id}": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Receive Mailgun delivery events for a workspace's own account",
+        "description": "The webhook for a workspace that sends through its own Mailgun account, signed with the webhook signing key in its mail settings. It handles events as the instance webhook does, for that workspace's deliveries only.",
+        "operationId": "mailing.public.mailgun_workspace_events",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "`{signature: {timestamp, token, signature}, \"event-data\": {...}}`",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a Mailgun event",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The signature is wrong, or the workspace saved no signing key",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "406": {
+            "description": "A replayed token or a stale timestamp; Mailgun stops retrying",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Bizkit failed; Mailgun retries",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/m/mailing/public/manage": {
       "get": {
         "tags": [
@@ -15681,6 +16197,14 @@
             "description": "Always true."
           }
         }
+      },
+      "AccountProvider": {
+        "type": "string",
+        "description": "Which service sends a workspace's mail.",
+        "enum": [
+          "smtp",
+          "mailgun"
+        ]
       },
       "AddressExport": {
         "type": "object",
@@ -18390,6 +18914,185 @@
           }
         }
       },
+      "MailSettings": {
+        "type": "object",
+        "description": "A workspace's own mail account. Secrets never come back: only whether\neach is set.",
+        "required": [
+          "provider",
+          "from_name",
+          "from_address",
+          "updated_at"
+        ],
+        "properties": {
+          "from_address": {
+            "type": "string",
+            "description": "The sender's address."
+          },
+          "from_name": {
+            "type": "string",
+            "description": "The sender's display name."
+          },
+          "mailgun": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MailgunSettings",
+                "description": "The Mailgun account, when `provider` is `mailgun`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "$ref": "#/components/schemas/AccountProvider",
+            "description": "Which service sends."
+          },
+          "reply_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where replies go, when not to the sender."
+          },
+          "smtp": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SmtpSettings",
+                "description": "The SMTP server, when `provider` is `smtp`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the settings last changed."
+          },
+          "verified_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When a test mail last went out with these settings. Any change\nclears it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MailTestResult": {
+        "type": "object",
+        "description": "The result of a test send.",
+        "required": [
+          "to",
+          "sent"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's or the connection's error, when it didn't."
+          },
+          "sent": {
+            "type": "boolean",
+            "description": "Whether the account accepted the mail."
+          },
+          "to": {
+            "type": "string",
+            "description": "Where the test went: the caller's address."
+          },
+          "verified_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the settings were verified; set by a test that sent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MailgunInput": {
+        "type": "object",
+        "description": "A Mailgun account.",
+        "required": [
+          "domain"
+        ],
+        "properties": {
+          "api_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The API key. Write-only."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The sending domain, such as `mg.example.com`."
+          },
+          "region": {
+            "$ref": "#/components/schemas/MailgunRegion",
+            "description": "The region. Default `us`."
+          },
+          "webhook_signing_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The webhook signing key, to accept the account's bounce and\ncomplaint events. Write-only."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MailgunRegion": {
+        "type": "string",
+        "description": "The Mailgun region, which picks the API host.",
+        "enum": [
+          "us",
+          "eu"
+        ]
+      },
+      "MailgunSettings": {
+        "type": "object",
+        "description": "A Mailgun account, without its keys.",
+        "required": [
+          "domain",
+          "region",
+          "has_api_key",
+          "has_webhook_signing_key"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The sending domain."
+          },
+          "has_api_key": {
+            "type": "boolean",
+            "description": "Whether an API key is saved."
+          },
+          "has_webhook_signing_key": {
+            "type": "boolean",
+            "description": "Whether a webhook signing key is saved."
+          },
+          "region": {
+            "$ref": "#/components/schemas/MailgunRegion",
+            "description": "The region."
+          },
+          "webhook_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to point the account's event webhook, so bounces and\ncomplaints reach bizkit. Null without the mailing module."
+          }
+        }
+      },
       "MailingForm": {
         "type": "object",
         "description": "A form a list can take addresses from.",
@@ -19816,6 +20519,92 @@
           }
         }
       },
+      "SmtpInput": {
+        "type": "object",
+        "description": "An SMTP server.",
+        "required": [
+          "host",
+          "port",
+          "security"
+        ],
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "The host name. It must resolve to public addresses."
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The password. Write-only."
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The port, such as 465 for `tls` or 587 for `starttls`.",
+            "minimum": 0
+          },
+          "security": {
+            "$ref": "#/components/schemas/SmtpSecurity",
+            "description": "How the connection is encrypted. `none` works only for local hosts\nin development builds."
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The user name, when the server wants sign-in."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SmtpSecurity": {
+        "type": "string",
+        "description": "How an SMTP connection is encrypted.",
+        "enum": [
+          "tls",
+          "starttls",
+          "none"
+        ]
+      },
+      "SmtpSettings": {
+        "type": "object",
+        "description": "An SMTP server, without its password.",
+        "required": [
+          "host",
+          "port",
+          "security",
+          "has_password"
+        ],
+        "properties": {
+          "has_password": {
+            "type": "boolean",
+            "description": "Whether a password is saved."
+          },
+          "host": {
+            "type": "string",
+            "description": "The host name."
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The port.",
+            "minimum": 0
+          },
+          "security": {
+            "$ref": "#/components/schemas/SmtpSecurity",
+            "description": "How the connection is encrypted."
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The user name."
+          }
+        }
+      },
       "Step": {
         "type": "object",
         "description": "One funnel step.",
@@ -20385,6 +21174,35 @@
       "WorkspaceId": {
         "type": "string",
         "format": "uuid"
+      },
+      "WorkspaceMail": {
+        "type": "object",
+        "description": "A workspace's mail settings and whether it can have them.",
+        "required": [
+          "can_save",
+          "instance_from"
+        ],
+        "properties": {
+          "can_save": {
+            "type": "boolean",
+            "description": "Whether the instance has a secrets key. Without one, saving fails."
+          },
+          "instance_from": {
+            "type": "string",
+            "description": "The `From` of the instance mailer, which sends without settings."
+          },
+          "settings": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MailSettings",
+                "description": "The workspace's own account, or null when the instance mailer sends\nits mail."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "WorkspaceRef": {
         "type": "object",

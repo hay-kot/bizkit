@@ -38,6 +38,7 @@ axum-test = "21.1.0"
 base64 = "0.23.1"
 bolero = "0.13.7"
 bytes = "1.12.1"
+chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["alloc"] }
 clap = { version = "4", features = ["derive", "env", "string", "wrap_help"] }
 clap_complete = "4"
 etcetera = "0.11"

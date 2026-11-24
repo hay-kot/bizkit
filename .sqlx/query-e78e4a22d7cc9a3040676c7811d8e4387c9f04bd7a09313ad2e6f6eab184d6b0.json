@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO workspace_mail (workspace_id, provider, from_name, from_address, reply_to,\n             smtp_host, smtp_port, smtp_security, smtp_username, mailgun_domain, mailgun_region,\n             secrets, verified_at, created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)\n         ON CONFLICT (workspace_id) DO UPDATE SET\n             provider = excluded.provider, from_name = excluded.from_name,\n             from_address = excluded.from_address, reply_to = excluded.reply_to,\n             smtp_host = excluded.smtp_host, smtp_port = excluded.smtp_port,\n             smtp_security = excluded.smtp_security, smtp_username = excluded.smtp_username,\n             mailgun_domain = excluded.mailgun_domain, mailgun_region = excluded.mailgun_region,\n             secrets = excluded.secrets, verified_at = NULL, updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 14
+    },
+    "nullable": []
+  },
+  "hash": "e78e4a22d7cc9a3040676c7811d8e4387c9f04bd7a09313ad2e6f6eab184d6b0"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT updated_at AS \"updated_at: UnixMillis\" FROM workspace_mail WHERE workspace_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "workspace_mail",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "82cdbd726f5802bf353d0d98421863b6ec521959ffb3b811803620429a0b2462"
+}

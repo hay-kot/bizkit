@@ -9,6 +9,8 @@ use async_trait::async_trait;
 use bizkit_core::Platform;
 use bizkit_core::deps::{Blob, BlobKey, BlobStore, Clock, HttpClient, Mail, MailError, Mailer};
 use bizkit_core::hooks::{HookPoint, HookRunner, HookTarget, SyncOutcome};
+use bizkit_core::ids::WorkspaceId;
+use bizkit_core::mail::{MailAccount, MailTransports};
 use bizkit_core::time::UnixMillis;
 use bytes::Bytes;
 use http::{HeaderMap, Method, StatusCode};
@@ -103,6 +105,102 @@ impl Mailer for FakeMailer {
         }
         lock(&self.sent).push(mail.clone());
         Ok(mail.id.as_ref().map(|id| format!("{id}@fake")))
+    }
+}
+
+/// A mail one workspace account sent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountMail {
+    /// The account's workspace.
+    pub workspace_id: WorkspaceId,
+    /// The account's `From`.
+    pub from: String,
+    /// The account's default `Reply-To`.
+    pub reply_to: Option<String>,
+    /// The mail.
+    pub mail: Mail,
+}
+
+#[derive(Debug, Default)]
+struct TransportState {
+    built: Vec<MailAccount>,
+    sent: Vec<AccountMail>,
+    build_error: Option<String>,
+}
+
+/// Workspace mail accounts without a network: each build records the
+/// account, and every mailer built records what it sends in one list.
+#[derive(Debug, Clone, Default)]
+pub struct FakeTransports {
+    state: Arc<Mutex<TransportState>>,
+    fail_next: Arc<AtomicU32>,
+}
+
+impl FakeTransports {
+    /// Every account a mailer was built for, oldest first.
+    #[must_use]
+    pub fn built(&self) -> Vec<MailAccount> {
+        lock(&self.state).built.clone()
+    }
+
+    /// Every mail workspace accounts sent so far.
+    #[must_use]
+    pub fn sent(&self) -> Vec<AccountMail> {
+        lock(&self.state).sent.clone()
+    }
+
+    /// Makes every build fail with `error` until called with `None`.
+    pub fn fail_builds(&self, error: Option<&str>) {
+        lock(&self.state).build_error = error.map(str::to_owned);
+    }
+
+    /// Makes the next `n` sends through any account fail with a transient
+    /// error.
+    pub fn fail_next(&self, n: u32) {
+        self.fail_next.store(n, Ordering::SeqCst);
+    }
+}
+
+#[async_trait]
+impl MailTransports for FakeTransports {
+    async fn build(&self, account: &MailAccount) -> anyhow::Result<Arc<dyn Mailer>> {
+        {
+            let mut state = lock(&self.state);
+            if let Some(error) = &state.build_error {
+                anyhow::bail!("{error}");
+            }
+            state.built.push(account.clone());
+        }
+        Ok(Arc::new(FakeAccountMailer {
+            workspace_id: account.workspace_id,
+            from: account.from.to_string(),
+            reply_to: account.reply_to.as_ref().map(ToString::to_string),
+            transports: self.clone(),
+        }))
+    }
+}
+
+#[derive(Debug)]
+struct FakeAccountMailer {
+    workspace_id: WorkspaceId,
+    from: String,
+    reply_to: Option<String>,
+    transports: FakeTransports,
+}
+
+#[async_trait]
+impl Mailer for FakeAccountMailer {
+    async fn send(&self, mail: &Mail) -> Result<Option<String>, MailError> {
+        if take_one(&self.transports.fail_next) {
+            return Err(MailError::Transient("421 fake account told to fail".to_owned()));
+        }
+        lock(&self.transports.state).sent.push(AccountMail {
+            workspace_id: self.workspace_id,
+            from: self.from.clone(),
+            reply_to: self.reply_to.clone(),
+            mail: mail.clone(),
+        });
+        Ok(mail.id.as_ref().map(|id| format!("{id}@account")))
     }
 }
 
@@ -222,6 +320,8 @@ mod tests {
             html: None,
             unsubscribe: None,
             id: None,
+            workspace_id: None,
+            reply_to: None,
         };
         mailer.fail_next_permanent(1);
         assert!(mailer.send(&mail).await.unwrap_err().is_permanent(), "permanent first");

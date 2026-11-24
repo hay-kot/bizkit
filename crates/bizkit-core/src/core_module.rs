@@ -15,6 +15,7 @@ impl Module for CoreModule {
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
         crate::tenancy::ops::register(cx)?;
         crate::auth::ops::register(cx)?;
+        crate::mail::ops::register(cx)?;
         cx.job(SendMailHandler)?;
         Ok(())
     }

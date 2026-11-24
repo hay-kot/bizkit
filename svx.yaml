@@ -29,6 +29,7 @@ services:
     depends: [mailpit]
     env:
       MAILGUN_WEBHOOK_KEY: dev-webhook-key # a dev-only key, to post signed sample events with curl
+      BIZKIT_SECRETS_KEY: L5ZxOE4SLfK6/R+ZxtAkTQF1253i1wNArmwgA1nocWA= # dev-only; seals workspace mail settings
     ready: { http: /healthz, timeout: 5m } # the first cargo build is slow
     links: { OpenAPI: /api/openapi.json }
 

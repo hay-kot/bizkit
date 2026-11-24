@@ -13,6 +13,7 @@ use std::time::Duration;
 use anyhow::Context as _;
 use axum::Extension;
 use axum::body::Bytes;
+use axum::extract::Path;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse as _, Response};
 use bizkit_core::Platform;
@@ -125,21 +126,70 @@ async fn find_delivery(
     }
 }
 
-/// `POST /events/mailgun`.
+#[utoipa::path(
+    post,
+    path = "/events/mailgun/{workspace_id}",
+    operation_id = "mailing.public.mailgun_workspace_events",
+    tag = "mailing",
+    summary = "Receive Mailgun delivery events for a workspace's own account",
+    description = "The webhook for a workspace that sends through its own Mailgun account, signed with the webhook signing key in its mail settings. It handles events as the instance webhook does, for that workspace's deliveries only.",
+    params(("workspace_id" = String, Path, description = "The workspace")),
+    request_body(content = Object, content_type = "application/json", description = "`{signature: {timestamp, token, signature}, \"event-data\": {...}}`"),
+    responses(
+        (status = 200, description = "Accepted", content_type = "text/plain", body = String),
+        (status = 400, description = "Not a Mailgun event", content_type = "text/plain", body = String),
+        (status = 401, description = "The signature is wrong, or the workspace saved no signing key", content_type = "text/plain", body = String),
+        (status = 406, description = "A replayed token or a stale timestamp; Mailgun stops retrying", content_type = "text/plain", body = String),
+        (status = 500, description = "Bizkit failed; Mailgun retries", content_type = "text/plain", body = String),
+    )
+)]
+#[expect(dead_code, reason = "exists for its utoipa docs")]
+pub(crate) const fn mailgun_workspace_docs() {}
+
+/// `POST /events/mailgun`: the instance account's events.
 pub(crate) async fn mailgun(Extension(platform): Extension<Platform>, body: Bytes) -> Response {
-    let payload: Payload = match serde_json::from_slice(&body) {
+    let key = platform.config().mail.webhook_signing_key.clone();
+    if key.is_none() {
+        tracing::warn!("a Mailgun webhook arrived, but mail.webhook_signing_key_env is not set");
+    }
+    receive(&platform, &body, key, None).await
+}
+
+/// `POST /events/mailgun/{workspace_id}`: a workspace account's events.
+pub(crate) async fn mailgun_workspace(
+    Extension(platform): Extension<Platform>,
+    Path(workspace_id): Path<WorkspaceId>,
+    body: Bytes,
+) -> Response {
+    let key = match platform.mail().webhook_signing_key(&platform, workspace_id).await {
+        Ok(key) => key,
+        Err(err) => {
+            tracing::error!(%workspace_id, error = %format!("{err:#}"), "reading a workspace's Mailgun webhook key failed");
+            return plain(StatusCode::INTERNAL_SERVER_ERROR, "Try again later.\n");
+        }
+    };
+    receive(&platform, &body, key, Some(workspace_id)).await
+}
+
+/// Checks and records one event. With `only`, deliveries of other
+/// workspaces are left alone: a workspace's key vouches for its own mail.
+async fn receive(
+    platform: &Platform,
+    body: &[u8],
+    key: Option<String>,
+    only: Option<WorkspaceId>,
+) -> Response {
+    let payload: Payload = match serde_json::from_slice(body) {
         Ok(payload) => payload,
         Err(err) => {
             tracing::warn!(error = %err, "a Mailgun webhook body has no signature or event-data");
             return plain(StatusCode::BAD_REQUEST, "Expected a Mailgun event.\n");
         }
     };
-    let key =
-        platform.config().mail.webhook_signing_key.as_deref().filter(|k| !k.trim().is_empty());
-    let Some(key) = key else {
-        tracing::warn!("a Mailgun webhook arrived, but mail.webhook_signing_key_env is not set");
+    let Some(key) = key.filter(|k| !k.trim().is_empty()) else {
         return plain(StatusCode::UNAUTHORIZED, "No signing key is set.\n");
     };
+    let key = key.as_str();
     let sig = &payload.signature;
     if !verify_mailgun_signature(key, &sig.timestamp, &sig.token, &sig.signature) {
         return plain(StatusCode::UNAUTHORIZED, "Bad signature.\n");
@@ -152,7 +202,7 @@ pub(crate) async fn mailgun(Extension(platform): Extension<Platform>, body: Byte
     if !fresh {
         return plain(StatusCode::NOT_ACCEPTABLE, "Stale timestamp.\n");
     }
-    match record(&platform, &payload, now).await {
+    match record(platform, &payload, now, only).await {
         Ok(true) => plain(StatusCode::OK, "OK\n"),
         Ok(false) => plain(StatusCode::NOT_ACCEPTABLE, "Token already used.\n"),
         Err(err) => {
@@ -164,7 +214,12 @@ pub(crate) async fn mailgun(Extension(platform): Extension<Platform>, body: Byte
 
 /// Claims the token and records the event in one transaction. False when
 /// the token was used before.
-async fn record(platform: &Platform, payload: &Payload, now: UnixMillis) -> anyhow::Result<bool> {
+async fn record(
+    platform: &Platform,
+    payload: &Payload,
+    now: UnixMillis,
+    only: Option<WorkspaceId>,
+) -> anyhow::Result<bool> {
     let mut tx = platform.db().write().await?;
     let claimed =
         store::claim_webhook_token(&mut tx, &payload.signature.token, now, now.minus(TOKEN_TTL))
@@ -181,8 +236,10 @@ async fn record(platform: &Platform, payload: &Payload, now: UnixMillis) -> anyh
             return Ok(true);
         }
     };
-    let found =
-        find_delivery(&mut tx, &payload.event_data).await.context("finding the delivery")?;
+    let found = find_delivery(&mut tx, &payload.event_data)
+        .await
+        .context("finding the delivery")?
+        .filter(|(workspace_id, ..)| only.is_none_or(|only| only == *workspace_id));
     if let Some((workspace_id, delivery_id, to_email)) = found {
         store::mark_delivery_event(&mut *tx, workspace_id, delivery_id, event.as_str(), now)
             .await

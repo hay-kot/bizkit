@@ -15,6 +15,7 @@ use crate::config::MailConfig;
 #[derive(Debug, Clone)]
 pub struct SmtpMailer {
     from: Mailbox,
+    reply_to: Option<Mailbox>,
     transport: AsyncSmtpTransport<Tokio1Executor>,
 }
 
@@ -36,7 +37,17 @@ impl SmtpMailer {
             let user = percent_decode(url.username());
             builder = builder.credentials(Credentials::new(user, password));
         }
-        Ok(Self { from, transport: builder.build() })
+        Ok(Self { from, reply_to: None, transport: builder.build() })
+    }
+
+    /// A mailer over a transport the caller built, with a default
+    /// `Reply-To`.
+    pub(crate) const fn with_transport(
+        from: Mailbox,
+        reply_to: Option<Mailbox>,
+        transport: AsyncSmtpTransport<Tokio1Executor>,
+    ) -> Self {
+        Self { from, reply_to, transport }
     }
 }
 
@@ -69,6 +80,13 @@ impl SmtpMailer {
             .to(to)
             .subject(&mail.subject)
             .message_id(Some(format!("<{message_id}>")));
+        let reply_to = match &mail.reply_to {
+            Some(text) => Some(text.parse().with_context(|| format!("parsing reply-to {text:?}"))?),
+            None => self.reply_to.clone(),
+        };
+        if let Some(reply_to) = reply_to {
+            builder = builder.reply_to(reply_to);
+        }
         if let Some(url) = &mail.unsubscribe {
             builder = builder
                 .raw_header(HeaderValue::new(
@@ -131,12 +149,8 @@ mod tests {
 
     fn mail(unsubscribe: Option<&str>) -> Mail {
         Mail {
-            to: "ada@example.com".to_owned(),
-            subject: "Hello".to_owned(),
-            text: "Hi".to_owned(),
-            html: None,
             unsubscribe: unsubscribe.map(|url| Url::parse(url).expect("url")),
-            id: None,
+            ..Mail::new("ada@example.com", "Hello", "Hi")
         }
     }
 
@@ -166,6 +180,25 @@ mod tests {
         let text = formatted(&with_id);
         assert!(text.contains("Message-ID: <0190-abc@example.com>"), "{text}");
         assert!(mailer().message_id(&mail(None)).ends_with("@example.com"), "generated id");
+    }
+
+    #[test]
+    fn reply_to_comes_from_the_mail_else_the_default() {
+        let none = formatted(&mail(None));
+        assert!(!none.contains("Reply-To"), "{none}");
+        let with = Mail { reply_to: Some("ada@example.org".to_owned()), ..mail(None) };
+        let given = formatted(&with);
+        assert!(given.contains("Reply-To: ada@example.org"), "{given}");
+        let defaulted = SmtpMailer::with_transport(
+            "bizkit <noreply@example.com>".parse().expect("from"),
+            Some("help@example.com".parse().expect("reply-to")),
+            AsyncSmtpTransport::<Tokio1Executor>::unencrypted_localhost(),
+        );
+        let id = defaulted.message_id(&mail(None));
+        let fallback =
+            String::from_utf8(defaulted.message(&mail(None), &id).expect("message").formatted())
+                .expect("utf-8");
+        assert!(fallback.contains("Reply-To: help@example.com"), "{fallback}");
     }
 
     #[test]

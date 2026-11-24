@@ -3568,6 +3568,208 @@ expression: tools
     },
     {
       "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Remove the workspace's mail account; the instance mailer sends its mail again",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "The workspace.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "mail_settings_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show the workspace's mail account and sender, without secrets",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "The workspace.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "mail_settings_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Set the workspace's own mail account (SMTP or Mailgun) and sender; secrets are write-only",
+      "inputSchema": {
+        "$defs": {
+          "AccountProvider": {
+            "description": "Which service sends a workspace's mail.",
+            "enum": [
+              "smtp",
+              "mailgun"
+            ],
+            "type": "string"
+          },
+          "MailgunInput": {
+            "additionalProperties": false,
+            "description": "A Mailgun account.",
+            "properties": {
+              "api_key": {
+                "description": "The API key. Write-only.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "domain": {
+                "description": "The sending domain, such as `mg.example.com`.",
+                "type": "string"
+              },
+              "region": {
+                "$ref": "#/$defs/MailgunRegion",
+                "description": "The region. Default `us`."
+              },
+              "webhook_signing_key": {
+                "description": "The webhook signing key, to accept the account's bounce and\ncomplaint events. Write-only.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "domain"
+            ],
+            "type": "object"
+          },
+          "MailgunRegion": {
+            "description": "The Mailgun region, which picks the API host.",
+            "enum": [
+              "us",
+              "eu"
+            ],
+            "type": "string"
+          },
+          "SmtpInput": {
+            "additionalProperties": false,
+            "description": "An SMTP server.",
+            "properties": {
+              "host": {
+                "description": "The host name. It must resolve to public addresses.",
+                "type": "string"
+              },
+              "password": {
+                "description": "The password. Write-only.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "port": {
+                "description": "The port, such as 465 for `tls` or 587 for `starttls`.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "security": {
+                "$ref": "#/$defs/SmtpSecurity",
+                "description": "How the connection is encrypted. `none` works only for local hosts\nin development builds."
+              },
+              "username": {
+                "description": "The user name, when the server wants sign-in.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "security"
+            ],
+            "type": "object"
+          },
+          "SmtpSecurity": {
+            "description": "How an SMTP connection is encrypted.",
+            "enum": [
+              "tls",
+              "starttls",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "New mail settings, replacing any saved ones. A secret left out keeps the\nsaved one when the provider stays the same; an empty string removes it.",
+        "properties": {
+          "from_address": {
+            "description": "The sender's address. The account must be allowed to send from it.",
+            "type": "string"
+          },
+          "from_name": {
+            "description": "The sender's display name, 1-120 characters.",
+            "type": "string"
+          },
+          "mailgun": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MailgunInput",
+                "description": "Required with `provider: mailgun`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "$ref": "#/$defs/AccountProvider",
+            "description": "Which service sends."
+          },
+          "reply_to": {
+            "description": "Where replies go, when not to the sender.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "smtp": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SmtpInput",
+                "description": "Required with `provider: smtp`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "from_name",
+          "from_address"
+        ],
+        "type": "object"
+      },
+      "name": "mail_settings_put"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Send a test mail to yourself through the workspace's mail account",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A test send.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "mail_settings_test"
+    },
+    {
+      "annotations": {
         "destructiveHint": false,
         "readOnlyHint": false
       },

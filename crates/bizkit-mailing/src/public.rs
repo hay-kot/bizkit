@@ -61,6 +61,7 @@ pub(crate) fn router() -> Router {
         .route("/unsubscribe", get(unsubscribe_page).post(unsubscribe_post))
         .route("/manage", get(manage_page).post(manage_post))
         .route("/events/mailgun", post(crate::events::mailgun))
+        .route("/events/mailgun/{workspace_id}", post(crate::events::mailgun_workspace))
 }
 
 /// The token a link carries.
@@ -182,7 +183,8 @@ const fn manage_docs() {}
     unsubscribe_docs,
     manage_page_docs,
     manage_docs,
-    crate::events::mailgun_docs
+    crate::events::mailgun_docs,
+    crate::events::mailgun_workspace_docs
 ))]
 pub(crate) struct PublicDocs;
 

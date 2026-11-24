@@ -15,6 +15,11 @@ export type Accepted = {
 };
 
 /**
+ * Which service sends a workspace's mail.
+ */
+export type AccountProvider = 'smtp' | 'mailgun';
+
+/**
  * Everything mailing holds on one address in a workspace.
  */
 export type AddressExport = {
@@ -1564,6 +1569,110 @@ export type MailDeliveryPage = {
 };
 
 /**
+ * A workspace's own mail account. Secrets never come back: only whether
+ * each is set.
+ */
+export type MailSettings = {
+    /**
+     * The sender's address.
+     */
+    from_address: string;
+    /**
+     * The sender's display name.
+     */
+    from_name: string;
+    mailgun?: MailgunSettings | null;
+    /**
+     * Which service sends.
+     */
+    provider: AccountProvider;
+    /**
+     * Where replies go, when not to the sender.
+     */
+    reply_to?: string | null;
+    smtp?: SmtpSettings | null;
+    /**
+     * When the settings last changed.
+     */
+    updated_at: Timestamp;
+    verified_at?: Timestamp | null;
+};
+
+/**
+ * The result of a test send.
+ */
+export type MailTestResult = {
+    /**
+     * The provider's or the connection's error, when it didn't.
+     */
+    error?: string | null;
+    /**
+     * Whether the account accepted the mail.
+     */
+    sent: boolean;
+    /**
+     * Where the test went: the caller's address.
+     */
+    to: string;
+    verified_at?: Timestamp | null;
+};
+
+/**
+ * A Mailgun account.
+ */
+export type MailgunInput = {
+    /**
+     * The API key. Write-only.
+     */
+    api_key?: string | null;
+    /**
+     * The sending domain, such as `mg.example.com`.
+     */
+    domain: string;
+    /**
+     * The region. Default `us`.
+     */
+    region?: MailgunRegion;
+    /**
+     * The webhook signing key, to accept the account's bounce and
+     * complaint events. Write-only.
+     */
+    webhook_signing_key?: string | null;
+};
+
+/**
+ * The Mailgun region, which picks the API host.
+ */
+export type MailgunRegion = 'us' | 'eu';
+
+/**
+ * A Mailgun account, without its keys.
+ */
+export type MailgunSettings = {
+    /**
+     * The sending domain.
+     */
+    domain: string;
+    /**
+     * Whether an API key is saved.
+     */
+    has_api_key: boolean;
+    /**
+     * Whether a webhook signing key is saved.
+     */
+    has_webhook_signing_key: boolean;
+    /**
+     * The region.
+     */
+    region: MailgunRegion;
+    /**
+     * Where to point the account's event webhook, so bounces and
+     * complaints reach bizkit. Null without the mailing module.
+     */
+    webhook_url?: string | null;
+};
+
+/**
  * A form a list can take addresses from.
  */
 export type MailingForm = {
@@ -2527,6 +2636,64 @@ export type Site = {
 };
 
 /**
+ * An SMTP server.
+ */
+export type SmtpInput = {
+    /**
+     * The host name. It must resolve to public addresses.
+     */
+    host: string;
+    /**
+     * The password. Write-only.
+     */
+    password?: string | null;
+    /**
+     * The port, such as 465 for `tls` or 587 for `starttls`.
+     */
+    port: number;
+    /**
+     * How the connection is encrypted. `none` works only for local hosts
+     * in development builds.
+     */
+    security: SmtpSecurity;
+    /**
+     * The user name, when the server wants sign-in.
+     */
+    username?: string | null;
+};
+
+/**
+ * How an SMTP connection is encrypted.
+ */
+export type SmtpSecurity = 'tls' | 'starttls' | 'none';
+
+/**
+ * An SMTP server, without its password.
+ */
+export type SmtpSettings = {
+    /**
+     * Whether a password is saved.
+     */
+    has_password: boolean;
+    /**
+     * The host name.
+     */
+    host: string;
+    /**
+     * The port.
+     */
+    port: number;
+    /**
+     * How the connection is encrypted.
+     */
+    security: SmtpSecurity;
+    /**
+     * The user name.
+     */
+    username?: string | null;
+};
+
+/**
  * One funnel step.
  */
 export type Step = {
@@ -2881,6 +3048,21 @@ export type Workspace = {
 };
 
 export type WorkspaceId = string;
+
+/**
+ * A workspace's mail settings and whether it can have them.
+ */
+export type WorkspaceMail = {
+    /**
+     * Whether the instance has a secrets key. Without one, saving fails.
+     */
+    can_save: boolean;
+    /**
+     * The `From` of the instance mailer, which sends without settings.
+     */
+    instance_from: string;
+    settings?: MailSettings | null;
+};
 
 /**
  * A workspace's ID, slug and name.
@@ -6984,6 +7166,217 @@ export type InvitationsRevokeResponses = {
 
 export type InvitationsRevokeResponse = InvitationsRevokeResponses[keyof InvitationsRevokeResponses];
 
+export type MailSettingsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mail/settings';
+};
+
+export type MailSettingsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailSettingsDeleteError = MailSettingsDeleteErrors[keyof MailSettingsDeleteErrors];
+
+export type MailSettingsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type MailSettingsDeleteResponse = MailSettingsDeleteResponses[keyof MailSettingsDeleteResponses];
+
+export type MailSettingsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mail/settings';
+};
+
+export type MailSettingsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailSettingsGetError = MailSettingsGetErrors[keyof MailSettingsGetErrors];
+
+export type MailSettingsGetResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceMail;
+};
+
+export type MailSettingsGetResponse = MailSettingsGetResponses[keyof MailSettingsGetResponses];
+
+export type MailSettingsPutData = {
+    body: {
+        /**
+         * The sender's address. The account must be allowed to send from it.
+         */
+        from_address: string;
+        /**
+         * The sender's display name, 1-120 characters.
+         */
+        from_name: string;
+        mailgun?: MailgunInput | null;
+        /**
+         * Which service sends.
+         */
+        provider: AccountProvider;
+        /**
+         * Where replies go, when not to the sender.
+         */
+        reply_to?: string | null;
+        smtp?: SmtpInput | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mail/settings';
+};
+
+export type MailSettingsPutErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailSettingsPutError = MailSettingsPutErrors[keyof MailSettingsPutErrors];
+
+export type MailSettingsPutResponses = {
+    /**
+     * OK
+     */
+    200: MailSettings;
+};
+
+export type MailSettingsPutResponse = MailSettingsPutResponses[keyof MailSettingsPutResponses];
+
+export type MailSettingsTestData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mail/settings/test';
+};
+
+export type MailSettingsTestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorBody;
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailSettingsTestError = MailSettingsTestErrors[keyof MailSettingsTestErrors];
+
+export type MailSettingsTestResponses = {
+    /**
+     * OK
+     */
+    200: MailTestResult;
+};
+
+export type MailSettingsTestResponse = MailSettingsTestResponses[keyof MailSettingsTestResponses];
+
 export type MailingAddressesEraseData = {
     body: {
         /**
@@ -10181,6 +10574,53 @@ export type MailingPublicMailgunEventsResponses = {
 };
 
 export type MailingPublicMailgunEventsResponse = MailingPublicMailgunEventsResponses[keyof MailingPublicMailgunEventsResponses];
+
+export type MailingPublicMailgunWorkspaceEventsData = {
+    /**
+     * `{signature: {timestamp, token, signature}, "event-data": {...}}`
+     */
+    body: {
+        [key: string]: unknown;
+    };
+    path: {
+        /**
+         * The workspace
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/m/mailing/public/events/mailgun/{workspace_id}';
+};
+
+export type MailingPublicMailgunWorkspaceEventsErrors = {
+    /**
+     * Not a Mailgun event
+     */
+    400: string;
+    /**
+     * The signature is wrong, or the workspace saved no signing key
+     */
+    401: string;
+    /**
+     * A replayed token or a stale timestamp; Mailgun stops retrying
+     */
+    406: string;
+    /**
+     * Bizkit failed; Mailgun retries
+     */
+    500: string;
+};
+
+export type MailingPublicMailgunWorkspaceEventsError = MailingPublicMailgunWorkspaceEventsErrors[keyof MailingPublicMailgunWorkspaceEventsErrors];
+
+export type MailingPublicMailgunWorkspaceEventsResponses = {
+    /**
+     * Accepted
+     */
+    200: string;
+};
+
+export type MailingPublicMailgunWorkspaceEventsResponse = MailingPublicMailgunWorkspaceEventsResponses[keyof MailingPublicMailgunWorkspaceEventsResponses];
 
 export type MailingPublicManagePageData = {
     body?: never;
