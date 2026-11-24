@@ -4037,6 +4037,531 @@
         "x-bizkit-scope": "analytics:read"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/analytics/schema/events": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List the event names a project sent, pageview included, most sent first",
+        "operationId": "analytics.schema.events",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Day",
+                  "description": "The first day, UTC. Give it with `to`; default 29 days before today."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Text the name contains, ignoring ASCII case."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Day",
+                  "description": "The last day, UTC, inclusive. Give it with `from`; default today."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaEventList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/schema/keys": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List the event property or person trait keys a project has, with their value types",
+        "operationId": "analytics.schema.keys",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only properties of this event (`pageview` included). Property source only."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Day",
+                  "description": "The first day, UTC. Give it with `to`; default 29 days before today.\nThe trait source ignores the range."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Text the key contains, ignoring ASCII case."
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SchemaSource",
+              "description": "Event properties or person traits."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Day",
+                  "description": "The last day, UTC, inclusive. Give it with `from`; default today."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaKeyList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/analytics/schema/values": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List the top values of an event property or person trait, in text form",
+        "operationId": "analytics.schema.values",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only values on this event (`pageview` included). Property source only."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Day",
+                  "description": "The first day, UTC. Give it with `to`; default 29 days before today.\nThe trait source ignores the range."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The property or trait key, matched exactly."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 20.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Text the value contains, ignoring ASCII case."
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SchemaSource",
+              "description": "Event properties or person traits."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Day",
+                  "description": "The last day, UTC, inclusive. Give it with `from`; default today."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaValueList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/analytics/site": {
       "get": {
         "tags": [
@@ -18633,6 +19158,162 @@
           "timeout",
           "overloaded",
           "invalid_output"
+        ]
+      },
+      "SchemaEvent": {
+        "type": "object",
+        "description": "One event name seen in the scanned events.",
+        "required": [
+          "name",
+          "events",
+          "users",
+          "last_seen"
+        ],
+        "properties": {
+          "events": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Scanned events with this name."
+          },
+          "last_seen": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the newest one arrived."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name; `pageview` for page views."
+          },
+          "users": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Distinct people (or daily visitors) who sent them."
+          }
+        }
+      },
+      "SchemaEventList": {
+        "type": "object",
+        "description": "Event names, most sent first.",
+        "required": [
+          "items",
+          "sampled"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchemaEvent"
+            },
+            "description": "The names."
+          },
+          "sampled": {
+            "type": "boolean",
+            "description": "The scan stopped at its cap of newest events, so older events in the\nrange are not counted and rare names can be missing."
+          }
+        }
+      },
+      "SchemaKey": {
+        "type": "object",
+        "description": "One property or trait key.",
+        "required": [
+          "key",
+          "types",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Scanned events (or people) that have it with a text, number or\nboolean value."
+          },
+          "key": {
+            "type": "string",
+            "description": "The key."
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchemaValueType"
+            },
+            "description": "The types its values take, in this order: text, number, boolean."
+          }
+        }
+      },
+      "SchemaKeyList": {
+        "type": "object",
+        "description": "Keys, most used first.",
+        "required": [
+          "items",
+          "sampled"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchemaKey"
+            },
+            "description": "The keys."
+          },
+          "sampled": {
+            "type": "boolean",
+            "description": "The scan stopped at its cap of newest events (or most recently seen\npeople), so rare keys can be missing."
+          }
+        }
+      },
+      "SchemaSource": {
+        "type": "string",
+        "description": "Where keys and values come from.",
+        "enum": [
+          "property",
+          "trait"
+        ]
+      },
+      "SchemaValue": {
+        "type": "object",
+        "description": "One value a key takes.",
+        "required": [
+          "value",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Scanned events (or people) with this value."
+          },
+          "value": {
+            "type": "string",
+            "description": "The value in text form, as insight filters compare it: numbers as\nwritten, booleans as `true` or `false`."
+          }
+        }
+      },
+      "SchemaValueList": {
+        "type": "object",
+        "description": "Top values, most common first.",
+        "required": [
+          "items",
+          "sampled"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchemaValue"
+            },
+            "description": "The values."
+          },
+          "sampled": {
+            "type": "boolean",
+            "description": "The scan stopped at its cap of newest events (or most recently seen\npeople) with the key, so counts cover only those."
+          }
+        }
+      },
+      "SchemaValueType": {
+        "type": "string",
+        "description": "The JSON type of a key's values.",
+        "enum": [
+          "text",
+          "number",
+          "boolean"
         ]
       },
       "ScopeArea": {

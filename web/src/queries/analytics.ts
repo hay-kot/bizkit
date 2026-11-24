@@ -29,6 +29,9 @@ import {
   analyticsPeopleGetQuery,
   analyticsPeopleListQuery,
   analyticsRetentionQuery,
+  analyticsSchemaEventsQuery,
+  analyticsSchemaKeysQuery,
+  analyticsSchemaValuesQuery,
   analyticsSiteCreateMutation,
   analyticsSiteGetQuery,
   analyticsSiteUpdateMutation,
@@ -36,6 +39,9 @@ import {
   analyticsStatsSummaryQuery,
 } from '@/api/gen/@pinia/colada.gen'
 import type {
+  AnalyticsSchemaEventsData,
+  AnalyticsSchemaKeysData,
+  AnalyticsSchemaValuesData,
   BreakdownRow,
   BreakdownSource,
   Cohort,
@@ -58,6 +64,11 @@ import type {
   InsightResult,
   Measure,
   PersonSummary,
+  SchemaEvent,
+  SchemaKey,
+  SchemaSource,
+  SchemaValue,
+  SchemaValueType,
   Site,
   Step,
   StepResult,
@@ -90,6 +101,11 @@ export type {
   InsightResult,
   Measure,
   PersonSummary,
+  SchemaEvent,
+  SchemaKey,
+  SchemaSource,
+  SchemaValue,
+  SchemaValueType,
   Site,
   Step,
   StepResult,
@@ -506,4 +522,72 @@ export function useDeleteDashboard() {
     onSettled: () =>
       invalidate('analyticsDashboardsList', 'analyticsInsightsList', 'analyticsInsightsGet'),
   })
+}
+
+/**
+ * Schema lookups feed pickers while someone types, and a project's names and
+ * keys change slowly, so a minute-old answer is fine and saves a scan.
+ */
+export const SCHEMA_STALE_MS = 60_000
+
+type SchemaParams<T extends { query: object }> = Omit<T['query'], 'project_id'>
+
+/** Event names the project sent, pageview included, most sent first. */
+export function useSchemaEvents(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+  params: MaybeRefOrGetter<SchemaParams<AnalyticsSchemaEventsData>> = {},
+) {
+  return useQuery(() => ({
+    ...analyticsSchemaEventsQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId), ...toValue(params) },
+    }),
+    staleTime: SCHEMA_STALE_MS,
+  }))
+}
+
+/** Event property or person trait keys, with the types their values take. */
+export function useSchemaKeys(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+  params: MaybeRefOrGetter<SchemaParams<AnalyticsSchemaKeysData>>,
+) {
+  return useQuery(() => ({
+    ...analyticsSchemaKeysQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId), ...toValue(params) },
+    }),
+    staleTime: SCHEMA_STALE_MS,
+  }))
+}
+
+/** The top values of one property or trait key, in text form. Waits for a key. */
+export function useSchemaValues(
+  workspaceId: MaybeRefOrGetter<string>,
+  projectId: MaybeRefOrGetter<string>,
+  params: MaybeRefOrGetter<SchemaParams<AnalyticsSchemaValuesData>>,
+) {
+  return useQuery(() => ({
+    ...analyticsSchemaValuesQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { project_id: toValue(projectId), ...toValue(params) },
+    }),
+    staleTime: SCHEMA_STALE_MS,
+    enabled: toValue(params).key !== '',
+  }))
+}
+
+/** Event names as picker options: page views first, then custom events. */
+export function eventOptions(events: SchemaEvent[]): {
+  value: string
+  count: number
+  group: string
+}[] {
+  const pages = events.filter((e) => e.name === 'pageview')
+  const custom = events.filter((e) => e.name !== 'pageview')
+  return [
+    ...pages.map((e) => ({ value: e.name, count: e.events, group: 'Page views' })),
+    ...custom.map((e) => ({ value: e.name, count: e.events, group: 'Custom events' })),
+  ]
 }

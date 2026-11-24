@@ -178,7 +178,7 @@ function onDelete() {
         @close="editing = false"
         @submit="onSave"
       >
-        <FunnelForm v-model="draft" />
+        <FunnelForm v-model="draft" :workspace-id="workspaceId" :project-id="projectId" />
       </FormPanel>
     </template>
   </AnalyticsShell>
