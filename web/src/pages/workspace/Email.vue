@@ -4,6 +4,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import Card from '@/components/ui/Card.vue'
+import Checkbox from '@/components/ui/Checkbox.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Field from '@/components/ui/Field.vue'
 import Select from '@/components/ui/Select.vue'
@@ -51,7 +52,7 @@ interface FormState {
   fromAddress: string
   replyTo: string
   host: string
-  port: string
+  port: number | ''
   security: SmtpSecurity
   username: string
   password: string
@@ -59,6 +60,7 @@ interface FormState {
   region: MailgunRegion
   apiKey: string
   webhookKey: string
+  removeWebhookKey: boolean
 }
 
 function fromSettings(settings: MailSettings | null | undefined): FormState {
@@ -68,7 +70,7 @@ function fromSettings(settings: MailSettings | null | undefined): FormState {
     fromAddress: settings?.from_address ?? '',
     replyTo: settings?.reply_to ?? '',
     host: settings?.smtp?.host ?? '',
-    port: String(settings?.smtp?.port ?? 587),
+    port: settings?.smtp?.port ?? 587,
     security: settings?.smtp?.security ?? 'starttls',
     username: settings?.smtp?.username ?? '',
     password: '',
@@ -76,26 +78,50 @@ function fromSettings(settings: MailSettings | null | undefined): FormState {
     region: settings?.mailgun?.region ?? 'us',
     apiKey: '',
     webhookKey: '',
+    removeWebhookKey: false,
   }
 }
 
 const form = reactive<FormState>(fromSettings(undefined))
 const saved = ref(JSON.stringify(form))
+const settings = computed(() => data.value?.settings ?? null)
+// Keyed on updated_at so a refetch after a test send (which only moves
+// verified_at) doesn't wipe what the admin is typing.
 watch(
-  () => data.value?.settings,
-  (settings) => {
-    Object.assign(form, fromSettings(settings))
+  () => (data.value ? (settings.value?.updated_at ?? 'none') : 'loading'),
+  () => {
+    Object.assign(form, fromSettings(settings.value))
     saved.value = JSON.stringify(form)
   },
   { immediate: true },
 )
-const settings = computed(() => data.value?.settings ?? null)
 const canSave = computed(() => data.value?.can_save ?? false)
 const dirty = computed(() => JSON.stringify(form) !== saved.value)
 const lastTest = ref<MailTestResult | null>(null)
 
-function keptHint(saved: boolean | undefined) {
-  return saved ? 'Saved. Leave it empty to keep it.' : undefined
+// The API keeps a saved secret only for the server or account it was saved
+// for, so the hint has to follow the fields that decide that.
+const keepsPassword = computed(() => {
+  const smtp = settings.value?.provider === 'smtp' ? settings.value.smtp : null
+  return (
+    !!smtp?.has_password &&
+    smtp.host === form.host.trim() &&
+    smtp.port === Number(form.port) &&
+    (smtp.username ?? '') === form.username.trim() &&
+    form.username.trim() !== ''
+  )
+})
+const keepsApiKey = computed(() => {
+  const mailgun = settings.value?.provider === 'mailgun' ? settings.value.mailgun : null
+  return (
+    !!mailgun?.has_api_key &&
+    mailgun.domain === form.domain.trim().toLowerCase() &&
+    mailgun.region === form.region
+  )
+})
+
+function keptHint(kept: boolean) {
+  return kept ? 'Saved. Leave it empty to keep it.' : undefined
 }
 
 function optional(text: string) {
@@ -128,12 +154,15 @@ async function onSave() {
             form.provider === 'mailgun'
               ? { domain: form.domain, region: form.region, api_key: secret(form.apiKey) }
               : undefined,
-          webhook_signing_key: secret(form.webhookKey),
+          webhook_signing_key: form.removeWebhookKey ? '' : secret(form.webhookKey),
         },
       }),
     success: 'Mail settings saved',
   })
-  if (result) lastTest.value = null
+  if (!result) return
+  lastTest.value = null
+  Object.assign(form, { password: '', apiKey: '', webhookKey: '', removeWebhookKey: false })
+  saved.value = JSON.stringify(form)
 }
 
 async function onTest() {
@@ -235,7 +264,7 @@ function onRemove() {
               </Field>
               <Field label="Port" width="md">
                 <input
-                  v-model="form.port"
+                  v-model.number="form.port"
                   name="smtp-port"
                   type="number"
                   min="1"
@@ -259,7 +288,7 @@ function onRemove() {
                   class="input w-full"
                 />
               </Field>
-              <Field label="Password" width="md" :hint="keptHint(settings?.smtp?.has_password)">
+              <Field label="Password" width="md" :hint="keptHint(keepsPassword)">
                 <input
                   v-model="form.password"
                   name="smtp-password"
@@ -283,7 +312,7 @@ function onRemove() {
               <Field label="Region" width="md">
                 <Select v-model="form.region" :options="regionOptions" label="Region" />
               </Field>
-              <Field label="API key" width="md" :hint="keptHint(settings?.mailgun?.has_api_key)">
+              <Field label="API key" width="md" :hint="keptHint(keepsApiKey)">
                 <input
                   v-model="form.apiKey"
                   name="mailgun-api-key"
@@ -298,7 +327,7 @@ function onRemove() {
               label="Mailgun webhook signing key"
               width="md"
               :hint="
-                keptHint(settings?.has_webhook_signing_key) ??
+                keptHint(!!settings?.has_webhook_signing_key && !form.removeWebhookKey) ??
                 'Optional. Lets Mailgun report bounces and complaints, so bizkit stops mailing those addresses.'
               "
             >
@@ -307,9 +336,15 @@ function onRemove() {
                 name="webhook-signing-key"
                 type="password"
                 autocomplete="new-password"
+                :disabled="form.removeWebhookKey"
                 class="input w-full"
               />
             </Field>
+            <Checkbox
+              v-if="settings?.has_webhook_signing_key"
+              v-model="form.removeWebhookKey"
+              label="Remove the saved webhook signing key"
+            />
             <Field
               v-if="settings?.webhook_url"
               label="Webhook URL"

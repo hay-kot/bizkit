@@ -36,7 +36,9 @@ export function useSaveMailSettings() {
   const invalidate = useInvalidate()
   return useMutation({
     ...mailSettingsPutMutation(),
-    onSettled: () => invalidate('mailSettingsGet'),
+    // A refused save changed nothing, and a refetch would hand the form a
+    // new object while the admin still has edits in it.
+    onSuccess: () => invalidate('mailSettingsGet'),
   })
 }
 
