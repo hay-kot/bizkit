@@ -4,6 +4,8 @@
 pub mod api;
 pub mod beacon;
 mod cache;
+#[cfg(feature = "test-hooks")]
+pub mod demo_site;
 pub mod enrich;
 mod explore;
 mod files;

@@ -47,7 +47,7 @@ pub(crate) fn run(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::R
     })
 }
 
-async fn wait_for_signal() {
+pub(crate) async fn wait_for_signal() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};

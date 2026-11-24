@@ -94,6 +94,19 @@ mod cli {
         assert!(response.ends_with("ok"), "healthz body: {response}");
     }
 
+    #[cfg(all(feature = "test-hooks", feature = "analytics"))]
+    #[test]
+    fn dev_demo_site_needs_the_demo_seed() {
+        let dir = tempfile::tempdir().unwrap();
+        bin()
+            .args(["dev", "demo-site", "--listen", "127.0.0.1:0"])
+            .args(["--snippet-base", "http://localhost:5173", "--data-dir"])
+            .arg(dir.path())
+            .assert()
+            .failure()
+            .stderr(contains("run `bizkit dev seed-demo` first"));
+    }
+
     #[cfg(feature = "test-hooks")]
     #[test]
     fn dev_seed_demo_runs_twice() {

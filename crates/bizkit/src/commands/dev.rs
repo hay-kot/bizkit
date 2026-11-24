@@ -43,6 +43,17 @@ enum DevCommand {
         /// The email to sign in as
         email: String,
     },
+    /// Serve the demo product site, tracked with the demo workspace's
+    /// website snippet, until interrupted
+    #[cfg(feature = "analytics")]
+    DemoSite {
+        /// The address to listen on
+        #[arg(long)]
+        listen: std::net::SocketAddr,
+        /// Where browsers reach bizkit's public routes, such as the dev UI
+        #[arg(long)]
+        snippet_base: Url,
+    },
 }
 
 pub(crate) fn run(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result<()> {
@@ -87,6 +98,24 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
             let link =
                 bizkit_core::dev::login_link(&db, &base_url, email, SystemClock.now()).await?;
             writeln!(out, "{link}")?;
+        }
+        #[cfg(feature = "analytics")]
+        DevCommand::DemoSite { listen, snippet_base } => {
+            let key = bizkit_analytics::demo_site_key(&db).await?.context(
+                "the demo workspace has no website site; run `bizkit dev seed-demo` first",
+            )?;
+            db.close().await;
+            let tag = bizkit_analytics::demo_site::snippet_tag(snippet_base, &key);
+            let listener = tokio::net::TcpListener::bind(listen)
+                .await
+                .with_context(|| format!("binding {listen}"))?;
+            let bound = listener.local_addr().context("reading the bound address")?;
+            writeln!(out, "serving the demo site on http://{bound}")?;
+            out.flush()?;
+            bizkit_analytics::demo_site::serve(listener, &tag, super::serve::wait_for_signal())
+                .await
+                .context("serving the demo site")?;
+            return Ok(());
         }
     }
     db.close().await;
@@ -165,6 +194,23 @@ mod tests {
     }
 
     #[cfg(all(feature = "analytics", feature = "test-hooks"))]
+    #[cfg(feature = "analytics")]
+    #[tokio::test]
+    async fn demo_site_needs_the_demo_seed() {
+        let dir = tempfile::tempdir().unwrap();
+        let args = Args {
+            command: DevCommand::DemoSite {
+                listen: "127.0.0.1:0".parse().unwrap(),
+                snippet_base: Url::parse("http://localhost:5173").unwrap(),
+            },
+            data_dir: Some(dir.path().to_path_buf()),
+        };
+        let mut out = Vec::new();
+        let err = dev(&args, &Context::default(), &mut out).await.unwrap_err();
+        assert!(format!("{err:#}").contains("run `bizkit dev seed-demo` first"), "{err:#}");
+        assert_eq!(out, b"", "nothing is printed");
+    }
+
     /// The website site takes the demo site's host and key, and its file
     /// has onboarding events, none in the future.
     async fn demo_site_is_ready(data_dir: &std::path::Path) {
