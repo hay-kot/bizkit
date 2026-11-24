@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\"\n           FROM mailing_deliveries WHERE workspace_id = ? AND id = ?",
+  "query": "SELECT id AS \"id: DeliveryId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", contact_id AS \"contact_id: ContactId\", kind,\n                  broadcast_id AS \"broadcast_id: BroadcastId\",\n                  enrollment_id AS \"enrollment_id: EnrollmentId\", step_id AS \"step_id: StepId\",\n                  to_email, subject, status, error, attempts, resends,\n                  created_at AS \"created_at: UnixMillis\", sent_at AS \"sent_at: UnixMillis\"\n           FROM mailing_deliveries WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
@@ -147,8 +147,19 @@
         }
       },
       {
-        "name": "created_at: UnixMillis",
+        "name": "resends",
         "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "resends"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 14,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -159,7 +170,7 @@
       },
       {
         "name": "sent_at: UnixMillis",
-        "ordinal": 14,
+        "ordinal": 15,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -187,8 +198,9 @@
       true,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "3802349e5aca3a92e3b1f125f4a08d4c983ff59067d8562684136bbc16ca9637"
+  "hash": "b26ce7e9fb75e8fabf98a9a55d5f64c54c5cd1a65475546f1d85465ea47d8aec"
 }

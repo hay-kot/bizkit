@@ -2488,7 +2488,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": true
       },
-      "description": "Show a broadcast",
+      "description": "Show a broadcast with its deliveries by status",
       "inputSchema": {
         "$defs": {
           "BroadcastId": {
@@ -2557,6 +2557,34 @@ expression: tools
         "type": "object"
       },
       "name": "mailing_broadcasts_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Queue a sent broadcast's failed deliveries again; the others are not sent twice",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_resend"
     },
     {
       "annotations": {

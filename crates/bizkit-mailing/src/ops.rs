@@ -17,8 +17,9 @@ use utoipa::ToSchema;
 
 use crate::api::{
     Broadcast, BroadcastId, BroadcastList, BroadcastStatus, Contact, ContactCounts, ContactId,
-    ContactPage, ContactStatus, DeliveryId, DeliveryKind, DeliveryStatus, ListId, MailDelivery,
-    MailDeliveryPage, MailingForm, MailingFormList, MailingList, MailingListList, Preview,
+    ContactPage, ContactStatus, DeliveryCounts, DeliveryId, DeliveryKind, DeliveryStatus, ListId,
+    MailDelivery, MailDeliveryPage, MailingForm, MailingFormList, MailingList, MailingListList,
+    Preview, ResendReport,
 };
 use crate::capture::FORM_KIND;
 use crate::contacts::{self, NewContact, Source};
@@ -63,6 +64,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(BroadcastsDelete)?;
     cx.op(BroadcastsTest)?;
     cx.op(BroadcastsSend)?;
+    cx.op(BroadcastsResend)?;
     cx.op(DeliveriesList)?;
     cx.op(FormsList)?;
     Ok(())
@@ -179,6 +181,7 @@ fn broadcast_to_api(row: BroadcastRow) -> anyhow::Result<Broadcast> {
         tag: row.tag,
         recipients: count(row.recipients),
         sent_at: row.sent_at,
+        deliveries: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -197,6 +200,7 @@ fn delivery_to_api(row: DeliveryRow) -> anyhow::Result<MailDelivery> {
         subject: row.subject,
         error: row.error,
         attempts: u32::try_from(row.attempts).unwrap_or(0),
+        resends: u32::try_from(row.resends).unwrap_or(0),
         created_at: row.created_at,
         sent_at: row.sent_at,
     })
@@ -1117,13 +1121,21 @@ impl Operation for BroadcastsGet {
     const METHOD: Method = Method::Get;
     const PATH: &'static str = "/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}";
     const ACCESS: Access = READ;
-    const SUMMARY: &'static str = "Show a broadcast";
+    const SUMMARY: &'static str = "Show a broadcast with its deliveries by status";
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: InBroadcast) -> Result<Broadcast, ApiError> {
-        let row =
-            broadcast_in(cx.platform().db().read(), input.workspace_id, input.broadcast_id).await?;
-        Ok(broadcast_to_api(row)?)
+        let db = cx.platform().db().read();
+        let row = broadcast_in(db, input.workspace_id, input.broadcast_id).await?;
+        let counts = store::broadcast_delivery_counts(db, row.workspace_id, row.id).await?;
+        let mut broadcast = broadcast_to_api(row)?;
+        broadcast.deliveries = Some(DeliveryCounts {
+            queued: count(counts.queued),
+            sent: count(counts.sent),
+            failed: count(counts.failed),
+            skipped: count(counts.skipped),
+        });
+        Ok(broadcast)
     }
 }
 
@@ -1256,6 +1268,39 @@ impl Operation for BroadcastsSend {
         platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
         tx.commit().await?;
         Ok(broadcast_to_api(row)?)
+    }
+}
+
+struct BroadcastsResend;
+impl Operation for BroadcastsResend {
+    type Input = InBroadcast;
+    type Output = ResendReport;
+    const ID: &'static str = "mailing.broadcasts.resend";
+    const METHOD: Method = Method::Post;
+    const PATH: &'static str =
+        "/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resend";
+    const ACCESS: Access = WRITE;
+    const SUMMARY: &'static str =
+        "Queue a sent broadcast's failed deliveries again; the others are not sent twice";
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: InBroadcast) -> Result<ResendReport, ApiError> {
+        let platform = cx.platform();
+        let mut tx = cx.write().await?;
+        let row = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
+        if row.status != BroadcastStatus::Sent.as_str() {
+            return Err(ApiError::Conflict(
+                "only a sent broadcast resends; wait until every mail is queued".to_owned(),
+            ));
+        }
+        let requeued = store::requeue_failed(&mut *tx, row.workspace_id, row.id).await?;
+        for delivery_id in &requeued {
+            let job = send::Send { workspace_id: row.workspace_id, delivery_id: *delivery_id };
+            platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
+        }
+        tx.commit().await?;
+        Ok(ResendReport { requeued: u64::try_from(requeued.len()).unwrap_or(u64::MAX) })
     }
 }
 

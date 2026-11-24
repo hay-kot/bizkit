@@ -185,10 +185,32 @@ pub struct Broadcast {
     pub recipients: u64,
     /// When sending started.
     pub sent_at: Option<UnixMillis>,
+    /// Its deliveries by status; only when getting one broadcast.
+    pub deliveries: Option<DeliveryCounts>,
     /// When it was created.
     pub created_at: UnixMillis,
     /// When it last changed.
     pub updated_at: UnixMillis,
+}
+
+/// A broadcast's deliveries by status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+pub struct DeliveryCounts {
+    /// Waiting to go out, or retrying.
+    pub queued: u64,
+    /// Accepted by the mail server.
+    pub sent: u64,
+    /// Every attempt failed. "Resend to failed" queues these again.
+    pub failed: u64,
+    /// Not sent, because the contact left the list.
+    pub skipped: u64,
+}
+
+/// What "Resend to failed" did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ResendReport {
+    /// Failed deliveries put back in the queue; 0 when none had failed.
+    pub requeued: u64,
 }
 
 /// Broadcasts of a workspace.
@@ -295,8 +317,10 @@ pub struct MailDelivery {
     pub status: DeliveryStatus,
     /// Why the last attempt failed, or why it was skipped.
     pub error: Option<String>,
-    /// Send attempts so far.
+    /// Attempts of the current send; a resend starts again from 1.
     pub attempts: u32,
+    /// How often "Resend to failed" queued it again.
+    pub resends: u32,
     /// When it was queued.
     pub created_at: UnixMillis,
     /// When the mail server took it.

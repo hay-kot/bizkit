@@ -74,6 +74,7 @@ pub(crate) struct DeliveryRow {
     pub(crate) status: String,
     pub(crate) error: Option<String>,
     pub(crate) attempts: i64,
+    pub(crate) resends: i64,
     pub(crate) created_at: UnixMillis,
     pub(crate) sent_at: Option<UnixMillis>,
 }
@@ -671,7 +672,7 @@ pub(crate) async fn find_delivery(
                   list_id AS "list_id: ListId", contact_id AS "contact_id: ContactId", kind,
                   broadcast_id AS "broadcast_id: BroadcastId",
                   enrollment_id AS "enrollment_id: EnrollmentId", step_id AS "step_id: StepId",
-                  to_email, subject, status, error, attempts,
+                  to_email, subject, status, error, attempts, resends,
                   created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis"
            FROM mailing_deliveries WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
@@ -714,7 +715,7 @@ pub(crate) async fn list_deliveries(
                   list_id AS "list_id: ListId", contact_id AS "contact_id: ContactId", kind,
                   broadcast_id AS "broadcast_id: BroadcastId",
                   enrollment_id AS "enrollment_id: EnrollmentId", step_id AS "step_id: StepId",
-                  to_email, subject, status, error, attempts,
+                  to_email, subject, status, error, attempts, resends,
                   created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis"
            FROM mailing_deliveries
            WHERE workspace_id = ?1 AND kind != 'test'
@@ -797,5 +798,54 @@ pub(crate) async fn broadcast_recipients(
         broadcast_id,
     )
     .fetch_one(exec)
+    .await
+}
+
+/// A broadcast's deliveries by status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DeliveryCounts {
+    pub(crate) queued: i64,
+    pub(crate) sent: i64,
+    pub(crate) failed: i64,
+    pub(crate) skipped: i64,
+}
+
+pub(crate) async fn broadcast_delivery_counts(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    broadcast_id: BroadcastId,
+) -> sqlx::Result<DeliveryCounts> {
+    sqlx::query_as!(
+        DeliveryCounts,
+        r#"SELECT COALESCE(SUM(status = 'queued'), 0) AS "queued!: i64",
+                  COALESCE(SUM(status = 'sent'), 0) AS "sent!: i64",
+                  COALESCE(SUM(status = 'failed'), 0) AS "failed!: i64",
+                  COALESCE(SUM(status = 'skipped'), 0) AS "skipped!: i64"
+           FROM mailing_deliveries
+           WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'"#,
+        workspace_id,
+        broadcast_id,
+    )
+    .fetch_one(exec)
+    .await
+}
+
+/// Puts a broadcast's failed deliveries back in the queue and returns their
+/// IDs. Rows in any other status stay as they are, so a second call finds
+/// nothing to do until a resent mail fails again.
+pub(crate) async fn requeue_failed(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    broadcast_id: BroadcastId,
+) -> sqlx::Result<Vec<DeliveryId>> {
+    sqlx::query_scalar!(
+        r#"UPDATE mailing_deliveries SET status = 'queued', resends = resends + 1
+           WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'
+             AND status = 'failed'
+           RETURNING id AS "id: DeliveryId""#,
+        workspace_id,
+        broadcast_id,
+    )
+    .fetch_all(exec)
     .await
 }

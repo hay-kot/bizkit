@@ -609,6 +609,86 @@ mod mailing {
     }
 
     #[tokio::test]
+    async fn resend_queues_only_failed_deliveries_once() {
+        let s = setup().await;
+        let list = s.list(json!({"double_opt_in": false})).await;
+        s.subscribed(&list, "ana@example.com", json!({})).await;
+        s.subscribed(&list, "ben@example.com", json!({})).await;
+        let cal = s.subscribed(&list, "cal@example.com", json!({})).await;
+        let broadcast = s.broadcast(&list, "Hi").await;
+        let path = format!("{}/broadcasts/{}", s.ws(), id(&broadcast));
+        s.member.post(&format!("{path}/resend"), &json!({})).await.expect(StatusCode::CONFLICT);
+
+        s.app.mail.fail_next(100);
+        s.member.post(&format!("{path}/send"), &json!({})).await.expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let unsubscribe = format!("{}/{}/unsubscribe", s.contacts(&list), id(&cal));
+        s.member.post(&unsubscribe, &json!({})).await.expect(StatusCode::OK);
+        for _ in 0..10 {
+            s.app.clock.advance(Duration::from_hours(2));
+            s.app.drain_jobs().await;
+        }
+        let got: Value = s.member.get(&path).await.expect(StatusCode::OK).json();
+        assert_eq!(
+            got["deliveries"],
+            json!({"queued": 0, "sent": 0, "failed": 2, "skipped": 1}),
+            "two failed, one left the list"
+        );
+
+        s.app.mail.fail_next(0);
+        let first: Value = s
+            .member
+            .post(&format!("{path}/resend"), &json!({}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(first["requeued"], 2, "only the failed ones");
+        let again: Value = s
+            .member
+            .post(&format!("{path}/resend"), &json!({}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(again["requeued"], 0, "already queued, nothing to add");
+        s.app.drain_jobs().await;
+
+        let mut sent: Vec<String> = s.app.mail.take().into_iter().map(|mail| mail.to).collect();
+        sent.sort();
+        assert_eq!(sent, ["ana@example.com", "ben@example.com"], "one mail each, none to cal");
+        let log = s.deliveries(&format!("broadcast_id={}", id(&broadcast))).await;
+        let mut rows: Vec<(String, String, u64)> = log
+            .iter()
+            .map(|row| {
+                (
+                    row["to_email"].as_str().unwrap().to_owned(),
+                    row["status"].as_str().unwrap().to_owned(),
+                    row["resends"].as_u64().unwrap(),
+                )
+            })
+            .collect();
+        rows.sort();
+        assert_eq!(
+            rows,
+            [
+                ("ana@example.com".to_owned(), "sent".to_owned(), 1),
+                ("ben@example.com".to_owned(), "sent".to_owned(), 1),
+                ("cal@example.com".to_owned(), "skipped".to_owned(), 0),
+            ],
+            "the log shows the retry"
+        );
+
+        let done: Value = s
+            .member
+            .post(&format!("{path}/resend"), &json!({}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(done["requeued"], 0, "sent mail is never sent twice");
+        s.app.drain_jobs().await;
+        assert!(s.app.mail.take().is_empty(), "no mail");
+    }
+
+    #[tokio::test]
     async fn forms_list_shows_the_projects_forms_for_the_picker() {
         let s = setup().await;
         let form = s.form(json!([])).await;

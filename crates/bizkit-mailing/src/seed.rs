@@ -148,6 +148,7 @@ async fn seed_broadcasts(
             status: DeliveryStatus::Sent.as_str().to_owned(),
             error: None,
             attempts: 1,
+            resends: 0,
             created_at: sent_at,
             sent_at: Some(sent_at.plus(Duration::from_secs(2))),
         };

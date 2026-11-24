@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { refDebounced, useIntervalFn } from '@vueuse/core'
-import { FlaskConical, Inbox, Send, Trash2 } from 'lucide-vue-next'
+import { FlaskConical, Inbox, RotateCw, Send, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -29,6 +29,7 @@ import {
   useDeliveries,
   useMailingList,
   usePreview,
+  useResendBroadcast,
   useSendBroadcast,
   useTestBroadcast,
   useUpdateBroadcast,
@@ -41,7 +42,12 @@ const props = defineProps<{
   broadcastId: string
 }>()
 const router = useRouter()
-const { data: broadcast, error: broadcastError } = useBroadcast(
+const {
+  data: broadcast,
+  error: broadcastError,
+  refetch: refetchBroadcast,
+  asyncStatus: broadcastStatus,
+} = useBroadcast(
   () => props.workspaceId,
   () => props.broadcastId,
 )
@@ -73,6 +79,10 @@ const logPoll = useIntervalFn(
   LOG_POLL_MS,
   { immediate: false },
 )
+// The failed count on the Resend button follows the log.
+watch(deliveries, () => {
+  if (!isDraft.value && broadcastStatus.value !== 'loading') void refetchBroadcast()
+})
 watch(
   () =>
     !isDraft.value &&
@@ -118,6 +128,7 @@ const dirty = computed(
 const update = useUpdateBroadcast()
 const remove = useDeleteBroadcast()
 const send = useSendBroadcast()
+const resend = useResendBroadcast()
 const {
   mutateAsync: sendTest,
   reset: resetTest,
@@ -161,6 +172,14 @@ const audience = computed(() => {
     : `${formatNumber(count)} ${count === 1 ? 'subscriber' : 'subscribers'} of ${name}`
 })
 
+const failed = computed(() => broadcast.value?.deliveries?.failed ?? 0)
+const recipientsText = computed(() => {
+  const current = broadcast.value
+  if (!current || current.status === 'draft') return '—'
+  const total = formatNumber(current.recipients)
+  return failed.value > 0 ? `${total}, ${formatNumber(failed.value)} failed` : total
+})
+
 const facts = computed(() => {
   const current = broadcast.value
   if (!current) return []
@@ -168,11 +187,7 @@ const facts = computed(() => {
     { key: 'list', label: 'List', value: list.value?.name ?? '' },
     { key: 'status', label: 'Status' },
     { key: 'to', label: 'To', value: current.tag ? `Tagged “${current.tag}”` : 'Every subscriber' },
-    {
-      key: 'recipients',
-      label: 'Recipients',
-      value: current.status === 'draft' ? '—' : formatNumber(current.recipients),
-    },
+    { key: 'recipients', label: 'Recipients', value: recipientsText.value },
     { key: 'sent', label: 'Sent', value: formatDate(current.sent_at) },
   ]
 })
@@ -265,8 +280,40 @@ const actions = computed(() =>
           disabled: sendBlocked.value !== undefined || send.asyncStatus.value === 'loading',
         },
       ]
-    : [],
+    : broadcast.value?.status === 'sent'
+      ? [
+          {
+            label:
+              failed.value > 0
+                ? `Resend to ${formatNumber(failed.value)} failed`
+                : 'Resend to failed',
+            icon: RotateCw,
+            run: () => void onResend(),
+            disabled: failed.value === 0 || resend.asyncStatus.value === 'loading',
+          },
+        ]
+      : [],
 )
+
+function onResend() {
+  const count = failed.value
+  return runAction({
+    confirm: {
+      title: `Resend to ${formatNumber(count)} failed ${count === 1 ? 'recipient' : 'recipients'}?`,
+      message: 'Only mail that failed goes out again. Nobody gets it twice.',
+      confirmLabel: 'Resend',
+      danger: false,
+    },
+    run: () =>
+      resend.mutateAsync({
+        path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
+      }),
+    success: (report) =>
+      report.requeued === 0
+        ? 'Nothing had failed'
+        : `Queued ${formatNumber(report.requeued)} again`,
+  })
+}
 
 const columns = [
   { key: 'to', label: 'To' },
@@ -380,7 +427,10 @@ const columns = [
           >
           <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
           <template #cell-attempts="{ row }"
-            ><span class="text-sm tabular-nums">{{ row.attempts }}</span></template
+            ><span class="text-sm tabular-nums">{{ row.attempts }}</span
+            ><span v-if="row.resends > 0" class="ms-2 badge badge-ghost badge-sm"
+              >resent{{ row.resends > 1 ? ` ×${row.resends}` : '' }}</span
+            ></template
           >
           <template #cell-sent="{ row }"
             ><span class="text-sm whitespace-nowrap">{{

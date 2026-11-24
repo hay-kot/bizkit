@@ -6929,7 +6929,7 @@
         "tags": [
           "mailing"
         ],
-        "summary": "Show a broadcast",
+        "summary": "Show a broadcast with its deliveries by status",
         "operationId": "mailing.broadcasts.get",
         "parameters": [
           {
@@ -7202,6 +7202,116 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Broadcast"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resend": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Queue a sent broadcast's failed deliveries again; the others are not sent twice",
+        "operationId": "mailing.broadcasts.resend",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "broadcast_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/BroadcastId",
+              "description": "The broadcast."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendReport"
                 }
               }
             }
@@ -12044,6 +12154,17 @@
             "$ref": "#/components/schemas/Timestamp",
             "description": "When it was created."
           },
+          "deliveries": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryCounts",
+                "description": "Its deliveries by status; only when getting one broadcast."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "$ref": "#/components/schemas/BroadcastId",
             "description": "The broadcast ID."
@@ -12451,6 +12572,42 @@
           "url": {
             "type": "string",
             "description": "Where it went."
+          }
+        }
+      },
+      "DeliveryCounts": {
+        "type": "object",
+        "description": "A broadcast's deliveries by status.",
+        "required": [
+          "queued",
+          "sent",
+          "failed",
+          "skipped"
+        ],
+        "properties": {
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Every attempt failed. \"Resend to failed\" queues these again.",
+            "minimum": 0
+          },
+          "queued": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Waiting to go out, or retrying.",
+            "minimum": 0
+          },
+          "sent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Accepted by the mail server.",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Not sent, because the contact left the list.",
+            "minimum": 0
           }
         }
       },
@@ -13463,13 +13620,14 @@
           "subject",
           "status",
           "attempts",
+          "resends",
           "created_at"
         ],
         "properties": {
           "attempts": {
             "type": "integer",
             "format": "int32",
-            "description": "Send attempts so far.",
+            "description": "Attempts of the current send; a resend starts again from 1.",
             "minimum": 0
           },
           "broadcast_id": {
@@ -13512,6 +13670,12 @@
           "kind": {
             "$ref": "#/components/schemas/DeliveryKind",
             "description": "What it was for."
+          },
+          "resends": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How often \"Resend to failed\" queued it again.",
+            "minimum": 0
           },
           "sent_at": {
             "oneOf": [
@@ -14168,6 +14332,21 @@
             "type": "integer",
             "format": "int64",
             "description": "The body size in bytes.",
+            "minimum": 0
+          }
+        }
+      },
+      "ResendReport": {
+        "type": "object",
+        "description": "What \"Resend to failed\" did.",
+        "required": [
+          "requeued"
+        ],
+        "properties": {
+          "requeued": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Failed deliveries put back in the queue; 0 when none had failed.",
             "minimum": 0
           }
         }

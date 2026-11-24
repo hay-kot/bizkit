@@ -146,6 +146,7 @@ export type Broadcast = {
      * When it was created.
      */
     created_at: Timestamp;
+    deliveries?: DeliveryCounts | null;
     /**
      * The broadcast ID.
      */
@@ -394,6 +395,28 @@ export type Delivery = {
      * Where it went.
      */
     url: string;
+};
+
+/**
+ * A broadcast's deliveries by status.
+ */
+export type DeliveryCounts = {
+    /**
+     * Every attempt failed. "Resend to failed" queues these again.
+     */
+    failed: number;
+    /**
+     * Waiting to go out, or retrying.
+     */
+    queued: number;
+    /**
+     * Accepted by the mail server.
+     */
+    sent: number;
+    /**
+     * Not sent, because the contact left the list.
+     */
+    skipped: number;
 };
 
 export type DeliveryId = string;
@@ -1035,7 +1058,7 @@ export type ListId = string;
  */
 export type MailDelivery = {
     /**
-     * Send attempts so far.
+     * Attempts of the current send; a resend starts again from 1.
      */
     attempts: number;
     broadcast_id?: BroadcastId | null;
@@ -1056,6 +1079,10 @@ export type MailDelivery = {
      * What it was for.
      */
     kind: DeliveryKind;
+    /**
+     * How often "Resend to failed" queued it again.
+     */
+    resends: number;
     sent_at?: Timestamp | null;
     /**
      * Where it stands.
@@ -1477,6 +1504,16 @@ export type RequestSummary = {
      * The body size in bytes.
      */
     size: number;
+};
+
+/**
+ * What "Resend to failed" did.
+ */
+export type ResendReport = {
+    /**
+     * Failed deliveries put back in the queue; 0 when none had failed.
+     */
+    requeued: number;
 };
 
 /**
@@ -5692,6 +5729,60 @@ export type MailingBroadcastsUpdateResponses = {
 };
 
 export type MailingBroadcastsUpdateResponse = MailingBroadcastsUpdateResponses[keyof MailingBroadcastsUpdateResponses];
+
+export type MailingBroadcastsResendData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resend';
+};
+
+export type MailingBroadcastsResendErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsResendError = MailingBroadcastsResendErrors[keyof MailingBroadcastsResendErrors];
+
+export type MailingBroadcastsResendResponses = {
+    /**
+     * OK
+     */
+    200: ResendReport;
+};
+
+export type MailingBroadcastsResendResponse = MailingBroadcastsResendResponses[keyof MailingBroadcastsResendResponses];
 
 export type MailingBroadcastsSendData = {
     body?: never;

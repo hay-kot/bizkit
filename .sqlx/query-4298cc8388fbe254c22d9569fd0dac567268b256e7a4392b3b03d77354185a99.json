@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_deliveries SET status = 'queued', resends = resends + 1\n           WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'\n             AND status = 'failed'\n           RETURNING id AS \"id: DeliveryId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: DeliveryId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4298cc8388fbe254c22d9569fd0dac567268b256e7a4392b3b03d77354185a99"
+}

@@ -91,6 +91,7 @@ pub(crate) fn delivery(
         status: DeliveryStatus::Queued.as_str().to_owned(),
         error: None,
         attempts: 0,
+        resends: 0,
         created_at: platform.now(),
         sent_at: None,
     }

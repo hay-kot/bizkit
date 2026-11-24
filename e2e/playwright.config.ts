@@ -18,5 +18,13 @@ export default defineConfig({
     { name: 'smoke', testDir: 'tests/smoke' },
     { name: 'workflows', testDir: 'tests/workflows' },
     { name: 'features', testDir: 'tests/features' },
+    // Tests that change shared state (Mailpit chaos, the server clock) run
+    // after every other project, one at a time.
+    {
+      name: 'isolated',
+      testDir: 'tests/isolated',
+      dependencies: ['smoke', 'workflows', 'features'],
+      fullyParallel: false,
+    },
   ],
 })

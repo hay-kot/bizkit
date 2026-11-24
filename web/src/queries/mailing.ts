@@ -8,6 +8,7 @@ import {
   mailingBroadcastsDeleteMutation,
   mailingBroadcastsGetQuery,
   mailingBroadcastsListQuery,
+  mailingBroadcastsResendMutation,
   mailingBroadcastsSendMutation,
   mailingBroadcastsTestMutation,
   mailingBroadcastsUpdateMutation,
@@ -229,6 +230,15 @@ export function useSendBroadcast() {
   return useMutation({
     ...mailingBroadcastsSendMutation(),
     onSettled: () => invalidate(...BROADCAST_QUERIES, 'mailingDeliveriesList'),
+  })
+}
+
+/** Queues a sent broadcast's failed deliveries again. */
+export function useResendBroadcast() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingBroadcastsResendMutation(),
+    onSettled: () => invalidate('mailingBroadcastsGet', 'mailingDeliveriesList'),
   })
 }
 
