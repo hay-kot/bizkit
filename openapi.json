@@ -7687,6 +7687,106 @@
         "x-bizkit-scope": "mailing:read"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mailing/forms": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "List the forms of a project that a list can take addresses from",
+        "operationId": "mailing.forms.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailingFormList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:read"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/mailing/lists": {
       "get": {
         "tags": [
@@ -13457,6 +13557,40 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "MailingForm": {
+        "type": "object",
+        "description": "A form a list can take addresses from.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The form's ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The form's name."
+          }
+        }
+      },
+      "MailingFormList": {
+        "type": "object",
+        "description": "The forms of a project, for linking them to a list.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MailingForm"
+            },
+            "description": "Sorted by name. Empty when the forms module isn't installed."
           }
         }
       },

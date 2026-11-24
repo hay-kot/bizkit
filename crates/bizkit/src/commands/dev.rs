@@ -314,6 +314,40 @@ mod tests {
         assert!(latest <= now, "no event after the seed ran: {latest} > {now}");
     }
 
+    #[cfg(all(feature = "mailing", feature = "forms"))]
+    #[tokio::test]
+    async fn seed_demo_fills_mailing_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let args = Args { command: DevCommand::SeedDemo, data_dir: Some(data_dir.clone()) };
+        let counts = || async {
+            let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+            let mut counts = Vec::new();
+            for sql in [
+                "SELECT COUNT(*) FROM mailing_lists",
+                "SELECT COUNT(*) FROM mailing_list_forms",
+                "SELECT COUNT(*) FROM mailing_contacts WHERE status = 'subscribed'",
+                "SELECT COUNT(*) FROM mailing_contacts",
+                "SELECT COUNT(*) FROM mailing_broadcasts",
+                "SELECT COUNT(*) FROM mailing_deliveries",
+                "SELECT COUNT(*) FROM jobs",
+            ] {
+                counts.push(sqlx::query_scalar::<_, i64>(sql).fetch_one(db.read()).await.unwrap());
+            }
+            db.close().await;
+            counts
+        };
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        let first = counts().await;
+        assert_eq!(
+            first[..6],
+            [1, 1, 3, 5, 2, 3],
+            "lists, form links, subscribed, contacts, broadcasts, deliveries"
+        );
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        assert_eq!(counts().await, first, "a second run changes nothing and queues no mail");
+    }
+
     #[cfg(feature = "analytics")]
     #[tokio::test]
     async fn seed_demo_fills_analytics_once() {

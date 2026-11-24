@@ -501,6 +501,7 @@ dependencies = [
  "bizkit-core",
  "bizkit-forms",
  "bizkit-testkit",
+ "futures",
  "http",
  "insta",
  "pulldown-cmark",

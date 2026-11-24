@@ -586,4 +586,26 @@ mod mailing {
         );
         s.app.mail.fail_next(0);
     }
+
+    #[tokio::test]
+    async fn forms_list_shows_the_projects_forms_for_the_picker() {
+        let s = setup().await;
+        let form = s.form(json!([])).await;
+        let path = format!("{}/forms?project_id={}", s.ws(), s.project());
+        let forms: Value = s.member.get(&path).await.expect(StatusCode::OK).json();
+        assert_eq!(forms["items"], json!([{"id": form, "name": "Signup"}]));
+    }
+
+    #[tokio::test]
+    async fn forms_list_is_empty_without_the_forms_module() {
+        let app = TestApp::builder().module(Mailing).build().await;
+        let team = app.seed(Persona::Team, "mail").await;
+        let member = app.with_session(&team.accounts["member"].session_token);
+        let path = format!(
+            "/api/v1/workspaces/{}/mailing/forms?project_id={}",
+            team.workspaces["main"].id, team.projects["site"].id
+        );
+        let forms: Value = member.get(&path).await.expect(StatusCode::OK).json();
+        assert_eq!(forms["items"], json!([]));
+    }
 }

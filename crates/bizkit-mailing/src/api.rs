@@ -322,3 +322,19 @@ pub struct Preview {
     /// The plain-text part.
     pub text: String,
 }
+
+/// A form a list can take addresses from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MailingForm {
+    /// The form's ID.
+    pub id: String,
+    /// The form's name.
+    pub name: String,
+}
+
+/// The forms of a project, for linking them to a list.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MailingFormList {
+    /// Sorted by name. Empty when the forms module isn't installed.
+    pub items: Vec<MailingForm>,
+}

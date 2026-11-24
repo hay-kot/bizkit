@@ -1083,6 +1083,30 @@ export type MailDeliveryPage = {
 };
 
 /**
+ * A form a list can take addresses from.
+ */
+export type MailingForm = {
+    /**
+     * The form's ID.
+     */
+    id: string;
+    /**
+     * The form's name.
+     */
+    name: string;
+};
+
+/**
+ * The forms of a project, for linking them to a list.
+ */
+export type MailingFormList = {
+    /**
+     * Sorted by name. Empty when the forms module isn't installed.
+     */
+    items: Array<MailingForm>;
+};
+
+/**
  * A mailing list. Contacts and their consent belong to one list.
  */
 export type MailingList = {
@@ -5836,6 +5860,57 @@ export type MailingDeliveriesListResponses = {
 };
 
 export type MailingDeliveriesListResponse = MailingDeliveriesListResponses[keyof MailingDeliveriesListResponses];
+
+export type MailingFormsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/forms';
+};
+
+export type MailingFormsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingFormsListError = MailingFormsListErrors[keyof MailingFormsListErrors];
+
+export type MailingFormsListResponses = {
+    /**
+     * OK
+     */
+    200: MailingFormList;
+};
+
+export type MailingFormsListResponse = MailingFormsListResponses[keyof MailingFormsListResponses];
 
 export type MailingListsListData = {
     body?: never;

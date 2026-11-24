@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 use crate::api::{
     Broadcast, BroadcastId, BroadcastList, BroadcastStatus, Contact, ContactCounts, ContactId,
     ContactPage, ContactStatus, DeliveryId, DeliveryKind, DeliveryStatus, ListId, MailDelivery,
-    MailDeliveryPage, MailingList, MailingListList, Preview,
+    MailDeliveryPage, MailingForm, MailingFormList, MailingList, MailingListList, Preview,
 };
 use crate::capture::FORM_KIND;
 use crate::contacts::{self, NewContact, Source};
@@ -64,6 +64,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(BroadcastsTest)?;
     cx.op(BroadcastsSend)?;
     cx.op(DeliveriesList)?;
+    cx.op(FormsList)?;
     Ok(())
 }
 
@@ -317,6 +318,17 @@ pub(crate) struct ListLists {
     project_id: Option<ProjectId>,
 }
 impl Validate for ListLists {}
+
+/// Which project's forms to show.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListForms {
+    /// The workspace.
+    workspace_id: WorkspaceId,
+    /// The project.
+    project_id: ProjectId,
+}
+impl Validate for ListForms {}
 
 /// A new list.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -1278,5 +1290,36 @@ impl Operation for DeliveriesList {
         let (items, more) = page(items, limit);
         let next_before = if more { items.last().map(|d| d.id) } else { None };
         Ok(MailDeliveryPage { items, next_before })
+    }
+}
+
+// ---------------------------------------------------------------- forms
+
+struct FormsList;
+impl Operation for FormsList {
+    type Input = ListForms;
+    type Output = MailingFormList;
+    const ID: &'static str = "mailing.forms.list";
+    const METHOD: Method = Method::Get;
+    const PATH: &'static str = "/workspaces/{workspace_id}/mailing/forms";
+    const ACCESS: Access = READ;
+    const SUMMARY: &'static str = "List the forms of a project that a list can take addresses from";
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: ListForms) -> Result<MailingFormList, ApiError> {
+        let platform = cx.platform();
+        let Some((_, resolver)) = platform.hook_target_kind(FORM_KIND) else {
+            return Ok(MailingFormList { items: Vec::new() });
+        };
+        let forms = resolver
+            .list(platform, input.workspace_id, input.project_id)
+            .await
+            .context("listing forms")?;
+        Ok(MailingFormList {
+            items: forms
+                .into_iter()
+                .map(|form| MailingForm { id: form.id, name: form.label })
+                .collect(),
+        })
     }
 }

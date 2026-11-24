@@ -20,6 +20,7 @@ test-hooks = ["bizkit-core/test-hooks"]
 anyhow.workspace = true
 axum.workspace = true
 bizkit-core.workspace = true
+futures.workspace = true
 http.workspace = true
 pulldown-cmark.workspace = true
 serde.workspace = true

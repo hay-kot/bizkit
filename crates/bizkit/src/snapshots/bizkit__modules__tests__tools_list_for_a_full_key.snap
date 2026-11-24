@@ -3076,6 +3076,34 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the forms of a project that a list can take addresses from",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which project's forms to show.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_forms_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": false
       },
       "description": "Create a mailing list in a project",
