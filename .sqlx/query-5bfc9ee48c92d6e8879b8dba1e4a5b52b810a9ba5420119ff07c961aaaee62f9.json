@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT workspace_id AS \"workspace_id: WorkspaceId\", project_id AS \"project_id: ProjectId\",\n                  name, value, sealed, updated_at AS \"updated_at: UnixMillis\"\n           FROM extension_secrets WHERE sealed IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_secrets",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_secrets",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_secrets",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "value",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "extension_secrets",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "name": "sealed",
+        "ordinal": 4,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "extension_secrets",
+            "name": "sealed"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "extension_secrets",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "5bfc9ee48c92d6e8879b8dba1e4a5b52b810a9ba5420119ff07c961aaaee62f9"
+}

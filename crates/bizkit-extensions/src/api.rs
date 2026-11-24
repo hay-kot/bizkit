@@ -317,6 +317,10 @@ pub struct Secret {
     pub name: String,
     /// When it was last set.
     pub updated_at: UnixMillis,
+    /// False when the value doesn't open with this instance's secrets key
+    /// (it has none, or it changed). Runs fail until the secret is set
+    /// again.
+    pub readable: bool,
 }
 
 /// A project's secrets.
@@ -324,4 +328,7 @@ pub struct Secret {
 pub struct SecretList {
     /// The secrets, by name.
     pub items: Vec<Secret>,
+    /// False when the instance has no secrets key (`secrets_key_env`), so
+    /// secrets can't be set. Existing plaintext secrets keep working.
+    pub can_save: bool,
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO extension_secrets (workspace_id, project_id, name, sealed, updated_at)\n         VALUES (?, ?, ?, ?, ?)\n         ON CONFLICT (project_id, name) DO UPDATE SET value = NULL, sealed = excluded.sealed,\n                                                      updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "ba612350e8e1b200191c11ef5a0599d5f7bf6340de664d62098528b32fcae99a"
+}

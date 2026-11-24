@@ -297,6 +297,12 @@ impl App {
             mail: MailRouter::default(),
             config,
         }));
+        for module in &modules {
+            module
+                .startup(&platform)
+                .await
+                .with_context(|| format!("starting module {}", module.name()))?;
+        }
         let worker = Worker::new(platform.clone(), handlers);
         Ok(Self {
             platform,

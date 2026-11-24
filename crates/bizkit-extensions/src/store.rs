@@ -1,7 +1,5 @@
 //! The extensions tables. Every query filters on `workspace_id`.
 
-use std::collections::BTreeMap;
-
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
@@ -378,37 +376,79 @@ pub(crate) async fn list_runs(
     .await
 }
 
-/// A project's secret names and when they were set, by name.
-pub(crate) async fn list_secrets(
-    exec: impl SqliteExecutor<'_>,
-    workspace_id: WorkspaceId,
-    project_id: ProjectId,
-) -> sqlx::Result<Vec<(String, UnixMillis)>> {
-    let rows = sqlx::query!(
-        r#"SELECT name, updated_at AS "updated_at: UnixMillis" FROM extension_secrets
-           WHERE workspace_id = ? AND project_id = ? ORDER BY name"#,
-        workspace_id,
-        project_id
-    )
-    .fetch_all(exec)
-    .await?;
-    Ok(rows.into_iter().map(|row| (row.name, row.updated_at)).collect())
+/// An `extension_secrets` row. Exactly one of `value` (plaintext, from
+/// before secrets were sealed) and `sealed` is set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StoredSecret {
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) project_id: ProjectId,
+    pub(crate) name: String,
+    pub(crate) value: Option<String>,
+    pub(crate) sealed: Option<Vec<u8>>,
+    pub(crate) updated_at: UnixMillis,
 }
 
-/// A project's secrets by name, for a run.
-pub(crate) async fn secret_values(
+/// A project's secrets, by name.
+pub(crate) async fn project_secrets(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     project_id: ProjectId,
-) -> sqlx::Result<BTreeMap<String, String>> {
-    let rows = sqlx::query!(
-        "SELECT name, value FROM extension_secrets WHERE workspace_id = ? AND project_id = ?",
+) -> sqlx::Result<Vec<StoredSecret>> {
+    sqlx::query_as!(
+        StoredSecret,
+        r#"SELECT workspace_id AS "workspace_id: WorkspaceId", project_id AS "project_id: ProjectId",
+                  name, value, sealed, updated_at AS "updated_at: UnixMillis"
+           FROM extension_secrets WHERE workspace_id = ? AND project_id = ? ORDER BY name"#,
         workspace_id,
         project_id
     )
     .fetch_all(exec)
+    .await
+}
+
+/// Every plaintext secret of the instance. Startup seals them across all
+/// workspaces at once, so this is the one query that doesn't filter on
+/// `workspace_id`; each row carries its own.
+pub(crate) async fn plaintext_secrets(
+    exec: impl SqliteExecutor<'_>,
+) -> sqlx::Result<Vec<StoredSecret>> {
+    sqlx::query_as!(
+        StoredSecret,
+        r#"SELECT workspace_id AS "workspace_id: WorkspaceId", project_id AS "project_id: ProjectId",
+                  name, value, sealed, updated_at AS "updated_at: UnixMillis"
+           FROM extension_secrets WHERE sealed IS NULL"#
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// How many plaintext secrets the instance holds, across workspaces like
+/// [`plaintext_secrets`].
+pub(crate) async fn count_plaintext_secrets(exec: impl SqliteExecutor<'_>) -> sqlx::Result<i64> {
+    sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!: i64" FROM extension_secrets WHERE sealed IS NULL"#
+    )
+    .fetch_one(exec)
+    .await
+}
+
+/// Replaces a plaintext value with its sealed form.
+pub(crate) async fn seal_secret(
+    exec: impl SqliteExecutor<'_>,
+    row: &StoredSecret,
+    sealed: &[u8],
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE extension_secrets SET value = NULL, sealed = ?
+         WHERE workspace_id = ? AND project_id = ? AND name = ? AND sealed IS NULL",
+        sealed,
+        row.workspace_id,
+        row.project_id,
+        row.name,
+    )
+    .execute(exec)
     .await?;
-    Ok(rows.into_iter().map(|row| (row.name, row.value)).collect())
+    Ok(())
 }
 
 /// A secret to write.
@@ -417,7 +457,7 @@ pub(crate) struct SecretRow<'a> {
     pub(crate) workspace_id: WorkspaceId,
     pub(crate) project_id: ProjectId,
     pub(crate) name: &'a str,
-    pub(crate) value: &'a str,
+    pub(crate) sealed: &'a [u8],
     pub(crate) updated_at: UnixMillis,
 }
 
@@ -426,14 +466,14 @@ pub(crate) async fn put_secret(
     row: &SecretRow<'_>,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "INSERT INTO extension_secrets (workspace_id, project_id, name, value, updated_at)
+        "INSERT INTO extension_secrets (workspace_id, project_id, name, sealed, updated_at)
          VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT (project_id, name) DO UPDATE SET value = excluded.value,
+         ON CONFLICT (project_id, name) DO UPDATE SET value = NULL, sealed = excluded.sealed,
                                                       updated_at = excluded.updated_at",
         row.workspace_id,
         row.project_id,
         row.name,
-        row.value,
+        row.sealed,
         row.updated_at,
     )
     .execute(exec)

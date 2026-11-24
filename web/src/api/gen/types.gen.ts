@@ -2430,6 +2430,12 @@ export type Secret = {
      */
     name: string;
     /**
+     * False when the value doesn't open with this instance's secrets key
+     * (it has none, or it changed). Runs fail until the secret is set
+     * again.
+     */
+    readable: boolean;
+    /**
      * When it was last set.
      */
     updated_at: Timestamp;
@@ -2439,6 +2445,11 @@ export type Secret = {
  * A project's secrets.
  */
 export type SecretList = {
+    /**
+     * False when the instance has no secrets key (`secrets_key_env`), so
+     * secrets can't be set. Existing plaintext secrets keep working.
+     */
+    can_save: boolean;
     /**
      * The secrets, by name.
      */
@@ -5953,6 +5964,10 @@ export type ExtensionsSecretsPutErrors = {
      * Not Found
      */
     404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
     /**
      * Unprocessable Entity
      */

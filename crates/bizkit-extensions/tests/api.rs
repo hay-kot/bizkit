@@ -3,6 +3,7 @@
 
 #[cfg(test)]
 mod api {
+    use bizkit_core::Module as _;
     use bizkit_extensions::Extensions;
     use bizkit_forms::Forms;
     use bizkit_testkit::{Manifest, Persona, RawBody, SpecClient, TestApp};
@@ -240,6 +241,141 @@ mod api {
             script["id"].as_str().unwrap()
         );
         outsider.get(&theirs).await.expect(StatusCode::NOT_FOUND);
+    }
+
+    fn secrets_path(s: &Setup) -> String {
+        format!("{}/extensions/projects/{}/secrets", s.ws(), s.project())
+    }
+
+    async fn insert_raw_secret(s: &Setup, name: &str, value: Option<&str>, sealed: Option<&[u8]>) {
+        let mut tx = s.app.app().platform().db().write().await.unwrap();
+        sqlx::query(
+            "INSERT INTO extension_secrets (workspace_id, project_id, name, value, sealed, updated_at)
+             VALUES (?, ?, ?, ?, ?, 0)",
+        )
+        .bind(s.team.workspaces["main"].id.to_string())
+        .bind(s.project())
+        .bind(name)
+        .bind(value)
+        .bind(sealed)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    async fn stored(s: &Setup, name: &str) -> (Option<String>, Option<Vec<u8>>) {
+        sqlx::query_as("SELECT value, sealed FROM extension_secrets WHERE name = ?")
+            .bind(name)
+            .fetch_one(s.app.app().platform().db().read())
+            .await
+            .unwrap()
+    }
+
+    /// Runs a test of a script that echoes `ctx.secrets.TOKEN` unredacted
+    /// by splitting it, and returns the run.
+    async fn echo_token(s: &Setup) -> Value {
+        let script = s
+            .script(
+                POST,
+                "export default (input, ctx) => ({ parts: (ctx.secrets.TOKEN ?? '').split('') })",
+            )
+            .await;
+        let test = format!("{}/extensions/scripts/{}/test", s.ws(), script["id"].as_str().unwrap());
+        let report: Value = s.admin.post(&test, &json!({})).await.expect(StatusCode::OK).json();
+        report["items"][0]["run"].clone()
+    }
+
+    fn joined(run: &Value) -> String {
+        run["output"]["parts"].as_array().unwrap().iter().map(|p| p.as_str().unwrap()).collect()
+    }
+
+    #[tokio::test]
+    async fn secrets_are_sealed_at_rest() {
+        let s = setup().await;
+        s.put_secret("TOKEN", "hunter2-very-secret").await;
+        let (value, sealed) = stored(&s, "TOKEN").await;
+        assert_eq!(value, None, "no plaintext column");
+        let sealed = sealed.unwrap();
+        assert!(!sealed.windows(7).any(|w| w == b"hunter2"), "no plaintext in the sealed bytes");
+        let run = echo_token(&s).await;
+        assert_eq!(run["status"], "ok", "{run}");
+        assert_eq!(joined(&run), "hunter2-very-secret", "the run reads the value");
+        let list: Value = s.admin.get(&secrets_path(&s)).await.expect(StatusCode::OK).json();
+        assert_eq!(list["can_save"], true, "{list}");
+        assert_eq!(list["items"][0]["readable"], true, "{list}");
+    }
+
+    #[tokio::test]
+    async fn startup_seals_plaintext_secrets() {
+        let s = setup().await;
+        insert_raw_secret(&s, "TOKEN", Some("old-plaintext"), None).await;
+        Extensions::default().startup(s.app.app().platform()).await.unwrap();
+        let (value, sealed) = stored(&s, "TOKEN").await;
+        assert_eq!(value, None, "plaintext gone");
+        assert!(sealed.is_some(), "sealed");
+        let run = echo_token(&s).await;
+        assert_eq!(joined(&run), "old-plaintext", "same value after sealing");
+        Extensions::default().startup(s.app.app().platform()).await.unwrap();
+        assert_eq!(
+            joined(&echo_token(&s).await),
+            "old-plaintext",
+            "a second startup changes nothing"
+        );
+    }
+
+    #[tokio::test]
+    async fn without_a_key_plaintext_secrets_still_work_and_puts_are_refused() {
+        let app = TestApp::builder()
+            .config(|config| config.secrets_key = None)
+            .module(Forms)
+            .module(Extensions::default())
+            .build()
+            .await;
+        let team = app.seed(Persona::Team, "ext").await;
+        let admin = app.with_session(&team.accounts["admin"].session_token);
+        let s = Setup { app, team, admin };
+        insert_raw_secret(&s, "TOKEN", Some("legacy"), None).await;
+
+        let path = format!("{}/TOKEN", secrets_path(&s));
+        s.admin
+            .send(Method::PUT, &path, Some(&json!({"value": "new"})))
+            .await
+            .expect(StatusCode::CONFLICT);
+        let list: Value = s.admin.get(&secrets_path(&s)).await.expect(StatusCode::OK).json();
+        assert_eq!(list["can_save"], false, "{list}");
+        assert_eq!(list["items"][0]["readable"], true, "plaintext opens without a key");
+        assert_eq!(joined(&echo_token(&s).await), "legacy", "runs read it");
+
+        Extensions::default().startup(s.app.app().platform()).await.unwrap();
+        assert_eq!(stored(&s, "TOKEN").await.0.as_deref(), Some("legacy"), "left as it was");
+    }
+
+    #[tokio::test]
+    async fn a_secret_that_does_not_open_fails_the_run() {
+        let s = setup().await;
+        let other =
+            bizkit_core::secrets::Secrets::new(&bizkit_core::secrets::SecretKey::generate());
+        let foreign = other.seal(b"from-another-key", b"anything").unwrap();
+        insert_raw_secret(&s, "TOKEN", None, Some(&foreign)).await;
+
+        let list: Value = s.admin.get(&secrets_path(&s)).await.expect(StatusCode::OK).json();
+        assert_eq!(list["items"][0]["readable"], false, "{list}");
+        let run = echo_token(&s).await;
+        assert_eq!(run["status"], "error", "{run}");
+        assert!(run["error"].as_str().unwrap().contains("secret TOKEN"), "{run}");
+
+        let names_script =
+            s.script(POST, "export default (input, ctx) => Object.keys(ctx.secrets)").await;
+        let test =
+            format!("{}/extensions/scripts/{}/test", s.ws(), names_script["id"].as_str().unwrap());
+        let report: Value = s.admin.post(&test, &json!({})).await.expect(StatusCode::OK).json();
+        let listed = &report["items"][0]["run"];
+        assert_eq!(listed["status"], "ok", "a script that doesn't read it still runs: {listed}");
+        assert_eq!(listed["output"], json!(["TOKEN"]), "{listed}");
+
+        s.put_secret("TOKEN", "fresh").await;
+        assert_eq!(joined(&echo_token(&s).await), "fresh", "setting it again fixes it");
     }
 
     #[tokio::test]

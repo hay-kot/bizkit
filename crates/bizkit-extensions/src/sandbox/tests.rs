@@ -24,6 +24,7 @@ fn request(source: &str) -> RunRequest {
         budget: BUDGET,
         hard: HARD,
         secrets: None,
+        unreadable_secrets: Vec::new(),
         fetch: None,
         mail: None,
     }

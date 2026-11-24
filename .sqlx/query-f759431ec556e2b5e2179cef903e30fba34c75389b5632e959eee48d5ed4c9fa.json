@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE extension_secrets SET value = NULL, sealed = ?\n         WHERE workspace_id = ? AND project_id = ? AND name = ? AND sealed IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "f759431ec556e2b5e2179cef903e30fba34c75389b5632e959eee48d5ed4c9fa"
+}

@@ -20,6 +20,7 @@ use crate::api::{
     TargetList, TestCase, TestOutcome, TestReport, TestResult,
 };
 use crate::runner::{ASYNC_BUDGET, Execution, MAX_SOURCE_BYTES, ScriptRunner};
+use crate::secrets;
 use crate::store::{self, RunRow, ScriptRow};
 
 const READ: Access = Access::Workspace(Scope::new("extensions", Level::Read));
@@ -949,12 +950,19 @@ impl Operation for SecretsList {
 
     async fn call(&self, cx: OpCtx, input: InProject) -> Result<SecretList, ApiError> {
         project_in(&cx, input.workspace_id, input.project_id).await?;
+        let platform = cx.platform();
         let rows =
-            store::list_secrets(cx.platform().db().read(), input.workspace_id, input.project_id)
+            store::project_secrets(platform.db().read(), input.workspace_id, input.project_id)
                 .await?;
-        let items =
-            rows.into_iter().map(|(name, updated_at)| Secret { name, updated_at }).collect();
-        Ok(SecretList { items })
+        let items = rows
+            .into_iter()
+            .map(|row| Secret {
+                readable: secrets::open(platform.secrets(), &row).is_some(),
+                name: row.name,
+                updated_at: row.updated_at,
+            })
+            .collect();
+        Ok(SecretList { items, can_save: platform.secrets().is_some() })
     }
 }
 
@@ -969,8 +977,18 @@ impl Operation for SecretsPut {
     const ACCESS: Access = ADMIN;
     const SUMMARY: &'static str = "Set a project secret that async scripts read as ctx.secrets";
     const TAGS: &'static [&'static str] = TAGS;
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
 
     async fn call(&self, cx: OpCtx, input: PutSecret) -> Result<Secret, ApiError> {
+        let keys = cx.platform().secrets().ok_or_else(|| {
+            ApiError::Conflict(
+                "this instance has no secrets key (secrets_key_env), so projects can't save \
+                 secrets"
+                    .to_owned(),
+            )
+        })?;
+        let sealed =
+            secrets::seal(keys, input.workspace_id, input.project_id, &input.name, &input.value)?;
         let now = cx.now();
         let mut tx = cx.write().await?;
         if !bizkit_core::projects::exists(&mut *tx, input.workspace_id, input.project_id).await? {
@@ -982,13 +1000,13 @@ impl Operation for SecretsPut {
                 workspace_id: input.workspace_id,
                 project_id: input.project_id,
                 name: &input.name,
-                value: &input.value,
+                sealed: &sealed,
                 updated_at: now,
             },
         )
         .await?;
         tx.commit().await?;
-        Ok(Secret { name: input.name, updated_at: now })
+        Ok(Secret { name: input.name, updated_at: now, readable: true })
     }
 }
 
