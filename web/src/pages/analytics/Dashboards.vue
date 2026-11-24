@@ -67,6 +67,7 @@ async function onCreate() {
       :columns="columns"
       :rows="dashboards?.items"
       :row-key="(d) => d.id"
+      :row-to="(r) => `${base}/${r.id}`"
       :loading="isPending"
       :error="error"
       :empty="{
@@ -76,9 +77,7 @@ async function onCreate() {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="`${base}/${row.id}`" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-tiles="{ row }">
         <span class="text-sm tabular-nums">{{ row.insight_ids.length }}</span>

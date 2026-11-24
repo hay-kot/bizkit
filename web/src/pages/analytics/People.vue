@@ -66,6 +66,7 @@ function personPath(personId: string) {
           :columns="columns"
           :rows="people?.items"
           :row-key="(p) => p.id"
+          :row-to="(r) => personPath(r.id)"
           :loading="isPending"
           :error="error"
           :empty="
@@ -79,9 +80,7 @@ function personPath(personId: string) {
           "
         >
           <template #cell-person="{ row }">
-            <RouterLink :to="personPath(row.id)" class="link font-medium link-hover">
-              {{ row.display ?? row.user_id }}
-            </RouterLink>
+            {{ row.display ?? row.user_id }}
             <span v-if="row.display" class="ms-2 text-sm text-base-content/70">{{
               row.user_id
             }}</span>

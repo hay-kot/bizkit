@@ -116,8 +116,8 @@ const createGoal = useCreateGoal()
 const deleteGoal = useDeleteGoal()
 const goalColumns = [
   { key: 'name', label: 'Name' },
-  { key: 'match', label: 'Matches' },
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-16 text-right' },
+  { key: 'match', label: 'Matches', interactive: true },
+  { key: 'actions', label: 'Actions', hidden: true, class: 'w-16 text-right', interactive: true },
 ]
 const goalKinds: { value: GoalKind; label: string }[] = [
   { value: 'page', label: 'Page path' },
@@ -255,12 +255,9 @@ function viewGoal(goal: Goal | undefined) {
             title: 'No goals yet',
             message: 'Add a goal such as a signup page to see its conversion rate.',
           }"
+          @row-click="viewGoal"
         >
-          <template #cell-name="{ row }">
-            <button type="button" class="link font-medium link-hover" @click="viewGoal(row)">
-              {{ row.name }}
-            </button>
-          </template>
+          <template #cell-name="{ row }">{{ row.name }}</template>
           <template #cell-match="{ row }">
             <span class="text-sm"
               >{{ row.kind === 'page' ? 'Page' : 'Event' }}

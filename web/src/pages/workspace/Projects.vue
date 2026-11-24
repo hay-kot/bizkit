@@ -24,9 +24,9 @@ const panelOpen = ref(false)
 useCreateIntent(openPanel)
 const columns = [
   { key: 'name', label: 'Name' },
-  { key: 'slug', label: 'Slug' },
+  { key: 'slug', label: 'Slug', interactive: true },
   { key: 'created', label: 'Created' },
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-12 text-right' },
+  { key: 'actions', label: 'Actions', hidden: true, class: 'w-12 text-right', interactive: true },
 ]
 
 function openPanel() {
@@ -75,6 +75,7 @@ function onDelete(project: Project) {
       :columns="columns"
       :rows="projects?.items"
       :row-key="(p) => p.id"
+      :row-to="(r) => `/w/${workspaceId}/p/${r.id}`"
       :loading="isPending"
       :error="error"
       :empty="{
@@ -84,9 +85,7 @@ function onDelete(project: Project) {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="`/w/${workspaceId}/p/${row.id}`" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-slug="{ row }"
         ><code class="text-sm">{{ row.slug }}</code></template

@@ -120,7 +120,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   |---|---|---|
   | A page | `Page` (full width; `compact` only for one-card pages outside the shell) > `PageHeader` (icon and breadcrumb come from the route's module nav item; pass `icon` only outside a module; `Tabs` go in its `tabs` slot) > `PageSection`s and `Card`s | `grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*` are errors in `src/pages` |
   | A detail page's header actions | `DetailActions`: page buttons, Save (its label is the save state) and a `#menu` of `MenuItem`s (`danger` for delete, last) | Pages can't import `ActionsMenu` |
-  | A list of rows | `DataTable` with `#cell-<key>` slots; it handles loading, error and empty | `<table>` and DaisyUI `table*` classes are errors |
+  | A list of rows | `DataTable` with `#cell-<key>` slots; it handles loading, error and empty. `rowTo` for rows that open a page, `@row-click` for rows that open a panel; mark columns with their own controls `interactive` | `<table>` and DaisyUI `table*` classes are errors; `link-hover` is an error outside `components/ui` |
   | A choice | `Select` | `<select>`, `input[type=radio]` and DaisyUI `select*` classes are errors |
   | A tick box | `Checkbox` | `input[type=checkbox]` and DaisyUI `checkbox`/`toggle` classes are errors |
   | A create or edit form | `FormPanel` (side panel, or `variant="dialog"`), `Field`, `SubmitButton` | Pages can't import `Overlay`; DaisyUI `modal` classes are errors |

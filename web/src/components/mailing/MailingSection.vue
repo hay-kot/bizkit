@@ -47,6 +47,7 @@ const mailingPath = computed(() => `/w/${props.workspaceId}/p/${props.projectId}
       :columns="columns"
       :rows="isPending ? undefined : linked"
       :row-key="(l) => l.id"
+      :row-to="(r) => `${mailingPath}/lists/${r.id}`"
       :loading="isPending"
       :error="error"
       label="Mailing lists"
@@ -57,9 +58,7 @@ const mailingPath = computed(() => `/w/${props.workspaceId}/p/${props.projectId}
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="`${mailingPath}/lists/${row.id}`" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-description="{ row }"
         ><span class="text-sm text-base-content/80">{{ row.description ?? '' }}</span></template

@@ -172,6 +172,7 @@ function removeSecret(secret: string) {
         :columns="scriptColumns"
         :rows="shownScripts"
         :row-key="(s) => s.id"
+        :row-to="(r) => scriptPath(r.id)"
         :loading="isPending"
         :error="error"
         label="Scripts"
@@ -182,9 +183,7 @@ function removeSecret(secret: string) {
         }"
       >
         <template #cell-name="{ row }">
-          <RouterLink :to="scriptPath(row.id)" class="link font-medium link-hover">
-            {{ row.name }}
-          </RouterLink>
+          {{ row.name }}
           <span v-if="!row.enabled" class="ms-2 badge badge-ghost badge-sm">Disabled</span>
           <span v-if="!row.available" class="ms-2 badge badge-sm badge-warning">Unavailable</span>
         </template>

@@ -30,7 +30,7 @@ const name = ref('')
 const forwardUrl = ref('')
 const columns = [
   { key: 'name', label: 'Name' },
-  { key: 'url', label: 'URL' },
+  { key: 'url', label: 'URL', interactive: true },
   { key: 'requests', label: 'Requests' },
   { key: 'last', label: 'Last request' },
 ]
@@ -72,6 +72,7 @@ async function onCreate() {
       :columns="columns"
       :rows="endpoints?.items"
       :row-key="(e) => e.id"
+      :row-to="(r) => endpointPath(r.id)"
       :loading="isPending"
       :error="error"
       :empty="{
@@ -81,9 +82,7 @@ async function onCreate() {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="endpointPath(row.id)" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
         <span v-if="!row.enabled" class="ms-2 badge badge-ghost badge-sm">Disabled</span>
       </template>
       <template #cell-url="{ row }">
