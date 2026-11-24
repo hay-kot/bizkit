@@ -10,7 +10,7 @@ import { TAB_LAYOUT, type TabHeader } from './tabLayout'
  * The parent route of a feature with tabs. It renders the page, header and
  * tabs once, and the current tab's route in a nested `RouterView`, so a tab
  * switch swaps only the content. Each tab's page renders a `TabPage`, which
- * sets the header's title, description, width and actions.
+ * sets the header's title, description and actions.
  *
  * `childProps` go to every tab's page, on top of its route params.
  */
@@ -21,7 +21,7 @@ defineProps<{
   childProps?: Record<string, unknown>
 }>()
 
-const header = reactive<TabHeader>({ title: '', width: 'wide' })
+const header = reactive<TabHeader>({ title: '' })
 const actions = ref<HTMLElement | null>(null)
 const withActions = ref(0)
 const leaving = ref(false)
@@ -29,7 +29,7 @@ provide(TAB_LAYOUT, { header, actions, withActions, leaving })
 </script>
 
 <template>
-  <Page :width="header.width">
+  <Page>
     <PageHeader :section="section" :title="header.title" :description="header.description">
       <template v-if="withActions > 0" #default>
         <div ref="actions" class="flex flex-wrap items-center gap-2" />

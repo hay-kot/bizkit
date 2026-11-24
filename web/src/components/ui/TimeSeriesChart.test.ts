@@ -20,12 +20,29 @@ describe('TimeSeriesChart', () => {
     expect(svg.attributes('aria-label')).toBe(
       'Visitors and Previous from Mar 13 to Mar 15. Visitors total 75, Previous total 50.',
     )
-    expect(wrapper.findAll('path.stroke-primary')).toHaveLength(1)
+    expect(wrapper.findAll('path.stroke-chart-1')).toHaveLength(1)
     const muted = wrapper.get('path.stroke-base-content\\/40')
     expect(muted.attributes('stroke-dasharray')).toBe('4 4')
-    expect(wrapper.findAll('path.fill-primary\\/10')).toHaveLength(1)
+    expect(wrapper.findAll('path.fill-chart-1\\/10')).toHaveLength(1)
     const yLabels = wrapper.findAll('g > g > text').map((t) => t.text())
     expect(yLabels).toEqual(['0', '20', '40'])
+  })
+
+  it('gives each solid series the next chart color, skipping muted ones', () => {
+    const wrapper = mount(TimeSeriesChart, {
+      props: {
+        points: points.map((p) => ({ ...p, values: [...p.values, 1] })),
+        series: [
+          { name: 'A', tone: 'primary' as const },
+          { name: 'Previous', tone: 'muted' as const },
+          { name: 'B', tone: 'primary' as const },
+        ],
+      },
+    })
+    const lines = wrapper.findAll('path[fill="none"]').map((p) => p.classes())
+    expect(lines[0]).toContain('stroke-chart-1')
+    expect(lines[1]).toContain('stroke-base-content/40')
+    expect(lines[2]).toContain('stroke-chart-2')
   })
 
   it('has a hidden data table', () => {

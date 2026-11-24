@@ -1,18 +1,16 @@
 <script setup lang="ts">
 /**
  * The root of every page. It sets the width and the space between the
- * page's top-level blocks, so pages add no margins between them. Pages stay
- * left-aligned so the header doesn't move between pages of different widths,
- * except `compact` ones: they have no header and center their one card.
+ * page's top-level blocks, so pages add no margins between them.
  *
- * - `wide` (default): the layout's full content width, for list and detail pages.
- * - `narrow`: settings pages.
- * - `compact`: a page that is one small card, such as Invite.
+ * - `wide` (default): the layout's full content width. Every page in the
+ *   workspace shell uses it, so blocks line up from page to page.
+ * - `compact`: a page that is one small card without a header, such as
+ *   Invite, centered.
  */
-withDefaults(defineProps<{ width?: 'wide' | 'narrow' | 'compact' }>(), { width: 'wide' })
+withDefaults(defineProps<{ width?: 'wide' | 'compact' }>(), { width: 'wide' })
 const widths = {
   wide: 'w-full',
-  narrow: 'w-full max-w-3xl',
   compact: 'mx-auto mt-8 w-full max-w-md',
 }
 </script>

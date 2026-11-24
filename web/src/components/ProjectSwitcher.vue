@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown, FolderKanban, List } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+import Avatar from '@/components/ui/Avatar.vue'
 import Menu from '@/components/ui/Menu.vue'
 import MenuItem from '@/components/ui/MenuItem.vue'
 import { projectNav, projectPath } from '@/modules'
@@ -20,25 +21,29 @@ const section = computed(() => {
 </script>
 
 <template>
-  <Menu label="Switch project">
+  <Menu label="Switch project" class="w-full">
     <template #trigger="{ open, toggle, controls }">
       <button
         type="button"
-        class="flex w-full items-center gap-2.5 rounded-field px-2.5 py-2 text-left text-sm transition-colors hover:bg-base-300"
+        class="flex h-12 w-full items-center gap-2.5 rounded-field border border-field-border bg-base-100 px-2.5 text-left transition-colors hover:border-base-content/60 hover:bg-raised"
         :aria-expanded="open"
         :aria-controls="controls"
         aria-haspopup="menu"
         @click="toggle"
       >
-        <FolderKanban class="size-4 shrink-0" aria-hidden="true" />
-        <span class="flex-1 truncate font-medium" data-testid="project-name">{{
-          current?.name ?? 'Choose a project'
-        }}</span>
+        <Avatar v-if="current" :name="current.name" size="sm" />
+        <FolderKanban v-else class="size-6 shrink-0 p-0.5" aria-hidden="true" />
+        <span class="flex min-w-0 flex-1 flex-col leading-tight">
+          <span class="text-xs text-base-content/70">Project</span>
+          <span class="truncate text-sm font-semibold" data-testid="project-name">{{
+            current?.name ?? 'Choose a project'
+          }}</span>
+        </span>
         <span class="sr-only">Switch project</span>
         <ChevronsUpDown class="size-4 shrink-0 text-base-content/70" aria-hidden="true" />
       </button>
     </template>
-    <div class="px-2 py-1.5 text-xs font-medium text-base-content/70">Projects</div>
+    <div class="px-3 pt-2 pb-1 text-xs font-medium text-base-content/70">Projects</div>
     <MenuItem v-for="p in projects" :key="p.id" :to="projectPath(props.workspaceId, p.id, section)">
       <span class="flex-1 truncate">{{ p.name }}</span>
       <Check v-if="p.id === current?.id" class="size-4" aria-hidden="true" />

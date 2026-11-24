@@ -2,22 +2,38 @@
 
 Every page follows one of four archetypes. The primitives live in `src/components/ui`; ESLint catches the common breaks of the layout rules in `src/pages` (`grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*`); the rest is on review.
 
+## Surfaces and color
+
+Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and a page picks its surfaces through the primitives, not by hand:
+
+| Surface | Token | Use |
+|---|---|---|
+| Canvas | `base-200` | The page and the sidebar. |
+| Panel | `base-100` | Cards, tables, stat tiles, description lists, side panels. |
+| Raised | `raised` | Menus, popovers, tooltips and plain buttons. In light it is white, and the shadow gives the lift. |
+| Field | `field`, `field-border` | Inputs, textareas and `Select` triggers: inset in dark, white with a strong border in light. The border meets 3:1. |
+| Lines | `base-300` | Borders and dividers. |
+
+`primary` is the orange accent: primary buttons, links (`link`), the active tab's underline, the active nav item's bar, focus rings and the first chart series. Keep muted text at `/70` or more so it passes AA on every surface.
+
 ## Building blocks
 
 | Block | Use |
 |---|---|
-| `Page` | The root of every page. `width`: `wide` (default) for list and detail pages, `narrow` for settings, `compact` for a one-card page without a header, centered. Owns the space between top-level blocks. |
+| `Page` | The root of every page. `width`: `wide` (default) fills the content column, for every page in the workspace shell; `compact` is a one-card page without a header, centered (Invite). Owns the space between top-level blocks. |
 | `PageHeader` | Eyebrow (`section`), the title with actions on the same row, then the description. |
 | `PageSection` | A titled block that isn't a card: a table or list with a heading and optional actions. |
 | `Card` | A bordered group of fields or facts. `#actions` in the heading, `#footer` for a right-aligned Save. |
+| `Field` | A label over its control, with a hint or error under it. `width="md"` caps it at a readable width inside a full-width card (settings). |
+| `Select`, `Menu` | Popups on the `raised` surface. Options and menu items are at least 36px tall with `px-3`; a `Select` list is at least 14rem wide whatever its trigger. `Select size="sm"` is the toolbar size. |
 | `DescriptionList` | Read-only facts about the entity, straight under the header. |
 | `DetailActions` + `MenuItem` | A detail page's header actions: page buttons (`actions`), Save (`save`) and the "..." menu (`#menu`), all `btn-sm` in one style family. Save shows its own state: "Save", a disabled "Saved", or "Saving". Destructive menu items are `danger` and go last. |
 | `FormPanel` | Create and edit forms, as a side panel or a dialog. |
 | `Tabs` | Route links under a page header, one route per tab, for a feature with several pages (Analytics). The active tab gets `aria-current="page"`; a tab stays active on paths under it unless `exact`. |
-| `TabLayout`, `TabPage` | A feature with tabs is one parent route whose component wraps `TabLayout` (page, header and `Tabs`, rendered once) with the tabs as child routes. Each tab's page renders a `TabPage`, which sets the header's title, description, width and actions, so a tab switch swaps only the content (Analytics, Mailing). Detail pages without tabs stay outside the parent. |
+| `TabLayout`, `TabPage` | A feature with tabs is one parent route whose component wraps `TabLayout` (page, header and `Tabs`, rendered once) with the tabs as child routes. Each tab's page renders a `TabPage`, which sets the header's title, description and actions, so a tab switch swaps only the content (Analytics, Mailing). Detail pages without tabs stay outside the parent. |
 | `DateRangePicker` | A report's range: a preset `Select` (Today to Last month) and two date fields for Custom. Days are `YYYY-MM-DD` in UTC; `presetRange` and `previousPeriod` in `lib/range.ts` do the math. |
 | `StatTiles` | A row of KPI tiles. With `previous` set, a tile shows the change as a percent with an arrow, green up and red down, or "new" when the previous value was 0. |
-| `TimeSeriesChart` | A line chart over time in hand-written SVG. The first `primary` series gets an area; a `muted` series is the dashed previous period. Hover or arrow keys read a point. Empty data draws a flat baseline. |
+| `TimeSeriesChart` | A line chart over time in hand-written SVG. Each `primary` series takes the next chart color (`chart-1` to `chart-4`: primary, secondary, accent, warning) and the first gets an area; a `muted` series is the dashed previous period. Hover or arrow keys read a point. Empty data draws a flat baseline. |
 | `BarList` | A ranked list with a share bar behind each row (a `progress` element, so no width style), the top `limit` rows and a "Show all" button (`show-all`). |
 | `ReportGrid` | Lays report panels out two-up on wide screens, one column below, so the page needs no grid classes. |
 
@@ -41,10 +57,10 @@ Form, Script. One column, always: no side-by-side cards or sidebars.
 
 ## Settings page
 
-Workspace settings.
+Workspace settings, analytics settings.
 
-- `Page width="narrow"`, one `Card` per group.
-- Fields stack label over control at full width. Read-only values are readonly inputs with a `CopyButton`.
+- `Page` (full width, like every page), one `Card` per group.
+- Fields stack label over control, each `Field width="md"`, so the card spans the page and the fields stay readable. Read-only values are readonly inputs with a `CopyButton`.
 - Save sits in the card's footer and stays disabled until something changed. Each card saves on its own.
 - A danger zone, when there is one, is the last card.
 
@@ -60,6 +76,8 @@ Analytics. A read-only page of numbers for a date range.
 
 ## Rules for every page
 
+- **Width.** Every top-level block on a page is full width, so blocks line up with each other and from page to page. Narrow content goes inside a block (`Field width="md"`, prose capped in the primitives). Side-by-side panels exist only inside `ReportGrid`.
+- **Toolbars.** Every control in a toolbar row is 36px: `Select size="sm"`, `input-sm`, and a button beside them `btn h-9`. Controls in forms are 40px.
 - **Spacing.** `Page` puts `gap-8` between blocks, `PageSection` `gap-3` under its heading, `Card` `gap-4` in its body. Pages add no margins between their top-level blocks.
 - **Empty states.** `DataTable`'s `empty` prop: an icon, a title and one sentence. Only the main list adds a create action.
 - **Forms.** `Field` puts the label over the control. One column. The submit button goes bottom right in panels, in the card footer on settings.

@@ -173,7 +173,7 @@ const viewingFacts = computed(() => {
           placeholder="plan=pro"
           aria-label="Property filter, key=value"
         />
-        <button type="submit" class="btn btn-sm">Add filter</button>
+        <button type="submit" class="btn h-9">Add filter</button>
       </form>
     </RangeToolbar>
     <p v-if="propError" class="text-sm text-error">{{ propError }}</p>

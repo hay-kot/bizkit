@@ -78,7 +78,7 @@ function onPick() {
         ref="menu"
         role="menu"
         :aria-label="label"
-        class="absolute z-30 min-w-56 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg"
+        class="absolute z-30 min-w-56 rounded-box border border-base-300 bg-raised p-1.5 shadow-lg"
         :class="[
           align === 'end' ? 'right-0' : 'left-0',
           placement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1',

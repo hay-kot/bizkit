@@ -61,7 +61,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-base-100">
+  <div class="flex min-h-screen bg-base-200">
     <Transition
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="opacity-0"
@@ -98,10 +98,15 @@ watch(
             <X class="size-4" aria-hidden="true" />
           </button>
         </div>
+        <!-- The project is a control, not a page: it gets a field-like box of
+        its own, apart from the nav rows, so it isn't clicked by mistake. -->
+        <div v-if="projects.length > 0" class="px-2 pt-3">
+          <ProjectSwitcher :workspace-id="workspaceId" :projects="projects" :current="project" />
+        </div>
         <div class="px-2 pt-2">
           <button
             type="button"
-            class="flex w-full items-center gap-2.5 rounded-field border border-base-300 bg-base-100 px-2.5 py-1.5 text-sm text-base-content/70 transition-colors hover:bg-base-300"
+            class="flex h-9 w-full items-center gap-2.5 rounded-field border border-base-300 bg-base-100 px-3 text-sm text-base-content/70 transition-colors hover:bg-raised"
             aria-keyshortcuts="Meta+K Control+K"
             data-testid="open-palette"
             @click="openPalette()"
@@ -111,18 +116,17 @@ watch(
             <kbd class="font-sans text-xs">{{ isMac ? '⌘K' : 'Ctrl K' }}</kbd>
           </button>
         </div>
-        <nav class="flex-1 overflow-y-auto p-2" aria-label="Project">
-          <p class="px-2.5 pt-1 pb-1.5 text-xs font-medium text-base-content/70">Project</p>
-          <template v-if="projects.length > 0">
-            <ProjectSwitcher :workspace-id="workspaceId" :projects="projects" :current="project" />
-            <ul v-if="project" class="mt-1 flex flex-col gap-0.5">
-              <li v-for="item in visible(projectNav)" :key="item.path">
-                <SidebarLink :item="item" :to="projectPath(workspaceId, project.id, item.path)" />
-              </li>
-            </ul>
-          </template>
+        <nav
+          class="mt-3 flex-1 overflow-y-auto border-t border-base-300 p-2 pt-3"
+          aria-label="Project"
+        >
+          <ul v-if="projects.length > 0 && project" class="flex flex-col gap-0.5">
+            <li v-for="item in visible(projectNav)" :key="item.path">
+              <SidebarLink :item="item" :to="projectPath(workspaceId, project.id, item.path)" />
+            </li>
+          </ul>
           <div
-            v-else-if="!projectsPending && !projectsError"
+            v-else-if="projects.length === 0 && !projectsPending && !projectsError"
             class="px-2.5 py-2 text-sm text-base-content/80"
           >
             <p>No projects yet.</p>
@@ -154,38 +158,36 @@ watch(
         </button>
         <span class="truncate font-semibold">{{ workspace?.name }}</span>
       </header>
-      <main class="flex-1 px-4 py-6 sm:px-8">
-        <div class="mx-auto max-w-5xl">
-          <ErrorAlert v-if="error" :error="error" />
-          <EmptyState
-            v-else-if="projectMissing"
-            :icon="FolderX"
-            title="Project not found"
-            message="It may have been deleted, or the link is wrong."
+      <main class="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <ErrorAlert v-if="error" :error="error" />
+        <EmptyState
+          v-else-if="projectMissing"
+          :icon="FolderX"
+          title="Project not found"
+          message="It may have been deleted, or the link is wrong."
+        >
+          <RouterLink :to="`/w/${workspaceId}/projects`" class="btn btn-primary btn-sm">
+            All projects
+          </RouterLink>
+        </EmptyState>
+        <RouterView v-else v-slot="{ Component, route: child }">
+          <Transition
+            mode="out-in"
+            enter-active-class="transition duration-150 ease-out"
+            enter-from-class="translate-y-1 opacity-0"
+            leave-active-class="transition duration-100 ease-in"
+            leave-to-class="opacity-0"
           >
-            <RouterLink :to="`/w/${workspaceId}/projects`" class="btn btn-primary btn-sm">
-              All projects
-            </RouterLink>
-          </EmptyState>
-          <RouterView v-else v-slot="{ Component, route: child }">
-            <Transition
-              mode="out-in"
-              enter-active-class="transition duration-150 ease-out"
-              enter-from-class="translate-y-1 opacity-0"
-              leave-active-class="transition duration-100 ease-in"
-              leave-to-class="opacity-0"
-            >
-              <component
-                :is="Component"
-                :key="routeKey(child, depth)"
-                :workspace-id="workspaceId"
-                :workspace-name="workspace?.name ?? ''"
-                :project-name="project?.name ?? ''"
-                :is-admin="isAdmin"
-              />
-            </Transition>
-          </RouterView>
-        </div>
+            <component
+              :is="Component"
+              :key="routeKey(child, depth)"
+              :workspace-id="workspaceId"
+              :workspace-name="workspace?.name ?? ''"
+              :project-name="project?.name ?? ''"
+              :is-admin="isAdmin"
+            />
+          </Transition>
+        </RouterView>
       </main>
     </div>
     <PaletteRows

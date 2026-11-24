@@ -178,7 +178,6 @@ function viewGoal(goal: Goal | undefined) {
     :project-name="projectName"
     gate="site"
     title="Analytics settings"
-    width="narrow"
   >
     <template #default="{ site: current }">
       <Card title="Snippet" description="Add this to the <head> of every page on your site.">
@@ -205,6 +204,7 @@ function viewGoal(goal: Goal | undefined) {
         >
           <Field
             label="Allowed hostnames"
+            width="md"
             hint="One per line, exact or *.example.com. Events from other hosts are dropped."
           >
             <textarea
@@ -218,7 +218,7 @@ function viewGoal(goal: Goal | undefined) {
           <p v-if="!hostList.length" role="alert" class="alert text-sm alert-warning">
             Any hostname can send events to this project, including copies of your site.
           </p>
-          <Field label="Visitor identity">
+          <Field label="Visitor identity" width="md">
             <Select v-model="identityMode" :options="identityModes" label="Visitor identity" />
           </Field>
           <p class="text-sm text-base-content/70">

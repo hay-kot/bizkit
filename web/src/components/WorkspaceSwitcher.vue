@@ -20,7 +20,7 @@ const title = computed(() => props.name ?? current.value?.workspace.name ?? '')
     <template #trigger="{ open, toggle, controls }">
       <button
         type="button"
-        class="flex w-full items-center gap-2.5 rounded-field p-2 text-left transition-colors hover:bg-base-300"
+        class="flex w-full items-center gap-2.5 rounded-field p-2 text-left transition-colors hover:bg-raised"
         :aria-expanded="open"
         :aria-controls="controls"
         aria-haspopup="menu"
@@ -37,7 +37,7 @@ const title = computed(() => props.name ?? current.value?.workspace.name ?? '')
         <ChevronsUpDown class="size-4 shrink-0 text-base-content/70" aria-hidden="true" />
       </button>
     </template>
-    <div class="px-2 py-1.5 text-xs font-medium text-base-content/70">Workspaces</div>
+    <div class="px-3 pt-2 pb-1 text-xs font-medium text-base-content/70">Workspaces</div>
     <MenuItem v-for="m in me?.memberships ?? []" :key="m.workspace.id" :to="`/w/${m.workspace.id}`">
       <Avatar :name="m.workspace.name" size="sm" />
       <span class="flex-1 truncate">{{ m.workspace.name }}</span>

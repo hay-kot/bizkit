@@ -26,7 +26,7 @@ async function onSignOut() {
     <template #trigger="{ open, toggle, controls }">
       <button
         type="button"
-        class="flex w-full items-center gap-2 rounded-field px-2 py-1.5 text-left text-sm transition-colors hover:bg-base-300"
+        class="flex w-full items-center gap-2 rounded-field px-2 py-1.5 text-left text-sm transition-colors hover:bg-raised"
         :aria-expanded="open"
         :aria-controls="controls"
         aria-haspopup="menu"
@@ -44,7 +44,7 @@ async function onSignOut() {
         />
       </button>
     </template>
-    <div class="px-2 py-1.5 text-xs text-base-content/70">{{ me?.email }}</div>
+    <div class="px-3 pt-2 pb-1 text-xs text-base-content/70">{{ me?.email }}</div>
     <MenuItem to="/"><LayoutGrid class="size-4" aria-hidden="true" />Your workspaces</MenuItem>
     <MenuItem @select="onSignOut"><LogOut class="size-4" aria-hidden="true" />Sign out</MenuItem>
   </Menu>

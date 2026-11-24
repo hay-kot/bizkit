@@ -19,7 +19,7 @@ const model = defineModel<boolean | string[]>({ required: true })
         type="checkbox"
         :value="value"
         :disabled="disabled"
-        class="peer size-4 cursor-pointer appearance-none rounded-sm border border-base-content/40 bg-base-100 transition-colors duration-100 group-hover:border-base-content/70 checked:border-primary checked:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
+        class="peer size-4 cursor-pointer appearance-none rounded-sm border border-base-content/40 bg-base-100 transition-colors duration-100 group-hover:border-base-content/70 checked:border-primary checked:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
       <Check
         class="pointer-events-none absolute inset-0 size-4 p-0.5 text-primary-content opacity-0 transition-opacity duration-100 peer-checked:opacity-100"
