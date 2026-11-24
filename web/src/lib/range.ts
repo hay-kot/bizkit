@@ -142,6 +142,11 @@ function minDay(a: string, b: string): string {
   return a < b ? a : b
 }
 
+/** Milliseconds from `now` to the next UTC midnight, when `utcToday` changes. */
+export function msToNextUtcDay(now: Date = new Date()): number {
+  return toTime(utcToday(now)) + DAY_MS - now.getTime()
+}
+
 /** Today in UTC, as `YYYY-MM-DD`. */
 export function utcToday(now: Date = new Date()): string {
   return toDay(now.getTime())

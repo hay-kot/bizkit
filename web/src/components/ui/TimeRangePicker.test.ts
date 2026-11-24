@@ -1,4 +1,4 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import { h } from 'vue'
 
@@ -29,6 +29,11 @@ function button(name: string): HTMLButtonElement {
 
 function trigger(picker: Picker) {
   return picker.get('[aria-haspopup="dialog"]')
+}
+
+async function openPanel(picker: Picker) {
+  await trigger(picker).trigger('click')
+  await flushPromises()
 }
 
 afterEach(() => {
@@ -74,7 +79,7 @@ describe('TimeRangePicker', () => {
 
   it('picks a quick range, marks the active one and returns focus', async () => {
     const picker = mountPicker({ preset: '30d', from: '2026-02-14', to: today })
-    await trigger(picker).trigger('click')
+    await openPanel(picker)
     const dialog = document.querySelector('[role="dialog"]')!
     const active = dialog.querySelector<HTMLElement>('[aria-current="true"]')!
     expect(active.textContent?.trim()).toBe('Last 30 days')
@@ -89,7 +94,7 @@ describe('TimeRangePicker', () => {
 
   it('applies an absolute range and refuses one that ends after today', async () => {
     const picker = mountPicker({ preset: '30d', from: '2026-02-14', to: today })
-    await trigger(picker).trigger('click')
+    await openPanel(picker)
     const [from, to] = [...document.querySelectorAll<HTMLInputElement>('input[type="date"]')]
     expect(from!.value).toBe('2026-02-14')
 
@@ -112,7 +117,7 @@ describe('TimeRangePicker', () => {
 
   it('closes on Escape and gives focus back to the trigger', async () => {
     const picker = mountPicker({ preset: '30d', from: '2026-02-14', to: today })
-    await trigger(picker).trigger('click')
+    await openPanel(picker)
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await picker.vm.$nextTick()
     expect(document.querySelector('[role="dialog"]')).toBeNull()
@@ -126,5 +131,31 @@ describe('TimeRangePicker', () => {
     )
     expect(picker.find('span[aria-hidden="true"].w-px').exists()).toBe(true)
     expect(picker.text()).toContain('Compare')
+  })
+
+  it('keeps the absolute fields in step with the range while open', async () => {
+    const picker = mountPicker({ preset: '7d', from: '2026-03-09', to: today })
+    await openPanel(picker)
+    await picker.setProps({ range: { preset: 'custom', from: '2026-03-02', to: '2026-03-08' } })
+    const [from, to] = [...document.querySelectorAll<HTMLInputElement>('input[type="date"]')]
+    expect([from!.value, to!.value]).toEqual(['2026-03-02', '2026-03-08'])
+
+    from!.form!.requestSubmit()
+    expect(picker.emitted('apply')?.[0]).toEqual([
+      { preset: 'custom', from: '2026-03-02', to: '2026-03-08' },
+    ])
+  })
+
+  it('asks for both days once a field is cleared, not before', async () => {
+    const picker = mountPicker({ preset: '7d', from: '2026-03-09', to: today })
+    await openPanel(picker)
+    expect(document.querySelector('[role="alert"]')).toBeNull()
+
+    const from = document.querySelector<HTMLInputElement>('input[type="date"]')!
+    from.value = ''
+    from.dispatchEvent(new Event('input'))
+    await picker.vm.$nextTick()
+    expect(document.querySelector('[role="alert"]')?.textContent?.trim()).toBe('Pick both days.')
+    expect(button('Apply').disabled).toBe(true)
   })
 })

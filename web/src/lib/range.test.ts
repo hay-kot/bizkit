@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   addDays,
+  msToNextUtcDay,
   presetRange,
   previousPeriod,
   rangeFromQuery,
@@ -186,5 +187,10 @@ describe('range', () => {
     expect(savedPreset('14d')).toBeUndefined()
     expect(savedPreset('yesterday')).toBeUndefined()
     expect(savedPreset('custom')).toBeUndefined()
+  })
+
+  it('counts the time to the next UTC midnight', () => {
+    expect(msToNextUtcDay(new Date('2026-03-15T23:59:00Z'))).toBe(60_000)
+    expect(msToNextUtcDay(new Date('2026-12-31T00:00:00Z'))).toBe(86_400_000)
   })
 })

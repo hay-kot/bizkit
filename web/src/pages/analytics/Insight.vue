@@ -60,7 +60,7 @@ const range = computed<DateRange>({
   get: () => {
     const saved = insight.value?.range
     if (route.query.range || !saved) return urlRange.value
-    return { preset: saved, ...presetRange(saved, today) }
+    return { preset: saved, ...presetRange(saved, today.value) }
   },
   set: (next) => (urlRange.value = next),
 })

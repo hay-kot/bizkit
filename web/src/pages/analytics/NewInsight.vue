@@ -64,6 +64,9 @@ async function onSave() {
         ]"
       />
     </template>
+    <p v-if="!savedPreset(range.preset)" class="text-sm text-base-content/70">
+      This range isn't saved. A saved insight opens on the last 30 days.
+    </p>
     <InsightBuilder
       v-model:range="range"
       v-model:draft="draft"

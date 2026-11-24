@@ -4,11 +4,10 @@ import {
   onKeyStroke,
   useElementBounding,
   useElementSize,
-  useEventListener,
   useWindowSize,
 } from '@vueuse/core'
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ZoomOut } from 'lucide-vue-next'
-import { computed, nextTick, ref, useId } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 
 import { formatDayRange } from '@/lib/format'
 import {
@@ -45,6 +44,20 @@ const panel = ref<HTMLElement>()
 const panelId = useId()
 const from = ref('')
 const to = ref('')
+// The error waits for an edit, so opening the panel never greets the user
+// with one.
+const touched = ref(false)
+const measured = ref(false)
+
+// Previous, Next, Zoom out and Back change the range while the panel may be
+// open; Apply must start from what the page shows, not from when it opened.
+watch(
+  () => [props.range.from, props.range.to] as const,
+  ([nextFrom, nextTo]) => {
+    from.value = nextFrom
+    to.value = nextTo
+  },
+)
 
 const label = computed(() => {
   const preset = props.presets.flat().find((p) => p.value === props.range.preset)
@@ -74,25 +87,36 @@ function applyAbsolute() {
 }
 
 // The panel renders in <body> so scroll containers can't clip it, below the
-// whole group and shifted to stay inside the viewport. Below the sm
-// breakpoint the panes stack and the panel takes the viewport's width.
+// whole group, or above it when there is less room below than FLOOR (or the
+// panel's height) and more above. It shifts to stay inside the viewport and
+// follows the group when the page scrolls. Below the sm breakpoint the panes
+// stack and the panel takes the viewport's width.
 const EDGE = 8
+const GAP = 4
 const SM = 640
+const FLOOR = 360
 const anchor = useElementBounding(root)
 const viewport = useWindowSize({ includeScrollbar: false })
-const { width: panelWidth } = useElementSize(panel, undefined, { box: 'border-box' })
+const panelSize = useElementSize(panel, { width: 0, height: 0 }, { box: 'border-box' })
 const position = computed(() => {
   const maxWidth = Math.max(0, viewport.width.value - 2 * EDGE)
-  const top = anchor.bottom.value + 4
   const narrow = viewport.width.value < SM
   const left = narrow
     ? EDGE
-    : Math.max(EDGE, Math.min(anchor.left.value, viewport.width.value - EDGE - panelWidth.value))
+    : Math.max(
+        EDGE,
+        Math.min(anchor.left.value, viewport.width.value - EDGE - panelSize.width.value),
+      )
+  const below = viewport.height.value - anchor.bottom.value - GAP - EDGE
+  const above = anchor.top.value - GAP - EDGE
+  const up = below < Math.min(FLOOR, panelSize.height.value) && above > below
   return {
-    top: `${top}px`,
     left: `${left}px`,
     maxWidth: `${maxWidth}px`,
-    maxHeight: `${Math.max(160, viewport.height.value - top - EDGE)}px`,
+    maxHeight: `${Math.max(160, up ? above : below)}px`,
+    ...(up
+      ? { bottom: `${viewport.height.value - anchor.top.value + GAP}px` }
+      : { top: `${anchor.bottom.value + GAP}px` }),
     ...(narrow ? { width: `${maxWidth}px` } : {}),
   }
 })
@@ -101,7 +125,17 @@ async function show() {
   anchor.update()
   from.value = props.range.from
   to.value = props.range.to
+  touched.value = false
+  measured.value = false
   open.value = true
+  // The panel renders hidden first so its size is known before it is placed;
+  // the ResizeObserver behind panelSize reports only after a frame.
+  await nextTick()
+  if (panel.value) {
+    panelSize.width.value = panel.value.offsetWidth
+    panelSize.height.value = panel.value.offsetHeight
+  }
+  measured.value = true
   await nextTick()
   const start =
     panel.value?.querySelector<HTMLElement>('[aria-current="true"]') ??
@@ -117,13 +151,6 @@ function close() {
 
 onClickOutside(root, () => (open.value = false), { ignore: [panel] })
 onKeyStroke('Escape', () => close())
-useEventListener(
-  'scroll',
-  (event: Event) => {
-    if (open.value && !panel.value?.contains(event.target as Node)) open.value = false
-  },
-  { capture: true, passive: true },
-)
 
 function onFocusOut(event: FocusEvent) {
   const next = event.relatedTarget as Node | null
@@ -201,6 +228,7 @@ const iconButton =
           aria-label="Time range"
           :style="position"
           class="fixed z-60 flex flex-col overflow-auto rounded-box border border-base-300 bg-raised shadow-lg sm:flex-row"
+          :class="measured ? '' : 'invisible'"
           @focusout="onFocusOut"
         >
           <form
@@ -211,13 +239,25 @@ const iconButton =
             <h2 class="text-xs font-medium text-base-content/70">Absolute range</h2>
             <label class="flex flex-col gap-1 text-sm">
               From
-              <input v-model="from" type="date" class="input h-9 w-full" :max="today" />
+              <input
+                v-model="from"
+                type="date"
+                class="input h-9 w-full"
+                :max="today"
+                @input="touched = true"
+              />
             </label>
             <label class="flex flex-col gap-1 text-sm">
               To
-              <input v-model="to" type="date" class="input h-9 w-full" :max="today" />
+              <input
+                v-model="to"
+                type="date"
+                class="input h-9 w-full"
+                :max="today"
+                @input="touched = true"
+              />
             </label>
-            <p v-if="absoluteError && from && to" class="text-xs text-error" role="alert">
+            <p v-if="absoluteError && touched" class="text-xs text-error" role="alert">
               {{ absoluteError }}
             </p>
             <button
