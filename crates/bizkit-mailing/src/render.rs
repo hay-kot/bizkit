@@ -18,6 +18,8 @@ pub(crate) struct Rendered {
 
 /// The values merge fields take: `{{ name }}`, `{{ email }}` and
 /// `{{ attr.key }}`. A missing name or attribute renders as nothing.
+/// `attributes: None` is the preview, which has no reader: `{{ attr.key }}`
+/// stays as written there, so the author sees which keys a mail uses.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Merge<'a> {
     pub(crate) name: Option<&'a str>,
@@ -83,6 +85,15 @@ fn fill(text: &str, merge: &Merge<'_>) -> String {
     while let Some((before, opened)) = rest.split_once("{{") {
         let Some((field, after)) = opened.split_once("}}") else { break };
         out.push_str(before);
+        // In `{{ x {{ name }}` the first `{{` is text and `name` the field.
+        let field = match field.rsplit_once("{{") {
+            Some((stray, field)) => {
+                out.push_str("{{");
+                out.push_str(stray);
+                field
+            }
+            None => field,
+        };
         if let Some(value) = merge_value(field.trim(), merge) {
             out.push_str(&value);
         } else {
@@ -102,12 +113,8 @@ fn merge_value(field: &str, merge: &Merge<'_>) -> Option<String> {
         "email" => Some(merge.email.to_owned()),
         _ => {
             let key = field.strip_prefix("attr.")?;
-            Some(
-                merge
-                    .attributes
-                    .and_then(|attributes| attributes.0.get(key))
-                    .map_or_else(String::new, ToString::to_string),
-            )
+            let attributes = merge.attributes?;
+            Some(attributes.0.get(key).map_or_else(String::new, ToString::to_string))
         }
     }
 }
@@ -345,7 +352,16 @@ mod tests {
         assert_eq!(text, "<b>Pro</b>/5/1.5/false/[]/{{ nope }}/{{ name", "text part");
         let html = markdown_html("Plan: {{ attr.plan }}", &merge);
         assert!(html.contains("&lt;b&gt;Pro&lt;/b&gt;"), "escaped in html: {html}");
-        assert_eq!(fill("{{ attr.plan }}", &ADA), "", "no attributes");
+        assert_eq!(fill("{{ attr.plan }}", &ADA), "{{ attr.plan }}", "the preview keeps it");
+        let none = Attributes::default();
+        let without = Merge { attributes: Some(&none), ..ADA };
+        assert_eq!(fill("[{{ attr.plan }}]", &without), "[]", "a reader without it");
+    }
+
+    #[test]
+    fn a_stray_opening_brace_pair_is_text() {
+        assert_eq!(fill("Hi {{ team, {{ name }}!", &ADA), "Hi {{ team, Ada!");
+        assert_eq!(fill("{{{{ name }}", &ADA), "{{Ada");
     }
 
     #[test]

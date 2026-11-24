@@ -7,8 +7,10 @@ import {
   describeAttributes,
   describeSegment,
   isEveryone,
+  rowsProblem,
   rowsToAttributes,
   rowsToConditions,
+  uniqueTags,
 } from './attributes'
 
 describe('attribute rows', () => {
@@ -44,7 +46,38 @@ describe('attribute rows', () => {
   })
 })
 
+describe('row problems', () => {
+  const row = (key: string, kind: 'text' | 'number' | 'bool', value: string) => ({
+    key,
+    kind,
+    value,
+  })
+
+  it('ignores blank rows', () => {
+    expect(rowsProblem([row('', 'text', ''), row('', 'bool', 'true')])).toBeUndefined()
+  })
+
+  it('reports what a save would drop', () => {
+    expect(rowsProblem([row('', 'text', 'pro')])).toMatch(/needs a key/)
+    expect(rowsProblem([row('seats', 'number', '')])).toMatch(/seats needs a number/)
+    expect(rowsProblem([row('plan', 'text', 'a'), row('plan', 'text', 'b')])).toMatch(
+      /more than one row/,
+    )
+  })
+
+  it('reads a value Vue cast to a number', () => {
+    const cast = { key: 'seats', kind: 'number' as const, value: 5 as unknown as string }
+    expect(rowsProblem([cast])).toBeUndefined()
+    expect(rowsToAttributes([cast])).toEqual({ seats: 5 })
+  })
+})
+
 describe('segments', () => {
+  it('drops repeated tags as the server does', () => {
+    expect(uniqueTags([' vip', 'vip ', '', 'beta'])).toEqual(['vip', 'beta'])
+    expect(canonicalSegment({ tags: ['vip', 'vip'] })).toBe(canonicalSegment({ tags: ['vip'] }))
+  })
+
   it('treats an empty segment as everyone', () => {
     expect(isEveryone({})).toBe(true)
     expect(isEveryone({ tags: [], attributes: [], joined_after: null })).toBe(true)

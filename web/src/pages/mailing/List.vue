@@ -9,6 +9,7 @@ import {
   type AttributeRow,
   attributesToRows,
   describeAttributes,
+  rowsProblem,
   rowsToAttributes,
 } from '@/components/mailing/attributes'
 import AttributesEditor from '@/components/mailing/AttributesEditor.vue'
@@ -131,6 +132,7 @@ function openAdd() {
 
 async function onAdd() {
   const d = draft.value
+  if (rowsProblem(d.attributes)) return
   await addContact.mutateAsync({
     path: { workspace_id: props.workspaceId, list_id: props.listId },
     body: {
@@ -161,6 +163,7 @@ async function onEdit() {
   const contact = editing.value
   if (!contact) return
   const e = edit.value
+  if (rowsProblem(e.attributes)) return
   await updateContact.mutateAsync({
     path: { workspace_id: props.workspaceId, list_id: props.listId, contact_id: contact.id },
     body: {

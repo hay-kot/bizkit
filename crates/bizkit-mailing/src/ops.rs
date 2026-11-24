@@ -599,7 +599,9 @@ pub(crate) struct CreateContact {
     /// Labels for sending to part of the list.
     #[serde(default)]
     tags: Vec<String>,
-    /// Values for `{{ attr.key }}` merge fields and segments.
+    /// Values for `{{ attr.key }}` merge fields and segments. An address
+    /// already on the list keeps its attributes; change them with
+    /// `mailing.contacts.update`.
     #[serde(default)]
     attributes: Attributes,
 }

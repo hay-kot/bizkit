@@ -22,7 +22,9 @@ import {
   describeSegment,
   fromDateInput,
   isEveryone,
+  rowsProblem,
   rowsToConditions,
+  uniqueTags,
 } from '@/components/mailing/attributes'
 import AttributesEditor from '@/components/mailing/AttributesEditor.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
@@ -127,20 +129,25 @@ const conditions = ref<AttributeRow[]>([])
 const joinedAfter = ref('')
 const joinedBefore = ref('')
 const segment = computed<Segment>(() => ({
-  tags: segmentTags.value
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t !== ''),
+  tags: uniqueTags(segmentTags.value.split(',')),
   attributes: rowsToConditions(conditions.value),
   joined_after: fromDateInput(joinedAfter.value),
   joined_before: fromDateInput(joinedBefore.value),
 }))
+
+const conditionsProblem = computed(() => rowsProblem(conditions.value))
+// The raw fields, half-filled rows included, so a refetch can tell whether
+// the user touched them since the last fill.
+const segmentFields = () =>
+  JSON.stringify([segmentTags.value, conditions.value, joinedAfter.value, joinedBefore.value])
+let filledFields = ''
 
 function fillSegment(loaded: Segment) {
   segmentTags.value = (loaded.tags ?? []).join(', ')
   conditions.value = conditionsToRows(loaded.attributes)
   joinedAfter.value = dateInput(loaded.joined_after)
   joinedBefore.value = dateInput(loaded.joined_before)
+  filledFields = segmentFields()
 }
 // As in Script.vue: a refetch only replaces fields the user hasn't edited
 // since the last fill, so a save or a poll never loses typing.
@@ -151,9 +158,7 @@ watch(
     if (!loaded) return
     const fresh = synced?.id !== loaded.id
     if (fresh || subject.value === synced?.subject) subject.value = loaded.subject
-    if (fresh || canonicalSegment(segment.value) === canonicalSegment(synced?.segment)) {
-      fillSegment(loaded.segment)
-    }
+    if (fresh || segmentFields() === filledFields) fillSegment(loaded.segment)
     if (fresh || body.value === synced?.body_md) body.value = loaded.body_md
     synced = loaded
   },
@@ -216,6 +221,7 @@ watch(
 
 const counter = useAudience()
 const matching = ref<number | null>(null)
+const countError = ref<unknown>(null)
 const settledSegment = refDebounced(segment, 400)
 let countRun = 0
 watch(
@@ -228,14 +234,24 @@ watch(
         path: { workspace_id: props.workspaceId, list_id: listId },
         body: { segment: wanted },
       })
-      if (run === countRun) matching.value = result.subscribers
-    } catch {
-      if (run === countRun) matching.value = null
+      if (run !== countRun) return
+      matching.value = result.subscribers
+      countError.value = null
+    } catch (error) {
+      if (run !== countRun) return
+      matching.value = null
+      countError.value = error
     }
   },
   { immediate: true },
 )
 
+const countText = computed(() => {
+  if (conditionsProblem.value) return 'Fix the conditions to see who matches.'
+  if (countError.value) return `Can’t count this segment: ${errorMessage(countError.value)}`
+  if (matching.value === null) return 'Counting…'
+  return `Matches ${formatNumber(matching.value)} ${plural(matching.value)}.`
+})
 const plural = (count: number) => (count === 1 ? 'subscriber' : 'subscribers')
 const audience = computed(() => {
   const name = list.value?.name ?? 'the list'
@@ -270,6 +286,10 @@ const facts = computed(() => {
 })
 
 function save() {
+  if (conditionsProblem.value) {
+    toast(conditionsProblem.value, 'error')
+    return Promise.resolve()
+  }
   return runAction({
     run: () =>
       update.mutateAsync({
@@ -400,6 +420,7 @@ function onDelete() {
 }
 
 const sendBlocked = computed(() => {
+  if (conditionsProblem.value) return 'Fix the recipients first'
   if (dirty.value) return 'Save the draft first'
   if (body.value.trim() === '') return 'Write the body first'
   return undefined
@@ -427,7 +448,12 @@ const actions = computed(() => {
   }
   return isDraft.value
     ? [
-        { label: 'Test send', icon: FlaskConical, run: openTest, disabled: dirty.value },
+        {
+          label: 'Test send',
+          icon: FlaskConical,
+          run: openTest,
+          disabled: dirty.value || conditionsProblem.value !== undefined,
+        },
         {
           label: 'Schedule',
           icon: CalendarClock,
@@ -570,6 +596,7 @@ const columns = [
         <AttributesEditor
           v-model="conditions"
           name="segment-condition"
+          form="broadcast-form"
           label="Attribute equals"
           add-label="Add condition"
         />
@@ -592,11 +619,7 @@ const columns = [
           />
         </Field>
         <p role="status" class="text-sm text-base-content/80">
-          {{
-            matching === null
-              ? 'Counting…'
-              : `Matches ${formatNumber(matching)} ${plural(matching)}.`
-          }}
+          {{ countText }}
         </p>
       </Card>
 

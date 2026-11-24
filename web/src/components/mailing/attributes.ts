@@ -20,21 +20,48 @@ function toRow(key: string, value: AttributeValue): AttributeRow {
   return { key, kind: kindOf(value), value: String(value) }
 }
 
+// Vue's v-model casts a number input's value to a number, so a row's
+// value can arrive as one despite its type.
+const text = (value: unknown) => String(value)
+
 /** The row's typed value, or undefined when a number doesn't parse. */
 export function rowValue(row: AttributeRow): AttributeValue | undefined {
-  if (row.kind === 'bool') return row.value === 'true'
+  const value = text(row.value)
+  if (row.kind === 'bool') return value === 'true'
   if (row.kind === 'number') {
-    const n = Number(row.value)
-    return row.value.trim() === '' || Number.isNaN(n) ? undefined : n
+    const n = Number(value)
+    return value.trim() === '' || Number.isNaN(n) ? undefined : n
   }
-  return row.value
+  return value
+}
+
+function isBlank(row: AttributeRow): boolean {
+  return row.key.trim() === '' && (row.kind === 'bool' || text(row.value).trim() === '')
+}
+
+/**
+ * Why the rows can't be saved as they are, or undefined. Rows left blank
+ * don't count; anything else that a save would drop is a problem, so a
+ * segment never widens and an attribute never goes away unseen.
+ */
+export function rowsProblem(rows: AttributeRow[]): string | undefined {
+  const seen = new Set<string>()
+  for (const row of rows) {
+    if (isBlank(row)) continue
+    const key = row.key.trim()
+    if (key === '') return 'Every row with a value needs a key.'
+    if (seen.has(key)) return `${key} is in more than one row.`
+    seen.add(key)
+    if (rowValue(row) === undefined) return `${key} needs a number.`
+  }
+  return undefined
 }
 
 export function attributesToRows(attributes: Attributes | undefined): AttributeRow[] {
   return Object.entries(attributes ?? {}).map(([key, value]) => toRow(key, value))
 }
 
-/** Rows with a key and a value that parses; the server checks the rest. */
+/** Rows with a key and a value that parses; check `rowsProblem` first. */
 export function rowsToAttributes(rows: AttributeRow[]): Attributes {
   const out: Attributes = {}
   for (const row of rows) {
@@ -59,11 +86,16 @@ export function describeAttributes(attributes: Attributes | undefined): string {
     .join(' · ')
 }
 
+/** Trimmed, without blanks and repeats, as the server stores them. */
+export function uniqueTags(tags: string[]): string[] {
+  return [...new Set(tags.map((t) => t.trim()).filter((t) => t !== ''))]
+}
+
 /** A segment in one comparable shape: times as milliseconds, empty parts dropped. */
 export function canonicalSegment(segment: Segment | undefined) {
   const time = (at: string | null | undefined) => (at ? new Date(at).getTime() : null)
   return JSON.stringify({
-    tags: segment?.tags ?? [],
+    tags: uniqueTags(segment?.tags ?? []),
     attributes: (segment?.attributes ?? []).map((c) => [c.key, c.equals]),
     joined_after: time(segment?.joined_after),
     joined_before: time(segment?.joined_before),

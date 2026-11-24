@@ -8657,7 +8657,9 @@ export type MailingContactsListResponse = MailingContactsListResponses[keyof Mai
 export type MailingContactsCreateData = {
     body: {
         /**
-         * Values for `{{ attr.key }}` merge fields and segments.
+         * Values for `{{ attr.key }}` merge fields and segments. An address
+         * already on the list keeps its attributes; change them with
+         * `mailing.contacts.update`.
          */
         attributes?: Attributes;
         /**

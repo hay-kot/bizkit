@@ -11503,7 +11503,7 @@
                 "properties": {
                   "attributes": {
                     "$ref": "#/components/schemas/Attributes",
-                    "description": "Values for `{{ attr.key }}` merge fields and segments."
+                    "description": "Values for `{{ attr.key }}` merge fields and segments. An address\nalready on the list keeps its attributes; change them with\n`mailing.contacts.update`."
                   },
                   "email": {
                     "type": "string",
