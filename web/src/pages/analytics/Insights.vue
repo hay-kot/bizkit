@@ -5,13 +5,10 @@ import { computed } from 'vue'
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import { describeQuery } from '@/components/analytics/insightDraft'
 import DataTable from '@/components/ui/DataTable.vue'
-import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatRelative } from '@/lib/format'
 import { useInsights } from '@/queries/analytics'
-import { useRouter } from 'vue-router'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
-const router = useRouter()
 const {
   data: insights,
   isPending,
@@ -21,7 +18,6 @@ const {
   () => props.projectId,
 )
 const base = computed(() => `/w/${props.workspaceId}/p/${props.projectId}/analytics/insights`)
-useCreateIntent(() => void router.push(`${base.value}/new`))
 
 const columns = [
   { key: 'name', label: 'Name' },

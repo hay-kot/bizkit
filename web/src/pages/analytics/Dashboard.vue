@@ -68,12 +68,19 @@ function setTiles(ids: string[], success: string) {
     success,
   })
 }
-function move(at: number, by: -1 | 1) {
-  const ids = [...(dashboard.value?.insight_ids ?? [])]
-  const [id] = ids.splice(at, 1)
-  if (id === undefined) return
-  ids.splice(at + by, 0, id)
-  void setTiles(ids, by < 0 ? 'Moved up' : 'Moved down')
+/**
+ * Moves a tile among the shown tiles. Saved IDs the insights list doesn't
+ * have yet keep their place at the end, so a stale list never drops them.
+ */
+function move(insight: Insight, by: -1 | 1) {
+  if (update.isLoading.value) return
+  const shown = tiles.value.map((tile) => tile.id)
+  const at = shown.indexOf(insight.id)
+  if (at < 0 || at + by < 0 || at + by >= shown.length) return
+  shown.splice(at, 1)
+  shown.splice(at + by, 0, insight.id)
+  const hidden = (dashboard.value?.insight_ids ?? []).filter((id) => !shown.includes(id))
+  void setTiles([...shown, ...hidden], by < 0 ? 'Moved up' : 'Moved down')
 }
 function removeTile(insight: Insight) {
   const ids = (dashboard.value?.insight_ids ?? []).filter((id) => id !== insight.id)
@@ -139,31 +146,34 @@ function onDelete() {
       </DetailActions>
     </template>
     <ErrorAlert v-if="dashboardError" :error="dashboardError" />
-    <RangeToolbar v-model:range="range" :today="today" />
-    <SkeletonRows v-if="!dashboard || insights.isPending.value" :rows="6" />
-    <EmptyState
-      v-else-if="!tiles.length"
-      :icon="LayoutDashboard"
-      title="No insights on this dashboard"
-      message="Open an insight and pick Add to dashboard."
-    >
-      <RouterLink :to="`${base}/insights`" class="btn btn-sm">Go to insights</RouterLink>
-    </EmptyState>
-    <ReportGrid v-else>
-      <InsightTile
-        v-for="(insight, at) in tiles"
-        :key="insight.id"
-        :workspace-id="workspaceId"
-        :insight="insight"
-        :range="range"
-        :to="`${base}/insights/${insight.id}`"
-        :first="at === 0"
-        :last="at === tiles.length - 1"
-        @up="move(at, -1)"
-        @down="move(at, 1)"
-        @remove="removeTile(insight)"
-      />
-    </ReportGrid>
+    <ErrorAlert v-else-if="insights.error.value" :error="insights.error.value" />
+    <template v-if="!dashboardError && !insights.error.value">
+      <RangeToolbar v-model:range="range" :today="today" />
+      <SkeletonRows v-if="!dashboard || insights.isPending.value" :rows="6" />
+      <EmptyState
+        v-else-if="!tiles.length"
+        :icon="LayoutDashboard"
+        title="No insights on this dashboard"
+        message="Open an insight and pick Add to dashboard."
+      >
+        <RouterLink :to="`${base}/insights`" class="btn btn-sm">Go to insights</RouterLink>
+      </EmptyState>
+      <ReportGrid v-else>
+        <InsightTile
+          v-for="(insight, at) in tiles"
+          :key="insight.id"
+          :workspace-id="workspaceId"
+          :insight="insight"
+          :range="range"
+          :to="`${base}/insights/${insight.id}`"
+          :first="at === 0"
+          :last="at === tiles.length - 1"
+          @up="move(insight, -1)"
+          @down="move(insight, 1)"
+          @remove="removeTile(insight)"
+        />
+      </ReportGrid>
+    </template>
 
     <FormPanel
       :open="renaming"

@@ -66,10 +66,12 @@ const range = computed<DateRange>({
 })
 
 const draft = ref<InsightDraft>(emptyInsight())
+// Seed the draft once per insight: refetches after a rename or a pin must
+// not throw away edits that aren't saved yet.
 watch(
-  () => insight.value?.query,
-  (query) => {
-    if (query) draft.value = draftOf(query)
+  () => insight.value?.id,
+  (id) => {
+    if (id && insight.value) draft.value = draftOf(insight.value.query)
   },
   { immediate: true },
 )
@@ -87,10 +89,14 @@ const dirty = computed(() => {
 })
 
 const update = useUpdateInsight()
-async function onSave() {
-  await update.mutateAsync({
-    path: { workspace_id: props.workspaceId, insight_id: props.insightId },
-    body: { query: queryOf(draft.value), range: savedRange.value },
+function onSave() {
+  return runAction({
+    run: () =>
+      update.mutateAsync({
+        path: { workspace_id: props.workspaceId, insight_id: props.insightId },
+        body: { query: queryOf(draft.value), range: savedRange.value },
+      }),
+    success: 'Insight saved',
   })
 }
 
@@ -222,6 +228,9 @@ function onDelete() {
       </DetailActions>
     </template>
     <ErrorAlert v-if="insightError" :error="insightError" />
+    <p v-if="range.preset === 'custom'" class="text-sm text-base-content/70">
+      Custom dates aren't saved. The insight opens on its saved range.
+    </p>
     <form id="insight-form" class="contents" @submit.prevent="onSave">
       <InsightBuilder
         v-if="insight"

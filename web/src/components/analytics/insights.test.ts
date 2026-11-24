@@ -43,6 +43,20 @@ describe('insight drafts', () => {
     })
   })
 
+  it('leave out filters that are still being filled in', () => {
+    const draft = {
+      ...emptyInsight(),
+      event: 'e',
+      filters: [
+        { key: 'seats', op: 'gt' as const, value: '' },
+        { key: 'seats', op: 'lt' as const, value: 'many' },
+        { key: 'plan', op: 'is' as const, value: ' ' },
+        { key: 'plan', op: 'is_not' as const, value: 'free' },
+      ],
+    }
+    expect(queryOf(draft).filters).toEqual([{ key: 'plan', op: 'is_not', value: 'free' }])
+  })
+
   it('leave the breakdown out of a per-user distribution, and use traits for people', () => {
     const base = {
       ...emptyInsight(),

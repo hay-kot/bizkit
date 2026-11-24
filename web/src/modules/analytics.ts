@@ -75,7 +75,7 @@ export default defineWebModule({
         icon: Plus,
         kind: 'action',
         keywords: ['create', 'add', 'insight', 'query', 'analytics'],
-        to: `${base}/insights?new=1`,
+        to: `${base}/insights/new`,
       },
       {
         id: 'analytics:new-dashboard',

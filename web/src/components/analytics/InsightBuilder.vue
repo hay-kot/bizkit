@@ -19,9 +19,11 @@ const range = defineModel<DateRange>('range', { required: true })
 const draft = defineModel<InsightDraft>('draft', { required: true })
 
 const TYPING_PAUSE_MS = 300
-const query = computed(() => queryOf(draft.value))
-const settled = refDebounced(query, TYPING_PAUSE_MS)
-const runnable = computed(() => isRunnable(draft.value))
+// The query and whether it can run come from the same settled draft, so
+// a half-made draft never reaches the server.
+const settledDraft = refDebounced(draft, TYPING_PAUSE_MS)
+const settled = computed(() => queryOf(settledDraft.value))
+const runnable = computed(() => isRunnable(settledDraft.value))
 const result = useInsightResult(
   () => props.workspaceId,
   () => props.projectId,
@@ -41,7 +43,7 @@ const eventNames = computed(() => (names.data.value?.names ?? []).map((n) => n.n
 <template>
   <RangeToolbar v-model:range="range" :today="today" />
   <InsightControls v-model="draft" :event-names="eventNames" />
-  <p v-if="!runnable" class="py-6 text-center text-sm text-base-content/70">
+  <p v-if="!isRunnable(draft)" class="py-6 text-center text-sm text-base-content/70">
     Pick an event to see its numbers.
   </p>
   <InsightResultView

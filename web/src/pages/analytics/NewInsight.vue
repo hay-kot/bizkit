@@ -23,7 +23,7 @@ const naming = ref(false)
 const name = ref('')
 
 function openSave() {
-  name.value = draft.value.event ? `${draft.value.event}` : 'People'
+  name.value = draft.value.kind === 'people' ? 'People' : draft.value.event
   create.reset()
   naming.value = true
 }

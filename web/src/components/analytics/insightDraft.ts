@@ -73,9 +73,22 @@ function filterOf(draft: FilterDraft): InsightFilter {
   return { key, op: draft.op, value: numeric ? number : text }
 }
 
+/**
+ * True when a filter row is complete: a key, and a value when its op takes
+ * one (a number for gt and lt). Rows still being filled in are left out of
+ * the query, so the result doesn't fail or drop to zero while typing.
+ */
+function isComplete(draft: FilterDraft): boolean {
+  if (draft.key.trim() === '') return false
+  if (draft.op === 'is_set') return true
+  const text = draft.value.trim()
+  if (text === '') return false
+  return (draft.op !== 'gt' && draft.op !== 'lt') || Number.isFinite(Number(text))
+}
+
 /** The query the draft asks, ready for `insights.query` or saving. */
 export function queryOf(draft: InsightDraft): InsightQuery {
-  const filters = draft.filters.filter((f) => f.key.trim() !== '').map(filterOf)
+  const filters = draft.filters.filter(isComplete).map(filterOf)
   const key = draft.breakdownKey.trim()
   const breakdown =
     draft.breakdownSource && key && !(draft.kind === 'events' && draft.measure === 'per_user')
