@@ -25,6 +25,7 @@ const {
 } = useMailingLists(
   () => props.workspaceId,
   () => props.projectId,
+  isForm,
 )
 const linked = computed(() =>
   (lists.value?.items ?? []).filter((list) => list.form_ids.includes(props.entityId)),

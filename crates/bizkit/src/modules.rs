@@ -25,7 +25,6 @@ pub(crate) fn modules() -> Vec<Box<dyn Module>> {
     #[cfg(feature = "analytics")]
     modules.push(Box::new(bizkit_analytics::Analytics::default()));
     // After forms: its demo seed links a list to the seeded Contact form.
-    // Before extensions: its demo seed binds a script to the seeded sequence.
     #[cfg(feature = "mailing")]
     modules.push(Box::new(bizkit_mailing::Mailing));
     #[cfg(feature = "extensions")]

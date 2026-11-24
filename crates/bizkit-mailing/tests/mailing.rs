@@ -393,6 +393,7 @@ mod mailing {
         let list = s.list(json!({"double_opt_in": false})).await;
         s.subscribed(&list, "gus@example.com", json!({})).await;
         s.subscribed(&list, "hal@example.com", json!({})).await;
+        s.subscribed(&list, "ivy@example.com", json!({})).await;
         let broadcast = s.broadcast(&list, "Hi").await;
         s.member
             .post(&format!("{}/broadcasts/{}/send", s.ws(), id(&broadcast)), &json!({}))
@@ -441,6 +442,26 @@ mod mailing {
             s.contact(&list, "hal@example.com").await["status"],
             "unsubscribed",
             "one click"
+        );
+
+        // RFC 8058's own example posts multipart/form-data.
+        let ivy = s.app.mail.last_to("ivy@example.com").unwrap().unsubscribe.unwrap();
+        let ivy_path = format!("{}?{}", ivy.path(), ivy.query().unwrap());
+        let multipart = "--b\r\nContent-Disposition: form-data; name=\"List-Unsubscribe\"\r\n\r\nOne-Click\r\n--b--\r\n";
+        let ivy_res = s
+            .app
+            .client()
+            .send_body(
+                Method::POST,
+                &ivy_path,
+                RawBody::new("multipart/form-data; boundary=b", multipart),
+            )
+            .await;
+        assert_eq!(ivy_res.status, StatusCode::OK, "multipart one click");
+        assert_eq!(
+            s.contact(&list, "ivy@example.com").await["status"],
+            "unsubscribed",
+            "multipart one click"
         );
         assert_eq!(
             s.public(Method::POST, "unsubscribe", "nope").await.status,

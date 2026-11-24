@@ -7702,7 +7702,7 @@ export type MailingPublicUnsubscribePageResponse = MailingPublicUnsubscribePageR
 
 export type MailingPublicUnsubscribeData = {
     /**
-     * Optional
+     * Optional; `List-Unsubscribe=One-Click` asks for a plain-text answer
      */
     body: string;
     path?: never;

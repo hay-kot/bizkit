@@ -4,7 +4,8 @@
 //! state. Everything echoed is escaped.
 
 use anyhow::Context as _;
-use axum::extract::{Query, RawForm};
+use axum::body::Bytes;
+use axum::extract::Query;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::get;
@@ -110,7 +111,7 @@ const fn unsubscribe_page_docs() {}
     summary = "Unsubscribe from a list",
     description = "The `List-Unsubscribe` URL. A body of `List-Unsubscribe=One-Click` (RFC 8058) gets a plain-text answer; the page's button gets a page.",
     params(("t" = String, Query, description = "The token from a list mail")),
-    request_body(content((String = "application/x-www-form-urlencoded")), description = "Optional"),
+    request_body(content((String = "application/x-www-form-urlencoded"), (String = "multipart/form-data")), description = "Optional; `List-Unsubscribe=One-Click` asks for a plain-text answer"),
     responses(
         (status = 200, description = "Unsubscribed", content(
             (String = "text/html"),
@@ -183,8 +184,10 @@ async fn confirm_page(
     Query(token): Query<Token>,
 ) -> Response {
     let db = platform.db().read();
-    let Ok(Some(contact)) = crate::store::find_by_confirm_token(db, &token.t).await else {
-        return invalid();
+    let contact = match crate::store::find_by_confirm_token(db, &token.t).await {
+        Ok(Some(contact)) => contact,
+        Ok(None) => return invalid(),
+        Err(err) => return failed(&err.into()),
     };
     let list = match crate::store::find_list(db, contact.workspace_id, contact.list_id).await {
         Ok(Some(list)) => list,
@@ -275,12 +278,22 @@ fn plain(status: StatusCode, text: &'static str) -> Response {
     response
 }
 
+/// Whether a POST body asks for RFC 8058 one-click unsubscribe. Mail
+/// providers send it URL-encoded or as `multipart/form-data` (RFC 8058's own
+/// example), so the body is read whatever its content type: any POST with a
+/// valid token unsubscribes, and this only picks the plain-text answer.
+fn is_one_click(body: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(body);
+    text.trim() == ONE_CLICK
+        || (text.contains("name=\"List-Unsubscribe\"") && text.contains("One-Click"))
+}
+
 async fn unsubscribe_post(
     Extension(platform): Extension<Platform>,
     Query(token): Query<Token>,
-    RawForm(body): RawForm,
+    body: Bytes,
 ) -> Response {
-    let one_click = body.as_ref() == ONE_CLICK.as_bytes();
+    let one_click = is_one_click(&body);
     let result = async {
         let mut tx = platform.db().write().await?;
         let outcome = contacts::unsubscribe_by_token(&mut tx, &token.t, platform.now()).await?;

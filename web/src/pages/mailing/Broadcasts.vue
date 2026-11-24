@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Plus, Send } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import MailingTabs from '@/components/mailing/MailingTabs.vue'
@@ -45,6 +45,14 @@ const columns = [
   { key: 'recipients', label: 'Recipients' },
   { key: 'sent', label: 'Sent' },
 ]
+
+// `?new=1` opens the panel on mount, often before the lists load.
+watch(
+  () => lists.value?.items[0]?.id,
+  (first) => {
+    if (panelOpen.value && listId.value === '' && first) listId.value = first
+  },
+)
 
 function openPanel() {
   listId.value = lists.value?.items[0]?.id ?? ''
@@ -124,7 +132,7 @@ async function onCreate() {
       submit-label="Create draft"
       :pending="create.asyncStatus.value === 'loading'"
       :error="create.error.value"
-      :disabled="listOptions.length === 0"
+      :disabled="listId === ''"
       @close="panelOpen = false"
       @submit="onCreate"
     >

@@ -3,7 +3,7 @@
 
 use std::fmt::Write as _;
 
-use pulldown_cmark::{CowStr, Event, Options, Parser, Tag, TagEnd, TextMergeStream};
+use pulldown_cmark::{CowStr, Event, LinkType, Options, Parser, Tag, TagEnd, TextMergeStream};
 use url::Url;
 
 /// A mail ready to send.
@@ -100,8 +100,11 @@ fn markdown_html(body_md: &str, merge: &Merge<'_>) -> String {
         TextMergeStream::new(Parser::new_ext(body_md, options)).filter_map(|event| match event {
             Event::Html(html) | Event::InlineHtml(html) => Some(Event::Text(html)),
             Event::Text(text) => Some(Event::Text(CowStr::from(fill(&text, merge)))),
-            Event::Start(Tag::Link { ref dest_url, .. }) => {
-                let keep = allowed_link(dest_url, &["http", "https", "mailto"]);
+            Event::Start(Tag::Link { link_type, ref dest_url, .. }) => {
+                // An email autolink's `dest_url` is the bare address; the
+                // HTML writer adds `mailto:` itself.
+                let keep = link_type == LinkType::Email
+                    || allowed_link(dest_url, &["http", "https", "mailto"]);
                 dropped_links.push(!keep);
                 keep.then_some(event)
             }
@@ -244,6 +247,12 @@ mod tests {
         assert!(html.contains("href=\"mailto:x@example.com\""), "{html}");
         assert!(html.contains("src=\"https://example.com/f.png\""), "{html}");
         assert!(html.contains(">a<") || html.contains("a "), "dropped link keeps its text: {html}");
+    }
+
+    #[test]
+    fn email_autolinks_keep_their_link() {
+        let html = markdown_html("Questions? <support@example.com>", &ADA);
+        assert!(html.contains("href=\"mailto:support@example.com\""), "{html}");
     }
 
     #[test]

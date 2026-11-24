@@ -548,6 +548,7 @@ pub(crate) struct PreviewInput {
 impl Validate for PreviewInput {
     fn validate(&self) -> Result<(), FieldErrors> {
         let mut errors = FieldErrors::default();
+        check_subject(&mut errors, &self.subject);
         check_body(&mut errors, &self.body_md);
         errors.into_result()
     }

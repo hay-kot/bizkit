@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { refDebounced } from '@vueuse/core'
+import { refDebounced, useIntervalFn } from '@vueuse/core'
 import { FlaskConical, Inbox, Send, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -61,12 +61,25 @@ const {
   () => props.workspaceId,
   () => props.broadcastId,
 )
-// The broadcast refetches while it sends; the log follows each refetch.
-// Never cancel a log refetch in flight: Send awaits its own invalidation of
+// The fan-out marks the broadcast sent once every mail is queued, before
+// the mails go out, so the log polls on its own while any row is queued.
+// It never cancels a refetch in flight: Send awaits its own invalidation of
 // the log and would report the cancel as a failure.
-watch(broadcast, (loaded) => {
-  if (loaded && !isDraft.value && deliveriesStatus.value !== 'loading') void refetchDeliveries()
-})
+const LOG_POLL_MS = 2_000
+const logPoll = useIntervalFn(
+  () => {
+    if (deliveriesStatus.value !== 'loading') void refetchDeliveries()
+  },
+  LOG_POLL_MS,
+  { immediate: false },
+)
+watch(
+  () =>
+    !isDraft.value &&
+    (isSending.value || (deliveries.value?.items ?? []).some((d) => d.status === 'queued')),
+  (waiting) => (waiting ? logPoll.resume() : logPoll.pause()),
+  { immediate: true },
+)
 
 const subject = ref('')
 const tag = ref('')
@@ -97,7 +110,7 @@ watch(list, (loaded) => {
 const dirty = computed(
   () =>
     broadcast.value !== undefined &&
-    (subject.value !== broadcast.value.subject ||
+    (subject.value.trim() !== broadcast.value.subject ||
       tag.value.trim() !== (broadcast.value.tag ?? '') ||
       body.value !== broadcast.value.body_md),
 )
@@ -170,7 +183,11 @@ function save() {
     run: () =>
       update.mutateAsync({
         path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
-        body: { subject: subject.value, body_md: body.value, tag: wanted === '' ? null : wanted },
+        body: {
+          subject: subject.value.trim(),
+          body_md: body.value,
+          tag: wanted === '' ? null : wanted,
+        },
       }),
     success: 'Draft saved',
   })

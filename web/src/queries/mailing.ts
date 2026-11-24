@@ -58,13 +58,15 @@ export const ROWS_SHOWN = 100
 export function useMailingLists(
   workspaceId: MaybeRefOrGetter<string>,
   projectId: MaybeRefOrGetter<string>,
+  enabled: MaybeRefOrGetter<boolean> = true,
 ) {
-  return useQuery(() =>
-    mailingListsListQuery({
+  return useQuery(() => ({
+    ...mailingListsListQuery({
       path: { workspace_id: toValue(workspaceId) },
       query: { project_id: toValue(projectId) },
     }),
-  )
+    enabled: toValue(enabled),
+  }))
 }
 
 /** One list with its counts; idle until `listId` is set. */

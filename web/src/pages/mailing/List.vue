@@ -4,6 +4,7 @@ import { MailX, Settings, Trash2, UserPlus, Users } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ErrorAlert from '@/components/ErrorAlert.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
@@ -237,7 +238,7 @@ const actions = computed(() => [
       </DetailActions>
     </PageHeader>
 
-    <p v-if="listError" class="text-sm text-error">This list doesn’t exist.</p>
+    <ErrorAlert v-if="listError" :error="listError" />
 
     <DescriptionList v-if="list" :items="facts" />
 
@@ -249,9 +250,9 @@ const actions = computed(() => [
           name="contact-search"
           aria-label="Search contacts"
           placeholder="Search"
-          class="input w-48 input-sm"
+          class="input w-36 input-sm sm:w-48"
         />
-        <div class="w-40">
+        <div class="w-36 sm:w-40">
           <Select v-model="status" :options="statusOptions" label="Status" size="sm" />
         </div>
       </template>
