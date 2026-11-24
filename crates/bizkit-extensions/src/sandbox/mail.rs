@@ -118,7 +118,7 @@ fn check(message: Message) -> Result<Mail, String> {
             return Err(format!("mail.send: {name} is over {} KiB", MAX_MAIL_BODY_BYTES >> 10));
         }
     }
-    Ok(Mail { to, subject, text, html })
+    Ok(Mail { to, subject, text, html, unsubscribe: None })
 }
 
 /// What [`enqueue`] did.

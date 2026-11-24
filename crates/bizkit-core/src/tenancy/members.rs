@@ -86,6 +86,27 @@ pub(crate) async fn find(
     .await
 }
 
+/// Whether `email` belongs to a member of the workspace, ignoring case.
+///
+/// # Errors
+///
+/// When the query fails.
+pub async fn is_member_email(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<bool> {
+    let found = sqlx::query_scalar!(
+        "SELECT 1 AS found FROM memberships m JOIN users u ON u.id = m.user_id
+         WHERE m.workspace_id = ? AND lower(u.email) = lower(?)",
+        workspace_id,
+        email
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(found.is_some())
+}
+
 pub(crate) async fn admin_count(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,

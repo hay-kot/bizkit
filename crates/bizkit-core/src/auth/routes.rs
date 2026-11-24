@@ -138,6 +138,7 @@ async fn sign_in_inner(platform: &Platform, request_id: &str, body: &[u8]) -> Re
              If you didn't ask for it, ignore this mail."
         ),
         html: None,
+        unsubscribe: None,
     };
     platform.bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
     tx.commit().await?;

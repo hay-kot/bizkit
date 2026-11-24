@@ -210,6 +210,7 @@ mod tests {
             subject: "s".to_owned(),
             text: "t".to_owned(),
             html: None,
+            unsubscribe: None,
         };
         assert!(mailer.send(&mail).await.is_err(), "first send fails");
         assert!(mailer.send(&mail).await.is_ok(), "second send works");

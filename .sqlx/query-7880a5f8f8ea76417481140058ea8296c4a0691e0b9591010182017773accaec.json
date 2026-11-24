@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS found FROM memberships m JOIN users u ON u.id = m.user_id\n         WHERE m.workspace_id = ? AND lower(u.email) = lower(?)",
+  "describe": {
+    "columns": [
+      {
+        "name": "found",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7880a5f8f8ea76417481140058ea8296c4a0691e0b9591010182017773accaec"
+}

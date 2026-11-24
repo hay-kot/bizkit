@@ -14,6 +14,7 @@ use anyhow::Context as _;
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 pub use self::fs_blobs::FsBlobs;
 pub use self::log_mailer::LogMailer;
@@ -75,6 +76,10 @@ pub struct Mail {
     /// An optional HTML body.
     #[serde(default)]
     pub html: Option<String>,
+    /// Where a list mail's recipient unsubscribes. Sent as `List-Unsubscribe`
+    /// with `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058).
+    #[serde(default)]
+    pub unsubscribe: Option<Url>,
 }
 
 /// Sends mail.
