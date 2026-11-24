@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { Pencil, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
+import FunnelDropoffs from '@/components/analytics/FunnelDropoffs.vue'
 import FunnelForm from '@/components/analytics/FunnelForm.vue'
 import FunnelSteps from '@/components/analytics/FunnelSteps.vue'
 import {
+  describeStep,
   draftOf,
   emptyFunnel,
   type FunnelDraft,
@@ -20,7 +22,13 @@ import MenuItem from '@/components/ui/MenuItem.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import { useReportRange } from '@/composables/useReportRange'
 import { runAction } from '@/lib/action'
-import { useDeleteFunnel, useFunnel, useFunnelResults, useUpdateFunnel } from '@/queries/analytics'
+import {
+  useDeleteFunnel,
+  useFunnel,
+  useFunnelDropoffs,
+  useFunnelResults,
+  useUpdateFunnel,
+} from '@/queries/analytics'
 
 const props = defineProps<{
   workspaceId: string
@@ -28,6 +36,7 @@ const props = defineProps<{
   projectName: string
   funnelId: string
 }>()
+const route = useRoute()
 const router = useRouter()
 const { today, range } = useReportRange()
 const { data: funnel, error: funnelError } = useFunnel(
@@ -47,6 +56,29 @@ const results = useFunnelResults(
   () => props.funnelId,
   range,
 )
+// The step whose drop-offs are open, from `?dropped=`; a link shares it.
+const dropped = computed(() => {
+  const step = Number(route.query.dropped)
+  const steps = funnel.value?.steps.length ?? 0
+  return Number.isInteger(step) && step >= 2 && step <= steps ? step : undefined
+})
+const dropoffs = useFunnelDropoffs(
+  () => props.workspaceId,
+  () => props.funnelId,
+  range,
+  dropped,
+)
+function droppedLink(step: number) {
+  return { query: { ...route.query, dropped: String(step) } }
+}
+const closeDropoffs = computed(() => ({ query: { ...route.query, dropped: undefined } }))
+const droppedLabel = computed(() => {
+  const step = dropped.value && funnel.value?.steps[dropped.value - 1]
+  return step ? describeStep(step) : ''
+})
+function personPath(personId: string) {
+  return `/w/${props.workspaceId}/p/${props.projectId}/analytics/people/${personId}`
+}
 const update = useUpdateFunnel()
 const remove = useDeleteFunnel()
 const listPath = computed(() => `/w/${props.workspaceId}/p/${props.projectId}/analytics/funnels`)
@@ -119,7 +151,23 @@ function onDelete() {
       </p>
       <ErrorAlert v-if="results.error.value" :error="results.error.value" />
       <SkeletonRows v-else-if="results.isPending.value" :rows="4" />
-      <FunnelSteps v-else-if="results.data.value" :steps="results.data.value.steps" />
+      <FunnelSteps
+        v-else-if="results.data.value"
+        :steps="results.data.value.steps"
+        :dropped-link="droppedLink"
+        :selected="dropped"
+      />
+      <FunnelDropoffs
+        v-if="dropped"
+        :key="dropped"
+        :step="dropped"
+        :label="droppedLabel"
+        :page="dropoffs.data.value"
+        :loading="dropoffs.isPending.value"
+        :error="dropoffs.error.value"
+        :person-path="personPath"
+        :close="closeDropoffs"
+      />
 
       <FormPanel
         :open="editing"
