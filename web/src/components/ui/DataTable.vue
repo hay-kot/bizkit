@@ -6,6 +6,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 import SkeletonRows from './SkeletonRows.vue'
+import { stretchedTarget as target } from './stretchedTarget'
 
 export interface Column {
   /** Names the cell slot: `#cell-<key>`. Without a slot the cell is empty. */
@@ -95,15 +96,6 @@ if (import.meta.env.DEV) {
 }
 
 const entries = computed(() => (props.rows ?? []).map((row) => ({ row, to: props.rowTo?.(row) })))
-
-// One real link or button per row, stretched over the row by its ::after,
-// rather than a <tr role="link"> with a click handler: a real link keeps
-// middle-click, Cmd-click, the status-bar URL and one tab stop per row, and
-// screen readers announce it by its name.
-const target = [
-  'font-medium text-primary after:absolute after:inset-0',
-  'focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-primary',
-]
 
 function clickable(to: RouteLocationRaw | undefined): boolean {
   return to !== undefined || props.onRowClick !== undefined

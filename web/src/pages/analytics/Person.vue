@@ -6,6 +6,8 @@ import { useRouter } from 'vue-router'
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
+import List from '@/components/ui/List.vue'
+import ListItem from '@/components/ui/ListItem.vue'
 import PageSection from '@/components/ui/PageSection.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import { formatDateTime, formatUtcDay } from '@/lib/format'
@@ -76,10 +78,14 @@ function icon(event: EventItem) {
   return event.source === 'server' ? Server : Zap
 }
 
-function propsText(values: Record<string, unknown>): string {
-  return Object.entries(values)
-    .map(([key, value]) => `${key}=${traitText(value)}`)
-    .join(', ')
+function eventTitle(event: EventItem): string {
+  return event.name === 'pageview' ? `Viewed ${event.path ?? 'a page'}` : event.name
+}
+
+function eventDetail(event: EventItem): string | undefined {
+  const parts = Object.entries(event.props).map(([key, value]) => `${key}=${traitText(value)}`)
+  if (event.name !== 'pageview' && event.path) parts.unshift(event.path)
+  return parts.length ? parts.join(', ') : undefined
 }
 </script>
 
@@ -98,33 +104,26 @@ function propsText(values: Record<string, unknown>): string {
       <DescriptionList :items="facts" />
       <p v-if="!days.length" class="text-sm text-base-content/70">No stored events.</p>
       <PageSection v-for="group in days" :key="group.day" :title="formatUtcDay(group.day)">
-        <ol class="flex flex-col gap-2">
-          <li v-for="event in group.events" :key="event.id" class="flex items-start gap-3 text-sm">
-            <component
-              :is="icon(event)"
-              class="mt-0.5 size-4 shrink-0 text-base-content/70"
-              aria-hidden="true"
-            />
-            <span class="w-20 shrink-0 text-base-content/70 tabular-nums"
-              >{{ event.ts.slice(11, 16) }} UTC</span
-            >
-            <span class="min-w-0 flex-1">
-              <span class="font-medium">{{
-                event.name === 'pageview' ? `Viewed ${event.path ?? 'a page'}` : event.name
-              }}</span>
-              <span
-                v-if="event.name !== 'pageview' && event.path"
-                class="ms-2 text-base-content/70"
-                >{{ event.path }}</span
+        <List
+          :items="group.events"
+          :item-key="(e) => String(e.id)"
+          :label="formatUtcDay(group.day)"
+        >
+          <template #item="{ item }">
+            <ListItem :title="eventTitle(item)" :description="eventDetail(item)">
+              <template #leading>
+                <component
+                  :is="icon(item)"
+                  class="size-4 shrink-0 text-base-content/70"
+                  aria-hidden="true"
+                />
+              </template>
+              <template #meta
+                ><span class="tabular-nums">{{ item.ts.slice(11, 16) }} UTC</span></template
               >
-              <span
-                v-if="Object.keys(event.props).length"
-                class="block truncate text-base-content/70"
-                >{{ propsText(event.props) }}</span
-              >
-            </span>
-          </li>
-        </ol>
+            </ListItem>
+          </template>
+        </List>
       </PageSection>
       <p v-if="(person.events.length ?? 0) >= TIMELINE_SHOWN" class="text-sm text-base-content/70">
         Showing the latest {{ TIMELINE_SHOWN }} events.

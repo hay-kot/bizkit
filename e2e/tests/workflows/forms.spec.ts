@@ -31,7 +31,7 @@ test('a site posts to a new form; the admin gets mail, flags spam and exports', 
   expect(await posted.text()).toContain('Thanks!')
 
   await page.reload()
-  const row = page.getByRole('row', { name: /Hello from the site · Ada/ })
+  const row = page.getByRole('listitem').filter({ hasText: 'Hello from the site' })
   await expect(row).toBeVisible()
 
   const link = await emailLinkPath(request, owner, /https?:\/\/\S+\/w\/[0-9a-f-]+\/p\/[0-9a-f-]+\/forms\/[0-9a-f-]+/)
@@ -42,7 +42,7 @@ test('a site posts to a new form; the admin gets mail, flags spam and exports', 
   await expect(row).toHaveCount(0)
   await page.getByRole('combobox', { name: 'Show' }).click()
   await page.getByRole('option', { name: 'Spam' }).click()
-  await expect(page.getByRole('row', { name: /Hello from the site · Ada/ })).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: 'Hello from the site' })).toBeVisible()
 
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export CSV' }).click()

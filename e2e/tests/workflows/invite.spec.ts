@@ -19,7 +19,9 @@ test('an admin invites a new email, who signs in from the mail and joins', async
   await page.getByLabel('Email').fill(invitee)
   await page.getByRole('button', { name: 'Send invitation' }).click()
   await expect(page.getByText(`Invitation sent to ${invitee}`)).toBeVisible()
-  await expect(page.getByRole('cell', { name: invitee, exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('list', { name: 'Pending invitations' }).getByText(invitee, { exact: true }),
+  ).toBeVisible()
 
   const invitePath = await inviteLinkPath(request, invitee)
   const context = await browser.newContext({ baseURL, storageState: signedOut })
@@ -41,7 +43,7 @@ test('an admin invites a new email, who signs in from the mail and joins', async
 
   await page.reload()
   const members = page.getByRole('region', { name: 'Members' })
-  await expect(members.getByRole('cell', { name: invitee, exact: true })).toBeVisible()
+  await expect(members.getByText(invitee, { exact: true })).toBeVisible()
   await expect(
     page.getByRole('region', { name: 'Pending invitations' }).getByText(invitee),
   ).toHaveCount(0)

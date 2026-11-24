@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { LayoutGrid, Mail } from 'lucide-vue-next'
+import { LayoutGrid, Mail, Plus, Settings } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import WorkspaceGrid from '@/components/WorkspaceGrid.vue'
+import Avatar from '@/components/ui/Avatar.vue'
+import CardGrid from '@/components/ui/CardGrid.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import LinkCard from '@/components/ui/LinkCard.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
@@ -110,11 +112,38 @@ function onDecline(invite: MyInvitation) {
 
     <section aria-labelledby="workspaces-heading">
       <h2 id="workspaces-heading" class="sr-only">Workspaces</h2>
-      <WorkspaceGrid
-        :memberships="me?.memberships ?? []"
-        :loading="isPending"
-        @create="openCreate"
-      />
+      <CardGrid :items="me?.memberships" :item-key="(m) => m.workspace.id" :loading="isPending">
+        <template #item="{ item }">
+          <LinkCard
+            :to="`/w/${item.workspace.id}`"
+            :title="item.workspace.name"
+            :description="item.workspace.slug"
+          >
+            <template #leading><Avatar :name="item.workspace.name" size="lg" /></template>
+            <template #meta
+              ><span class="capitalize">{{ item.role }}</span></template
+            >
+            <template v-if="item.role === 'admin'" #actions>
+              <RouterLink
+                :to="`/w/${item.workspace.id}/settings`"
+                class="btn btn-square btn-ghost btn-sm"
+                :aria-label="`Settings for ${item.workspace.name}`"
+              >
+                <Settings class="size-4" aria-hidden="true" />
+              </RouterLink>
+            </template>
+          </LinkCard>
+        </template>
+        <template #end>
+          <button
+            type="button"
+            class="flex h-full min-h-24 w-full items-center justify-center gap-2 rounded-box border border-dashed border-base-300 p-4 text-sm font-medium transition hover:border-base-content/40 hover:bg-base-100"
+            @click="openCreate"
+          >
+            <Plus class="size-4" aria-hidden="true" />New workspace
+          </button>
+        </template>
+      </CardGrid>
     </section>
 
     <FormPanel

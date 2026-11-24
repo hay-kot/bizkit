@@ -4,12 +4,12 @@ test.use({ persona: 'team' })
 
 test('create a project', async ({ page, world }) => {
   await page.goto(`/w/${world.workspaces.main!.id}/projects`)
-  await expect(page.getByRole('cell', { name: 'Website', exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Projects' }).getByRole('link', { name: 'Website', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByLabel('Name').fill('Docs')
   await expect(page.getByLabel('Slug')).toHaveValue('docs')
   await page.getByRole('button', { name: 'Create project' }).click()
-  await expect(page.getByRole('cell', { name: 'Docs', exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Projects' }).getByRole('link', { name: 'Docs', exact: true })).toBeVisible()
 })
 
 test('the sidebar puts project pages under the project and workspace meta at the bottom', async ({
