@@ -37,7 +37,6 @@ import {
 const props = defineProps<{
   workspaceId: string
   projectId: string
-  projectName: string
   listId: string
 }>()
 const router = useRouter()
@@ -225,8 +224,7 @@ const actions = computed(() => [
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
-      :title="list?.name ?? 'List'"
+      :title="list?.name ?? ''"
       :description="list?.description ?? 'Contacts of this list, newest first.'"
     >
       <DetailActions :actions="actions">

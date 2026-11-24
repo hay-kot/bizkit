@@ -13,7 +13,7 @@ import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatRelative } from '@/lib/format'
 import { useCreateEndpoint, useEndpoints } from '@/queries/webhooks'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const router = useRouter()
 const {
   data: endpoints,
@@ -60,7 +60,6 @@ async function onCreate() {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       title="Webhooks"
       description="Capture the webhooks other services send, inspect them, and send them on."
     >

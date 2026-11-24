@@ -12,7 +12,7 @@ import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatDate } from '@/lib/format'
 import { useCreateForm, useForms } from '@/queries/forms'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const router = useRouter()
 const {
   data: forms,
@@ -56,7 +56,6 @@ async function onCreate() {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       title="Forms"
       description="Collect submissions from your sites, with spam kept out."
     >

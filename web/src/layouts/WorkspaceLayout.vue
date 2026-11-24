@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
 import { FolderX, Menu as MenuIcon, Search, X } from 'lucide-vue-next'
-import { inject, ref, unref, watch } from 'vue'
+import { inject, provide, ref, unref, watch } from 'vue'
 import { useRoute, viewDepthKey } from 'vue-router'
 
 import EmptyState from '@/components/EmptyState.vue'
@@ -12,7 +12,9 @@ import SidebarLink from '@/components/SidebarLink.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import CommandPalette from '@/components/ui/CommandPalette.vue'
+import { PAGE_CONTEXT } from '@/components/ui/pageHeader'
 import { useCurrentProject } from '@/composables/useCurrentProject'
+import { createPageContext } from '@/layouts/pageContext'
 import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
 import { useIsAdmin } from '@/composables/useIsAdmin'
@@ -39,6 +41,14 @@ const {
   isPending: projectsPending,
   error: projectsError,
 } = useCurrentProject(() => props.workspaceId)
+
+provide(
+  PAGE_CONTEXT,
+  createPageContext(() => props.workspaceId, {
+    workspace: () => workspace.value?.name,
+    project: (id) => projects.value.find((p) => p.id === id)?.name,
+  }),
+)
 const mobileOpen = ref(false)
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 

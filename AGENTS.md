@@ -118,7 +118,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 
   | Need | Use | Enforced by |
   |---|---|---|
-  | A page | `Page` (full width; `compact` only for one-card pages outside the shell) > `PageHeader` > `PageSection`s and `Card`s | `grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*` are errors in `src/pages` |
+  | A page | `Page` (full width; `compact` only for one-card pages outside the shell) > `PageHeader` (icon and breadcrumb come from the route's module nav item; pass `icon` only outside a module; `Tabs` go in its `tabs` slot) > `PageSection`s and `Card`s | `grid-cols-*`, `col-span-*`, `columns-*`, `grid-flow-col` and `max-w-*` are errors in `src/pages` |
   | A detail page's header actions | `DetailActions`: page buttons, Save (its label is the save state) and a `#menu` of `MenuItem`s (`danger` for delete, last) | Pages can't import `ActionsMenu` |
   | A list of rows | `DataTable` with `#cell-<key>` slots; it handles loading, error and empty | `<table>` and DaisyUI `table*` classes are errors |
   | A choice | `Select` | `<select>`, `input[type=radio]` and DaisyUI `select*` classes are errors |

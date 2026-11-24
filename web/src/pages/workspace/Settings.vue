@@ -11,7 +11,7 @@ import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { toast } from '@/lib/toast'
 import { useRenameWorkspace, useWorkspace } from '@/queries/workspaces'
 
-const props = defineProps<{ workspaceId: string; workspaceName: string }>()
+const props = defineProps<{ workspaceId: string }>()
 const { data: workspace } = useWorkspace(() => props.workspaceId)
 const rename = useRenameWorkspace()
 const name = ref('')
@@ -28,7 +28,7 @@ async function onSave() {
 
 <template>
   <Page>
-    <PageHeader :section="workspaceName" title="Settings" />
+    <PageHeader title="Settings" />
     <form @submit.prevent="onSave">
       <Card title="General" description="The name shows in the switcher and in invitation emails.">
         <Field label="Name" width="md">

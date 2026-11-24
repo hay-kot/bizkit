@@ -31,10 +31,5 @@ const childProps = computed(() => ({
 </script>
 
 <template>
-  <TabLayout
-    :section="projectName"
-    :tabs="tabs"
-    label="Analytics pages"
-    :child-props="childProps"
-  />
+  <TabLayout :tabs="tabs" label="Analytics pages" :child-props="childProps" />
 </template>

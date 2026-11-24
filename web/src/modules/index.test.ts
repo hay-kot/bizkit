@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteRecordRaw } from 'vue-router'
 
-import { modules, projectNav, workspaceNav } from './index'
+import { modules, projectNav, projectRoutes, workspaceNav, workspaceRoutes } from './index'
 
 /** A module's routes with children joined to their parent's path. */
 function flat(routes: RouteRecordRaw[] = []): RouteRecordRaw[] {
@@ -61,6 +61,15 @@ describe('web modules', () => {
       ...all(m.projectRoutes),
     ])) {
       expect(route.path.startsWith('/'), route.path).toBe(false)
+    }
+  })
+
+  it('tag every route under a nav item with it, for page headers', () => {
+    for (const route of [...projectRoutes, ...workspaceRoutes]) {
+      const path = route.path.replace(/^p\/:projectId\//, '')
+      const nav = route.meta?.nav
+      if (nav) expect(path === nav.path || path.startsWith(`${nav.path}/`), path).toBe(true)
+      else expect(path, 'only Projects has no nav item').toBe('projects')
     }
   })
 

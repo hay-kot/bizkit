@@ -15,7 +15,7 @@ import { toast } from '@/lib/toast'
 import type { Project } from '@/queries/projects'
 import { useCreateProject, useDeleteProject, useProjects } from '@/queries/projects'
 
-const props = defineProps<{ workspaceId: string; workspaceName: string }>()
+const props = defineProps<{ workspaceId: string }>()
 const { data: projects, isPending, error } = useProjects(() => props.workspaceId)
 const create = useCreateProject()
 const remove = useDeleteProject()
@@ -62,7 +62,7 @@ function onDelete(project: Project) {
 <template>
   <Page>
     <PageHeader
-      :section="workspaceName"
+      :icon="FolderKanban"
       title="Projects"
       description="Everything in a workspace hangs off a project."
     >

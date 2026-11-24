@@ -11,8 +11,21 @@ import webhooks from './webhooks'
 /** Every web module, in the order their routes register. */
 export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions]
 
+/**
+ * Tags a module's route with the module's nav item it sits under (`forms`
+ * and `forms/:formId` both under Forms). Child routes inherit the meta.
+ */
+function withNav(module: WebModule, route: RouteRecordRaw): RouteRecordRaw {
+  const nav = module.nav.find(
+    (item) => route.path === item.path || route.path.startsWith(`${item.path}/`),
+  )
+  return nav ? ({ ...route, meta: { ...route.meta, nav } } as RouteRecordRaw) : route
+}
+
 /** Every module's workspace routes, relative to `/w/:workspaceId/`. */
-export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) => m.workspaceRoutes ?? [])
+export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) =>
+  (m.workspaceRoutes ?? []).map((route) => withNav(m, route)),
+)
 
 /** Params as props, on a route and its children. */
 function withProps(route: RouteRecordRaw): RouteRecordRaw {
@@ -28,7 +41,7 @@ function withProps(route: RouteRecordRaw): RouteRecordRaw {
  * as props. A route with children (a tabbed layout) passes params to them too.
  */
 export const projectRoutes: RouteRecordRaw[] = modules
-  .flatMap((m) => m.projectRoutes ?? [])
+  .flatMap((m) => (m.projectRoutes ?? []).map((route) => withNav(m, route)))
   .map((route) => withProps({ ...route, path: `p/:projectId/${route.path}` } as RouteRecordRaw))
 
 function navFor(section: NavSection): NavItem[] {

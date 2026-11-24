@@ -39,7 +39,6 @@ import {
 const props = defineProps<{
   workspaceId: string
   projectId: string
-  projectName: string
   scriptId: string
 }>()
 const router = useRouter()
@@ -314,7 +313,6 @@ function summaryOf(run: Run): string {
     <p v-if="scriptError" class="text-error">{{ errorMessage(scriptError) }}</p>
     <template v-else-if="script">
       <PageHeader
-        :section="projectName"
         :title="script.name"
         :description="
           hook

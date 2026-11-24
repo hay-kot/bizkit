@@ -16,7 +16,6 @@ const inviting = ref(false)
 <template>
   <Page>
     <PageHeader
-      :section="workspaceName"
       title="Team"
       description="Everyone who can work in this workspace, and who has been invited."
     >

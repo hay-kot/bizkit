@@ -5,7 +5,7 @@ import TabLayout from '@/components/ui/TabLayout.vue'
 
 /** The mailing tabs' parent route: header and tabs, rendered once. */
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const attrs = useAttrs()
 
 const tabs = computed(() => {
@@ -20,10 +20,9 @@ const tabs = computed(() => {
 const childProps = computed(() => ({
   ...attrs,
   workspaceId: props.workspaceId,
-  projectName: props.projectName,
 }))
 </script>
 
 <template>
-  <TabLayout :section="projectName" :tabs="tabs" label="Mailing pages" :child-props="childProps" />
+  <TabLayout :tabs="tabs" label="Mailing pages" :child-props="childProps" />
 </template>

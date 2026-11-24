@@ -30,7 +30,6 @@ import {
 const props = defineProps<{
   workspaceId: string
   projectId: string
-  projectName: string
   endpointId: string
 }>()
 const router = useRouter()
@@ -127,8 +126,7 @@ async function onSaveSettings() {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
-      :title="endpoint?.name ?? 'Endpoint'"
+      :title="endpoint?.name ?? ''"
       :description="
         endpoint && !endpoint.enabled
           ? 'Disabled: requests get a 404 and nothing is stored.'

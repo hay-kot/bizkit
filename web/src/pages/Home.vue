@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Mail } from 'lucide-vue-next'
+import { LayoutGrid, Mail } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -71,6 +71,7 @@ function onDecline(invite: MyInvitation) {
 <template>
   <Page>
     <PageHeader
+      :icon="LayoutGrid"
       title="Your workspaces"
       description="Pick a workspace to work in, or start a new one."
     />

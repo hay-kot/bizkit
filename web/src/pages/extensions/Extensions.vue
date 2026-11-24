@@ -23,7 +23,7 @@ import {
   useSecrets,
 } from '@/queries/extensions'
 
-const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const { data: hooks } = useHooks(() => props.workspaceId)
 const {
   data: scripts,
@@ -150,7 +150,6 @@ function removeSecret(secret: string) {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       title="Extensions"
       description="Scripts that run on this project's hook points, such as after each form submission."
     >
