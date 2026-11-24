@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mailing_lists (id, workspace_id, project_id, name, description,\n                                    double_opt_in, footer, created_at, updated_at, archive,\n                                    archive_key)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "fa31b37d2edf2b52f3671a9f2ecbd5d0dc298c981af9e54ecdd32b9062c387e9"
+}

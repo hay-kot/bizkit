@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use anyhow::Context as _;
-use bizkit_core::auth::{is_plausible_email, normalize_email};
+use bizkit_core::auth::{is_plausible_email, normalize_email, random_token};
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::jobs::Enqueue;
 use bizkit_core::ops::{Access, Level, Method, NoContent, OpCtx, Operation, Scope, Success};
@@ -119,21 +119,23 @@ async fn lists_to_api(
     let links = store::list_forms(platform.db().read(), workspace_id, &ids).await?;
     let form_ids: Vec<String> = links.iter().map(|(_, form)| form.clone()).collect();
     let live = live_forms(platform, workspace_id, None, &form_ids).await?;
-    Ok(rows
-        .into_iter()
+    rows.into_iter()
         .map(|row| {
             let linked = links
                 .iter()
                 .filter(|(list, form)| *list == row.id && live.contains(form))
                 .map(|(_, form)| form.clone())
                 .collect();
-            list_to_api(row, linked, None)
+            let archive_url = crate::archive::archive_url(platform, &row.archive_key)?;
+            Ok(list_to_api(row, linked, archive_url.to_string()))
         })
-        .collect())
+        .collect()
 }
 
-fn list_to_api(row: ListRow, form_ids: Vec<String>, counts: Option<ContactCounts>) -> MailingList {
+fn list_to_api(row: ListRow, form_ids: Vec<String>, archive_url: String) -> MailingList {
     MailingList {
+        archive: row.archive,
+        archive_url,
         id: row.id,
         project_id: row.project_id,
         name: row.name,
@@ -141,7 +143,7 @@ fn list_to_api(row: ListRow, form_ids: Vec<String>, counts: Option<ContactCounts
         double_opt_in: row.double_opt_in,
         footer: row.footer,
         form_ids,
-        counts,
+        counts: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -207,6 +209,7 @@ fn broadcast_to_api(row: BroadcastRow) -> anyhow::Result<Broadcast> {
         send_at: row.send_at,
         paused_at: row.paused_at,
         pause_reason: row.pause_reason,
+        archived: row.archived,
         deliveries: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -482,6 +485,9 @@ pub(crate) struct CreateList {
     /// Forms of the project whose submitters join the list.
     #[serde(default)]
     form_ids: Vec<String>,
+    /// Whether the public archive is on. Default false.
+    #[serde(default)]
+    archive: bool,
 }
 
 impl Validate for CreateList {
@@ -521,6 +527,9 @@ pub(crate) struct UpdateList {
     /// Replaces the linked forms.
     #[serde(default)]
     form_ids: Option<Vec<String>>,
+    /// Turns the public archive on or off.
+    #[serde(default)]
+    archive: Option<bool>,
 }
 
 impl Validate for UpdateList {
@@ -727,6 +736,9 @@ pub(crate) struct CreateBroadcast {
     /// Which subscribers get it; absent: every subscriber.
     #[serde(default)]
     segment: Segment,
+    /// Show it in the list's public archive once sent. Default false.
+    #[serde(default)]
+    archived: bool,
 }
 impl Validate for CreateBroadcast {
     fn validate(&self) -> Result<(), FieldErrors> {
@@ -758,6 +770,10 @@ pub(crate) struct UpdateBroadcast {
     /// Replaces the segment.
     #[serde(default)]
     segment: Option<Segment>,
+    /// Shows it in the list's public archive once sent, or hides it. The
+    /// only field that changes after a draft is sent or scheduled.
+    #[serde(default)]
+    archived: Option<bool>,
 }
 impl Validate for UpdateBroadcast {
     fn validate(&self) -> Result<(), FieldErrors> {
@@ -904,6 +920,8 @@ impl Operation for ListsCreate {
             footer: trimmed(input.footer.as_ref()),
             created_at: now,
             updated_at: now,
+            archive: input.archive,
+            archive_key: random_token(),
         };
         let mut tx = cx.write().await?;
         if !bizkit_core::projects::exists(&mut *tx, input.workspace_id, input.project_id).await? {
@@ -968,6 +986,9 @@ impl Operation for ListsUpdate {
         }
         if let Some(footer) = input.footer {
             row.footer = trimmed(footer.as_ref());
+        }
+        if let Some(archive) = input.archive {
+            row.archive = archive;
         }
         row.updated_at = cx.now();
         store::update_list(&mut *tx, &row).await?;
@@ -1319,6 +1340,7 @@ impl Operation for BroadcastsCreate {
             paused_at: None,
             pause_reason: None,
             failures_in_row: 0,
+            archived: input.archived,
         };
         store::insert_broadcast(&mut *tx, &row).await?;
         tx.commit().await?;
@@ -1362,18 +1384,39 @@ impl Operation for BroadcastsUpdate {
     const METHOD: Method = Method::Patch;
     const PATH: &'static str = "/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}";
     const ACCESS: Access = WRITE;
-    const SUMMARY: &'static str = "Change a draft broadcast";
+    const SUMMARY: &'static str =
+        "Change a draft broadcast, or whether any broadcast shows in the public archive";
     const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: UpdateBroadcast) -> Result<Broadcast, ApiError> {
         let mut tx = cx.write().await?;
         let mut row = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
-        if row.status != BroadcastStatus::Draft.as_str() {
+        let edits_draft = input.list_id.is_some()
+            || input.subject.is_some()
+            || input.body_md.is_some()
+            || input.segment.is_some();
+        if edits_draft && row.status != BroadcastStatus::Draft.as_str() {
             return Err(ApiError::Conflict(NOT_DRAFT.to_owned()));
         }
-        if row.send_at.is_some() {
+        if edits_draft && row.send_at.is_some() {
             return Err(ApiError::Conflict(SCHEDULED.to_owned()));
+        }
+        if let Some(archived) = input.archived {
+            row.archived = archived;
+            row.updated_at = cx.now();
+            store::set_broadcast_archived(
+                &mut *tx,
+                row.workspace_id,
+                row.id,
+                archived,
+                row.updated_at,
+            )
+            .await?;
+        }
+        if !edits_draft {
+            tx.commit().await?;
+            return Ok(broadcast_to_api(row)?);
         }
         if let Some(list_id) = input.list_id {
             if store::find_list(&mut *tx, input.workspace_id, list_id).await?.is_none() {

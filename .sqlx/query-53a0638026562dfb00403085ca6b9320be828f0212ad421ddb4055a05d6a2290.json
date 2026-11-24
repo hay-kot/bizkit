@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT l.id AS \"id: ListId\", l.workspace_id AS \"workspace_id: WorkspaceId\",\n                  l.project_id AS \"project_id: ProjectId\", l.name, l.description,\n                  l.double_opt_in AS \"double_opt_in: bool\", l.footer,\n                  l.created_at AS \"created_at: UnixMillis\", l.updated_at AS \"updated_at: UnixMillis\",\n                  l.archive AS \"archive: bool\", l.archive_key\n           FROM mailing_lists l\n           JOIN mailing_list_forms f ON f.list_id = l.id AND f.workspace_id = l.workspace_id\n           WHERE l.workspace_id = ? AND l.project_id = ? AND f.form_id = ?\n           ORDER BY l.name, l.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ListId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "description",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "name": "double_opt_in: bool",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "double_opt_in"
+          }
+        }
+      },
+      {
+        "name": "footer",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "footer"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "archive: bool",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "archive"
+          }
+        }
+      },
+      {
+        "name": "archive_key",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "archive_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "53a0638026562dfb00403085ca6b9320be828f0212ad421ddb4055a05d6a2290"
+}

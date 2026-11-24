@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_broadcasts SET archived = ?, updated_at = ? WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "4f08a9a6cf1811df9fd7b67775396f3d18ab114d6ad576d1818b1d3ed1c354c1"
+}

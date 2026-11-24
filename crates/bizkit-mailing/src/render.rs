@@ -54,6 +54,23 @@ pub(crate) fn render(
     }
 }
 
+/// A broadcast's subject as the public archive shows it. The archive has
+/// no reader, so merge fields render empty.
+pub(crate) fn archive_subject(subject: &str) -> String {
+    one_line(&fill(subject, &no_reader(&Attributes::default())))
+}
+
+/// A broadcast's body as HTML for the public archive: merge fields render
+/// empty, and there is no frame, since unsubscribe and manage links
+/// belong to one reader.
+pub(crate) fn archive_body(body_md: &str) -> String {
+    markdown_html(body_md, &no_reader(&Attributes::default()))
+}
+
+const fn no_reader(attributes: &Attributes) -> Merge<'_> {
+    Merge { name: None, email: "", attributes: Some(attributes) }
+}
+
 /// The double opt-in mail.
 pub(crate) fn confirm(frame: &Frame<'_>, confirm_url: &Url) -> Rendered {
     let list = escape(frame.list_name);
@@ -362,6 +379,14 @@ mod tests {
     fn a_stray_opening_brace_pair_is_text() {
         assert_eq!(fill("Hi {{ team, {{ name }}!", &ADA), "Hi {{ team, Ada!");
         assert_eq!(fill("{{{{ name }}", &ADA), "{{Ada");
+    }
+
+    #[test]
+    fn the_archive_has_no_reader() {
+        assert_eq!(archive_subject("News for {{ name }}{{ attr.plan }}"), "News for", "subject");
+        let html = archive_body("Hi {{ name }} <{{ email }}> on {{ attr.plan }}.");
+        assert!(!html.contains("{{"), "{html}");
+        assert!(!html.contains("Unsubscribe"), "{html}");
     }
 
     #[test]

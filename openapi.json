@@ -9248,6 +9248,10 @@
                   "subject"
                 ],
                 "properties": {
+                  "archived": {
+                    "type": "boolean",
+                    "description": "Show it in the list's public archive once sent. Default false."
+                  },
                   "body_md": {
                     "type": "string",
                     "description": "The body in Markdown."
@@ -9548,7 +9552,7 @@
         "tags": [
           "mailing"
         ],
-        "summary": "Change a draft broadcast",
+        "summary": "Change a draft broadcast, or whether any broadcast shows in the public archive",
         "operationId": "mailing.broadcasts.update",
         "parameters": [
           {
@@ -9576,6 +9580,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "archived": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Shows it in the list's public archive once sent, or hides it. The\nonly field that changes after a draft is sent or scheduled."
+                  },
                   "body_md": {
                     "type": [
                       "string",
@@ -10724,6 +10735,10 @@
                   "name"
                 ],
                 "properties": {
+                  "archive": {
+                    "type": "boolean",
+                    "description": "Whether the public archive is on. Default false."
+                  },
                   "description": {
                     "type": [
                       "string",
@@ -11062,6 +11077,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "archive": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Turns the public archive on or off."
+                  },
                   "description": {
                     "type": [
                       "string",
@@ -15560,6 +15582,143 @@
         }
       }
     },
+    "/m/mailing/public/archive/{key}": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Show a list's public archive",
+        "description": "The list's sent broadcasts marked `archived`, newest first, at most 100.",
+        "operationId": "mailing.public.archive",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The list's archive key, from `archive_url`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No list with this key has its archive on",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/mailing/public/archive/{key}/feed.xml": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Get a list's public archive as RSS",
+        "description": "RSS 2.0 with the latest 20 archived broadcasts; each item's description is its HTML.",
+        "operationId": "mailing.public.archive_feed",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The list's archive key, from `archive_url`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The feed",
+            "content": {
+              "application/rss+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No list with this key has its archive on",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/mailing/public/archive/{key}/{broadcast_id}": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Show one broadcast of a list's public archive",
+        "operationId": "mailing.public.archive_issue",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The list's archive key, from `archive_url`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "broadcast_id",
+            "in": "path",
+            "description": "The broadcast",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The archive is off, or the broadcast isn't in it",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/m/mailing/public/confirm": {
       "get": {
         "tags": [
@@ -16744,10 +16903,15 @@
           "segment",
           "status",
           "recipients",
+          "archived",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Shown in the list's public archive once it is sent, while the\nlist's archive is on."
+          },
           "body_md": {
             "type": "string",
             "description": "The body in Markdown. `{{ name }}`, `{{ email }}` and\n`{{ attr.key }}` are filled in."
@@ -19341,10 +19505,20 @@
           "name",
           "double_opt_in",
           "form_ids",
+          "archive",
+          "archive_url",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "archive": {
+            "type": "boolean",
+            "description": "Whether the public archive shows the broadcasts marked `archived`."
+          },
+          "archive_url": {
+            "type": "string",
+            "description": "The public archive page; its RSS feed is `feed.xml` under it. Set\neven while the archive is off, so it can be shared before."
+          },
           "counts": {
             "oneOf": [
               {

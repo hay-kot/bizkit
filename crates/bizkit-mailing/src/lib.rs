@@ -2,6 +2,7 @@
 //! broadcasts and email sequences. Plan: `.hive/plans/2026-11-23-mailing.md`.
 
 pub mod api;
+mod archive;
 mod capture;
 pub mod contacts;
 mod events;
@@ -54,7 +55,9 @@ impl Module for Mailing {
         cx.job::<send::FanOut, _>(send::FanOutHandler)?;
         cx.job::<send::StartBroadcast, _>(send::StartBroadcastHandler)?;
         cx.subscribe::<ContactCaptured, _>(capture::CaptureSubscriber)?;
-        cx.public_routes(public::router(), public::PublicDocs::openapi())
+        let mut docs = public::PublicDocs::openapi();
+        docs.merge(archive::ArchiveDocs::openapi());
+        cx.public_routes(public::router(), docs)
     }
 
     #[cfg(feature = "test-hooks")]

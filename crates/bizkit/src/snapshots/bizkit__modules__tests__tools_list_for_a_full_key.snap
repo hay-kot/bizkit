@@ -3972,6 +3972,10 @@ expression: tools
         "additionalProperties": false,
         "description": "A new draft broadcast.",
         "properties": {
+          "archived": {
+            "description": "Show it in the list's public archive once sent. Default false.",
+            "type": "boolean"
+          },
           "body_md": {
             "description": "The body in Markdown.",
             "type": "string"
@@ -4237,7 +4241,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Change a draft broadcast",
+      "description": "Change a draft broadcast, or whether any broadcast shows in the public archive",
       "inputSchema": {
         "$defs": {
           "AttributeCondition": {
@@ -4326,6 +4330,13 @@ expression: tools
         "additionalProperties": false,
         "description": "Changes to a draft. Absent fields stay as they are.",
         "properties": {
+          "archived": {
+            "description": "Shows it in the list's public archive once sent, or hides it. The\nonly field that changes after a draft is sent or scheduled.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "body_md": {
             "description": "The body in Markdown.",
             "type": [
@@ -5115,6 +5126,10 @@ expression: tools
         "additionalProperties": false,
         "description": "A new list.",
         "properties": {
+          "archive": {
+            "description": "Whether the public archive is on. Default false.",
+            "type": "boolean"
+          },
           "description": {
             "description": "What subscribers get, for the team.",
             "type": [
@@ -5264,6 +5279,13 @@ expression: tools
         "additionalProperties": false,
         "description": "Changes to a list. Absent fields stay as they are.",
         "properties": {
+          "archive": {
+            "description": "Turns the public archive on or off.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "description": {
             "description": "What subscribers get; `null` removes it.",
             "type": [

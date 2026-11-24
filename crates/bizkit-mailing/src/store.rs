@@ -20,6 +20,10 @@ pub(crate) struct ListRow {
     pub(crate) footer: Option<String>,
     pub(crate) created_at: UnixMillis,
     pub(crate) updated_at: UnixMillis,
+    /// Whether the public archive is on.
+    pub(crate) archive: bool,
+    /// The unguessable key the archive URL names.
+    pub(crate) archive_key: String,
 }
 
 /// A `mailing_contacts` row. `tags` and `attributes` stay JSON text and
@@ -63,6 +67,8 @@ pub(crate) struct BroadcastRow {
     pub(crate) paused_at: Option<UnixMillis>,
     pub(crate) pause_reason: Option<String>,
     pub(crate) failures_in_row: i64,
+    /// Shown in the list's public archive once sent.
+    pub(crate) archived: bool,
 }
 
 /// A `mailing_deliveries` row.
@@ -194,8 +200,9 @@ fn json_text<T: serde::Serialize>(value: &T) -> sqlx::Result<String> {
 pub(crate) async fn insert_list(exec: impl SqliteExecutor<'_>, row: &ListRow) -> sqlx::Result<()> {
     sqlx::query!(
         "INSERT INTO mailing_lists (id, workspace_id, project_id, name, description,
-                                    double_opt_in, footer, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                    double_opt_in, footer, created_at, updated_at, archive,
+                                    archive_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.project_id,
@@ -205,6 +212,8 @@ pub(crate) async fn insert_list(exec: impl SqliteExecutor<'_>, row: &ListRow) ->
         row.footer,
         row.created_at,
         row.updated_at,
+        row.archive,
+        row.archive_key,
     )
     .execute(exec)
     .await?;
@@ -215,13 +224,14 @@ pub(crate) async fn insert_list(exec: impl SqliteExecutor<'_>, row: &ListRow) ->
 pub(crate) async fn update_list(exec: impl SqliteExecutor<'_>, row: &ListRow) -> sqlx::Result<()> {
     sqlx::query!(
         "UPDATE mailing_lists SET name = ?, description = ?, double_opt_in = ?, footer = ?,
-                                  updated_at = ?
+                                  updated_at = ?, archive = ?
          WHERE workspace_id = ? AND id = ?",
         row.name,
         row.description,
         row.double_opt_in,
         row.footer,
         row.updated_at,
+        row.archive,
         row.workspace_id,
         row.id,
     )
@@ -240,7 +250,8 @@ pub(crate) async fn find_list(
         r#"SELECT id AS "id: ListId", workspace_id AS "workspace_id: WorkspaceId",
                   project_id AS "project_id: ProjectId", name, description,
                   double_opt_in AS "double_opt_in: bool", footer,
-                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis",
+                  archive AS "archive: bool", archive_key
            FROM mailing_lists WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
         id,
@@ -260,7 +271,8 @@ pub(crate) async fn list_lists(
         r#"SELECT id AS "id: ListId", workspace_id AS "workspace_id: WorkspaceId",
                   project_id AS "project_id: ProjectId", name, description,
                   double_opt_in AS "double_opt_in: bool", footer,
-                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis",
+                  archive AS "archive: bool", archive_key
            FROM mailing_lists WHERE workspace_id = ?1 AND (?2 IS NULL OR project_id = ?2)
            ORDER BY name, id"#,
         workspace_id,
@@ -282,7 +294,8 @@ pub(crate) async fn lists_for_form(
         r#"SELECT l.id AS "id: ListId", l.workspace_id AS "workspace_id: WorkspaceId",
                   l.project_id AS "project_id: ProjectId", l.name, l.description,
                   l.double_opt_in AS "double_opt_in: bool", l.footer,
-                  l.created_at AS "created_at: UnixMillis", l.updated_at AS "updated_at: UnixMillis"
+                  l.created_at AS "created_at: UnixMillis", l.updated_at AS "updated_at: UnixMillis",
+                  l.archive AS "archive: bool", l.archive_key
            FROM mailing_lists l
            JOIN mailing_list_forms f ON f.list_id = l.id AND f.workspace_id = l.workspace_id
            WHERE l.workspace_id = ? AND l.project_id = ? AND f.form_id = ?
@@ -666,8 +679,8 @@ pub(crate) async fn insert_broadcast(
     sqlx::query!(
         "INSERT INTO mailing_broadcasts (id, workspace_id, list_id, subject, body_md, segment, status,
                                          recipients, sent_at, created_at, updated_at, send_at,
-                                         paused_at, pause_reason, failures_in_row)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                         paused_at, pause_reason, failures_in_row, archived)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.list_id,
@@ -683,13 +696,18 @@ pub(crate) async fn insert_broadcast(
         row.paused_at,
         row.pause_reason,
         row.failures_in_row,
+        row.archived,
     )
     .execute(exec)
     .await?;
     Ok(())
 }
 
-/// Writes every changeable column of `row`, matched by workspace and ID.
+/// Writes every changeable column of `row` but `archived`, matched by
+/// workspace and ID. `archived` changes only through
+/// [`set_broadcast_archived`], so the fan-out, which holds a row across
+/// batches, never undoes a toggle made while it runs. It can still write
+/// back an older `updated_at`.
 pub(crate) async fn update_broadcast(
     exec: impl SqliteExecutor<'_>,
     row: &BroadcastRow,
@@ -730,12 +748,89 @@ pub(crate) async fn find_broadcast(
                   list_id AS "list_id: ListId", subject, body_md, segment, status, recipients,
                   sent_at AS "sent_at: UnixMillis", created_at AS "created_at: UnixMillis",
                   updated_at AS "updated_at: UnixMillis", send_at AS "send_at: UnixMillis",
-                  paused_at AS "paused_at: UnixMillis", pause_reason, failures_in_row
+                  paused_at AS "paused_at: UnixMillis", pause_reason, failures_in_row,
+                  archived AS "archived: bool"
            FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
         id,
     )
     .fetch_optional(exec)
+    .await
+}
+
+pub(crate) async fn set_broadcast_archived(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: BroadcastId,
+    archived: bool,
+    now: UnixMillis,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_broadcasts SET archived = ?, updated_at = ? WHERE workspace_id = ? AND id = ?",
+        archived,
+        now,
+        workspace_id,
+        id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// The list whose archive URL names `key`, if its archive is on. The key
+/// is unguessable and arrives before the workspace is known, so the
+/// workspace comes from the row.
+pub(crate) async fn find_archive_list(
+    exec: impl SqliteExecutor<'_>,
+    key: &str,
+) -> sqlx::Result<Option<ListRow>> {
+    sqlx::query_as!(
+        ListRow,
+        r#"SELECT id AS "id: ListId", workspace_id AS "workspace_id: WorkspaceId",
+                  project_id AS "project_id: ProjectId", name, description,
+                  double_opt_in AS "double_opt_in: bool", footer,
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis",
+                  archive AS "archive: bool", archive_key
+           FROM mailing_lists WHERE archive_key = ? AND archive = 1"#,
+        key,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// A broadcast as the public archive shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ArchiveIssue {
+    pub(crate) id: BroadcastId,
+    pub(crate) subject: String,
+    pub(crate) body_md: String,
+    pub(crate) sent_at: UnixMillis,
+}
+
+/// The list's archived broadcasts that finished sending, newest first; only
+/// `only` when given. A paused broadcast stays out until it resumes.
+pub(crate) async fn archive_issues(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    list_id: ListId,
+    only: Option<BroadcastId>,
+    limit: i64,
+) -> sqlx::Result<Vec<ArchiveIssue>> {
+    sqlx::query_as!(
+        ArchiveIssue,
+        r#"SELECT id AS "id!: BroadcastId", subject, body_md, sent_at AS "sent_at!: UnixMillis"
+           FROM mailing_broadcasts
+           WHERE workspace_id = ?1 AND list_id = ?2 AND archived = 1 AND status = 'sent'
+             AND paused_at IS NULL AND sent_at IS NOT NULL
+             AND (?3 IS NULL OR id = ?3)
+           ORDER BY sent_at DESC, id DESC
+           LIMIT ?4"#,
+        workspace_id,
+        list_id,
+        only,
+        limit,
+    )
+    .fetch_all(exec)
     .await
 }
 
@@ -754,7 +849,7 @@ pub(crate) async fn list_broadcasts(
                   b.recipients, b.sent_at AS "sent_at: UnixMillis",
                   b.created_at AS "created_at: UnixMillis", b.updated_at AS "updated_at: UnixMillis",
                   b.send_at AS "send_at: UnixMillis", b.paused_at AS "paused_at: UnixMillis",
-                  b.pause_reason, b.failures_in_row
+                  b.pause_reason, b.failures_in_row, b.archived AS "archived: bool"
            FROM mailing_broadcasts b
            JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id
            WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)
