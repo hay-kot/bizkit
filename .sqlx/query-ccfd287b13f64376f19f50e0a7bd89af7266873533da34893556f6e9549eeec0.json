@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.site_key FROM analytics_sites s\n         JOIN projects p ON p.id = s.project_id\n         JOIN workspaces w ON w.id = s.workspace_id\n         WHERE w.slug = ? AND p.slug = 'website'",
+  "describe": {
+    "columns": [
+      {
+        "name": "site_key",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "site_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ccfd287b13f64376f19f50e0a7bd89af7266873533da34893556f6e9549eeec0"
+}

@@ -1823,6 +1823,149 @@
         "x-bizkit-scope": "analytics:write"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}/dropoffs": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List the people who reached the step before a funnel step and stopped there",
+        "operationId": "analytics.funnels.dropoffs",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "funnel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunnelId",
+              "description": "The funnel."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The first day people may enter, UTC."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many people, 1-100. Default 25.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "description": "The step they did not reach, 2 to the funnel's step count.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Day",
+              "description": "The last day people may enter, UTC, inclusive."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropoffPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "analytics:read"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}/results": {
       "get": {
         "tags": [
@@ -9290,6 +9433,79 @@
           "event",
           "goal"
         ]
+      },
+      "Dropoff": {
+        "type": "object",
+        "description": "Someone who reached the step before and not the step.",
+        "required": [
+          "entered_at",
+          "last_step_at",
+          "events"
+        ],
+        "properties": {
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `email` or `name` trait, when there is one."
+          },
+          "entered_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "Their first step-1 event in the range."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventItem"
+            },
+            "description": "Their events from entry to the end of their window, oldest first, at\nmost 20."
+          },
+          "last_step_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "Their last reached step's event."
+          },
+          "person_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonId",
+                "description": "Set for identified people; their page has the full timeline."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The site's ID for the user, when identified."
+          }
+        }
+      },
+      "DropoffPage": {
+        "type": "object",
+        "description": "The people who dropped off before a step.",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Dropoff"
+            },
+            "description": "The latest entries first."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Everyone who dropped there; the drop between the two steps in the\nresults."
+          }
+        }
       },
       "Endpoint": {
         "type": "object",

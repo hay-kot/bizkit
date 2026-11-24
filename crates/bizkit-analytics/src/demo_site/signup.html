@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign up - Tallyho</title>
+<link rel="stylesheet" href="/site.css">
+<script src="/site.js"></script>
+<!-- bizkit -->
+</head>
+<body data-page="signup">
+<header class="top"><a class="brand" href="/">Tallyho</a><nav><a href="/pricing">Pricing</a><a href="/signup">Sign up</a></nav></header>
+<main>
+<ol class="steps"><li class="now">Sign up</li><li>Create a project</li><li>Invite a teammate</li><li>See your first report</li></ol>
+<h1>Create your account</h1>
+<form id="signup" class="card">
+<label>Name <input name="name" value="Sam Rivera" autocomplete="off" required></label>
+<label>Email <input name="email" type="email" required></label>
+<label>Plan <select name="plan"><option value="free">Free</option><option value="pro">Pro</option></select></label>
+<button class="button" type="submit">Sign up</button>
+</form>
+</main>
+<footer>A demo product for bizkit analytics. Every page sends a pageview; each step calls <code>bizkit.track()</code>.</footer>
+</body>
+</html>

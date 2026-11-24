@@ -36,6 +36,19 @@ services:
     oneshot: true
     depends: [api]
 
+  demo-site:
+    # A tracked product to click through: landing, pricing, signup and
+    # onboarding, cross-origin to bizkit like a customer's site. Its beacons
+    # go through the UI's proxy, as the snippet's base URL is the UI.
+    run: >-
+      exec ./target/debug/bizkit --config dev/bizkit.yaml dev demo-site
+      --listen 127.0.0.1:$PORT --snippet-base http://localhost:$SVX_PORT_UI
+      --data-dir $SVX_STACK_DIR/data
+    port: 8090
+    depends: [seed, ui]
+    ready: { http: / }
+    links: { Demo site: 'http://localhost:{{ .port }}/' }
+
   ui:
     run: exec pnpm -C web dev --host 127.0.0.1 --port $PORT --strictPort
     port: 5173

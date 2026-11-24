@@ -262,6 +262,49 @@ export type Delivery = {
 export type Dimension = 'page' | 'referrer' | 'utm_source' | 'utm_medium' | 'utm_campaign' | 'country' | 'device' | 'browser' | 'os' | 'event' | 'goal';
 
 /**
+ * Someone who reached the step before and not the step.
+ */
+export type Dropoff = {
+    /**
+     * The `email` or `name` trait, when there is one.
+     */
+    display?: string | null;
+    /**
+     * Their first step-1 event in the range.
+     */
+    entered_at: Timestamp;
+    /**
+     * Their events from entry to the end of their window, oldest first, at
+     * most 20.
+     */
+    events: Array<EventItem>;
+    /**
+     * Their last reached step's event.
+     */
+    last_step_at: Timestamp;
+    person_id?: PersonId | null;
+    /**
+     * The site's ID for the user, when identified.
+     */
+    user_id?: string | null;
+};
+
+/**
+ * The people who dropped off before a step.
+ */
+export type DropoffPage = {
+    /**
+     * The latest entries first.
+     */
+    items: Array<Dropoff>;
+    /**
+     * Everyone who dropped there; the drop between the two steps in the
+     * results.
+     */
+    total: number;
+};
+
+/**
  * A public URL that stores every request it gets.
  */
 export type Endpoint = {
@@ -2722,6 +2765,73 @@ export type AnalyticsFunnelsUpdateResponses = {
 };
 
 export type AnalyticsFunnelsUpdateResponse = AnalyticsFunnelsUpdateResponses[keyof AnalyticsFunnelsUpdateResponses];
+
+export type AnalyticsFunnelsDropoffsData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The funnel.
+         */
+        funnel_id: FunnelId;
+    };
+    query: {
+        /**
+         * The first day people may enter, UTC.
+         */
+        from: Day;
+        /**
+         * At most this many people, 1-100. Default 25.
+         */
+        limit?: number | null;
+        /**
+         * The step they did not reach, 2 to the funnel's step count.
+         */
+        step: number;
+        /**
+         * The last day people may enter, UTC, inclusive.
+         */
+        to: Day;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/funnels/{funnel_id}/dropoffs';
+};
+
+export type AnalyticsFunnelsDropoffsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsFunnelsDropoffsError = AnalyticsFunnelsDropoffsErrors[keyof AnalyticsFunnelsDropoffsErrors];
+
+export type AnalyticsFunnelsDropoffsResponses = {
+    /**
+     * OK
+     */
+    200: DropoffPage;
+};
+
+export type AnalyticsFunnelsDropoffsResponse = AnalyticsFunnelsDropoffsResponses[keyof AnalyticsFunnelsDropoffsResponses];
 
 export type AnalyticsFunnelsResultsData = {
     body?: never;

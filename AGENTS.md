@@ -134,6 +134,10 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
 
 `svx up` starts Mailpit, the API (`cargo run` with `test-hooks`, using `dev/bizkit.yaml`), the demo seed and Vite, on ports of this checkout's own svx slot, so several checkouts can run at once. `svx status` shows the links, `svx logs api` the API log, and `svx down` stops it all. Open the app at `http://localhost:<ui port>`, not `127.0.0.1`: the API's base URL is the localhost one, so magic links and the CSRF Origin check use it, while every service still listens on 127.0.0.1. Sign in as `demo@bizkit.test` for the seeded demo workspace (any `@bizkit.test` email works; other emails get no mail, and a second request within a minute sends none) and open the link from the stack's Mailpit.
 
+The `demo-site` service (`bizkit dev demo-site`) serves a small tracked product, "Tallyho", at the Demo site link: landing, pricing, signup and three onboarding steps, with the website project's snippet. Walk it to see live events, people and funnel drop-off in the Website project's analytics. Seeded onboarding events come only with a fresh project file; to refill an old stack, stop the api, delete `.svx/<stack>/data/analytics/<website project id>.db` and run `svx restart api seed`.
+
+`mise run demo:traffic -- --site <demo site url> --api <api url> [--visitors 200]` (`e2e/demo-traffic.ts`) drives headless browsers through the demo site with drop-off at each step, so the funnels fill from real ingest. Pass the `localhost` demo site URL and the api URL from `svx status`. It sends beacons straight to the api with a made-up `X-Forwarded-For` per visitor (through Vite every visitor would be one client) and runs 4 visitors at a time, which stays under the per-site ingest limit. Each run adds events for today, so run it by hand.
+
 ## Tests
 
 - Unit tests go in a `#[cfg(test)] mod tests` block in the same file. Integration tests that run the binary go in `tests/`.

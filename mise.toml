@@ -36,6 +36,10 @@ run = "cargo test --locked --workspace --all-features"
 description = "Run the Playwright end-to-end tests against a fresh server and Mailpit"
 run = "scripts/test-e2e.sh"
 
+[tasks."demo:traffic"]
+description = "Drive headless visitors through the dev stack's demo site (--site <demo url> --api <api url> [--visitors 200])"
+run = "node e2e/demo-traffic.ts"
+
 # Deep fuzzing of the bolero harnesses under libFuzzer. Needs a nightly
 # toolchain and `cargo install cargo-bolero`, so it stays out of `check` and
 # CI; `cargo test` already runs the same harnesses as property tests.

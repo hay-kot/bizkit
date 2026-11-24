@@ -7,6 +7,7 @@ import {
   formatNumber,
   formatPercent,
   formatRelative,
+  formatTimeAfter,
   isPast,
 } from './format'
 
@@ -14,6 +15,12 @@ describe('format', () => {
   it('formats dates and falls back when empty', () => {
     expect(formatDate('2026-11-22T12:00:00Z')).toMatch(/2026/)
     expect(formatDate(null, 'Never')).toBe('Never')
+  })
+
+  it('adds the date to a time on a later day', () => {
+    const start = '2026-11-22T12:00:00'
+    expect(formatTimeAfter('2026-11-22T20:04:00', start)).toBe('8:04 PM')
+    expect(formatTimeAfter('2026-11-25T20:04:00', start)).toBe('Nov 25, 8:04 PM')
   })
 
   it('knows the past', () => {

@@ -48,3 +48,51 @@ test('an admin turns on analytics; a cookieless site sends a pageview that the o
     useInnerText: true,
   })
 })
+
+test('a funnel lists the people who dropped off before a step', async ({ page, playwright, world, baseURL }) => {
+  const workspace = world.workspaces.main!.id
+  const project = world.projects.site!.id
+  const api = await playwright.request.newContext({
+    baseURL,
+    extraHTTPHeaders: { authorization: `Bearer ${world.api_keys.full!.token}` },
+  })
+  try {
+    const base = `/api/v1/workspaces/${workspace}/analytics`
+    expect((await api.post(`${base}/site`, { data: { project_id: project } })).status()).toBe(201)
+    const events = [
+      { name: '$identify', user_id: 'ada', traits: { email: 'ada@example.com' } },
+      { name: 'pageview', user_id: 'ada', url: 'https://x.test/pricing' },
+      { name: 'signup_started', user_id: 'ada' },
+      { name: 'signup', user_id: 'ada' },
+      { name: '$identify', user_id: 'bob', traits: { email: 'bob@example.com' } },
+      { name: 'pageview', user_id: 'bob', url: 'https://x.test/pricing' },
+      { name: 'signup_started', user_id: 'bob' },
+    ]
+    expect((await api.post(`${base}/events`, { data: { project_id: project, events } })).status()).toBe(200)
+    const steps = [
+      { kind: 'page', match: '/pricing' },
+      { kind: 'event', match: 'signup_started' },
+      { kind: 'event', match: 'signup' },
+    ]
+    const created = await api.post(`${base}/funnels`, { data: { project_id: project, name: 'Signup', steps } })
+    expect(created.status()).toBe(201)
+    const funnel = (await created.json()) as { id: string }
+
+    // Events land after the writer's flush window; open the page once they have.
+    const hasEvents = async () => {
+      const site = (await (await api.get(`${base}/site?project_id=${project}`)).json()) as { has_events: boolean }
+      return site.has_events
+    }
+    await expect.poll(hasEvents).toBe(true)
+    await page.goto(`/w/${workspace}/p/${project}/analytics/funnels/${funnel.id}`)
+    await page.getByRole('link', { name: '1 dropped off' }).click()
+    await expect(page.getByRole('heading', { name: 'Dropped before step 3: signup' })).toBeVisible()
+    const table = page.getByRole('table', { name: 'People who dropped off' })
+    await expect(table.getByRole('link', { name: 'bob@example.com' })).toBeVisible()
+    await expect(table).not.toContainText('ada@example.com')
+    await page.getByRole('link', { name: 'Close' }).click()
+    await expect(table).toBeHidden()
+  } finally {
+    await api.dispose()
+  }
+})

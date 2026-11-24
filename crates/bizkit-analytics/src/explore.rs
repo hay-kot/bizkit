@@ -292,6 +292,11 @@ impl Validate for RecentEvents {
     }
 }
 
+/// An event's stored properties, or none when they don't parse.
+pub(crate) fn props_of(text: Option<String>) -> Map<String, Value> {
+    text.and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
+}
+
 /// One stored event.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub(crate) struct EventItem {
@@ -379,10 +384,7 @@ impl Operation for EventsRecent {
                 path: row.path,
                 person_id: row.person_id,
                 user_id: row.user_id,
-                props: row
-                    .props
-                    .and_then(|text| serde_json::from_str(&text).ok())
-                    .unwrap_or_default(),
+                props: props_of(row.props),
                 source: row.source,
             })
             .collect();

@@ -4,6 +4,8 @@
 pub mod api;
 pub mod beacon;
 mod cache;
+#[cfg(feature = "test-hooks")]
+pub mod demo_site;
 pub mod enrich;
 mod explore;
 mod files;
@@ -19,6 +21,8 @@ mod report;
 mod rollup;
 #[cfg(feature = "test-hooks")]
 mod seed;
+#[cfg(feature = "test-hooks")]
+pub use crate::seed::demo_site_key;
 mod server;
 mod stats;
 mod store;

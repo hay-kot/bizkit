@@ -1,0 +1,129 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT w.rank AS \"rank!: i64\", w.id AS \"id!: i64\", w.ts AS \"ts!: UnixMillis\",\n                  w.name AS \"name!: String\", w.path AS \"path?: String\", w.props AS \"props?: String\",\n                  w.source AS \"source!: String\",\n                  p.id AS \"person_id?: PersonId\", p.user_id AS \"user_id?\", p.traits AS \"traits?\"\n           FROM (\n             SELECT CAST(k.key AS INTEGER) AS rank, e.id, e.ts, e.name, e.path, e.props, e.source, e.person,\n                    ROW_NUMBER() OVER (PARTITION BY k.key ORDER BY e.ts, e.id) AS seq\n             FROM json_each(?) AS k\n             JOIN analytics_events AS e\n               ON e.workspace_id = ? AND e.project_id = ?\n              AND e.person = json_extract(k.value, '$[0]')\n              AND e.ts >= json_extract(k.value, '$[1]') AND e.ts <= json_extract(k.value, '$[2]')\n           ) AS w\n           LEFT JOIN analytics_people p\n             ON p.id = substr(w.person, 3) AND substr(w.person, 1, 2) = 'p:'\n            AND p.workspace_id = ? AND p.project_id = ?\n           WHERE w.seq <= ?\n           ORDER BY w.rank, w.ts, w.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "rank!: i64",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "id!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "ts!: UnixMillis",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "name": "name!: String",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "path?: String",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "path"
+          }
+        }
+      },
+      {
+        "name": "props?: String",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "props"
+          }
+        }
+      },
+      {
+        "name": "source!: String",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_events",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "person_id?: PersonId",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "user_id?",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "traits?",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_people",
+            "name": "traits"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      null,
+      null,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a8fa4077182d47732e87f67b530fb73ec7fa4168d3446957053f92557fce2b9c"
+}

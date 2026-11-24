@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 
 import { formatNumber, formatPercent } from '@/lib/format'
 import type { StepResult } from '@/queries/analytics'
 
 import { describeStep } from './funnelDraft'
 
-/** A funnel's results: one bar per step, scaled to the first step. */
-const props = defineProps<{ steps: StepResult[] }>()
+/**
+ * A funnel's results: one bar per step, scaled to the first step. With
+ * `droppedLink`, each drop-off count links to the people who dropped there.
+ */
+const props = defineProps<{
+  steps: StepResult[]
+  droppedLink?: (step: number) => RouteLocationRaw
+  selected?: number
+}>()
 
 const rows = computed(() => {
   const first = Math.max(1, props.steps[0]?.people ?? 0)
@@ -40,9 +48,20 @@ const rows = computed(() => {
         <span v-if="row.fromPrevious" class="text-base-content/70 tabular-nums">
           {{ row.fromPrevious }} from step {{ row.number - 1 }}
         </span>
-        <span v-if="row.dropped" class="text-base-content/70 tabular-nums">
-          {{ formatNumber(row.dropped) }} dropped off
-        </span>
+        <template v-if="row.dropped">
+          <RouterLink
+            v-if="droppedLink"
+            :to="droppedLink(row.number)"
+            class="link tabular-nums link-hover"
+            :class="selected === row.number ? 'font-medium text-primary' : 'text-base-content/70'"
+            :aria-current="selected === row.number ? 'true' : undefined"
+          >
+            {{ formatNumber(row.dropped) }} dropped off
+          </RouterLink>
+          <span v-else class="text-base-content/70 tabular-nums">
+            {{ formatNumber(row.dropped) }} dropped off
+          </span>
+        </template>
       </div>
       <progress
         class="progress h-3 w-full text-primary"

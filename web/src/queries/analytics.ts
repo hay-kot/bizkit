@@ -7,6 +7,7 @@ import {
   analyticsEventsRecentQuery,
   analyticsFunnelsCreateMutation,
   analyticsFunnelsDeleteMutation,
+  analyticsFunnelsDropoffsQuery,
   analyticsFunnelsGetQuery,
   analyticsFunnelsListQuery,
   analyticsFunnelsResultsQuery,
@@ -27,6 +28,8 @@ import type {
   BreakdownRow,
   Cohort,
   Dimension,
+  Dropoff,
+  DropoffPage,
   EventItem,
   EventName,
   Funnel,
@@ -47,6 +50,8 @@ export type {
   BreakdownRow,
   Cohort,
   Dimension,
+  Dropoff,
+  DropoffPage,
   EventItem,
   EventName,
   Funnel,
@@ -202,7 +207,12 @@ export function useRecentEvents(
   )
 }
 
-const FUNNEL_QUERIES = ['analyticsFunnelsList', 'analyticsFunnelsGet', 'analyticsFunnelsResults']
+const FUNNEL_QUERIES = [
+  'analyticsFunnelsList',
+  'analyticsFunnelsGet',
+  'analyticsFunnelsResults',
+  'analyticsFunnelsDropoffs',
+]
 
 export function useFunnels(
   workspaceId: MaybeRefOrGetter<string>,
@@ -238,6 +248,25 @@ export function useFunnelResults(
       query: toValue(range),
     }),
   )
+}
+
+/** Who dropped off before `step`; idle until a step is picked. */
+export function useFunnelDropoffs(
+  workspaceId: MaybeRefOrGetter<string>,
+  funnelId: MaybeRefOrGetter<string>,
+  range: MaybeRefOrGetter<DayRange>,
+  step: MaybeRefOrGetter<number | undefined>,
+) {
+  return useQuery(() => {
+    const { from, to } = toValue(range)
+    return {
+      ...analyticsFunnelsDropoffsQuery({
+        path: { workspace_id: toValue(workspaceId), funnel_id: toValue(funnelId) },
+        query: { from, to, step: toValue(step) ?? 2 },
+      }),
+      enabled: toValue(step) !== undefined,
+    }
+  })
 }
 
 export function useCreateFunnel() {

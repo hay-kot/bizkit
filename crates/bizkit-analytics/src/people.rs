@@ -14,7 +14,7 @@ use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
 use crate::api::{Day, PersonId};
-use crate::explore::EventItem;
+use crate::explore::{EventItem, props_of};
 use crate::files::Files;
 use crate::names;
 use crate::report::Scope;
@@ -96,7 +96,7 @@ impl Validate for ListPeople {
     }
 }
 
-fn display(traits: &Map<String, Value>) -> Option<String> {
+pub(crate) fn display(traits: &Map<String, Value>) -> Option<String> {
     ["email", "name"].iter().find_map(|key| traits.get(*key)?.as_str().map(str::to_owned))
 }
 
@@ -283,10 +283,7 @@ impl Operation for PeopleGet {
                 path: row.path,
                 person_id: Some(input.person_id),
                 user_id: Some(person.user_id.clone()),
-                props: row
-                    .props
-                    .and_then(|text| serde_json::from_str(&text).ok())
-                    .unwrap_or_default(),
+                props: props_of(row.props),
                 source: row.source,
             })
             .collect();

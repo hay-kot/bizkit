@@ -43,6 +43,17 @@ enum DevCommand {
         /// The email to sign in as
         email: String,
     },
+    /// Serve the demo product site, tracked with the demo workspace's
+    /// website snippet, until interrupted
+    #[cfg(feature = "analytics")]
+    DemoSite {
+        /// The address to listen on
+        #[arg(long)]
+        listen: std::net::SocketAddr,
+        /// Where browsers reach bizkit's public routes, such as the dev UI
+        #[arg(long)]
+        snippet_base: Url,
+    },
 }
 
 pub(crate) fn run(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result<()> {
@@ -87,6 +98,24 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
             let link =
                 bizkit_core::dev::login_link(&db, &base_url, email, SystemClock.now()).await?;
             writeln!(out, "{link}")?;
+        }
+        #[cfg(feature = "analytics")]
+        DevCommand::DemoSite { listen, snippet_base } => {
+            let key = bizkit_analytics::demo_site_key(&db).await?.context(
+                "the demo workspace has no website site; run `bizkit dev seed-demo` first",
+            )?;
+            db.close().await;
+            let tag = bizkit_analytics::demo_site::snippet_tag(snippet_base, &key);
+            let listener = tokio::net::TcpListener::bind(listen)
+                .await
+                .with_context(|| format!("binding {listen}"))?;
+            let bound = listener.local_addr().context("reading the bound address")?;
+            writeln!(out, "serving the demo site on http://{bound}")?;
+            out.flush()?;
+            bizkit_analytics::demo_site::serve(listener, &tag, super::serve::wait_for_signal())
+                .await
+                .context("serving the demo site")?;
+            return Ok(());
         }
     }
     db.close().await;
@@ -164,7 +193,117 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "analytics", feature = "test-hooks"))]
+    #[cfg(feature = "analytics")]
+    #[tokio::test]
+    async fn demo_site_needs_the_demo_seed() {
+        let dir = tempfile::tempdir().unwrap();
+        let args = Args {
+            command: DevCommand::DemoSite {
+                listen: "127.0.0.1:0".parse().unwrap(),
+                snippet_base: Url::parse("http://localhost:5173").unwrap(),
+            },
+            data_dir: Some(dir.path().to_path_buf()),
+        };
+        let mut out = Vec::new();
+        let err = dev(&args, &Context::default(), &mut out).await.unwrap_err();
+        assert!(format!("{err:#}").contains("run `bizkit dev seed-demo` first"), "{err:#}");
+        assert_eq!(out, b"", "nothing is printed");
+    }
+
+    /// Hands each write to the test while `dev` keeps running.
+    #[cfg(feature = "analytics")]
+    struct Sender(tokio::sync::mpsc::UnboundedSender<Vec<u8>>);
+
+    #[cfg(feature = "analytics")]
+    impl Write for Sender {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.send(buf.to_vec()).map_err(std::io::Error::other)?;
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "analytics")]
+    #[tokio::test]
+    async fn demo_site_serves_pages_with_the_snippet() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let seed = Args { command: DevCommand::SeedDemo, data_dir: Some(data_dir.clone()) };
+        dev(&seed, &Context::default(), &mut Vec::new()).await.unwrap();
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let args = Args {
+            command: DevCommand::DemoSite {
+                listen: "127.0.0.1:0".parse().unwrap(),
+                snippet_base: Url::parse("http://localhost:5173").unwrap(),
+            },
+            data_dir: Some(data_dir),
+        };
+        let server = tokio::spawn(async move {
+            dev(&args, &Context::default(), &mut Sender(tx)).await.unwrap();
+        });
+        let mut line = Vec::new();
+        while !line.ends_with(b"\n") {
+            line.extend(rx.recv().await.unwrap());
+        }
+        let line = String::from_utf8(line).unwrap();
+        let addr = line
+            .strip_prefix("serving the demo site on http://")
+            .and_then(|rest| rest.strip_suffix('\n'))
+            .unwrap_or_else(|| panic!("output: {line:?}"))
+            .to_owned();
+        let page = tokio::task::spawn_blocking(move || {
+            use std::io::Read as _;
+            let mut stream = std::net::TcpStream::connect(addr).unwrap();
+            stream
+                .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            let mut page = String::new();
+            stream.read_to_string(&mut page).unwrap();
+            page
+        })
+        .await
+        .unwrap();
+        server.abort();
+        assert!(page.starts_with("HTTP/1.1 200"), "{page}");
+        assert!(
+            page.contains(r#"<script defer src="http://localhost:5173/m/analytics/public/s/"#),
+            "{page}"
+        );
+    }
+
+    /// The website site takes the demo site's host and key, and its file
+    /// has onboarding events, none in the future.
+    #[cfg(feature = "analytics")]
+    async fn demo_site_is_ready(data_dir: &std::path::Path) {
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let (project, hostnames): (bizkit_core::ids::ProjectId, String) = sqlx::query_as(
+            "SELECT s.project_id, s.hostnames FROM analytics_sites s
+             JOIN projects p ON p.id = s.project_id WHERE p.slug = 'website'",
+        )
+        .fetch_one(db.read())
+        .await
+        .unwrap();
+        assert!(hostnames.contains("\"localhost\""), "{hostnames}");
+        assert!(bizkit_analytics::demo_site_key(&db).await.unwrap().is_some());
+        db.close().await;
+        let file = bizkit_analytics::testing::project_pool(data_dir, project).await.unwrap();
+        let (onboarded, latest): (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*) FILTER (WHERE name = 'report_viewed'), MAX(ts) FROM analytics_events",
+        )
+        .fetch_one(&file)
+        .await
+        .unwrap();
+        file.close().await;
+        assert!(onboarded > 0, "some people finish onboarding");
+        let now = SystemClock.now().0;
+        assert!(latest <= now, "no event after the seed ran: {latest} > {now}");
+    }
+
+    #[cfg(feature = "analytics")]
     #[tokio::test]
     async fn seed_demo_fills_analytics_once() {
         let dir = tempfile::tempdir().unwrap();
@@ -212,7 +351,7 @@ mod tests {
         let first = counts().await;
         assert_eq!(
             first[..4],
-            [2, 2, 1, 28],
+            [2, 2, 2, 28],
             "sites, goals, funnels, days summed over two sites: {first:?}"
         );
         assert!(
@@ -221,6 +360,7 @@ mod tests {
         );
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         assert_eq!(counts().await, first, "a second run changes nothing");
+        demo_site_is_ready(&data_dir).await;
 
         // The move to project files dropped the events and reset the day
         // markers but kept the sites; a run after it refills the files.

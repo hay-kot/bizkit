@@ -10,6 +10,7 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'medium',
 })
+const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' })
 const relativeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['second', 60],
@@ -62,6 +63,24 @@ export function isPast(value: string): boolean {
 /** `Nov 22, 2026, 8:04:12 PM`, for a hover title next to a relative time. */
 export function formatDateTime(value: string | null | undefined, fallback = '—'): string {
   return value ? dateTimeFormat.format(new Date(value)) : fallback
+}
+
+const dayTimeFormat = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+/**
+ * `8:04 PM` when `value` is on the same local day as `start`, else
+ * `Nov 25, 8:04 PM`, for a list of times that follow `start`.
+ */
+export function formatTimeAfter(value: string, start: string): string {
+  const at = new Date(value)
+  return at.toDateString() === new Date(start).toDateString()
+    ? timeFormat.format(at)
+    : dayTimeFormat.format(at)
 }
 
 /**
