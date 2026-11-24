@@ -78,11 +78,15 @@ pub(crate) struct Suppress<'a> {
 }
 
 /// Adds the address to the list; true when it wasn't there (or a complaint
-/// replaced a weaker reason). A complaint also unsubscribes every contact
+/// replaced a weaker reason). An erased address is left out: its hash
+/// already blocks it, and a row would store it in plain text again. A complaint also unsubscribes every contact
 /// row with the address in the workspace: a spam report withdraws consent.
 /// A bounce doesn't, since the address may work again.
 pub(crate) async fn suppress(tx: &mut WriteTx, entry: Suppress<'_>) -> anyhow::Result<bool> {
     let email = entry.email.to_lowercase();
+    if erased(&mut **tx, entry.workspace_id, &email).await.context("checking for an erasure")? {
+        return Ok(false);
+    }
     let row = SuppressionRow {
         workspace_id: entry.workspace_id,
         email: email.clone(),

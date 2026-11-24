@@ -29,6 +29,7 @@ use crate::send::{self, FanOut, StartBroadcast};
 use crate::store::{
     self, BroadcastRow, ContactFilter, ContactRow, DeliveryFilter, DeliveryRow, ListRow,
 };
+use crate::suppress;
 
 pub(crate) const READ: Access = Access::Workspace(Scope::new("mailing", Level::Read));
 pub(crate) const WRITE: Access = Access::Workspace(Scope::new("mailing", Level::Write));
@@ -1285,7 +1286,7 @@ impl Operation for BroadcastsTest {
     // Only to members, so the endpoint can't mail anyone.
     const SUMMARY: &'static str = "Send a broadcast once to a workspace member";
     const SUCCESS: Success = Success::Created;
-    const ERRORS: &'static [StatusCode] = &[StatusCode::TOO_MANY_REQUESTS];
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT, StatusCode::TOO_MANY_REQUESTS];
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: TestBroadcast) -> Result<MailDelivery, ApiError> {
@@ -1295,6 +1296,9 @@ impl Operation for BroadcastsTest {
         let broadcast = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
         if !bizkit_core::members::is_member_email(&mut *tx, input.workspace_id, &to).await? {
             return Err(field_error("to", "must be the address of a workspace member"));
+        }
+        if suppress::erased(&mut *tx, input.workspace_id, &to).await? {
+            return Err(ApiError::Conflict(ERASED.to_owned()));
         }
         let hour_ago = cx.now().minus(Duration::from_hours(1));
         if store::tests_since(&mut *tx, input.workspace_id, hour_ago).await? >= TESTS_PER_HOUR {

@@ -335,12 +335,29 @@ mod privacy {
             .await
             .expect(StatusCode::CREATED);
         let token = s.manage_token("fay@example.com");
+        // The breaker copies provider text, which can quote the recipient.
+        let mut write = s.app.app().platform().db().write().await.unwrap();
+        sqlx::query(
+            "UPDATE mailing_broadcasts SET pause_reason = '550 <Fay@example.com>: unknown'",
+        )
+        .execute(&mut *write)
+        .await
+        .unwrap();
+        write.commit().await.unwrap();
+        let db = s.app.app().platform().db().read();
 
         let erased = s.erase("Fay@example.com").await;
         assert_eq!(erased["contacts"], 2, "contacts");
         assert!(erased["deliveries"].as_u64().unwrap() >= 2, "deliveries: {erased}");
         assert_eq!(erased["suppression"], true, "suppression");
         assert_eq!(s.plaintext_rows("fay@example.com").await, 0, "no plaintext left");
+        let quoted: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM mailing_broadcasts WHERE lower(pause_reason) LIKE '%fay@example.com%'",
+        )
+        .fetch_one(db)
+        .await
+        .unwrap();
+        assert_eq!(quoted, 0, "pause reasons redacted");
         assert_eq!(s.export("fay@example.com").await["erased"], true, "export says erased");
         s.manage_get(&token).await.expect(StatusCode::NOT_FOUND);
 
@@ -362,6 +379,19 @@ mod privacy {
             .await
             .expect(StatusCode::CONFLICT);
         assert_eq!(s.plaintext_rows("fay@example.com").await, 0, "still no plaintext");
+
+        // A member's address can't get a test send after an erase either.
+        let member_email = s.team.accounts["member"].email.clone();
+        let draft = json!({"list_id": id(&news), "subject": "Draft", "body_md": "Hi"});
+        let broadcast: Value = s
+            .member
+            .post(&format!("{}/broadcasts", s.ws()), &draft)
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        s.erase(&member_email).await;
+        let test_path = format!("{}/broadcasts/{}/test", s.ws(), id(&broadcast));
+        s.member.post(&test_path, &json!({"to": member_email})).await.expect(StatusCode::CONFLICT);
 
         let again = s.erase("fay@example.com").await;
         assert_eq!(

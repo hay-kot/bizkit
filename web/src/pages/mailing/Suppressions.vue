@@ -102,9 +102,10 @@ async function onAddress() {
     if (done) addressMode.value = null
     return
   }
-  // The confirm opens beneath an open dialog, so the form closes first.
+  // The confirm opens beneath an open dialog, so the form closes first and
+  // comes back with the address when the admin cancels or the erase fails.
   addressMode.value = null
-  await runAction({
+  const result = await runAction({
     confirm: {
       title: `Erase ${email}?`,
       message:
@@ -117,6 +118,10 @@ async function onAddress() {
     run: () => erase.mutateAsync({ path: { workspace_id: props.workspaceId }, body: { email } }),
     success: (r) => `Erased ${email}: ${r.contacts} contacts, ${r.deliveries} mails`,
   })
+  if (!result) {
+    address.value = email
+    addressMode.value = 'erase'
+  }
 }
 
 function onRemove(row: Suppression) {

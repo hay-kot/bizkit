@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_broadcasts SET pause_reason = ?3\n         WHERE workspace_id = ?1 AND instr(lower(pause_reason), ?2) > 0",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "9c7d7273e964ee671b75f2c3f01a57fa3b46c375e5f58a8f2067764fbdd4185d"
+}

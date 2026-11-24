@@ -141,7 +141,9 @@ async fn seed_privacy(
     now: UnixMillis,
 ) -> anyhow::Result<()> {
     let existing =
-        store::list_lists(&mut **tx, newsletter.workspace_id, Some(newsletter.project_id)).await?;
+        store::list_lists(&mut **tx, newsletter.workspace_id, Some(newsletter.project_id))
+            .await
+            .context("loading the project's lists")?;
     if !existing.iter().any(|list| list.name == UPDATES) {
         let list = ListRow {
             id: ListId::new(),
@@ -152,7 +154,7 @@ async fn seed_privacy(
             updated_at: days_ago(now, 20),
             ..newsletter.clone()
         };
-        store::insert_list(&mut **tx, &list).await?;
+        store::insert_list(&mut **tx, &list).await.context("inserting the updates list")?;
         for (email, name) in UPDATES_CONTACTS {
             let arrived = days_ago(now, 20);
             let contact = ContactRow {
@@ -172,7 +174,9 @@ async fn seed_privacy(
                 created_at: arrived,
                 updated_at: arrived,
             };
-            store::insert_contact(&mut **tx, &contact).await?;
+            store::insert_contact(&mut **tx, &contact)
+                .await
+                .context("inserting an updates contact")?;
         }
     }
     privacy::erase(tx, newsletter.workspace_id, ERASED, days_ago(now, 1)).await?;

@@ -6404,6 +6404,10 @@ export type MailingBroadcastsTestErrors = {
      */
     404: ErrorBody;
     /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
      * Unprocessable Entity
      */
     422: ErrorBody;

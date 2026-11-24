@@ -449,6 +449,8 @@ impl JobHandler<Send> for SendHandler {
                 return Ok(());
             }
         }
+        // An erase that commits after this check still lets this one mail
+        // out: jobs hold no transaction across the send, by design.
         if let Some(reason) = suppressed(platform, &delivery).await? {
             DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
             delivery.error = Some(reason);
@@ -497,8 +499,10 @@ impl JobHandler<Send> for SendHandler {
                 delivery.error = Some(error.clone());
                 mark_counting(platform, &delivery, failure).await?;
                 // The job error lands in core's jobs table, which an erase
-                // can't reach, so it names the delivery, not the address.
-                anyhow::bail!("sending delivery {} failed: {error}", delivery.id)
+                // can't reach. Provider text can quote the recipient, so it
+                // stays on the delivery row, and the job error names only
+                // the delivery.
+                anyhow::bail!("sending delivery {} failed; its row holds the error", delivery.id)
             }
         }
     }

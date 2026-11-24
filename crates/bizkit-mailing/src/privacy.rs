@@ -23,6 +23,9 @@ use crate::store;
 use crate::suppress::{self, erasure_hash};
 use crate::suppression_ops::suppression_to_api;
 
+/// The pause reason that replaces one quoting an erased address.
+const REDACTED_PAUSE: &str = "Deliveries failed in a row; the last error named an erased address.";
+
 pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(AddressesExport)?;
     cx.op(AddressesErase)?;
@@ -117,6 +120,9 @@ pub(crate) async fn erase(
     let suppression = store::delete_suppression(&mut **tx, workspace_id, email)
         .await
         .context("deleting the address's suppression")?;
+    store::redact_pause_reasons(&mut **tx, workspace_id, email, REDACTED_PAUSE)
+        .await
+        .context("redacting pause reasons")?;
     store::insert_erasure(&mut **tx, workspace_id, &erasure_hash(workspace_id, email), now)
         .await
         .context("recording the erasure")?;

@@ -1419,6 +1419,27 @@ pub(crate) async fn delete_address_contacts(
     Ok(result.rows_affected())
 }
 
+/// Replaces every broadcast pause reason that quotes `email`. The breaker
+/// copies the last provider error there, and SMTP replies can name the
+/// recipient. Returns how many changed.
+pub(crate) async fn redact_pause_reasons(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+    replacement: &str,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query!(
+        "UPDATE mailing_broadcasts SET pause_reason = ?3
+         WHERE workspace_id = ?1 AND instr(lower(pause_reason), ?2) > 0",
+        workspace_id,
+        email,
+        replacement,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 /// The contact a manage link names, in any workspace. The link's signature
 /// is the secret; the ID alone grants nothing.
 pub(crate) async fn find_contact_any(

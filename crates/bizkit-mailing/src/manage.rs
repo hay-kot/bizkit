@@ -46,7 +46,7 @@ pub(crate) async fn link_key(
     {
         return Ok(key);
     }
-    let mut tx = platform.db().write().await?;
+    let mut tx = platform.db().write().await.context("opening a write for the link key")?;
     store::insert_link_key(&mut *tx, workspace_id, &random_token(), platform.now())
         .await
         .context("creating the link key")?;
@@ -54,7 +54,7 @@ pub(crate) async fn link_key(
         .await
         .context("loading the link key")?
         .context("the link key is missing after its insert")?;
-    tx.commit().await?;
+    tx.commit().await.context("saving the link key")?;
     Ok(key)
 }
 
