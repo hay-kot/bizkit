@@ -6,7 +6,7 @@ use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
 
-use crate::api::{BroadcastId, ContactId, DeliveryId, EnrollmentId, ListId, StepId};
+use crate::api::{BroadcastId, ContactId, DeliveryId, EnrollmentId, ListId, SequenceId, StepId};
 
 /// A `mailing_lists` row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +79,75 @@ pub(crate) struct DeliveryRow {
     pub(crate) sent_at: Option<UnixMillis>,
 }
 
+/// A `mailing_sequences` row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SequenceRow {
+    pub(crate) id: SequenceId,
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) list_id: ListId,
+    pub(crate) name: String,
+    pub(crate) trigger: String,
+    pub(crate) enabled: bool,
+    pub(crate) created_at: UnixMillis,
+    pub(crate) updated_at: UnixMillis,
+}
+
+/// A `mailing_steps` row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StepRow {
+    pub(crate) id: StepId,
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) sequence_id: SequenceId,
+    pub(crate) position: i64,
+    pub(crate) delay_hours: i64,
+    pub(crate) subject: String,
+    pub(crate) body_md: String,
+}
+
+/// A `mailing_enrollments` row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EnrollmentRow {
+    pub(crate) id: EnrollmentId,
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) sequence_id: SequenceId,
+    pub(crate) contact_id: ContactId,
+    pub(crate) status: String,
+    pub(crate) next_run_at: Option<UnixMillis>,
+    pub(crate) created_at: UnixMillis,
+    pub(crate) updated_at: UnixMillis,
+}
+
+/// An enrollment with its contact's address and the steps it reached, for
+/// the enrollment list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EnrollmentView {
+    pub(crate) id: EnrollmentId,
+    pub(crate) sequence_id: SequenceId,
+    pub(crate) contact_id: ContactId,
+    pub(crate) email: String,
+    pub(crate) status: String,
+    pub(crate) steps_done: i64,
+    pub(crate) next_run_at: Option<UnixMillis>,
+    pub(crate) created_at: UnixMillis,
+    pub(crate) updated_at: UnixMillis,
+}
+
+/// The filters of the enrollment list.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct EnrollmentFilter<'a> {
+    pub(crate) status: Option<&'a str>,
+    pub(crate) before: Option<EnrollmentId>,
+}
+
+/// Enrollments of a sequence by stored status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EnrollmentCounts {
+    pub(crate) active: i64,
+    pub(crate) completed: i64,
+    pub(crate) exited: i64,
+    pub(crate) unsubscribed: i64,
+}
+
 /// Contacts of a list by stored status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Counts {
@@ -101,6 +170,7 @@ pub(crate) struct ContactFilter<'a> {
 pub(crate) struct DeliveryFilter<'a> {
     pub(crate) broadcast_id: Option<BroadcastId>,
     pub(crate) contact_id: Option<ContactId>,
+    pub(crate) sequence_id: Option<SequenceId>,
     pub(crate) status: Option<&'a str>,
     pub(crate) before: Option<DeliveryId>,
 }
@@ -723,12 +793,15 @@ pub(crate) async fn list_deliveries(
              AND (?3 IS NULL OR contact_id = ?3)
              AND (?4 IS NULL OR status = ?4)
              AND (?5 IS NULL OR id < ?5)
-           ORDER BY id DESC LIMIT ?6"#,
+             AND (?6 IS NULL OR enrollment_id IN
+                   (SELECT id FROM mailing_enrollments WHERE workspace_id = ?1 AND sequence_id = ?6))
+           ORDER BY id DESC LIMIT ?7"#,
         workspace_id,
         filter.broadcast_id,
         filter.contact_id,
         filter.status,
         filter.before,
+        filter.sequence_id,
         limit,
     )
     .fetch_all(exec)
@@ -848,4 +921,442 @@ pub(crate) async fn requeue_failed(
     )
     .fetch_all(exec)
     .await
+}
+
+// ---------------------------------------------------------------- sequences
+
+pub(crate) async fn insert_sequence(
+    exec: impl SqliteExecutor<'_>,
+    row: &SequenceRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO mailing_sequences (id, workspace_id, list_id, name, trigger, enabled,
+                                        created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        row.id,
+        row.workspace_id,
+        row.list_id,
+        row.name,
+        row.trigger,
+        row.enabled,
+        row.created_at,
+        row.updated_at,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Writes every changeable column of `row`, matched by workspace and ID.
+pub(crate) async fn update_sequence(
+    exec: impl SqliteExecutor<'_>,
+    row: &SequenceRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_sequences SET name = ?, trigger = ?, enabled = ?, updated_at = ?
+         WHERE workspace_id = ? AND id = ?",
+        row.name,
+        row.trigger,
+        row.enabled,
+        row.updated_at,
+        row.workspace_id,
+        row.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn find_sequence(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: SequenceId,
+) -> sqlx::Result<Option<SequenceRow>> {
+    sqlx::query_as!(
+        SequenceRow,
+        r#"SELECT id AS "id: SequenceId", workspace_id AS "workspace_id: WorkspaceId",
+                  list_id AS "list_id: ListId", name, trigger, enabled AS "enabled: bool",
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM mailing_sequences WHERE workspace_id = ? AND id = ?"#,
+        workspace_id,
+        id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// The workspace's sequences among `ids`.
+pub(crate) async fn find_sequences(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    ids: &[SequenceId],
+) -> sqlx::Result<Vec<(SequenceRow, ProjectId)>> {
+    let ids = json_text(&ids)?;
+    let rows = sqlx::query!(
+        r#"SELECT s.id AS "id: SequenceId", s.workspace_id AS "workspace_id: WorkspaceId",
+                  s.list_id AS "list_id: ListId", s.name, s.trigger, s.enabled AS "enabled: bool",
+                  s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis",
+                  l.project_id AS "project_id: ProjectId"
+           FROM mailing_sequences s
+           JOIN mailing_lists l ON l.id = s.list_id AND l.workspace_id = s.workspace_id
+           WHERE s.workspace_id = ? AND s.id IN (SELECT value FROM json_each(?))
+           ORDER BY s.name, s.id"#,
+        workspace_id,
+        ids,
+    )
+    .fetch_all(exec)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            let row = SequenceRow {
+                id: r.id,
+                workspace_id: r.workspace_id,
+                list_id: r.list_id,
+                name: r.name,
+                trigger: r.trigger,
+                enabled: r.enabled,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            };
+            (row, r.project_id)
+        })
+        .collect())
+}
+
+/// Sequences by name, only those of `project_id`'s lists or of `list_id`
+/// when given.
+pub(crate) async fn list_sequences(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    project_id: Option<ProjectId>,
+    list_id: Option<ListId>,
+) -> sqlx::Result<Vec<SequenceRow>> {
+    sqlx::query_as!(
+        SequenceRow,
+        r#"SELECT s.id AS "id: SequenceId", s.workspace_id AS "workspace_id: WorkspaceId",
+                  s.list_id AS "list_id: ListId", s.name, s.trigger, s.enabled AS "enabled: bool",
+                  s.created_at AS "created_at: UnixMillis", s.updated_at AS "updated_at: UnixMillis"
+           FROM mailing_sequences s
+           JOIN mailing_lists l ON l.id = s.list_id AND l.workspace_id = s.workspace_id
+           WHERE s.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)
+             AND (?3 IS NULL OR s.list_id = ?3)
+           ORDER BY s.name, s.id"#,
+        workspace_id,
+        project_id,
+        list_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// The list's enabled sequences that enroll new subscribers.
+pub(crate) async fn on_join_sequences(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    list_id: ListId,
+) -> sqlx::Result<Vec<SequenceRow>> {
+    sqlx::query_as!(
+        SequenceRow,
+        r#"SELECT id AS "id: SequenceId", workspace_id AS "workspace_id: WorkspaceId",
+                  list_id AS "list_id: ListId", name, trigger, enabled AS "enabled: bool",
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM mailing_sequences
+           WHERE workspace_id = ? AND list_id = ? AND trigger = 'on_join' AND enabled = 1
+           ORDER BY id"#,
+        workspace_id,
+        list_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+pub(crate) async fn delete_sequence(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: SequenceId,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "DELETE FROM mailing_sequences WHERE workspace_id = ? AND id = ?",
+        workspace_id,
+        id
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+// ---------------------------------------------------------------- steps
+
+/// The sequence's steps in order.
+pub(crate) async fn list_steps(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    sequence_id: SequenceId,
+) -> sqlx::Result<Vec<StepRow>> {
+    sqlx::query_as!(
+        StepRow,
+        r#"SELECT id AS "id: StepId", workspace_id AS "workspace_id: WorkspaceId",
+                  sequence_id AS "sequence_id: SequenceId", position, delay_hours, subject, body_md
+           FROM mailing_steps WHERE workspace_id = ? AND sequence_id = ?
+           ORDER BY position"#,
+        workspace_id,
+        sequence_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+pub(crate) async fn find_step(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: StepId,
+) -> sqlx::Result<Option<StepRow>> {
+    sqlx::query_as!(
+        StepRow,
+        r#"SELECT id AS "id: StepId", workspace_id AS "workspace_id: WorkspaceId",
+                  sequence_id AS "sequence_id: SequenceId", position, delay_hours, subject, body_md
+           FROM mailing_steps WHERE workspace_id = ? AND id = ?"#,
+        workspace_id,
+        id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// Replaces the sequence's steps with `steps`, in order. Rows whose ID is in
+/// `steps` are updated in place, so the deliveries that record which steps
+/// an enrollment reached keep pointing at them; the rest are deleted.
+pub(crate) async fn set_steps(
+    exec: &mut sqlx::SqliteConnection,
+    workspace_id: WorkspaceId,
+    sequence_id: SequenceId,
+    steps: &[StepRow],
+) -> sqlx::Result<()> {
+    let keep: Vec<StepId> = steps.iter().map(|step| step.id).collect();
+    let keep = json_text(&keep)?;
+    sqlx::query!(
+        "DELETE FROM mailing_steps
+         WHERE workspace_id = ? AND sequence_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
+        workspace_id,
+        sequence_id,
+        keep,
+    )
+    .execute(&mut *exec)
+    .await?;
+    // Positions are unique per sequence, so kept rows move out of the way
+    // before any takes its new place.
+    sqlx::query!(
+        "UPDATE mailing_steps SET position = -1 - position
+         WHERE workspace_id = ? AND sequence_id = ?",
+        workspace_id,
+        sequence_id,
+    )
+    .execute(&mut *exec)
+    .await?;
+    for step in steps {
+        sqlx::query!(
+            "INSERT INTO mailing_steps (id, workspace_id, sequence_id, position, delay_hours,
+                                        subject, body_md)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (id) DO UPDATE SET position = excluded.position,
+                 delay_hours = excluded.delay_hours, subject = excluded.subject,
+                 body_md = excluded.body_md
+             WHERE mailing_steps.workspace_id = excluded.workspace_id
+               AND mailing_steps.sequence_id = excluded.sequence_id",
+            step.id,
+            workspace_id,
+            sequence_id,
+            step.position,
+            step.delay_hours,
+            step.subject,
+            step.body_md,
+        )
+        .execute(&mut *exec)
+        .await?;
+    }
+    Ok(())
+}
+
+/// The lowest-position step of the sequence that has no delivery for the
+/// enrollment yet: the next one to send.
+pub(crate) async fn next_step(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    sequence_id: SequenceId,
+    enrollment_id: EnrollmentId,
+) -> sqlx::Result<Option<StepRow>> {
+    sqlx::query_as!(
+        StepRow,
+        r#"SELECT id AS "id: StepId", workspace_id AS "workspace_id: WorkspaceId",
+                  sequence_id AS "sequence_id: SequenceId", position, delay_hours, subject, body_md
+           FROM mailing_steps s
+           WHERE workspace_id = ?1 AND sequence_id = ?2
+             AND NOT EXISTS (SELECT 1 FROM mailing_deliveries d
+                             WHERE d.workspace_id = ?1 AND d.enrollment_id = ?3
+                               AND d.step_id = s.id)
+           ORDER BY position LIMIT 1"#,
+        workspace_id,
+        sequence_id,
+        enrollment_id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+// ---------------------------------------------------------------- enrollments
+
+/// Inserts `row` unless the contact is already enrolled in the sequence.
+/// True when it was inserted.
+pub(crate) async fn insert_enrollment(
+    exec: impl SqliteExecutor<'_>,
+    row: &EnrollmentRow,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "INSERT OR IGNORE INTO mailing_enrollments
+           (id, workspace_id, sequence_id, contact_id, status, next_run_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        row.id,
+        row.workspace_id,
+        row.sequence_id,
+        row.contact_id,
+        row.status,
+        row.next_run_at,
+        row.created_at,
+        row.updated_at,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Writes the status and schedule of `row`, matched by workspace and ID.
+pub(crate) async fn update_enrollment(
+    exec: impl SqliteExecutor<'_>,
+    row: &EnrollmentRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_enrollments SET status = ?, next_run_at = ?, updated_at = ?
+         WHERE workspace_id = ? AND id = ?",
+        row.status,
+        row.next_run_at,
+        row.updated_at,
+        row.workspace_id,
+        row.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn find_enrollment(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: EnrollmentId,
+) -> sqlx::Result<Option<EnrollmentRow>> {
+    sqlx::query_as!(
+        EnrollmentRow,
+        r#"SELECT id AS "id: EnrollmentId", workspace_id AS "workspace_id: WorkspaceId",
+                  sequence_id AS "sequence_id: SequenceId", contact_id AS "contact_id: ContactId",
+                  status, next_run_at AS "next_run_at: UnixMillis",
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM mailing_enrollments WHERE workspace_id = ? AND id = ?"#,
+        workspace_id,
+        id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+pub(crate) async fn find_enrollment_view(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: EnrollmentId,
+) -> sqlx::Result<Option<EnrollmentView>> {
+    sqlx::query_as!(
+        EnrollmentView,
+        r#"SELECT e.id AS "id: EnrollmentId", e.sequence_id AS "sequence_id: SequenceId",
+                  e.contact_id AS "contact_id: ContactId", c.email, e.status,
+                  (SELECT COUNT(*) FROM mailing_deliveries d
+                   WHERE d.workspace_id = e.workspace_id AND d.enrollment_id = e.id) AS "steps_done!: i64",
+                  e.next_run_at AS "next_run_at: UnixMillis",
+                  e.created_at AS "created_at: UnixMillis", e.updated_at AS "updated_at: UnixMillis"
+           FROM mailing_enrollments e
+           JOIN mailing_contacts c ON c.id = e.contact_id AND c.workspace_id = e.workspace_id
+           WHERE e.workspace_id = ? AND e.id = ?"#,
+        workspace_id,
+        id,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// Enrollments of a sequence newest first.
+pub(crate) async fn list_enrollments(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    sequence_id: SequenceId,
+    filter: &EnrollmentFilter<'_>,
+    limit: i64,
+) -> sqlx::Result<Vec<EnrollmentView>> {
+    sqlx::query_as!(
+        EnrollmentView,
+        r#"SELECT e.id AS "id: EnrollmentId", e.sequence_id AS "sequence_id: SequenceId",
+                  e.contact_id AS "contact_id: ContactId", c.email, e.status,
+                  (SELECT COUNT(*) FROM mailing_deliveries d
+                   WHERE d.workspace_id = e.workspace_id AND d.enrollment_id = e.id) AS "steps_done!: i64",
+                  e.next_run_at AS "next_run_at: UnixMillis",
+                  e.created_at AS "created_at: UnixMillis", e.updated_at AS "updated_at: UnixMillis"
+           FROM mailing_enrollments e
+           JOIN mailing_contacts c ON c.id = e.contact_id AND c.workspace_id = e.workspace_id
+           WHERE e.workspace_id = ?1 AND e.sequence_id = ?2
+             AND (?3 IS NULL OR e.status = ?3)
+             AND (?4 IS NULL OR e.id < ?4)
+           ORDER BY e.id DESC LIMIT ?5"#,
+        workspace_id,
+        sequence_id,
+        filter.status,
+        filter.before,
+        limit,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+pub(crate) async fn enrollment_counts(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    sequence_id: SequenceId,
+) -> sqlx::Result<EnrollmentCounts> {
+    sqlx::query_as!(
+        EnrollmentCounts,
+        r#"SELECT COALESCE(SUM(status = 'active'), 0) AS "active!: i64",
+                  COALESCE(SUM(status = 'completed'), 0) AS "completed!: i64",
+                  COALESCE(SUM(status = 'exited'), 0) AS "exited!: i64",
+                  COALESCE(SUM(status = 'unsubscribed'), 0) AS "unsubscribed!: i64"
+           FROM mailing_enrollments WHERE workspace_id = ? AND sequence_id = ?"#,
+        workspace_id,
+        sequence_id,
+    )
+    .fetch_one(exec)
+    .await
+}
+
+/// Ends the contact's active enrollments as `unsubscribed`.
+pub(crate) async fn unsubscribe_enrollments(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    contact_id: ContactId,
+    now: UnixMillis,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_enrollments SET status = 'unsubscribed', next_run_at = NULL, updated_at = ?
+         WHERE workspace_id = ? AND contact_id = ? AND status = 'active'",
+        now,
+        workspace_id,
+        contact_id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
 }

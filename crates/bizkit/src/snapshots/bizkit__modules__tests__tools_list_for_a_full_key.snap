@@ -3014,7 +3014,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": true
       },
-      "description": "List the send log of a broadcast or a contact, newest first",
+      "description": "List the send log of a broadcast, a contact or a sequence, newest first",
       "inputSchema": {
         "$defs": {
           "BroadcastId": {
@@ -3038,10 +3038,14 @@ expression: tools
               "skipped"
             ],
             "type": "string"
+          },
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
           }
         },
         "additionalProperties": false,
-        "description": "Which deliveries to list. Give exactly one of `broadcast_id` and\n`contact_id`.",
+        "description": "Which deliveries to list. Give exactly one of `broadcast_id`,\n`contact_id` and `sequence_id`.",
         "properties": {
           "before": {
             "oneOf": [
@@ -3085,6 +3089,17 @@ expression: tools
               "null"
             ]
           },
+          "sequence_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SequenceId",
+                "description": "A sequence's step deliveries."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "oneOf": [
               {
@@ -3100,6 +3115,153 @@ expression: tools
         "type": "object"
       },
       "name": "mailing_deliveries_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Enroll a subscribed contact in a sequence",
+      "inputSchema": {
+        "$defs": {
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A contact to enroll.",
+        "properties": {
+          "contact_id": {
+            "$ref": "#/$defs/ContactId",
+            "description": "A subscribed contact of the sequence's list."
+          },
+          "sequence_id": {
+            "$ref": "#/$defs/SequenceId",
+            "description": "The sequence."
+          }
+        },
+        "required": [
+          "sequence_id",
+          "contact_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_enrollments_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Take a contact out of a sequence; it gets no more steps",
+      "inputSchema": {
+        "$defs": {
+          "EnrollmentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An enrollment of a sequence.",
+        "properties": {
+          "enrollment_id": {
+            "$ref": "#/$defs/EnrollmentId",
+            "description": "The enrollment."
+          },
+          "sequence_id": {
+            "$ref": "#/$defs/SequenceId",
+            "description": "The sequence."
+          }
+        },
+        "required": [
+          "sequence_id",
+          "enrollment_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_enrollments_exit"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a sequence's enrollments, newest first",
+      "inputSchema": {
+        "$defs": {
+          "EnrollmentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "EnrollmentStatus": {
+            "description": "Where a contact's run through a sequence stands.",
+            "enum": [
+              "active",
+              "completed",
+              "exited",
+              "unsubscribed"
+            ],
+            "type": "string"
+          },
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which enrollments to list.",
+        "properties": {
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/EnrollmentId",
+                "description": "Only enrollments older than this one, for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sequence_id": {
+            "$ref": "#/$defs/SequenceId",
+            "description": "The sequence."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/EnrollmentStatus",
+                "description": "Only enrollments with this status."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sequence_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_enrollments_list"
     },
     {
       "annotations": {
@@ -3381,6 +3543,320 @@ expression: tools
         "type": "object"
       },
       "name": "mailing_preview"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create an email sequence for a list",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SequenceTrigger": {
+            "description": "What enrolls contacts in a sequence.",
+            "enum": [
+              "on_join",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "StepId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "StepInput": {
+            "additionalProperties": false,
+            "description": "A step of a sequence being saved.",
+            "properties": {
+              "body_md": {
+                "description": "The body in Markdown.",
+                "type": "string"
+              },
+              "delay_hours": {
+                "description": "Hours to wait after enrolling (first step) or after the step before,\n0 to 8760.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/StepId",
+                    "description": "The step's ID, to keep an existing step; absent adds a new one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subject": {
+                "description": "The subject line.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "delay_hours",
+              "subject"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new sequence.",
+        "properties": {
+          "enabled": {
+            "description": "Whether new contacts enroll. Default true.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list whose contacts it mails."
+          },
+          "name": {
+            "description": "The name, for the team.",
+            "type": "string"
+          },
+          "steps": {
+            "description": "The steps in order.",
+            "items": {
+              "$ref": "#/$defs/StepInput"
+            },
+            "type": "array"
+          },
+          "trigger": {
+            "$ref": "#/$defs/SequenceTrigger",
+            "description": "What enrolls contacts."
+          }
+        },
+        "required": [
+          "list_id",
+          "name",
+          "trigger"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_sequences_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a sequence with its steps and enrollments; sent mail stays in the log",
+      "inputSchema": {
+        "$defs": {
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A sequence of a workspace.",
+        "properties": {
+          "sequence_id": {
+            "$ref": "#/$defs/SequenceId",
+            "description": "The sequence."
+          }
+        },
+        "required": [
+          "sequence_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_sequences_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a sequence with its steps and enrollment counts",
+      "inputSchema": {
+        "$defs": {
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A sequence of a workspace.",
+        "properties": {
+          "sequence_id": {
+            "$ref": "#/$defs/SequenceId",
+            "description": "The sequence."
+          }
+        },
+        "required": [
+          "sequence_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_sequences_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List email sequences with their steps",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which sequences to list.",
+        "properties": {
+          "list_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ListId",
+                "description": "Only sequences of this list."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProjectId",
+                "description": "Only sequences of this project's lists."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "mailing_sequences_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a sequence and its steps",
+      "inputSchema": {
+        "$defs": {
+          "SequenceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SequenceTrigger": {
+            "description": "What enrolls contacts in a sequence.",
+            "enum": [
+              "on_join",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "StepId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "StepInput": {
+            "additionalProperties": false,
+            "description": "A step of a sequence being saved.",
+            "properties": {
+              "body_md": {
+                "description": "The body in Markdown.",
+                "type": "string"
+              },
+              "delay_hours": {
+                "description": "Hours to wait after enrolling (first step) or after the step before,\n0 to 8760.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/StepId",
+                    "description": "The step's ID, to keep an existing step; absent adds a new one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subject": {
+                "description": "The subject line.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "delay_hours",
+              "subject"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a sequence. Absent fields stay as they are.",
+        "properties": {
+          "enabled": {
+            "description": "Whether new contacts enroll. Running enrollments go on either way.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sequence_id": {
+            "$ref": "#/$defs/SequenceId",
+            "description": "The sequence."
+          },
+          "steps": {
+            "description": "Replaces the steps. Steps sent the ID they have keep it; steps left\nout are deleted; steps without an ID are added.",
+            "items": {
+              "$ref": "#/$defs/StepInput"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "trigger": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SequenceTrigger",
+                "description": "What enrolls contacts from now on."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sequence_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_sequences_update"
     },
     {
       "annotations": {

@@ -4,12 +4,15 @@
 pub mod api;
 mod capture;
 pub mod contacts;
+pub mod hooks;
 mod ops;
 mod public;
 mod render;
 #[cfg(feature = "test-hooks")]
 mod seed;
 pub mod send;
+mod sequence_ops;
+mod sequences;
 mod store;
 
 #[cfg(feature = "test-hooks")]
@@ -21,6 +24,7 @@ use futures::future::BoxFuture;
 use utoipa::OpenApi as _;
 
 pub use crate::ops::TESTS_PER_HOUR;
+pub use crate::sequence_ops::{MAX_DELAY_HOURS, MAX_STEPS};
 
 /// The mailing module.
 #[derive(Debug, Clone, Copy, Default)]
@@ -36,8 +40,11 @@ impl Module for Mailing {
     }
 
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
+        cx.hook_target_kind(&hooks::SEQUENCE, hooks::SequenceTargets)?;
+        cx.sync_hook(hooks::STEP_CONDITION)?;
         ops::register(cx)?;
         cx.job::<send::Send, _>(send::SendHandler)?;
+        cx.job::<sequences::Advance, _>(sequences::AdvanceHandler)?;
         cx.job::<send::FanOut, _>(send::FanOutHandler)?;
         cx.subscribe::<ContactCaptured, _>(capture::CaptureSubscriber)?;
         cx.public_routes(public::router(), public::PublicDocs::openapi())

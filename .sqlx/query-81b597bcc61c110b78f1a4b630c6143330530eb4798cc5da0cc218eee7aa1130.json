@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.id AS \"id: SequenceId\", s.workspace_id AS \"workspace_id: WorkspaceId\",\n                  s.list_id AS \"list_id: ListId\", s.name, s.trigger, s.enabled AS \"enabled: bool\",\n                  s.created_at AS \"created_at: UnixMillis\", s.updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_sequences s\n           JOIN mailing_lists l ON l.id = s.list_id AND l.workspace_id = s.workspace_id\n           WHERE s.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)\n             AND (?3 IS NULL OR s.list_id = ?3)\n           ORDER BY s.name, s.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: SequenceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "list_id: ListId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "list_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "trigger",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "trigger"
+          }
+        }
+      },
+      {
+        "name": "enabled: bool",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_sequences",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "81b597bcc61c110b78f1a4b630c6143330530eb4798cc5da0cc218eee7aa1130"
+}

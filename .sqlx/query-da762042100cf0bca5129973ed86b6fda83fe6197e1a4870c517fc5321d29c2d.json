@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mailing_steps (id, workspace_id, sequence_id, position, delay_hours,\n                                        subject, body_md)\n             VALUES (?, ?, ?, ?, ?, ?, ?)\n             ON CONFLICT (id) DO UPDATE SET position = excluded.position,\n                 delay_hours = excluded.delay_hours, subject = excluded.subject,\n                 body_md = excluded.body_md\n             WHERE mailing_steps.workspace_id = excluded.workspace_id\n               AND mailing_steps.sequence_id = excluded.sequence_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "da762042100cf0bca5129973ed86b6fda83fe6197e1a4870c517fc5321d29c2d"
+}

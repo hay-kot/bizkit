@@ -10,8 +10,8 @@ use bizkit_core::db::WriteTx;
 use bizkit_core::time::UnixMillis;
 
 use crate::api::{ContactId, ContactStatus, DeliveryKind};
-use crate::send;
 use crate::store::{self, ContactRow, ListRow};
+use crate::{send, sequences};
 
 /// Confirm mails a list sends per hour. Past it, new addresses stay pending
 /// without mail, so a script posting addresses to a public form can't turn
@@ -99,6 +99,9 @@ pub(crate) async fn subscribe(
             updated_at: now,
         };
         store::insert_contact(&mut **tx, &contact).await.context("inserting the contact")?;
+        if !confirms {
+            sequences::enroll_on_join(platform, tx, &contact).await?;
+        }
         if confirms && send_confirm(platform, tx, list, &contact).await? {
             contact.confirm_sent_at = Some(now);
             store::update_contact(&mut **tx, &contact)
@@ -165,12 +168,14 @@ pub(crate) enum LinkOutcome {
     Invalid,
 }
 
-/// Subscribes the pending contact a confirm link names.
+/// Subscribes the pending contact a confirm link names and enrolls it in the
+/// list's `on_join` sequences.
 pub(crate) async fn confirm(
+    platform: &Platform,
     tx: &mut WriteTx,
     token: &str,
-    now: UnixMillis,
 ) -> anyhow::Result<LinkOutcome> {
+    let now = platform.now();
     let Some(mut contact) =
         store::find_by_confirm_token(&mut **tx, token).await.context("looking up the token")?
     else {
@@ -194,6 +199,7 @@ pub(crate) async fn confirm(
     contact.subscribed_at = Some(now);
     contact.updated_at = now;
     store::update_contact(&mut **tx, &contact).await.context("subscribing the contact")?;
+    sequences::enroll_on_join(platform, tx, &contact).await?;
     Ok(LinkOutcome::Done(list.name))
 }
 
@@ -245,7 +251,8 @@ pub(crate) async fn unsubscribe_by_token(
     Ok(LinkOutcome::Done(list.name))
 }
 
-/// Marks `contact` unsubscribed. Final: nothing subscribes it again.
+/// Marks `contact` unsubscribed and ends its active sequence runs. Final:
+/// nothing subscribes it again.
 pub(crate) async fn unsubscribe(
     tx: &mut WriteTx,
     contact: &mut ContactRow,
@@ -257,5 +264,8 @@ pub(crate) async fn unsubscribe(
     ContactStatus::Unsubscribed.as_str().clone_into(&mut contact.status);
     contact.unsubscribed_at = Some(now);
     contact.updated_at = now;
-    store::update_contact(&mut **tx, contact).await.context("unsubscribing the contact")
+    store::update_contact(&mut **tx, contact).await.context("unsubscribing the contact")?;
+    store::unsubscribe_enrollments(&mut **tx, contact.workspace_id, contact.id, now)
+        .await
+        .context("ending the contact's sequences")
 }

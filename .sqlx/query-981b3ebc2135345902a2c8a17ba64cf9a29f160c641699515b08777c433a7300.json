@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM mailing_steps\n         WHERE workspace_id = ? AND sequence_id = ? AND id NOT IN (SELECT value FROM json_each(?))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "981b3ebc2135345902a2c8a17ba64cf9a29f160c641699515b08777c433a7300"
+}

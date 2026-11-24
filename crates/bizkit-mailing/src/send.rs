@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::{
     BroadcastId, BroadcastStatus, ContactStatus, DeliveryId, DeliveryKind, DeliveryStatus,
+    EnrollmentStatus,
 };
 use crate::public;
 use crate::render::{self, Frame, Merge, Rendered};
@@ -114,16 +115,67 @@ pub(crate) fn render_broadcast(
     contact: Option<&ContactRow>,
     to_email: &str,
 ) -> anyhow::Result<(Rendered, Option<url::Url>)> {
+    let body = Body { subject: &broadcast.subject, md: &broadcast.body_md };
+    render_to(platform, list, body, contact, to_email)
+}
+
+/// A mail's source text.
+#[derive(Debug, Clone, Copy)]
+struct Body<'a> {
+    subject: &'a str,
+    md: &'a str,
+}
+
+/// Renders a list mail to one recipient, with their unsubscribe link when
+/// they are a contact.
+fn render_to(
+    platform: &Platform,
+    list: &ListRow,
+    body: Body<'_>,
+    contact: Option<&ContactRow>,
+    to_email: &str,
+) -> anyhow::Result<(Rendered, Option<url::Url>)> {
     let unsubscribe =
         contact.map(|c| public::unsubscribe_url(platform, &c.unsubscribe_token)).transpose()?;
     let merge = Merge { name: contact.and_then(|c| c.name.as_deref()), email: to_email };
-    let mail = render::render(
-        &frame(list, unsubscribe.as_ref()),
-        &broadcast.subject,
-        &broadcast.body_md,
-        &merge,
-    );
+    let mail = render::render(&frame(list, unsubscribe.as_ref()), body.subject, body.md, &merge);
     Ok((mail, unsubscribe))
+}
+
+/// A step delivery at send time: skipped once the contact left the
+/// sequence or the step was deleted.
+async fn prepare_step(
+    platform: &Platform,
+    list: &ListRow,
+    delivery: &DeliveryRow,
+    contact: &ContactRow,
+) -> anyhow::Result<Prepared> {
+    let db = platform.db().read();
+    let Some(enrollment_id) = delivery.enrollment_id else {
+        return Ok(Prepared::Skip("the sequence was deleted"));
+    };
+    let enrollment = store::find_enrollment(db, delivery.workspace_id, enrollment_id)
+        .await
+        .context("loading the enrollment")?;
+    let left = enrollment.as_ref().is_none_or(|e| {
+        e.status == EnrollmentStatus::Exited.as_str()
+            || e.status == EnrollmentStatus::Unsubscribed.as_str()
+    });
+    if left {
+        return Ok(Prepared::Skip("the contact left the sequence"));
+    }
+    let step = match delivery.step_id {
+        Some(id) => {
+            store::find_step(db, delivery.workspace_id, id).await.context("loading the step")?
+        }
+        None => None,
+    };
+    let Some(step) = step else {
+        return Ok(Prepared::Skip("the step was deleted"));
+    };
+    let body = Body { subject: &step.subject, md: &step.body_md };
+    let (mail, unsubscribe) = render_to(platform, list, body, Some(contact), &delivery.to_email)?;
+    Ok(Prepared::Mail(to_mail(&delivery.to_email, mail, unsubscribe)))
 }
 
 /// What a delivery turns into at send time.
@@ -177,7 +229,13 @@ async fn prepare(
                 render_broadcast(platform, list, &broadcast, contact.as_ref(), &delivery.to_email)?;
             Ok(Prepared::Mail(to_mail(&delivery.to_email, mail, unsubscribe)))
         }
-        DeliveryKind::Step => Ok(Prepared::Skip("the step was deleted")),
+        DeliveryKind::Step => {
+            let Some(contact) = contact.filter(|_| status == Some(ContactStatus::Subscribed))
+            else {
+                return Ok(Prepared::Skip("the contact is not subscribed"));
+            };
+            prepare_step(platform, list, delivery, &contact).await
+        }
     }
 }
 

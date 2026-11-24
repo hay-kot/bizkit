@@ -233,7 +233,7 @@ async fn confirm_post(
 ) -> Response {
     let result = async {
         let mut tx = platform.db().write().await?;
-        let outcome = contacts::confirm(&mut tx, &token.t, platform.now()).await?;
+        let outcome = contacts::confirm(&platform, &mut tx, &token.t).await?;
         tx.commit().await?;
         anyhow::Ok(outcome)
     }

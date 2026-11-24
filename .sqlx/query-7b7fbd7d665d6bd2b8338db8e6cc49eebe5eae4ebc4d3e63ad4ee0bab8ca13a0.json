@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mailing_sequences (id, workspace_id, list_id, name, trigger, enabled,\n                                        created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "7b7fbd7d665d6bd2b8338db8e6cc49eebe5eae4ebc4d3e63ad4ee0bab8ca13a0"
+}

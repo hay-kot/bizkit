@@ -309,6 +309,10 @@ pub struct MailDelivery {
     pub contact_id: Option<ContactId>,
     /// The broadcast, for broadcast and test sends.
     pub broadcast_id: Option<BroadcastId>,
+    /// The enrollment, for sequence steps.
+    pub enrollment_id: Option<EnrollmentId>,
+    /// The sequence step, unless it was deleted.
+    pub step_id: Option<StepId>,
     /// The recipient.
     pub to_email: String,
     /// The subject line.
@@ -361,4 +365,164 @@ pub struct MailingForm {
 pub struct MailingFormList {
     /// Sorted by name. Empty when the forms module isn't installed.
     pub items: Vec<MailingForm>,
+}
+
+/// What enrolls contacts in a sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SequenceTrigger {
+    /// Contacts who become subscribed to the list after the sequence exists.
+    OnJoin,
+    /// Only `mailing.enrollments.create`.
+    Manual,
+}
+
+impl SequenceTrigger {
+    /// The stored text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::OnJoin => "on_join",
+            Self::Manual => "manual",
+        }
+    }
+
+    /// Parses the stored text.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "on_join" => Some(Self::OnJoin),
+            "manual" => Some(Self::Manual),
+            _ => None,
+        }
+    }
+}
+
+/// One mail of a sequence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SequenceStep {
+    /// The step ID. Edits keep it, so a contact never gets a step twice.
+    pub id: StepId,
+    /// Its place in the sequence, from 0.
+    pub position: u32,
+    /// Hours to wait after enrolling (first step) or after the step before.
+    pub delay_hours: u32,
+    /// The subject line.
+    pub subject: String,
+    /// The body in Markdown. `{{ name }}` and `{{ email }}` are filled in.
+    pub body_md: String,
+}
+
+/// Enrollments of a sequence by status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+pub struct EnrollmentCounts {
+    /// Still getting steps.
+    pub active: u64,
+    /// Got every step.
+    pub completed: u64,
+    /// Taken out of the sequence by the team.
+    pub exited: u64,
+    /// Left the list.
+    pub unsubscribed: u64,
+}
+
+/// Timed mails that each enrolled contact of a list gets in order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Sequence {
+    /// The sequence ID.
+    pub id: SequenceId,
+    /// The list whose contacts it mails.
+    pub list_id: ListId,
+    /// The name, for the team.
+    pub name: String,
+    /// What enrolls contacts.
+    pub trigger: SequenceTrigger,
+    /// Whether new contacts enroll. Running enrollments go on either way.
+    pub enabled: bool,
+    /// The steps in order.
+    pub steps: Vec<SequenceStep>,
+    /// Enrollments by status; only when getting one sequence.
+    pub enrollments: Option<EnrollmentCounts>,
+    /// When it was created.
+    pub created_at: UnixMillis,
+    /// When it last changed.
+    pub updated_at: UnixMillis,
+}
+
+/// Sequences of a workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SequenceList {
+    /// Sorted by name.
+    pub items: Vec<Sequence>,
+}
+
+/// Where a contact's run through a sequence stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EnrollmentStatus {
+    /// Waiting for the next step.
+    Active,
+    /// Every step was sent or skipped.
+    Completed,
+    /// Taken out by the team; gets no more steps.
+    Exited,
+    /// The contact unsubscribed; gets no more steps.
+    Unsubscribed,
+}
+
+impl EnrollmentStatus {
+    /// The stored text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Completed => "completed",
+            Self::Exited => "exited",
+            Self::Unsubscribed => "unsubscribed",
+        }
+    }
+
+    /// Parses the stored text.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "active" => Some(Self::Active),
+            "completed" => Some(Self::Completed),
+            "exited" => Some(Self::Exited),
+            "unsubscribed" => Some(Self::Unsubscribed),
+            _ => None,
+        }
+    }
+}
+
+/// One contact's run through a sequence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Enrollment {
+    /// The enrollment ID.
+    pub id: EnrollmentId,
+    /// The sequence.
+    pub sequence_id: SequenceId,
+    /// The contact.
+    pub contact_id: ContactId,
+    /// The contact's address.
+    pub email: String,
+    /// Where it stands.
+    pub status: EnrollmentStatus,
+    /// Steps sent or skipped so far.
+    pub steps_done: u32,
+    /// When the next step is due, while active.
+    pub next_run_at: Option<UnixMillis>,
+    /// When the contact enrolled.
+    pub created_at: UnixMillis,
+    /// When it last changed.
+    pub updated_at: UnixMillis,
+}
+
+/// A page of enrollments, newest first.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EnrollmentPage {
+    /// The enrollments.
+    pub items: Vec<Enrollment>,
+    /// Pass as `before` for the next page; absent on the last one.
+    pub next_before: Option<EnrollmentId>,
 }

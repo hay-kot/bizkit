@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO mailing_enrollments\n           (id, workspace_id, sequence_id, contact_id, status, next_run_at, created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "046f22e447471ee92c9917e5723510963d9d8affc45c2ef1e4a2d0eea8581ca4"
+}
