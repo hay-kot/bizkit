@@ -13,7 +13,9 @@ categories.workspace = true
 publish.workspace = true
 
 [features]
-default = ["forms", "webhooks", "extensions", "analytics", "mailing", "signing"]
+# Signing stays out of default builds until signers can place fields on
+# the pages; build with `--features signing` to work on it.
+default = ["forms", "webhooks", "extensions", "analytics", "mailing"]
 # Feature modules. Each one compiles a module in.
 forms = ["dep:bizkit-forms"]
 extensions = ["dep:bizkit-extensions"]
