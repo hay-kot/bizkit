@@ -24,6 +24,8 @@ base64.workspace = true
 bytes.workspace = true
 futures.workspace = true
 globset.workspace = true
+hex.workspace = true
+hmac.workspace = true
 http.workspace = true
 lettre.workspace = true
 rand.workspace = true
@@ -48,6 +50,7 @@ uuid.workspace = true
 insta.workspace = true
 proptest.workspace = true
 tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

@@ -246,6 +246,7 @@ fn to_mail(to: &str, mail: Rendered, unsubscribe: Option<url::Url>) -> Mail {
         text: mail.text,
         html: Some(mail.html),
         unsubscribe,
+        id: None,
     }
 }
 
@@ -295,7 +296,7 @@ impl JobHandler<Send> for SendHandler {
             mark(platform, &delivery).await?;
         }
         match platform.deps().mailer.send(&mail).await {
-            Ok(()) => {
+            Ok(_) => {
                 DeliveryStatus::Sent.as_str().clone_into(&mut delivery.status);
                 delivery.error = None;
                 delivery.sent_at = Some(platform.now());

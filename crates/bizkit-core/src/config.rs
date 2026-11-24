@@ -46,6 +46,21 @@ pub struct MailConfig {
     pub smtp_url: Option<Url>,
     /// The name of the environment variable that holds the SMTP password.
     pub smtp_password_env: Option<String>,
+    /// Which service sends mail. Default `smtp`.
+    pub provider: MailProvider,
+    /// The most mails sent per second across the whole process, 1 to 1000.
+    /// Unset means no cap.
+    pub rate_per_second: Option<u32>,
+    /// Mailgun settings, required with `provider: mailgun`.
+    pub mailgun: Option<MailgunConfig>,
+    /// The name of the environment variable that holds the Mailgun webhook
+    /// signing key. Set it with any provider, so SMTP relayed through
+    /// Mailgun gets bounce and complaint events too.
+    pub webhook_signing_key_env: Option<String>,
+    /// The webhook signing key itself, read from `webhook_signing_key_env`
+    /// by `serve`. Never read from the file.
+    #[serde(skip)]
+    pub webhook_signing_key: Option<String>,
 }
 
 impl Default for MailConfig {
@@ -54,8 +69,48 @@ impl Default for MailConfig {
             from: "bizkit <noreply@localhost>".to_owned(),
             smtp_url: None,
             smtp_password_env: None,
+            provider: MailProvider::default(),
+            rate_per_second: None,
+            mailgun: None,
+            webhook_signing_key_env: None,
+            webhook_signing_key: None,
         }
     }
+}
+
+/// The service that sends mail.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailProvider {
+    /// SMTP through `smtp_url`, or the log without it.
+    #[default]
+    Smtp,
+    /// Mailgun's HTTP API, with the `mailgun` section.
+    Mailgun,
+}
+
+/// Mailgun's HTTP API settings.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MailgunConfig {
+    /// The sending domain, such as `mg.example.com`.
+    pub domain: String,
+    /// The region the domain lives in. Default `us`.
+    #[serde(default)]
+    pub region: MailgunRegion,
+    /// The name of the environment variable that holds the API key.
+    pub api_key_env: String,
+}
+
+/// The Mailgun region, which picks the API host.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailgunRegion {
+    /// `api.mailgun.net`.
+    #[default]
+    Us,
+    /// `api.eu.mailgun.net`.
+    Eu,
 }
 
 /// Sign-in settings.
@@ -133,6 +188,7 @@ impl Config {
         if let Some(smtp_url) = &self.mail.smtp_url {
             check_smtp_url(smtp_url, &mut errors);
         }
+        check_mail_provider(&self.mail, &mut errors);
         if self.auth.session_ttl_days == 0 {
             errors.push("auth.session_ttl_days must be at least 1".to_owned());
         }
@@ -166,6 +222,36 @@ fn check_smtp_url(smtp_url: &Url, errors: &mut Vec<String>) {
             }
         }
         other => errors.push(format!("mail.smtp_url scheme {other} must be smtp or smtps")),
+    }
+}
+
+fn check_mail_provider(mail: &MailConfig, errors: &mut Vec<String>) {
+    if let Some(rate) = mail.rate_per_second
+        && !(1..=1000).contains(&rate)
+    {
+        errors.push(format!("mail.rate_per_second {rate} must be 1 to 1000"));
+    }
+    match (mail.provider, &mail.mailgun) {
+        (MailProvider::Mailgun, None) => {
+            errors.push("mail.provider is mailgun but mail.mailgun is unset".to_owned());
+        }
+        (MailProvider::Mailgun, Some(mailgun)) => {
+            if mail.smtp_url.is_some() {
+                errors.push("mail.provider is mailgun, so mail.smtp_url must be unset".to_owned());
+            }
+            let domain_ok = !mailgun.domain.is_empty()
+                && mailgun
+                    .domain
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+            if !domain_ok {
+                errors.push(format!("mail.mailgun.domain {:?} is not a domain", mailgun.domain));
+            }
+        }
+        (MailProvider::Smtp, Some(_)) => {
+            errors.push("mail.mailgun is set but mail.provider is not mailgun".to_owned());
+        }
+        (MailProvider::Smtp, None) => {}
     }
 }
 
@@ -286,5 +372,41 @@ mod tests {
         let mut config = config(vec![policy("a", &["*"])]);
         config.base_url = Some("http://localhost:5173".parse().unwrap());
         assert!(config.validate().is_ok(), "loopback http");
+    }
+
+    #[test]
+    fn mailgun_needs_its_section_and_no_smtp_url() {
+        let mut config = config(vec![policy("a", &["*"])]);
+        config.mail.provider = MailProvider::Mailgun;
+        config.mail.rate_per_second = Some(0);
+        insta::assert_debug_snapshot!(config.validate().unwrap_err().0, @r#"
+        [
+            "mail.rate_per_second 0 must be 1 to 1000",
+            "mail.provider is mailgun but mail.mailgun is unset",
+        ]
+        "#);
+        config.mail.rate_per_second = Some(10);
+        config.mail.mailgun = Some(MailgunConfig {
+            domain: "mg.example.com".to_owned(),
+            region: MailgunRegion::Eu,
+            api_key_env: "MAILGUN_API_KEY".to_owned(),
+        });
+        assert!(config.validate().is_ok(), "complete mailgun config");
+        config.mail.smtp_url = Some("smtps://mail.example.com".parse().unwrap());
+        assert!(config.validate().is_err(), "mailgun with smtp_url");
+    }
+
+    #[test]
+    fn mailgun_section_parses_from_yaml_shape() {
+        let mail: MailConfig = serde_json::from_value(serde_json::json!({
+            "provider": "mailgun",
+            "rate_per_second": 5,
+            "mailgun": {"domain": "mg.example.com", "api_key_env": "K"},
+            "webhook_signing_key_env": "W",
+        }))
+        .unwrap();
+        assert_eq!(mail.provider, MailProvider::Mailgun, "provider");
+        assert_eq!(mail.mailgun.map(|m| m.region), Some(MailgunRegion::Us), "region default");
+        assert_eq!(mail.webhook_signing_key, None, "the key never comes from the file");
     }
 }

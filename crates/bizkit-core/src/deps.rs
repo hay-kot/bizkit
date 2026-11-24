@@ -3,9 +3,11 @@
 
 mod fs_blobs;
 mod log_mailer;
+mod mailgun_mailer;
 mod reqwest_http;
 mod smtp_mailer;
 mod system_clock;
+mod throttle;
 
 use std::fmt;
 use std::sync::Arc;
@@ -18,10 +20,12 @@ use url::Url;
 
 pub use self::fs_blobs::FsBlobs;
 pub use self::log_mailer::LogMailer;
+pub use self::mailgun_mailer::{MailgunMailer, verify_mailgun_signature};
 pub use self::reqwest_http::ReqwestHttp;
 pub use self::smtp_mailer::SmtpMailer;
 pub use self::system_clock::SystemClock;
-use crate::config::Config;
+pub use self::throttle::ThrottledMailer;
+use crate::config::{Config, MailProvider};
 use crate::time::UnixMillis;
 
 /// The platform's side effects.
@@ -42,20 +46,45 @@ impl Deps {
     ///
     /// # Errors
     ///
-    /// When `data_dir` is unset or the mailer or HTTP client can't be built.
+    /// When `data_dir` is unset, the mail provider settings don't fit
+    /// together, or the mailer or HTTP client can't be built.
     pub fn from_config(config: &Config) -> anyhow::Result<Self> {
         let data_dir = config.data_dir.as_deref().context("data_dir is not set")?;
-        let mailer: Arc<dyn Mailer> = match &config.mail.smtp_url {
-            Some(url) => Arc::new(SmtpMailer::new(url, &config.mail)?),
-            None => Arc::new(LogMailer::new(&config.mail.from)),
-        };
+        let http: Arc<dyn HttpClient> = Arc::new(ReqwestHttp::new()?);
+        let mailer = mailer(config, &http)?;
         Ok(Self {
             clock: Arc::new(SystemClock),
             mailer,
-            http: Arc::new(ReqwestHttp::new()?),
+            http,
             blobs: Arc::new(FsBlobs::new(data_dir.join("blobs"))),
         })
     }
+}
+
+/// Runs after the command-line overrides, so it sees the final `smtp_url`.
+fn mailer(config: &Config, http: &Arc<dyn HttpClient>) -> anyhow::Result<Arc<dyn Mailer>> {
+    let mail = &config.mail;
+    let mailer: Arc<dyn Mailer> = match mail.provider {
+        MailProvider::Smtp => match &mail.smtp_url {
+            Some(url) => Arc::new(SmtpMailer::new(url, mail)?),
+            None => Arc::new(LogMailer::new(&mail.from)),
+        },
+        MailProvider::Mailgun => {
+            anyhow::ensure!(
+                mail.smtp_url.is_none(),
+                "mail.provider is mailgun, so mail.smtp_url (or --smtp-url) must be unset"
+            );
+            let mailgun = mail
+                .mailgun
+                .as_ref()
+                .context("mail.provider is mailgun but mail.mailgun is unset")?;
+            Arc::new(MailgunMailer::new(Arc::clone(http), mailgun, &mail.from)?)
+        }
+    };
+    Ok(match mail.rate_per_second {
+        Some(rate) => Arc::new(ThrottledMailer::new(mailer, rate)),
+        None => mailer,
+    })
 }
 
 /// The current time.
@@ -80,13 +109,46 @@ pub struct Mail {
     /// with `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058).
     #[serde(default)]
     pub unsubscribe: Option<Url>,
+    /// The local part of the `Message-ID`; the mailer adds `@<from domain>`.
+    /// Providers also get it as metadata (Mailgun `v:bizkit_id`), so their
+    /// events find the mail again. `None` lets the mailer pick an ID.
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+/// Why a mail wasn't sent.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum MailError {
+    /// Sending this mail again won't help: an SMTP 5xx other than 530 and
+    /// 535, a Mailgun 400 or 413, or a recipient that doesn't parse.
+    #[error("permanent: {0}")]
+    Permanent(String),
+    /// Sending again later may work: an SMTP 4xx, 530 or 535 (credentials),
+    /// a network error, or a Mailgun 401, 403, 404, 429 or 5xx.
+    #[error("{0}")]
+    Transient(String),
+}
+
+impl MailError {
+    /// Whether sending the mail again can't help.
+    #[must_use]
+    pub const fn is_permanent(&self) -> bool {
+        matches!(self, Self::Permanent(_))
+    }
 }
 
 /// Sends mail.
 #[async_trait]
 pub trait Mailer: Send + Sync + fmt::Debug {
-    /// Delivers `mail` or returns why it couldn't.
-    async fn send(&self, mail: &Mail) -> anyhow::Result<()>;
+    /// Delivers `mail`. Returns the provider's message ID (Mailgun's `id`) or
+    /// the `Message-ID` the mailer set, without angle brackets, or `None`
+    /// when nothing was sent (the log mailer).
+    ///
+    /// # Errors
+    ///
+    /// [`MailError::Permanent`] when a retry can't succeed, else
+    /// [`MailError::Transient`].
+    async fn send(&self, mail: &Mail) -> Result<Option<String>, MailError>;
 }
 
 /// Sends outbound HTTP requests to user-supplied URLs. The production
@@ -158,6 +220,18 @@ pub trait BlobStore: Send + Sync + fmt::Debug {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mailgun_refuses_an_smtp_url_set_by_flag() {
+        let mut config = Config::default();
+        config.mail.provider = MailProvider::Mailgun;
+        let http: Arc<dyn HttpClient> = Arc::new(ReqwestHttp::new().unwrap());
+        let no_section = mailer(&config, &http).unwrap_err();
+        assert!(no_section.to_string().contains("mail.mailgun is unset"), "{no_section}");
+        config.mail.smtp_url = Some("smtp://127.0.0.1:1025".parse().unwrap());
+        let with_smtp = mailer(&config, &http).unwrap_err();
+        assert!(with_smtp.to_string().contains("smtp_url"), "{with_smtp}");
+    }
 
     #[test]
     fn blob_keys_reject_traversal() {

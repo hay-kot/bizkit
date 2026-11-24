@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bizkit_core::Platform;
-use bizkit_core::deps::{Blob, BlobKey, BlobStore, Clock, HttpClient, Mail, Mailer};
+use bizkit_core::deps::{Blob, BlobKey, BlobStore, Clock, HttpClient, Mail, MailError, Mailer};
 use bizkit_core::hooks::{HookPoint, HookRunner, HookTarget, SyncOutcome};
 use bizkit_core::time::UnixMillis;
 use bytes::Bytes;
@@ -54,6 +54,7 @@ impl Clock for FakeClock {
 pub struct FakeMailer {
     sent: Arc<Mutex<Vec<Mail>>>,
     fail_next: Arc<AtomicU32>,
+    fail_next_permanent: Arc<AtomicU32>,
 }
 
 impl FakeMailer {
@@ -75,24 +76,33 @@ impl FakeMailer {
         lock(&self.sent).iter().rev().find(|mail| mail.to == email).cloned()
     }
 
-    /// Makes the next `n` sends fail.
+    /// Makes the next `n` sends fail with a transient error.
     pub fn fail_next(&self, n: u32) {
         self.fail_next.store(n, Ordering::SeqCst);
     }
+
+    /// Makes the next `n` sends fail with a permanent error. They count
+    /// before any [`Self::fail_next`] failures.
+    pub fn fail_next_permanent(&self, n: u32) {
+        self.fail_next_permanent.store(n, Ordering::SeqCst);
+    }
+}
+
+fn take_one(counter: &AtomicU32) -> bool {
+    counter.try_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1)).is_ok()
 }
 
 #[async_trait]
 impl Mailer for FakeMailer {
-    async fn send(&self, mail: &Mail) -> anyhow::Result<()> {
-        let failing = self
-            .fail_next
-            .try_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
-            .is_ok();
-        if failing {
-            anyhow::bail!("fake mailer told to fail");
+    async fn send(&self, mail: &Mail) -> Result<Option<String>, MailError> {
+        if take_one(&self.fail_next_permanent) {
+            return Err(MailError::Permanent("550 fake mailer told to fail for good".to_owned()));
+        }
+        if take_one(&self.fail_next) {
+            return Err(MailError::Transient("451 fake mailer told to fail".to_owned()));
         }
         lock(&self.sent).push(mail.clone());
-        Ok(())
+        Ok(mail.id.as_ref().map(|id| format!("{id}@fake")))
     }
 }
 
@@ -211,10 +221,15 @@ mod tests {
             text: "t".to_owned(),
             html: None,
             unsubscribe: None,
+            id: None,
         };
-        assert!(mailer.send(&mail).await.is_err(), "first send fails");
-        assert!(mailer.send(&mail).await.is_ok(), "second send works");
-        assert_eq!(mailer.last_to("a@example.com"), Some(mail), "recorded");
+        mailer.fail_next_permanent(1);
+        assert!(mailer.send(&mail).await.unwrap_err().is_permanent(), "permanent first");
+        assert!(!mailer.send(&mail).await.unwrap_err().is_permanent(), "then transient");
+        assert_eq!(mailer.send(&mail).await, Ok(None), "then it works");
+        let with_id = Mail { id: Some("d1".to_owned()), ..mail.clone() };
+        assert_eq!(mailer.send(&with_id).await, Ok(Some("d1@fake".to_owned())), "provider id");
+        assert_eq!(mailer.last_to("a@example.com"), Some(with_id), "recorded");
     }
 
     #[tokio::test]

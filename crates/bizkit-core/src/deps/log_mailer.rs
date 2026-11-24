@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::{Mail, Mailer};
+use super::{Mail, MailError, Mailer};
 
 /// Writes mail to the log instead of sending it, for installs without SMTP.
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ impl LogMailer {
 
 #[async_trait]
 impl Mailer for LogMailer {
-    async fn send(&self, mail: &Mail) -> anyhow::Result<()> {
+    async fn send(&self, mail: &Mail) -> Result<Option<String>, MailError> {
         tracing::info!(
             from = %self.from,
             to = %mail.to,
@@ -27,6 +27,6 @@ impl Mailer for LogMailer {
             "mail (no smtp_url set, so it is logged instead of sent):\n{}",
             mail.text
         );
-        Ok(())
+        Ok(None)
     }
 }

@@ -128,6 +128,19 @@ mod jobs {
     }
 
     #[tokio::test]
+    async fn permanent_mail_failures_do_not_retry() {
+        let app = TestApp::new().await;
+        app.mail.fail_next_permanent(1);
+        app.client()
+            .post("/api/auth/sign-in", &serde_json::json!({ "email": "a@example.com" }))
+            .await
+            .expect(http::StatusCode::ACCEPTED);
+        let run = app.drain_jobs().await;
+        assert_eq!((run.done, run.retried), (1, 0), "dropped, not retried");
+        assert!(app.mail.last_to("a@example.com").is_none(), "nothing sent");
+    }
+
+    #[tokio::test]
     async fn enqueueing_an_unregistered_kind_fails() {
         let app = TestApp::new().await;
         let platform = app.app().platform();

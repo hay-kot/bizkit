@@ -41,6 +41,7 @@ pub fn mail(
         text,
         html: None,
         unsubscribe: None,
+        id: None,
     }
 }
 
