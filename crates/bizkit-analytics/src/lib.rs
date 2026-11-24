@@ -24,6 +24,8 @@ mod rollup;
 mod seed;
 #[cfg(feature = "test-hooks")]
 pub use crate::seed::demo_site_key;
+mod self_usage;
+pub use crate::self_usage::SelfUsageConfig;
 mod server;
 mod stats;
 mod store;
@@ -41,6 +43,7 @@ use anyhow::Context as _;
 use bizkit_core::DemoSeed;
 use bizkit_core::api::ProjectDeleted;
 use bizkit_core::jobs::{JobCtx, Subscriber};
+use bizkit_core::usage::UsageReported;
 use bizkit_core::{Lifecycle, Module, ModuleContext};
 use futures::future::BoxFuture;
 use serde::de::Error as _;
@@ -72,6 +75,13 @@ pub struct AnalyticsConfig {
     /// 100, 10 to 250. A crash loses at most this window of events.
     #[serde(default, deserialize_with = "flush_ms")]
     pub flush_ms: Option<u16>,
+    /// The project that gets bizkit's own usage: user IDs, event names
+    /// such as `api_key_created`, workspace IDs and the `workspaces` and
+    /// `api_keys` counts per user. No emails or names. Members of that
+    /// workspace can read it for every user of the instance. Unset sends
+    /// nothing.
+    #[serde(default)]
+    pub self_usage: Option<SelfUsageConfig>,
 }
 
 fn flush_ms<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u16>, D::Error> {
@@ -152,7 +162,7 @@ impl Module for Analytics {
         let sites = Arc::new(cache::Sites::default());
         let flush = Duration::from_millis(u64::from(flush_ms));
         let files = Arc::new(Files::new(Arc::clone(&sites), flush, self.limits));
-        let geo = geo::Geo::new(config.geoip_path);
+        let geo = geo::Geo::new(config.geoip_path.clone());
         let ingest = Arc::new(ingest::Ingest::new(geo, sites, Arc::clone(&files)));
         let retention_days = config
             .raw_retention_days
@@ -170,6 +180,9 @@ impl Module for Analytics {
         let source = hooks::GoalHookSource(Arc::clone(&files));
         cx.async_hook::<hooks::GoalConverted, _>(hooks::GOAL_CONVERTED, source)?;
         cx.subscribe::<ProjectDeleted, _>(DeleteProjectFile(Arc::clone(&files)))?;
+        let send_usage =
+            self_usage::SendUsage { config: config.self_usage, ingest: Arc::clone(&ingest) };
+        cx.subscribe::<UsageReported, _>(send_usage)?;
         cx.lifecycle(AnalyticsLifecycle(files))?;
         cx.public_routes(ingest::router(ingest), ingest::IngestDocs::openapi())
     }

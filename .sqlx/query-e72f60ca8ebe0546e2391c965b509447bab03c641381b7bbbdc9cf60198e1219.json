@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.project_id AS \"project_id: ProjectId\", s.workspace_id AS \"workspace_id: WorkspaceId\",\n                  s.site_key, s.hostnames, s.identity_mode, s.last_event_day, s.rolled_through,\n                  s.created_at AS \"created_at: UnixMillis\", s.updated_at AS \"updated_at: UnixMillis\"\n           FROM analytics_sites s\n           JOIN workspaces w ON w.id = s.workspace_id\n           JOIN projects p ON p.id = s.project_id AND p.workspace_id = s.workspace_id\n           WHERE w.slug = ? AND p.slug = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "site_key",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "site_key"
+          }
+        }
+      },
+      {
+        "name": "hostnames",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "hostnames"
+          }
+        }
+      },
+      {
+        "name": "identity_mode",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "identity_mode"
+          }
+        }
+      },
+      {
+        "name": "last_event_day",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "last_event_day"
+          }
+        }
+      },
+      {
+        "name": "rolled_through",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "rolled_through"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "e72f60ca8ebe0546e2391c965b509447bab03c641381b7bbbdc9cf60198e1219"
+}

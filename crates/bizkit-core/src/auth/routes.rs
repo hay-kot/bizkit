@@ -21,7 +21,7 @@ use crate::error::{ApiError, ErrorBody};
 use crate::jobs::{Enqueue, SendMail};
 use crate::ops::http::{MAX_BODY_BYTES, request_id};
 use crate::tenancy::{invitations, members, workspaces};
-use crate::usage::{UsageKind, UsageReported};
+use crate::usage::{self, UsageKind, UsageReported};
 use crate::validate::{FieldErrors, from_json};
 
 const LINK_TTL: Duration = Duration::from_mins(15);
@@ -210,8 +210,9 @@ async fn verify_inner(
         (user, UsageKind::SignedUp)
     };
     users::touch_sign_in(&mut *tx, user.id, now).await?;
-    let usage = UsageReported { user_id: user.id, kind, workspace_id: None };
-    platform.bus().publish(&mut tx, &usage).await?;
+    let usage =
+        UsageReported { user_id: user.id, kind, workspace_id: None, at: now, affected: Vec::new() };
+    usage::publish(platform.bus(), &mut tx, &usage).await?;
     let token = random_token();
     let session = sessions::NewSession {
         token_hash: &hash_token(&token),

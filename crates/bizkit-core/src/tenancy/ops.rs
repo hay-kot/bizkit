@@ -19,7 +19,7 @@ use crate::ops::{
     Access, Level, Method, NoContent, NoInput, OpCtx, Operation, Role, Scope, Success,
 };
 use crate::time::UnixMillis;
-use crate::usage::{self, UsageKind};
+use crate::usage::{self, Report, UsageKind};
 use crate::validate::{FieldErrors, Validate, check_name, check_slug};
 
 const WORKSPACE_READ: Access = Access::Workspace(Scope::new("workspace", Level::Read));
@@ -597,7 +597,7 @@ impl Operation for WorkspacesCreate {
                 other => other?,
             };
         members::insert(&mut *tx, workspace.id, user_id, Role::Admin, now).await?;
-        usage::report(&cx, &mut tx, UsageKind::WorkspaceCreated, Some(workspace.id)).await?;
+        usage::report(&cx, &mut tx, Report::new(UsageKind::WorkspaceCreated, workspace.id)).await?;
         tx.commit().await?;
         Ok(workspace.into())
     }
@@ -726,6 +726,9 @@ impl Operation for MembersRemove {
             .ok_or(ApiError::NotFound)?;
         guard_last_admin(&mut tx, input.workspace_id, &member).await?;
         members::remove(&mut *tx, input.workspace_id, input.user_id).await?;
+        let report = Report::new(UsageKind::MemberRemoved, input.workspace_id)
+            .affecting(Some(input.user_id));
+        usage::report(&cx, &mut tx, report).await?;
         tx.commit().await?;
         Ok(NoContent)
     }
@@ -823,7 +826,8 @@ impl Operation for InvitationsCreate {
             id: None,
         };
         cx.platform().bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
-        usage::report(&cx, &mut tx, UsageKind::InvitationSent, Some(input.workspace_id)).await?;
+        usage::report(&cx, &mut tx, Report::new(UsageKind::InvitationSent, input.workspace_id))
+            .await?;
         tx.commit().await?;
         Invitation::try_from(invitation).map_err(internal)
     }
@@ -927,14 +931,17 @@ impl Operation for InvitationsAccept {
         let invitation = my_open_invitation(&cx, &mut tx, input.invitation_id).await?;
         let invited_role = Role::parse(&invitation.role).map_err(internal)?;
         // Someone already in the workspace (a policy join, say) keeps their role.
-        members::insert(&mut *tx, invitation.workspace_id, user_id, invited_role, now).await?;
+        let joined =
+            members::insert(&mut *tx, invitation.workspace_id, user_id, invited_role, now).await?;
         invitations::mark_accepted(&mut *tx, invitation.id, now).await?;
         let role = members::role_of(&mut *tx, invitation.workspace_id, user_id)
             .await?
             .ok_or(ApiError::NotFound)?;
         let workspace =
             workspaces::find(&mut *tx, invitation.workspace_id).await?.ok_or(ApiError::NotFound)?;
-        usage::report(&cx, &mut tx, UsageKind::MemberJoined, Some(workspace.id)).await?;
+        if joined {
+            usage::report(&cx, &mut tx, Report::new(UsageKind::MemberJoined, workspace.id)).await?;
+        }
         tx.commit().await?;
         Ok(Membership { workspace: workspace.into(), role })
     }
@@ -1016,7 +1023,8 @@ impl Operation for ProjectsCreate {
         };
         let project = Project::from(row);
         cx.platform().bus().publish(&mut tx, &ProjectCreated { project: project.clone() }).await?;
-        usage::report(&cx, &mut tx, UsageKind::ProjectCreated, Some(project.workspace_id)).await?;
+        usage::report(&cx, &mut tx, Report::new(UsageKind::ProjectCreated, project.workspace_id))
+            .await?;
         tx.commit().await?;
         Ok(project)
     }

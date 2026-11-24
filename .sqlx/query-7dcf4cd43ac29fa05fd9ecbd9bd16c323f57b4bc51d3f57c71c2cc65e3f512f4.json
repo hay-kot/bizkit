@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) AS \"n!: i64\" FROM api_keys\n           WHERE created_by = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+  "query": "SELECT COUNT(*) AS \"n!: i64\" FROM api_keys\n           WHERE created_by = ? AND revoked_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -11,11 +11,11 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false
     ]
   },
-  "hash": "ed032eb19fd73b2152059f94e67aa8a6245493503a3dbc55f528dcdc5bb57c8f"
+  "hash": "7dcf4cd43ac29fa05fd9ecbd9bd16c323f57b4bc51d3f57c71c2cc65e3f512f4"
 }

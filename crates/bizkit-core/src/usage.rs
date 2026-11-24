@@ -11,7 +11,7 @@ use sqlx::SqlitePool;
 
 use crate::db::WriteTx;
 use crate::ids::{UserId, WorkspaceId};
-use crate::jobs::Event;
+use crate::jobs::{Bus, Event};
 use crate::ops::{OpCtx, Principal};
 use crate::time::UnixMillis;
 
@@ -31,6 +31,8 @@ pub enum UsageKind {
     InvitationSent,
     /// Joined a workspace by accepting an invitation.
     MemberJoined,
+    /// Removed someone from a workspace.
+    MemberRemoved,
     /// Created an API key.
     ApiKeyCreated,
     /// Revoked an API key.
@@ -48,6 +50,7 @@ impl UsageKind {
             Self::ProjectCreated => "project_created",
             Self::InvitationSent => "invitation_sent",
             Self::MemberJoined => "member_joined",
+            Self::MemberRemoved => "member_removed",
             Self::ApiKeyCreated => "api_key_created",
             Self::ApiKeyRevoked => "api_key_revoked",
         }
@@ -63,6 +66,12 @@ pub struct UsageReported {
     pub kind: UsageKind,
     /// The workspace they did it in, if any.
     pub workspace_id: Option<WorkspaceId>,
+    /// When they did it.
+    pub at: UnixMillis,
+    /// Other users whose traits the action changed, such as the creator of a
+    /// key someone else revoked. They get fresh traits, not the event.
+    #[serde(default)]
+    pub affected: Vec<UserId>,
 }
 
 impl Event for UsageReported {
@@ -74,7 +83,9 @@ impl Event for UsageReported {
 pub struct UsageTraits {
     /// Workspaces the user belongs to.
     pub workspaces: i64,
-    /// API keys the user created that still work.
+    /// API keys the user created and nobody revoked. Expired keys still
+    /// count: nothing reports when a key expires, so a count that drops on
+    /// expiry would go stale.
     pub api_keys: i64,
 }
 
@@ -84,7 +95,7 @@ pub struct UsageTraits {
 /// # Errors
 ///
 /// When a query fails.
-pub async fn traits(db: &SqlitePool, user: UserId, now: UnixMillis) -> anyhow::Result<UsageTraits> {
+pub async fn traits(db: &SqlitePool, user: UserId) -> anyhow::Result<UsageTraits> {
     let workspaces = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "n!: i64" FROM memberships WHERE user_id = ?"#,
         user,
@@ -94,9 +105,8 @@ pub async fn traits(db: &SqlitePool, user: UserId, now: UnixMillis) -> anyhow::R
     .context("counting a user's workspaces")?;
     let api_keys = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "n!: i64" FROM api_keys
-           WHERE created_by = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)"#,
+           WHERE created_by = ? AND revoked_at IS NULL"#,
         user,
-        now,
     )
     .fetch_one(db)
     .await
@@ -104,15 +114,45 @@ pub async fn traits(db: &SqlitePool, user: UserId, now: UnixMillis) -> anyhow::R
     Ok(UsageTraits { workspaces, api_keys })
 }
 
-/// Publishes a [`UsageReported`] in `tx`. Nothing for API keys and anonymous
-/// calls: they have no person to count the action for.
-pub(crate) async fn report(
-    cx: &OpCtx,
-    tx: &mut WriteTx,
+/// An operation's usage report, before [`report`] adds who and when.
+#[derive(Debug, Clone)]
+pub(crate) struct Report {
     kind: UsageKind,
-    workspace_id: Option<WorkspaceId>,
-) -> anyhow::Result<()> {
+    workspace_id: WorkspaceId,
+    affected: Option<UserId>,
+}
+
+impl Report {
+    pub(crate) const fn new(kind: UsageKind, workspace_id: WorkspaceId) -> Self {
+        Self { kind, workspace_id, affected: None }
+    }
+
+    /// Also refreshes `user`'s traits, when the action changed them.
+    pub(crate) const fn affecting(mut self, user: Option<UserId>) -> Self {
+        self.affected = user;
+        self
+    }
+}
+
+/// Publishes `report` in `tx` for the signed-in user. Nothing for API keys
+/// and anonymous calls: they have no person to count the action for.
+pub(crate) async fn report(cx: &OpCtx, tx: &mut WriteTx, report: Report) -> anyhow::Result<()> {
     let Some(Principal::User(user)) = cx.principal() else { return Ok(()) };
-    let event = UsageReported { user_id: user.user_id, kind, workspace_id };
-    cx.platform().bus().publish(tx, &event).await
+    let event = UsageReported {
+        user_id: user.user_id,
+        kind: report.kind,
+        workspace_id: Some(report.workspace_id),
+        at: cx.now(),
+        affected: report.affected.into_iter().filter(|id| *id != user.user_id).collect(),
+    };
+    publish(cx.platform().bus(), tx, &event).await
+}
+
+/// Publishes `event` in `tx`.
+pub(crate) async fn publish(
+    bus: &Bus,
+    tx: &mut WriteTx,
+    event: &UsageReported,
+) -> anyhow::Result<()> {
+    bus.publish(tx, event).await.with_context(|| format!("reporting {}", event.kind.event_name()))
 }

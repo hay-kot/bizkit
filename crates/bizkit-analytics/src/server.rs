@@ -4,11 +4,11 @@
 
 use std::sync::Arc;
 
-use bizkit_core::ApiError;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::ops::{Access, Level, Method, OpCtx, Operation, Scope};
 use bizkit_core::time::UnixMillis;
 use bizkit_core::validate::{FieldErrors, Validate};
+use bizkit_core::{ApiError, Platform};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -19,7 +19,7 @@ use crate::beacon::{self, Name};
 use crate::enrich::{self, Attribution, Who};
 use crate::files::Submit;
 use crate::ingest::Ingest;
-use crate::store;
+use crate::store::{self, SiteRow};
 use crate::write::{Incoming, Origin};
 
 /// The most events per call.
@@ -44,29 +44,46 @@ pub(crate) struct ServerEvent {
     /// A custom event name (1-64 letters, digits, or `_ . : -`),
     /// `pageview`, or `$identify` to record traits and link `anon_id` to
     /// `user_id`.
-    name: String,
+    pub(crate) name: String,
     /// Your ID for the user. Needed for `$identify`; one of `user_id` and
     /// `anon_id` is needed for every event.
     #[serde(default)]
-    user_id: Option<String>,
+    pub(crate) user_id: Option<String>,
     /// The anonymous ID the snippet stored, to link browser events.
     #[serde(default)]
-    anon_id: Option<String>,
+    pub(crate) anon_id: Option<String>,
     /// The page the event relates to; its path and UTM tags are kept.
     #[serde(default)]
-    url: Option<String>,
+    pub(crate) url: Option<String>,
     /// Event properties: at most 20, with string (256 characters), number
     /// or boolean values.
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
-    props: Option<Map<String, Value>>,
+    pub(crate) props: Option<Map<String, Value>>,
     /// User traits, for `$identify` only. Same limits as `props`.
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
-    traits: Option<Map<String, Value>>,
+    pub(crate) traits: Option<Map<String, Value>>,
 }
 
 impl ServerEvent {
+    /// An event bizkit itself sends for `user_id`.
+    pub(crate) fn from_server(
+        name: &str,
+        user_id: &str,
+        props: Option<Map<String, Value>>,
+        traits: Option<Map<String, Value>>,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            user_id: Some(user_id.to_owned()),
+            anon_id: None,
+            url: None,
+            props,
+            traits,
+        }
+    }
+
     fn check(&self, errors: &mut FieldErrors, at: usize) {
         let field = |name: &str| format!("events[{at}].{name}");
         let name = Name::parse(&self.name);
@@ -140,25 +157,41 @@ impl Operation for EventsIngest {
 
     async fn call(&self, cx: OpCtx, input: IngestEvents) -> Result<Ingested, ApiError> {
         let platform = cx.platform();
-        let db = platform.db();
-        let row = store::find_site(db.read(), input.workspace_id, input.project_id)
+        let row = store::find_site(platform.db().read(), input.workspace_id, input.project_id)
             .await?
             .ok_or(ApiError::NotFound)?;
-        let site =
-            self.0.sites.get(db, &row.site_key, platform.now()).await?.ok_or(ApiError::NotFound)?;
-        let received = platform.now();
-        let salt = self.0.salts.get(db, Day::of(received)).await?;
         let accepted = input.events.len();
-        let events: Vec<Incoming> = input
-            .events
-            .into_iter()
-            .map(|event| incoming(&salt, input.project_id, received, event))
-            .collect::<Result<_, _>>()?;
-        match self.0.files.submit(platform, site, events).await {
-            Ok(()) => Ok(Ingested { accepted }),
-            Err(Submit::Full) => Err(ApiError::RateLimited { retry_after_secs: 1 }),
-            Err(Submit::Failed(err)) => Err(ApiError::Internal(err)),
-        }
+        record(&self.0, platform, &row, platform.now(), input.events).await?;
+        Ok(Ingested { accepted })
+    }
+}
+
+/// Queues server events, received at `received`, for `row`'s project
+/// file. Invalid events fail the call rather than lose their props.
+pub(crate) async fn record(
+    ingest: &Ingest,
+    platform: &Platform,
+    row: &SiteRow,
+    received: UnixMillis,
+    events: Vec<ServerEvent>,
+) -> Result<(), ApiError> {
+    let mut errors = FieldErrors::default();
+    for (at, event) in events.iter().enumerate() {
+        event.check(&mut errors, at);
+    }
+    errors.into_result()?;
+    let db = platform.db();
+    let site =
+        ingest.sites.get(db, &row.site_key, platform.now()).await?.ok_or(ApiError::NotFound)?;
+    let salt = ingest.salts.get(db, Day::of(received)).await?;
+    let events: Vec<Incoming> = events
+        .into_iter()
+        .map(|event| incoming(&salt, row.project_id, received, event))
+        .collect::<Result<_, _>>()?;
+    match ingest.files.submit(platform, site, events).await {
+        Ok(()) => Ok(()),
+        Err(Submit::Full) => Err(ApiError::RateLimited { retry_after_secs: 1 }),
+        Err(Submit::Failed(err)) => Err(ApiError::Internal(err)),
     }
 }
 
