@@ -2,6 +2,8 @@
 
 use std::time::Duration;
 
+use anyhow::Context as _;
+
 use bizkit_core::DemoSeed;
 use bizkit_core::auth::random_token;
 use bizkit_core::db::{Db, WriteTx};
@@ -226,12 +228,16 @@ async fn seed_suppressions(
     suppress::suppress(tx, manual).await?;
 
     let Some(contact) =
-        store::find_contact_by_email(&mut **tx, list.workspace_id, list.id, BOUNCED).await?
+        store::find_contact_by_email(&mut **tx, list.workspace_id, list.id, BOUNCED)
+            .await
+            .context("finding the bounced contact")?
     else {
         return Ok(());
     };
     let filter = DeliveryFilter { contact_id: Some(contact.id), ..DeliveryFilter::default() };
-    let deliveries = store::list_deliveries(&mut **tx, list.workspace_id, &filter, 50).await?;
+    let deliveries = store::list_deliveries(&mut **tx, list.workspace_id, &filter, 50)
+        .await
+        .context("loading the contact's deliveries")?;
     let Some(delivery) = deliveries
         .into_iter()
         .find(|d| d.kind == DeliveryKind::Broadcast.as_str() && d.event.is_none())
@@ -246,7 +252,8 @@ async fn seed_suppressions(
         DeliveryEvent::Bounced.as_str(),
         at,
     )
-    .await?;
+    .await
+    .context("marking the bounce")?;
     let bounce = Suppress {
         workspace_id: list.workspace_id,
         email: BOUNCED,

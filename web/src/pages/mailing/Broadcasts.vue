@@ -113,11 +113,15 @@ async function onCreate() {
       <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
       <template #cell-recipients="{ row }"
         ><span class="text-sm tabular-nums">{{
-          row.status === 'draft' ? '—' : formatNumber(row.recipients)
+          row.status === 'draft' || row.status === 'scheduled' ? '—' : formatNumber(row.recipients)
         }}</span></template
       >
       <template #cell-sent="{ row }"
-        ><span class="text-sm whitespace-nowrap">{{ formatDateTime(row.sent_at) }}</span></template
+        ><span class="text-sm whitespace-nowrap">{{
+          row.status === 'scheduled'
+            ? `Scheduled for ${formatDateTime(row.send_at)}`
+            : formatDateTime(row.sent_at)
+        }}</span></template
       >
       <template #empty-action>
         <button type="button" class="btn btn-primary btn-sm" @click="openPanel">

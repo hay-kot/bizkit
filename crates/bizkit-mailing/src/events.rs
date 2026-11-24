@@ -85,16 +85,16 @@ enum MailEvent {
 
 fn classify(event_data: &Value) -> MailEvent {
     let field = |name: &str| event_data.get(name).and_then(Value::as_str);
-    match field("event") {
-        Some("complained") => MailEvent::Complained,
-        // Mailgun's own suppressions (`suppress-bounce` and the like) mean it
-        // refused to try the address at all.
-        Some("failed")
-            if field("severity") == Some("permanent")
-                || field("reason").is_some_and(|r| r.starts_with("suppress-")) =>
-        {
-            MailEvent::Bounced
+    match (field("event"), field("reason")) {
+        (Some("complained"), _) => MailEvent::Complained,
+        // Mailgun refused to try an address on its own suppression lists. A
+        // complaint or unsubscribe there withdrew consent, so it counts as a
+        // complaint here: final, and it unsubscribes the contact rows.
+        (Some("failed"), Some("suppress-complaint" | "suppress-unsubscribe")) => {
+            MailEvent::Complained
         }
+        (Some("failed"), Some("suppress-bounce")) => MailEvent::Bounced,
+        (Some("failed"), _) if field("severity") == Some("permanent") => MailEvent::Bounced,
         _ => MailEvent::Ignored,
     }
 }
@@ -134,7 +134,9 @@ pub(crate) async fn mailgun(Extension(platform): Extension<Platform>, body: Byte
             return plain(StatusCode::BAD_REQUEST, "Expected a Mailgun event.\n");
         }
     };
-    let Some(key) = platform.config().mail.webhook_signing_key.as_deref() else {
+    let key =
+        platform.config().mail.webhook_signing_key.as_deref().filter(|k| !k.trim().is_empty());
+    let Some(key) = key else {
         tracing::warn!("a Mailgun webhook arrived, but mail.webhook_signing_key_env is not set");
         return plain(StatusCode::UNAUTHORIZED, "No signing key is set.\n");
     };
@@ -175,7 +177,7 @@ async fn record(platform: &Platform, payload: &Payload, now: UnixMillis) -> anyh
         MailEvent::Bounced => (DeliveryEvent::Bounced, SuppressionReason::Bounce),
         MailEvent::Complained => (DeliveryEvent::Complained, SuppressionReason::Complaint),
         MailEvent::Ignored => {
-            tx.commit().await?;
+            tx.commit().await.context("recording the webhook token")?;
             return Ok(true);
         }
     };
@@ -195,7 +197,7 @@ async fn record(platform: &Platform, payload: &Payload, now: UnixMillis) -> anyh
         };
         suppress::suppress(&mut tx, entry).await?;
     }
-    tx.commit().await?;
+    tx.commit().await.context("recording the event")?;
     Ok(true)
 }
 
@@ -213,6 +215,14 @@ mod tests {
             (
                 json!({"event": "failed", "severity": "temporary", "reason": "suppress-bounce"}),
                 MailEvent::Bounced,
+            ),
+            (
+                json!({"event": "failed", "severity": "permanent", "reason": "suppress-complaint"}),
+                MailEvent::Complained,
+            ),
+            (
+                json!({"event": "failed", "severity": "permanent", "reason": "suppress-unsubscribe"}),
+                MailEvent::Complained,
             ),
             (json!({"event": "complained"}), MailEvent::Complained),
             (json!({"event": "delivered"}), MailEvent::Ignored),

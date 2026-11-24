@@ -86,7 +86,7 @@ pub(crate) async fn start(
     row.updated_at = now;
     store::update_broadcast(&mut **tx, row).await.context("starting the broadcast")?;
     let job = FanOut { workspace_id: row.workspace_id, broadcast_id: row.id };
-    platform.bus().enqueue(tx, &job, Enqueue::default()).await?;
+    platform.bus().enqueue(tx, &job, Enqueue::default()).await.context("queuing the fan-out")?;
     Ok(())
 }
 
@@ -414,10 +414,14 @@ impl JobHandler<Send> for SendHandler {
         };
         if paused(platform, &delivery).await? {
             let mut tx = platform.db().write().await?;
-            store::park_delivery(&mut *tx, delivery.workspace_id, delivery.id, platform.now())
-                .await
-                .context("parking the delivery")?;
-            return tx.commit().await;
+            let parked =
+                store::park_if_paused(&mut *tx, delivery.workspace_id, delivery.id, platform.now())
+                    .await
+                    .context("parking the delivery")?;
+            tx.commit().await?;
+            if parked {
+                return Ok(());
+            }
         }
         if let Some(reason) = suppressed(platform, &delivery).await? {
             DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);

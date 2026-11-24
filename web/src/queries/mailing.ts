@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@pinia/colada'
 import { useIntervalFn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
-import { toValue, watch } from 'vue'
+import { onScopeDispose, toValue, watch } from 'vue'
 
 import {
   mailingBroadcastsCancelMutation,
@@ -207,7 +207,14 @@ export function useBroadcasts(
 
 const SENDING_POLL_MS = 2_000
 
-/** A broadcast; while it is sending, it refetches every two seconds. */
+/** The longest delay `setTimeout` takes; longer ones fire at once. */
+const MAX_TIMEOUT_MS = 2_147_483_647
+
+/**
+ * A broadcast; while it is sending, it refetches every two seconds, and a
+ * scheduled one refetches once its `send_at` has passed, so an open page
+ * sees it start.
+ */
 export function useBroadcast(
   workspaceId: MaybeRefOrGetter<string>,
   broadcastId: MaybeRefOrGetter<string>,
@@ -231,6 +238,25 @@ export function useBroadcast(
     (sending) => (sending ? poll.resume() : poll.pause()),
     { immediate: true },
   )
+  let start: ReturnType<typeof setTimeout> | undefined
+  const clearStart = () => clearTimeout(start)
+  watch(
+    () => (query.data.value?.status === 'scheduled' ? query.data.value.send_at : null),
+    (sendAt) => {
+      clearStart()
+      if (!sendAt) return
+      // At least a poll interval, so a start job running late doesn't spin.
+      const wait = Math.max(Date.parse(sendAt) - Date.now() + 1_000, SENDING_POLL_MS)
+      start = setTimeout(
+        () => {
+          if (query.asyncStatus.value !== 'loading') void query.refetch()
+        },
+        Math.min(wait, MAX_TIMEOUT_MS),
+      )
+    },
+    { immediate: true },
+  )
+  onScopeDispose(clearStart)
   return query
 }
 

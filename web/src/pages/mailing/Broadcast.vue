@@ -194,7 +194,7 @@ const audience = computed(() => {
 const failed = computed(() => broadcast.value?.deliveries?.failed ?? 0)
 const recipientsText = computed(() => {
   const current = broadcast.value
-  if (!current || current.status === 'draft') return '—'
+  if (!current || current.status === 'draft' || current.status === 'scheduled') return '—'
   const total = formatNumber(current.recipients)
   return failed.value > 0 ? `${total}, ${formatNumber(failed.value)} failed` : total
 })

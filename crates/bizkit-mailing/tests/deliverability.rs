@@ -361,10 +361,12 @@ mod deliverability {
 
     #[tokio::test]
     async fn the_webhook_needs_a_signing_key() {
-        let s = setup_with(None).await;
-        s.webhook(s.now_secs(), "t", json!({"event": "delivered"}))
-            .await
-            .expect(StatusCode::UNAUTHORIZED);
+        for key in [None, Some(""), Some("  ")] {
+            let s = setup_with(key).await;
+            s.webhook(s.now_secs(), "t", json!({"event": "delivered"}))
+                .await
+                .expect(StatusCode::UNAUTHORIZED);
+        }
     }
 
     fn at(s: &Setup, ahead: Duration) -> Value {

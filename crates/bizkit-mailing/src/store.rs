@@ -1010,23 +1010,29 @@ pub(crate) async fn requeue_failed(
     .await
 }
 
-/// Marks a broadcast delivery parked: its job ended because the broadcast
-/// is paused, and only Resume queues it again.
-pub(crate) async fn park_delivery(
+/// Parks a broadcast delivery while its broadcast is paused: its job ends,
+/// and only Resume queues it again. The pause is checked in the same
+/// statement, so a Resume that just ran can't leave the row parked with no
+/// job. False when the broadcast is no longer paused.
+pub(crate) async fn park_if_paused(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     id: DeliveryId,
     now: UnixMillis,
-) -> sqlx::Result<()> {
-    sqlx::query!(
-        "UPDATE mailing_deliveries SET parked_at = ? WHERE workspace_id = ? AND id = ?",
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE mailing_deliveries SET parked_at = ?1
+         WHERE workspace_id = ?2 AND id = ?3
+           AND EXISTS (SELECT 1 FROM mailing_broadcasts b
+                       WHERE b.workspace_id = ?2 AND b.id = mailing_deliveries.broadcast_id
+                         AND b.paused_at IS NOT NULL)",
         now,
         workspace_id,
         id,
     )
     .execute(exec)
     .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
 /// Unparks a broadcast's parked deliveries and returns their IDs, so each
