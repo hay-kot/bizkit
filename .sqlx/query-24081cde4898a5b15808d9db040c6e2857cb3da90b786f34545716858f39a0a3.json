@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, name, email, status,\n                  signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers WHERE token_hash = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: SignerId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "request_id: SigningRequestId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "request_id"
+          }
+        }
+      },
+      {
+        "name": "position",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "signature",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "signature"
+          }
+        }
+      },
+      {
+        "name": "signed_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "signed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "24081cde4898a5b15808d9db040c6e2857cb3da90b786f34545716858f39a0a3"
+}

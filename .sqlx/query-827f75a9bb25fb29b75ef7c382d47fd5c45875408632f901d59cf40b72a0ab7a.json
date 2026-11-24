@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM signing_events\n                         WHERE workspace_id = ? AND signer_id = ? AND kind = 'viewed') AS \"seen!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "seen!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "827f75a9bb25fb29b75ef7c382d47fd5c45875408632f901d59cf40b72a0ab7a"
+}

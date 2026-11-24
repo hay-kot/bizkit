@@ -10,6 +10,7 @@ use bizkit_core::jobs::{Enqueue, SendMail};
 use bizkit_core::ops::{
     Access, Level, Method, NoContent, OpCtx, Operation, Principal, Scope, Success,
 };
+use bizkit_core::time::UnixMillis;
 use bizkit_core::validate::{FieldErrors, Validate, check_name};
 use bizkit_core::{ApiError, ModuleContext, Platform};
 use http::StatusCode;
@@ -20,6 +21,7 @@ use crate::api::{
     AuditEvent, Document, DocumentVersion, EventKind, RequestStatus, Signer, SignerId,
     SigningRequest, SigningRequestDetail, SigningRequestId, SigningRequestList,
 };
+use crate::complete::Complete;
 use crate::pdf;
 use crate::store::{self, NewEvent, RequestRow, SignerRow};
 
@@ -33,6 +35,9 @@ pub(crate) const MAX_PDF_BYTES: usize = 700 * 1024;
 const MAX_SIGNERS: usize = 10;
 const MAX_MESSAGE: usize = 2000;
 const MAX_FILE_NAME: usize = 200;
+/// Signer mails a workspace may queue per hour, so the instance's domain
+/// can't mail strangers in bulk.
+const MAILS_PER_HOUR: i64 = 100;
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.scope_area("signing", "Signature requests and their PDFs")?;
@@ -43,6 +48,7 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(RequestsSend)?;
     cx.op(RequestsVoid)?;
     cx.op(RequestsDelete)?;
+    cx.op(RequestsRetry)?;
     Ok(())
 }
 
@@ -77,6 +83,8 @@ pub(crate) fn to_api(row: RequestRow, signers: Vec<SignerRow>) -> Result<Signing
         title: row.title,
         message: row.message,
         status: RequestStatus::parse(&row.status).map_err(internal)?,
+        failure: row.failure,
+        sender: row.sender,
         file_name: row.file_name,
         original_sha256: row.original_sha256,
         signed_sha256: row.signed_sha256,
@@ -245,9 +253,10 @@ impl Operation for RequestsCreate {
             return Err(ApiError::NotFound);
         }
         let now = cx.now();
-        let created_by = match cx.principal() {
-            Some(Principal::User(user)) => Some(user.user_id),
-            _ => None,
+        let (created_by, sender) = match cx.principal() {
+            Some(Principal::User(user)) => (Some(user.user_id), user.email.clone()),
+            Some(Principal::ApiKey(key)) => (None, format!("API key {}", key.key_id)),
+            None => (None, "unknown".to_owned()),
         };
         let row = RequestRow {
             id: SigningRequestId::new(),
@@ -260,6 +269,8 @@ impl Operation for RequestsCreate {
             original_sha256: sha256_hex(&bytes),
             signed_sha256: None,
             created_by,
+            sender,
+            failure: None,
             created_at: now,
             updated_at: now,
             sent_at: None,
@@ -393,8 +404,9 @@ impl Operation for RequestsSend {
     const ACCESS: Access = WRITE;
     const SUMMARY: &'static str = "Mail each signer their link";
     const TAGS: &'static [&'static str] = TAGS;
-    /// 409 when the request isn't a draft.
-    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+    /// 409 when the request isn't a draft; 429 past 100 signer mails per
+    /// workspace per hour.
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT, StatusCode::TOO_MANY_REQUESTS];
 
     async fn call(&self, cx: OpCtx, input: InRequest) -> Result<SigningRequest, ApiError> {
         let platform = cx.platform();
@@ -409,17 +421,25 @@ impl Operation for RequestsSend {
             return Err(ApiError::Conflict("only a draft can be sent".to_owned()));
         }
         let signers = store::signers(&mut *tx, row.workspace_id, row.id).await?;
+        let hour_ago = UnixMillis(now.0 - 3_600_000);
+        let recent = store::mails_since(&mut *tx, row.workspace_id, hour_ago).await?;
+        if recent + i64::try_from(signers.len()).unwrap_or(i64::MAX) > MAILS_PER_HOUR {
+            return Err(ApiError::RateLimited { retry_after_secs: 3600 });
+        }
         for signer in &signers {
             let token = random_token();
             store::set_token(&mut *tx, signer, &hash_token(&token)).await?;
-            let mail = crate::mail::sign_request(
-                &row,
-                signer,
-                &sign_link(platform, &token).map_err(internal)?,
-            );
+            let link = sign_link(platform, &token).map_err(internal)?;
+            let mail = crate::mail::sign_request(&row, signer, &link);
             platform.bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
+            let detail = format!("Link mailed to {}.", signer.email);
+            let event = NewEvent {
+                signer_id: Some(signer.id),
+                detail: Some(&detail),
+                ..NewEvent::of(&row, EventKind::Sent, now)
+            };
+            store::insert_event(&mut *tx, event).await?;
         }
-        store::insert_event(&mut *tx, NewEvent::of(&row, EventKind::Sent, now)).await?;
         tx.commit().await?;
         load(platform, find(platform, input.workspace_id, input.request_id).await?).await
     }
@@ -435,7 +455,7 @@ impl Operation for RequestsVoid {
     const ACCESS: Access = WRITE;
     const SUMMARY: &'static str = "Cancel a request; its links stop working";
     const TAGS: &'static [&'static str] = TAGS;
-    /// 409 when the request is completed or already voided.
+    /// 409 when the request is completed, voided, or signed by everyone.
     const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
 
     async fn call(&self, cx: OpCtx, input: InRequest) -> Result<SigningRequest, ApiError> {
@@ -445,6 +465,9 @@ impl Operation for RequestsVoid {
         let row = store::find_request(&mut *tx, input.workspace_id, input.request_id)
             .await?
             .ok_or(ApiError::NotFound)?;
+        if store::pending_signers(&mut *tx, &row).await? == 0 {
+            return Err(ApiError::Conflict("everyone has signed; it can't be voided".to_owned()));
+        }
         let from = [RequestStatus::Draft, RequestStatus::Sent];
         if !store::set_status(&mut *tx, &row, &from, RequestStatus::Voided, now).await? {
             return Err(ApiError::Conflict(
@@ -485,5 +508,37 @@ impl Operation for RequestsDelete {
         store::delete_request(&mut *tx, &row).await?;
         tx.commit().await?;
         Ok(NoContent)
+    }
+}
+
+struct RequestsRetry;
+impl Operation for RequestsRetry {
+    type Input = InRequest;
+    type Output = SigningRequest;
+    const ID: &'static str = "signing.requests.retry";
+    const METHOD: Method = Method::Post;
+    const PATH: &'static str = "/workspaces/{workspace_id}/signing/requests/{request_id}/retry";
+    const ACCESS: Access = WRITE;
+    const SUMMARY: &'static str = "Try sealing a failed request again";
+    const TAGS: &'static [&'static str] = TAGS;
+    /// 409 when the request isn't `failed`.
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+
+    async fn call(&self, cx: OpCtx, input: InRequest) -> Result<SigningRequest, ApiError> {
+        let platform = cx.platform();
+        let now = cx.now();
+        let mut tx = cx.write().await?;
+        let row = store::find_request(&mut *tx, input.workspace_id, input.request_id)
+            .await?
+            .ok_or(ApiError::NotFound)?;
+        if !store::set_status(&mut *tx, &row, &[RequestStatus::Failed], RequestStatus::Sent, now)
+            .await?
+        {
+            return Err(ApiError::Conflict("only a failed request can be retried".to_owned()));
+        }
+        let job = Complete { workspace_id: row.workspace_id, request_id: row.id };
+        platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
+        tx.commit().await?;
+        load(platform, find(platform, input.workspace_id, input.request_id).await?).await
     }
 }

@@ -80,8 +80,9 @@ uuid = { version = "=1.29.2", features = ["v7", "serde"] }
 
 # Doc signing: the RustCrypto 0.2/0.13 line, the newest with a stable cms.
 cms = { version = "=0.2.3", features = ["builder"] }
+der = { version = "=0.7.10", features = ["alloc", "derive", "oid"] }
 lopdf = { version = "=0.42.0", default-features = false }
-p256 = { version = "=0.13.2", features = ["ecdsa", "pkcs8"] }
+p256 = { version = "=0.13.2", features = ["ecdsa"] }
 sha2-010 = { package = "sha2", version = "0.10.9", features = ["oid"] }
 x509-cert = { version = "=0.2.5", features = ["builder"] }
 [profile.release]

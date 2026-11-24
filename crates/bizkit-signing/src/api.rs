@@ -20,6 +20,9 @@ pub enum RequestStatus {
     Completed,
     /// Cancelled; the links no longer work.
     Voided,
+    /// Everyone signed, but sealing the PDF failed; `failure` says why.
+    /// `signing.requests.retry` tries again.
+    Failed,
 }
 
 impl RequestStatus {
@@ -29,11 +32,13 @@ impl RequestStatus {
             Self::Sent => "sent",
             Self::Completed => "completed",
             Self::Voided => "voided",
+            Self::Failed => "failed",
         }
     }
 
     pub(crate) fn parse(text: &str) -> anyhow::Result<Self> {
         Ok(match text {
+            "failed" => Self::Failed,
             "draft" => Self::Draft,
             "sent" => Self::Sent,
             "completed" => Self::Completed,
@@ -71,6 +76,10 @@ pub struct SigningRequest {
     pub message: String,
     /// Where it is.
     pub status: RequestStatus,
+    /// Why sealing failed, while `status` is `failed`.
+    pub failure: Option<String>,
+    /// Who sent it, as `Name <email>` or the API key that did.
+    pub sender: String,
     /// The uploaded file's name.
     pub file_name: String,
     /// SHA-256 of the uploaded PDF, hex.
@@ -104,7 +113,8 @@ pub enum EventKind {
     Created,
     /// The links went out.
     Sent,
-    /// A signer opened the signing page.
+    /// A signer opened the signing page. Some mail scanners run scripts,
+    /// so this means the page loaded, not that a person read it.
     Viewed,
     /// A signer agreed and signed.
     Signed,
@@ -112,6 +122,8 @@ pub enum EventKind {
     Completed,
     /// The request was voided.
     Voided,
+    /// Sealing the PDF failed.
+    Failed,
 }
 
 impl EventKind {
@@ -123,11 +135,13 @@ impl EventKind {
             Self::Signed => "signed",
             Self::Completed => "completed",
             Self::Voided => "voided",
+            Self::Failed => "failed",
         }
     }
 
     pub(crate) fn parse(text: &str) -> anyhow::Result<Self> {
         Ok(match text {
+            "failed" => Self::Failed,
             "created" => Self::Created,
             "sent" => Self::Sent,
             "viewed" => Self::Viewed,

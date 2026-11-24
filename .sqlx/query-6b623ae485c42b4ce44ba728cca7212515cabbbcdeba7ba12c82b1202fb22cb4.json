@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO signing_seal (id, certificate, private_key, created_at) VALUES (1, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "6b623ae485c42b4ce44ba728cca7212515cabbbcdeba7ba12c82b1202fb22cb4"
+}

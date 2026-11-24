@@ -3,13 +3,28 @@
 //! with the signatures and an audit trail.
 
 pub mod api;
+mod complete;
 mod mail;
 mod ops;
 mod pdf;
+mod public;
+mod seal;
+#[cfg(feature = "test-hooks")]
+mod seed;
+mod signature;
 mod store;
 pub mod testing;
 
+#[cfg(feature = "test-hooks")]
+use bizkit_core::DemoSeed;
 use bizkit_core::{Module, ModuleContext};
+#[cfg(feature = "test-hooks")]
+use futures::future::BoxFuture;
+use utoipa::OpenApi as _;
+
+/// The demo seed's sender.
+#[cfg(feature = "test-hooks")]
+const DEMO_SENDER: &str = "demo@bizkit.test";
 
 /// The signing module.
 #[derive(Debug, Clone, Copy, Default)]
@@ -25,6 +40,17 @@ impl Module for Signing {
     }
 
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
-        ops::register(cx)
+        ops::register(cx)?;
+        cx.job::<complete::Complete, _>(complete::CompleteHandler)?;
+        cx.public_routes(public::router(), public::PublicDocs::openapi())
+    }
+
+    #[cfg(feature = "test-hooks")]
+    fn seed_demo<'a>(
+        &'a self,
+        db: &'a bizkit_core::db::Db,
+        seed: &'a mut DemoSeed,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(seed::seed(db, seed))
     }
 }

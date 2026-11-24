@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: SigningRequestId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", title, message, status, file_name,\n                  original_sha256, signed_sha256, created_by AS \"created_by: UserId\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\",\n                  sent_at AS \"sent_at: UnixMillis\", completed_at AS \"completed_at: UnixMillis\",\n                  voided_at AS \"voided_at: UnixMillis\"\n           FROM signing_requests WHERE workspace_id = ? AND id = ?",
+  "query": "SELECT id AS \"id: SigningRequestId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", title, message, status, file_name,\n                  original_sha256, signed_sha256, created_by AS \"created_by: UserId\", sender, failure,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\",\n                  sent_at AS \"sent_at: UnixMillis\", completed_at AS \"completed_at: UnixMillis\",\n                  voided_at AS \"voided_at: UnixMillis\"\n           FROM signing_requests WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
@@ -114,8 +114,30 @@
         }
       },
       {
-        "name": "created_at: UnixMillis",
+        "name": "sender",
         "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_requests",
+            "name": "sender"
+          }
+        }
+      },
+      {
+        "name": "failure",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_requests",
+            "name": "failure"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 12,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -126,7 +148,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 11,
+        "ordinal": 13,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -137,7 +159,7 @@
       },
       {
         "name": "sent_at: UnixMillis",
-        "ordinal": 12,
+        "ordinal": 14,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -148,7 +170,7 @@
       },
       {
         "name": "completed_at: UnixMillis",
-        "ordinal": 13,
+        "ordinal": 15,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -159,7 +181,7 @@
       },
       {
         "name": "voided_at: UnixMillis",
-        "ordinal": 14,
+        "ordinal": 16,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -184,11 +206,13 @@
       true,
       true,
       false,
+      true,
+      false,
       false,
       true,
       true,
       true
     ]
   },
-  "hash": "4e48c3c196ae888f064001fdac3b45fac001d4102b3a427e00a8b0d24892ac5e"
+  "hash": "f2b7d8452ab72465b79556617e58b7b98ec52ccbc0e4b7bf128533e1af91db61"
 }
