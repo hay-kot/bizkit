@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"n!: i64\" FROM signing_signers\n           WHERE workspace_id = ? AND request_id = ? AND status = 'pending'",
+  "describe": {
+    "columns": [
+      {
+        "name": "n!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "888c71b57f7682e4c008ccd4fd6a51c4e5f5c8b3ea89d3faf3420898d2f2cbdb"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO signing_events (workspace_id, request_id, signer_id, kind, at, ip, user_agent, detail)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "33aefc9f17967e7188c471ce4577a5973feeae6911eabcf64fc945ffd26f7dcf"
+}

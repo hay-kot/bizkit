@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"n!: i64\" FROM signing_events\n           WHERE workspace_id = ? AND kind = 'sent' AND signer_id IS NOT NULL AND at >= ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "n!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "09b882ed82f510a3c909ecb68a5a024c2430e1d2047be975dc8adf42de299a55"
+}

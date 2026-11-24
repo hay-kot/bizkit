@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE signing_signers SET status = 'signed', signature = ?, signed_at = ?\n         WHERE workspace_id = ? AND id = ? AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "be54a437abb401c42a4151b724907279777276b134405a0b904079aa26ebacf7"
+}

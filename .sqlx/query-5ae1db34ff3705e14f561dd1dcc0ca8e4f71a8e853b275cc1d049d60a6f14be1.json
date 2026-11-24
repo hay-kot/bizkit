@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT certificate, private_key FROM signing_seal WHERE id = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "certificate",
+        "ordinal": 0,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "signing_seal",
+            "name": "certificate"
+          }
+        }
+      },
+      {
+        "name": "private_key",
+        "ordinal": 1,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "signing_seal",
+            "name": "private_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5ae1db34ff3705e14f561dd1dcc0ca8e4f71a8e853b275cc1d049d60a6f14be1"
+}
