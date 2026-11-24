@@ -134,6 +134,11 @@ pub struct MailingList {
     pub footer: Option<String>,
     /// Forms whose submitters are added to the list.
     pub form_ids: Vec<String>,
+    /// Whether the public archive shows the broadcasts marked `archived`.
+    pub archive: bool,
+    /// The public archive page; its RSS feed is `feed.xml` under it. Set
+    /// even while the archive is off, so it can be shared before.
+    pub archive_url: String,
     /// Contacts by status. Only on get.
     pub counts: Option<ContactCounts>,
     /// When it was created.
@@ -301,6 +306,9 @@ pub struct Broadcast {
     pub send_at: Option<UnixMillis>,
     /// When the breaker paused it.
     pub paused_at: Option<UnixMillis>,
+    /// Shown in the list's public archive once it is sent, while the
+    /// list's archive is on.
+    pub archived: bool,
     /// Why it paused.
     pub pause_reason: Option<String>,
     /// Its deliveries by status; only when getting one broadcast.

@@ -97,6 +97,7 @@ async function onCreate() {
     >
       <template #cell-subject="{ row }">
         {{ row.subject }}
+        <span v-if="row.archived" class="ms-2 badge badge-ghost badge-sm">archive</span>
       </template>
       <template #cell-list="{ row }"
         ><span class="text-sm">{{ listName(row.list_id) }}</span></template

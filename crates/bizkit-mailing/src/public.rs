@@ -62,6 +62,7 @@ pub(crate) fn router() -> Router {
         .route("/manage", get(manage_page).post(manage_post))
         .route("/events/mailgun", post(crate::events::mailgun))
         .route("/events/mailgun/{workspace_id}", post(crate::events::mailgun_workspace))
+        .merge(crate::archive::router())
 }
 
 /// The token a link carries.

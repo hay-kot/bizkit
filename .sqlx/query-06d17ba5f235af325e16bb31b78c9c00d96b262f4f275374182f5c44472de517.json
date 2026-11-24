@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mailing_broadcasts (id, workspace_id, list_id, subject, body_md, segment, status,\n                                         recipients, sent_at, created_at, updated_at, send_at,\n                                         paused_at, pause_reason, failures_in_row, archived)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "06d17ba5f235af325e16bb31b78c9c00d96b262f4f275374182f5c44472de517"
+}

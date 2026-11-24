@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: ListId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", name, description,\n                  double_opt_in AS \"double_opt_in: bool\", footer,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_lists WHERE workspace_id = ? AND id = ?",
+  "query": "SELECT id AS \"id: ListId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", name, description,\n                  double_opt_in AS \"double_opt_in: bool\", footer,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\",\n                  archive AS \"archive: bool\", archive_key\n           FROM mailing_lists WHERE archive_key = ? AND archive = 1",
   "describe": {
     "columns": [
       {
@@ -101,10 +101,32 @@
             "name": "updated_at"
           }
         }
+      },
+      {
+        "name": "archive: bool",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "archive"
+          }
+        }
+      },
+      {
+        "name": "archive_key",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_lists",
+            "name": "archive_key"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -115,8 +137,10 @@
       false,
       true,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "601ebcfc36231ec8411d3e1133519e114f9846f3514014b79ff5c31117c029a2"
+  "hash": "bf8cb56fe8787779adfef1013e7984aaa2f61506aeab912809e071ecf362e9ef"
 }

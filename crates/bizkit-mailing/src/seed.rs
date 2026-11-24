@@ -104,7 +104,7 @@ fn days_ago(now: UnixMillis, days: u64) -> UnixMillis {
 
 /// Seeds the "Newsletter" list in the `website` project, linked to the
 /// demo Contact form, with five contacts, one sent broadcast with its send
-/// log, one draft and the welcome sequence. A list that already exists by
+/// log (in the list's public archive), one draft and the welcome sequence. A list that already exists by
 /// name only gets the sequence, if it lacks one by that name, and the
 /// suppressions. Nothing is queued, so the seed sends no mail.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
@@ -131,6 +131,8 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         footer: Some("Tallyho, 1 Main Street, Springfield".to_owned()),
         created_at: days_ago(now, 30),
         updated_at: days_ago(now, 30),
+        archive: true,
+        archive_key: random_token(),
     };
     let mut tx = db.write().await?;
     store::insert_list(&mut *tx, &list).await?;
@@ -170,6 +172,8 @@ async fn seed_privacy(
             double_opt_in: false,
             created_at: days_ago(now, 20),
             updated_at: days_ago(now, 20),
+            archive: false,
+            archive_key: random_token(),
             ..newsletter.clone()
         };
         store::insert_list(&mut **tx, &list).await.context("inserting the updates list")?;
@@ -264,6 +268,7 @@ async fn seed_broadcasts(
         paused_at: None,
         pause_reason: None,
         failures_in_row: 0,
+        archived: true,
     };
     store::insert_broadcast(&mut **tx, &sent).await?;
     for contact in subscribed {
@@ -284,6 +289,7 @@ async fn seed_broadcasts(
         sent_at: None,
         created_at: days_ago(now, 1),
         updated_at: days_ago(now, 1),
+        archived: false,
         ..sent
     };
     store::insert_broadcast(&mut **tx, &draft).await?;

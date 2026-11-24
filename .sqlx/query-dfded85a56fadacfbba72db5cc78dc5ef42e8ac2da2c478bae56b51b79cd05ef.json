@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT b.id AS \"id: BroadcastId\", b.workspace_id AS \"workspace_id: WorkspaceId\",\n                  b.list_id AS \"list_id: ListId\", b.subject, b.body_md, b.segment, b.status,\n                  b.recipients, b.sent_at AS \"sent_at: UnixMillis\",\n                  b.created_at AS \"created_at: UnixMillis\", b.updated_at AS \"updated_at: UnixMillis\",\n                  b.send_at AS \"send_at: UnixMillis\", b.paused_at AS \"paused_at: UnixMillis\",\n                  b.pause_reason, b.failures_in_row\n           FROM mailing_broadcasts b\n           JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id\n           WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)\n             AND (?3 IS NULL OR b.list_id = ?3)\n           ORDER BY b.id DESC",
+  "query": "SELECT id AS \"id: BroadcastId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", subject, body_md, segment, status, recipients,\n                  sent_at AS \"sent_at: UnixMillis\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\", send_at AS \"send_at: UnixMillis\",\n                  paused_at AS \"paused_at: UnixMillis\", pause_reason, failures_in_row,\n                  archived AS \"archived: bool\"\n           FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
@@ -167,10 +167,21 @@
             "name": "failures_in_row"
           }
         }
+      },
+      {
+        "name": "archived: bool",
+        "ordinal": 15,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "archived"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 2
     },
     "nullable": [
       false,
@@ -187,8 +198,9 @@
       true,
       true,
       true,
+      false,
       false
     ]
   },
-  "hash": "01dab4eaca45a42baa09bc7eb5513eb089eeacd4b2da4f4348092b693a64794f"
+  "hash": "dfded85a56fadacfbba72db5cc78dc5ef42e8ac2da2c478bae56b51b79cd05ef"
 }

@@ -249,6 +249,11 @@ export type BreakdownSource = 'property' | 'trait';
  */
 export type Broadcast = {
     /**
+     * Shown in the list's public archive once it is sent, while the
+     * list's archive is on.
+     */
+    archived: boolean;
+    /**
      * The body in Markdown. `{{ name }}`, `{{ email }}` and
      * `{{ attr.key }}` are filled in.
      */
@@ -1743,6 +1748,15 @@ export type MailingFormList = {
  * A mailing list. Contacts and their consent belong to one list.
  */
 export type MailingList = {
+    /**
+     * Whether the public archive shows the broadcasts marked `archived`.
+     */
+    archive: boolean;
+    /**
+     * The public archive page; its RSS feed is `feed.xml` under it. Set
+     * even while the archive is off, so it can be shared before.
+     */
+    archive_url: string;
     counts?: ContactCounts | null;
     /**
      * When it was created.
@@ -7626,6 +7640,10 @@ export type MailingBroadcastsListResponse = MailingBroadcastsListResponses[keyof
 export type MailingBroadcastsCreateData = {
     body: {
         /**
+         * Show it in the list's public archive once sent. Default false.
+         */
+        archived?: boolean;
+        /**
          * The body in Markdown.
          */
         body_md?: string;
@@ -7792,6 +7810,11 @@ export type MailingBroadcastsGetResponse = MailingBroadcastsGetResponses[keyof M
 
 export type MailingBroadcastsUpdateData = {
     body: {
+        /**
+         * Shows it in the list's public archive once sent, or hides it. The
+         * only field that changes after a draft is sent or scheduled.
+         */
+        archived?: boolean | null;
         /**
          * The body in Markdown.
          */
@@ -8294,6 +8317,10 @@ export type MailingListsListResponse = MailingListsListResponses[keyof MailingLi
 export type MailingListsCreateData = {
     body: {
         /**
+         * Whether the public archive is on. Default false.
+         */
+        archive?: boolean;
+        /**
          * What subscribers get, for the team.
          */
         description?: string | null;
@@ -8465,6 +8492,10 @@ export type MailingListsGetResponse = MailingListsGetResponses[keyof MailingList
 
 export type MailingListsUpdateData = {
     body: {
+        /**
+         * Turns the public archive on or off.
+         */
+        archive?: boolean | null;
         /**
          * What subscribers get; `null` removes it.
          */
@@ -10626,6 +10657,100 @@ export type FormsPublicChallengeResponses = {
 };
 
 export type FormsPublicChallengeResponse = FormsPublicChallengeResponses[keyof FormsPublicChallengeResponses];
+
+export type MailingPublicArchiveData = {
+    body?: never;
+    path: {
+        /**
+         * The list's archive key, from `archive_url`
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/m/mailing/public/archive/{key}';
+};
+
+export type MailingPublicArchiveErrors = {
+    /**
+     * No list with this key has its archive on
+     */
+    404: string;
+};
+
+export type MailingPublicArchiveError = MailingPublicArchiveErrors[keyof MailingPublicArchiveErrors];
+
+export type MailingPublicArchiveResponses = {
+    /**
+     * The page
+     */
+    200: string;
+};
+
+export type MailingPublicArchiveResponse = MailingPublicArchiveResponses[keyof MailingPublicArchiveResponses];
+
+export type MailingPublicArchiveFeedData = {
+    body?: never;
+    path: {
+        /**
+         * The list's archive key, from `archive_url`
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/m/mailing/public/archive/{key}/feed.xml';
+};
+
+export type MailingPublicArchiveFeedErrors = {
+    /**
+     * No list with this key has its archive on
+     */
+    404: string;
+};
+
+export type MailingPublicArchiveFeedError = MailingPublicArchiveFeedErrors[keyof MailingPublicArchiveFeedErrors];
+
+export type MailingPublicArchiveFeedResponses = {
+    /**
+     * The feed
+     */
+    200: string;
+};
+
+export type MailingPublicArchiveFeedResponse = MailingPublicArchiveFeedResponses[keyof MailingPublicArchiveFeedResponses];
+
+export type MailingPublicArchiveIssueData = {
+    body?: never;
+    path: {
+        /**
+         * The list's archive key, from `archive_url`
+         */
+        key: string;
+        /**
+         * The broadcast
+         */
+        broadcast_id: string;
+    };
+    query?: never;
+    url: '/m/mailing/public/archive/{key}/{broadcast_id}';
+};
+
+export type MailingPublicArchiveIssueErrors = {
+    /**
+     * The archive is off, or the broadcast isn't in it
+     */
+    404: string;
+};
+
+export type MailingPublicArchiveIssueError = MailingPublicArchiveIssueErrors[keyof MailingPublicArchiveIssueErrors];
+
+export type MailingPublicArchiveIssueResponses = {
+    /**
+     * The page
+     */
+    200: string;
+};
+
+export type MailingPublicArchiveIssueResponse = MailingPublicArchiveIssueResponses[keyof MailingPublicArchiveIssueResponses];
 
 export type MailingPublicConfirmPageData = {
     body?: never;

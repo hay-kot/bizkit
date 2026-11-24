@@ -106,6 +106,7 @@ const facts = computed(() => {
       label: 'Forms',
       value: current.form_ids.length ? current.form_ids.map(formName).join(', ') : 'None',
     },
+    { key: 'archive', label: 'Public archive' },
   ]
 })
 
@@ -212,6 +213,7 @@ const settings = ref({
   doubleOptIn: true,
   footer: '',
   formIds: [] as string[],
+  archive: false,
 })
 
 function openSettings() {
@@ -223,6 +225,7 @@ function openSettings() {
     doubleOptIn: current.double_opt_in,
     footer: current.footer ?? '',
     formIds: [...current.form_ids],
+    archive: current.archive,
   }
   updateList.reset()
   settingsOpen.value = true
@@ -238,6 +241,7 @@ async function onSaveSettings() {
       double_opt_in: s.doubleOptIn,
       footer: s.footer.trim() === '' ? null : s.footer.trim(),
       form_ids: s.formIds,
+      archive: s.archive,
     },
   })
   settingsOpen.value = false
@@ -286,7 +290,18 @@ const actions = computed(() => [
 
     <ErrorAlert v-if="listError" :error="listError" />
 
-    <DescriptionList v-if="list" :items="facts" />
+    <DescriptionList v-if="list" :items="facts">
+      <template #archive>
+        <a
+          v-if="list?.archive"
+          :href="list.archive_url"
+          target="_blank"
+          rel="noopener"
+          class="link link-primary"
+          >Open</a
+        ><span v-else>Off</span>
+      </template>
+    </DescriptionList>
 
     <PageSection title="Contacts">
       <template #actions>
@@ -445,6 +460,13 @@ const actions = computed(() => [
         v-model="settings.doubleOptIn"
         label="Addresses added by hand or the API confirm by mail"
       />
+      <Checkbox
+        v-model="settings.archive"
+        label="Publish a public archive and RSS feed of the broadcasts marked for it"
+      />
+      <p v-if="settings.archive" class="text-sm break-all text-base-content/70">
+        Anyone with this link can read them: {{ list?.archive_url }}
+      </p>
       <Field label="Footer" hint="Shown at the bottom of every mail, such as your postal address.">
         <textarea
           v-model="settings.footer"
