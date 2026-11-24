@@ -17,6 +17,7 @@ use crate::api::{Day, FunnelId, GoalId, PersonId};
 use crate::files::{ProjectDb, project_db_path};
 use crate::funnels::{self, FunnelRow};
 use crate::hooks::GOAL;
+use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow, GoalRow, SiteRow};
 
 const DAYS: i64 = 14;
@@ -422,7 +423,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             website_events(file, seed, project_id, &goals)
                 .await
                 .context("seeding website events")?;
-            mark_events(db, seed, project_id).await?;
+            mark_events(db, file, seed, project_id).await?;
         }
         if let Some(goal) = goals.into_iter().find(|goal| goal.name == SIGNUP_GOAL) {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
@@ -439,7 +440,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         let file = open_empty(seed, project_id).await?;
         if let Some(file) = &file {
             docs_events(file, seed, project_id).await.context("seeding docs events")?;
-            mark_events(db, seed, project_id).await?;
+            mark_events(db, file, seed, project_id).await?;
         }
         close(file).await;
     }
@@ -515,9 +516,16 @@ pub async fn demo_site_key(db: &Db) -> anyhow::Result<Option<String>> {
     Ok(key)
 }
 
-/// Sets the site's event day to today. A site that survived the move to
-/// project files had it reset, and reports treat it as having no events.
-async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+/// Sets the site's event day to today, then rolls up the seeded days before
+/// today, as the rollup job would at the next UTC midnight. A site that
+/// survived the move to project files had its day reset, and reports treat
+/// it as having no events.
+async fn mark_events(
+    db: &Db,
+    file: &ProjectDb,
+    seed: &DemoSeed,
+    project_id: ProjectId,
+) -> anyhow::Result<()> {
     let mut tx = db.write().await?;
     let today = Day::of(seed.now).to_string();
     store::advance_event_day(&mut *tx, seed.workspace_id, project_id, &today)
@@ -531,7 +539,10 @@ async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow:
     )
     .execute(&mut *tx)
     .await?;
-    tx.commit().await
+    tx.commit().await?;
+    let job = Rollup { workspace_id: seed.workspace_id, project_id };
+    rollup::roll(db, file, &job, Day::of(seed.now)).await.context("rolling up the seeded days")?;
+    Ok(())
 }
 
 /// The project's file when it has no events yet.

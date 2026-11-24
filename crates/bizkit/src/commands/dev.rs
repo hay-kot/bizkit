@@ -280,8 +280,12 @@ mod tests {
     #[cfg(feature = "analytics")]
     async fn demo_site_is_ready(data_dir: &std::path::Path) {
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
-        let (project, hostnames): (bizkit_core::ids::ProjectId, String) = sqlx::query_as(
-            "SELECT s.project_id, s.hostnames FROM analytics_sites s
+        let (project, hostnames, rolled_through): (
+            bizkit_core::ids::ProjectId,
+            String,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT s.project_id, s.hostnames, s.rolled_through FROM analytics_sites s
              JOIN projects p ON p.id = s.project_id WHERE p.slug = 'website'",
         )
         .fetch_one(db.read())
@@ -297,8 +301,15 @@ mod tests {
         .fetch_one(&file)
         .await
         .unwrap();
+        let last_rolled: Option<String> =
+            sqlx::query_scalar("SELECT MAX(day) FROM analytics_daily")
+                .fetch_one(&file)
+                .await
+                .unwrap();
         file.close().await;
         assert!(onboarded > 0, "some people finish onboarding");
+        assert!(rolled_through.is_some(), "the seeded days before today are rolled up");
+        assert_eq!(last_rolled, rolled_through, "daily rows up to rolled_through");
         let now = SystemClock.now().0;
         assert!(latest <= now, "no event after the seed ran: {latest} > {now}");
     }
