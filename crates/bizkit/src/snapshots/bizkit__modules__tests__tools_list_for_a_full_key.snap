@@ -1721,6 +1721,261 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the event names a project sent, pageview included, most sent first",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which event names to list.",
+        "properties": {
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Day",
+                "description": "The first day, UTC. Give it with `to`; default 29 days before today."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "q": {
+            "description": "Text the name contains, ignoring ASCII case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Day",
+                "description": "The last day, UTC, inclusive. Give it with `from`; default today."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_schema_events"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the event property or person trait keys a project has, with their value types",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SchemaSource": {
+            "description": "Where keys and values come from.",
+            "enum": [
+              "property",
+              "trait"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which keys to list.",
+        "properties": {
+          "event": {
+            "description": "Only properties of this event (`pageview` included). Property source only.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Day",
+                "description": "The first day, UTC. Give it with `to`; default 29 days before today.\nThe trait source ignores the range."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "q": {
+            "description": "Text the key contains, ignoring ASCII case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "$ref": "#/$defs/SchemaSource",
+            "description": "Event properties or person traits."
+          },
+          "to": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Day",
+                "description": "The last day, UTC, inclusive. Give it with `from`; default today."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project_id",
+          "source"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_schema_keys"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the top values of an event property or person trait, in text form",
+      "inputSchema": {
+        "$defs": {
+          "Day": {
+            "format": "date",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "SchemaSource": {
+            "description": "Where keys and values come from.",
+            "enum": [
+              "property",
+              "trait"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which values to list.",
+        "properties": {
+          "event": {
+            "description": "Only values on this event (`pageview` included). Property source only.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Day",
+                "description": "The first day, UTC. Give it with `to`; default 29 days before today.\nThe trait source ignores the range."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "description": "The property or trait key, matched exactly.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 20.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          },
+          "q": {
+            "description": "Text the value contains, ignoring ASCII case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "$ref": "#/$defs/SchemaSource",
+            "description": "Event properties or person traits."
+          },
+          "to": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Day",
+                "description": "The last day, UTC, inclusive. Give it with `from`; default today."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project_id",
+          "source",
+          "key"
+        ],
+        "type": "object"
+      },
+      "name": "analytics_schema_values"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": false
       },
       "description": "Turn on analytics for a project",

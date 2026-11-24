@@ -7,11 +7,11 @@ import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import { linkFromExplorer } from '@/components/analytics/insightDraft'
 import RangeToolbar from '@/components/analytics/RangeToolbar.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import Combobox from '@/components/ui/Combobox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import PageSection from '@/components/ui/PageSection.vue'
-import Select from '@/components/ui/Select.vue'
 import TimeSeriesChart, { type ChartPoint } from '@/components/ui/TimeSeriesChart.vue'
 import { useReportRange } from '@/composables/useReportRange'
 import { formatDateTime, formatNumber, formatShortUtcDay, isPast } from '@/lib/format'
@@ -68,11 +68,13 @@ const recent = useRecentEvents(
   filter,
 )
 
+// stats.names applies the property filters, so the picker offers only names
+// that match them.
 const nameOptions = computed(() => [
   { value: '', label: 'All custom events' },
-  ...(stats.data.value?.names ?? []).map((n) => ({ value: n.name, label: n.name })),
+  ...(stats.data.value?.names ?? []).map((n) => ({ value: n.name, count: n.count })),
   ...(filter.value.name && !stats.data.value?.names.some((n) => n.name === filter.value.name)
-    ? [{ value: filter.value.name, label: filter.value.name }]
+    ? [{ value: filter.value.name }]
     : []),
 ])
 const selectedName = computed({
@@ -164,7 +166,15 @@ const viewingFacts = computed(() => {
       </RouterLink>
     </template>
     <RangeToolbar v-model:range="range" :today="today">
-      <Select v-model="selectedName" :options="nameOptions" label="Event name" size="toolbar" />
+      <Combobox
+        v-model="selectedName"
+        :options="nameOptions"
+        label="Event name"
+        name="event-name"
+        placeholder="Find an event"
+        size="toolbar"
+        class="w-64"
+      />
       <form class="flex items-center gap-2" @submit.prevent="addProp">
         <input
           v-model="propDraft"

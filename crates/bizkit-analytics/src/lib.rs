@@ -20,6 +20,7 @@ mod ops;
 mod people;
 mod report;
 mod rollup;
+mod schema;
 #[cfg(feature = "test-hooks")]
 mod seed;
 #[cfg(feature = "test-hooks")]
@@ -178,6 +179,7 @@ impl Module for Analytics {
         explore::register(cx, &files)?;
         funnels::register(cx, &files)?;
         people::register(cx, &files)?;
+        schema::register(cx, &files)?;
         insights::register(cx, &files, retention_days)?;
         cx.hook_target_kind(&hooks::GOAL, hooks::GoalTargets)?;
         let source = hooks::GoalHookSource(Arc::clone(&files));

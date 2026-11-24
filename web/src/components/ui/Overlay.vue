@@ -43,8 +43,10 @@ watch(
   },
 )
 
-onKeyStroke('Escape', () => {
-  if (props.open) emit('close')
+// A control inside that handles Escape itself (an open list) prevents the
+// default, and that Escape must not also close the overlay.
+onKeyStroke('Escape', (event) => {
+  if (props.open && !event.defaultPrevented) emit('close')
 })
 
 function trapFocus(event: KeyboardEvent) {

@@ -1,0 +1,42 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH s AS MATERIALIZED (\n                 SELECT workspace_id, name, props AS doc FROM analytics_events\n                 WHERE NOT ? AND project_id = ? AND ts >= ? AND ts < ?\n                 ORDER BY ts DESC LIMIT ?),\n               t AS MATERIALIZED (\n                 SELECT traits AS doc FROM analytics_people\n                 WHERE ? AND workspace_id = ? AND project_id = ?\n                 ORDER BY last_seen DESC LIMIT ?),\n               d AS (\n                 SELECT doc FROM s\n                 WHERE workspace_id = ? AND (? IS NULL OR name = ?) AND doc IS NOT NULL\n                 UNION ALL SELECT doc FROM t),\n               k AS (\n                 SELECT CAST(j.key AS TEXT) AS key,\n                        CASE j.type WHEN 'text' THEN 'text' WHEN 'integer' THEN 'number'\n                                    WHEN 'real' THEN 'number' WHEN 'true' THEN 'boolean'\n                                    WHEN 'false' THEN 'boolean' END AS kind\n                 FROM d, json_each(d.doc) j),\n               agg AS (\n                 SELECT key, COUNT(*) AS count, GROUP_CONCAT(DISTINCT kind) AS kinds FROM k\n                 WHERE kind IS NOT NULL AND (? IS NULL OR key LIKE ? ESCAPE '\\')\n                 GROUP BY key ORDER BY 2 DESC, key LIMIT ?)\n               SELECT n.scanned AS \"scanned!: i64\", agg.key AS \"key?: String\",\n                      agg.count AS \"count?: i64\", agg.kinds AS \"kinds?: String\"\n               FROM (SELECT (SELECT COUNT(*) FROM s) + (SELECT COUNT(*) FROM t) AS scanned) n\n               LEFT JOIN agg\n               ORDER BY agg.count DESC, agg.key",
+  "describe": {
+    "columns": [
+      {
+        "name": "scanned!: i64",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "key?: String",
+        "ordinal": 1,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "count?: i64",
+        "ordinal": 2,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "kinds?: String",
+        "ordinal": 3,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 15
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "99d14f3f8f709d351a25c167ee8867daa021092b59f3f7bbed3dca8210acbb04"
+}

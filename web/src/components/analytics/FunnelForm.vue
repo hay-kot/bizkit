@@ -1,12 +1,29 @@
 <script setup lang="ts">
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-vue-next'
 
+import { computed } from 'vue'
+
+import Combobox from '@/components/ui/Combobox.vue'
 import Field from '@/components/ui/Field.vue'
 import Select from '@/components/ui/Select.vue'
+import { eventOptions, useSchemaEvents } from '@/queries/analytics'
+
 import { type FunnelDraft, MAX_STEPS, MIN_STEPS } from './funnelDraft'
 
 /** The fields of the funnel create and edit panels. */
+const props = defineProps<{ workspaceId: string; projectId: string }>()
 const draft = defineModel<FunnelDraft>({ required: true })
+
+// Page steps match paths, so the event list leaves page views out. Free text
+// stays allowed: a funnel can name an event the site doesn't send yet.
+const schemaEvents = useSchemaEvents(
+  () => props.workspaceId,
+  () => props.projectId,
+  { limit: 200 },
+)
+const customEvents = computed(() =>
+  eventOptions(schemaEvents.data.value?.items ?? []).filter((o) => o.value !== 'pageview'),
+)
 
 const kinds = [
   { value: 'page' as const, label: 'Page' },
@@ -61,13 +78,26 @@ function add() {
       <li v-for="(step, i) in draft.steps" :key="i" class="flex items-center gap-2">
         <span class="w-5 text-sm text-base-content/70 tabular-nums">{{ i + 1 }}</span>
         <Select v-model="step.kind" :options="kinds" :label="`Step ${i + 1} kind`" size="sm" />
+        <Combobox
+          v-if="step.kind === 'event'"
+          v-model="step.match"
+          :options="customEvents"
+          allow-custom
+          required
+          :name="`funnel-step-${i + 1}`"
+          placeholder="signup_completed"
+          :label="`Step ${i + 1} event name`"
+          size="sm"
+          class="flex-1"
+        />
         <input
+          v-else
           v-model="step.match"
           :name="`funnel-step-${i + 1}`"
           required
           class="input flex-1 input-sm"
-          :placeholder="step.kind === 'page' ? '/pricing' : 'signup_completed'"
-          :aria-label="`Step ${i + 1} ${step.kind === 'page' ? 'path' : 'event name'}`"
+          placeholder="/pricing"
+          :aria-label="`Step ${i + 1} path`"
         />
         <button
           type="button"

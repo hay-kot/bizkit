@@ -2059,6 +2059,117 @@ export type RunList = {
 export type RunStatus = 'ok' | 'error' | 'timeout' | 'overloaded' | 'invalid_output';
 
 /**
+ * One event name seen in the scanned events.
+ */
+export type SchemaEvent = {
+    /**
+     * Scanned events with this name.
+     */
+    events: number;
+    /**
+     * When the newest one arrived.
+     */
+    last_seen: Timestamp;
+    /**
+     * The name; `pageview` for page views.
+     */
+    name: string;
+    /**
+     * Distinct people (or daily visitors) who sent them.
+     */
+    users: number;
+};
+
+/**
+ * Event names, most sent first.
+ */
+export type SchemaEventList = {
+    /**
+     * The names.
+     */
+    items: Array<SchemaEvent>;
+    /**
+     * The scan stopped at its cap of newest events, so older events in the
+     * range are not counted and rare names can be missing.
+     */
+    sampled: boolean;
+};
+
+/**
+ * One property or trait key.
+ */
+export type SchemaKey = {
+    /**
+     * Scanned events (or people) that have it with a text, number or
+     * boolean value.
+     */
+    count: number;
+    /**
+     * The key.
+     */
+    key: string;
+    /**
+     * The types its values take, in this order: text, number, boolean.
+     */
+    types: Array<SchemaValueType>;
+};
+
+/**
+ * Keys, most used first.
+ */
+export type SchemaKeyList = {
+    /**
+     * The keys.
+     */
+    items: Array<SchemaKey>;
+    /**
+     * The scan stopped at its cap of newest events (or most recently seen
+     * people), so rare keys can be missing.
+     */
+    sampled: boolean;
+};
+
+/**
+ * Where keys and values come from.
+ */
+export type SchemaSource = 'property' | 'trait';
+
+/**
+ * One value a key takes.
+ */
+export type SchemaValue = {
+    /**
+     * Scanned events (or people) with this value.
+     */
+    count: number;
+    /**
+     * The value in text form, as insight filters compare it: numbers as
+     * written, booleans as `true` or `false`.
+     */
+    value: string;
+};
+
+/**
+ * Top values, most common first.
+ */
+export type SchemaValueList = {
+    /**
+     * The values.
+     */
+    items: Array<SchemaValue>;
+    /**
+     * The scan stopped at its cap of newest events (or most recently seen
+     * people), so counts cover only those.
+     */
+    sampled: boolean;
+};
+
+/**
+ * The JSON type of a key's values.
+ */
+export type SchemaValueType = 'text' | 'number' | 'boolean';
+
+/**
  * An area API key scopes name, such as `projects`.
  */
 export type ScopeArea = {
@@ -4804,6 +4915,209 @@ export type AnalyticsRetentionResponses = {
 };
 
 export type AnalyticsRetentionResponse = AnalyticsRetentionResponses[keyof AnalyticsRetentionResponses];
+
+export type AnalyticsSchemaEventsData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        from?: Day | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * Text the name contains, ignoring ASCII case.
+         */
+        q?: string | null;
+        to?: Day | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/schema/events';
+};
+
+export type AnalyticsSchemaEventsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSchemaEventsError = AnalyticsSchemaEventsErrors[keyof AnalyticsSchemaEventsErrors];
+
+export type AnalyticsSchemaEventsResponses = {
+    /**
+     * OK
+     */
+    200: SchemaEventList;
+};
+
+export type AnalyticsSchemaEventsResponse = AnalyticsSchemaEventsResponses[keyof AnalyticsSchemaEventsResponses];
+
+export type AnalyticsSchemaKeysData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * Only properties of this event (`pageview` included). Property source only.
+         */
+        event?: string | null;
+        from?: Day | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * Text the key contains, ignoring ASCII case.
+         */
+        q?: string | null;
+        /**
+         * Event properties or person traits.
+         */
+        source: SchemaSource;
+        to?: Day | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/schema/keys';
+};
+
+export type AnalyticsSchemaKeysErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSchemaKeysError = AnalyticsSchemaKeysErrors[keyof AnalyticsSchemaKeysErrors];
+
+export type AnalyticsSchemaKeysResponses = {
+    /**
+     * OK
+     */
+    200: SchemaKeyList;
+};
+
+export type AnalyticsSchemaKeysResponse = AnalyticsSchemaKeysResponses[keyof AnalyticsSchemaKeysResponses];
+
+export type AnalyticsSchemaValuesData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * Only values on this event (`pageview` included). Property source only.
+         */
+        event?: string | null;
+        from?: Day | null;
+        /**
+         * The property or trait key, matched exactly.
+         */
+        key: string;
+        /**
+         * At most this many, 1-200. Default 20.
+         */
+        limit?: number | null;
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+        /**
+         * Text the value contains, ignoring ASCII case.
+         */
+        q?: string | null;
+        /**
+         * Event properties or person traits.
+         */
+        source: SchemaSource;
+        to?: Day | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/analytics/schema/values';
+};
+
+export type AnalyticsSchemaValuesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type AnalyticsSchemaValuesError = AnalyticsSchemaValuesErrors[keyof AnalyticsSchemaValuesErrors];
+
+export type AnalyticsSchemaValuesResponses = {
+    /**
+     * OK
+     */
+    200: SchemaValueList;
+};
+
+export type AnalyticsSchemaValuesResponse = AnalyticsSchemaValuesResponses[keyof AnalyticsSchemaValuesResponses];
 
 export type AnalyticsSiteGetData = {
     body?: never;

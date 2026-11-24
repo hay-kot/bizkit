@@ -100,7 +100,7 @@ pub(crate) fn display(traits: &Map<String, Value>) -> Option<String> {
     ["email", "name"].iter().find_map(|key| traits.get(*key)?.as_str().map(str::to_owned))
 }
 
-fn like_pattern(q: &str) -> String {
+pub(crate) fn like_pattern(q: &str) -> String {
     let mut pattern = String::from("%");
     for c in q.trim().chars() {
         if matches!(c, '%' | '_' | '\\') {

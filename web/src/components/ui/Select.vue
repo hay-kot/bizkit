@@ -1,13 +1,9 @@
 <script setup lang="ts" generic="T extends string">
-import {
-  onClickOutside,
-  useElementBounding,
-  useElementSize,
-  useEventListener,
-  useWindowSize,
-} from '@vueuse/core'
+import { onClickOutside } from '@vueuse/core'
 import { Check, ChevronsUpDown } from 'lucide-vue-next'
 import { computed, nextTick, ref, useId } from 'vue'
+
+import { useFloatingList } from './floatingList'
 
 export interface SelectOption<V extends string> {
   value: V
@@ -42,42 +38,10 @@ const selected = computed(() => props.options.find((o) => o.value === model.valu
 
 onClickOutside(root, () => (open.value = false), { ignore: [list] })
 
-// The list renders in <body> so table and panel scroll containers can't clip
-// it; it opens upward when there's no room below. It is at least 224px (14rem)
-// wide, so a short toolbar trigger doesn't open a cramped list, and it shifts
-// left to stay inside the viewport, which matters near the right edge and on
-// phones.
-const EDGE = 8
-const MIN_LIST_WIDTH = 224
-const anchor = useElementBounding(button)
-const viewport = useWindowSize({ includeScrollbar: false })
-const { width: listWidth } = useElementSize(list, undefined, { box: 'border-box' })
-const position = computed(() => {
-  const below = viewport.height.value - anchor.bottom.value
-  const up = below < 336 && anchor.top.value > below
-  const maxWidth = Math.max(0, viewport.width.value - 2 * EDGE)
-  const minWidth = Math.min(Math.max(anchor.width.value, MIN_LIST_WIDTH), maxWidth)
-  const width = Math.max(listWidth.value, minWidth)
-  const left = Math.max(EDGE, Math.min(anchor.left.value, viewport.width.value - EDGE - width))
-  return {
-    left: `${left}px`,
-    minWidth: `${minWidth}px`,
-    maxWidth: `${maxWidth}px`,
-    ...(up
-      ? { bottom: `${viewport.height.value - anchor.top.value + 4}px` }
-      : { top: `${anchor.bottom.value + 4}px` }),
-  }
-})
-useEventListener(
-  'scroll',
-  (event: Event) => {
-    if (open.value && !list.value?.contains(event.target as Node)) open.value = false
-  },
-  { capture: true, passive: true },
-)
+const { position, update } = useFloatingList(button, list, open)
 
 async function show() {
-  anchor.update()
+  update()
   active.value = Math.max(
     0,
     props.options.findIndex((o) => o.value === model.value),

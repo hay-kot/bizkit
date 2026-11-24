@@ -112,7 +112,7 @@ async function onCreate() {
       @close="panelOpen = false"
       @submit="onCreate"
     >
-      <FunnelForm v-model="draft" />
+      <FunnelForm v-model="draft" :workspace-id="workspaceId" :project-id="projectId" />
     </FormPanel>
   </AnalyticsShell>
 </template>
