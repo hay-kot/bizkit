@@ -27,7 +27,7 @@ test.describe('workspace pages', () => {
   })
 
   const workspacePages = ['projects', 'team', 'api-keys', 'settings']
-  const projectPages = ['forms', 'webhooks', 'extensions']
+  const projectPages = ['forms', 'webhooks', 'extensions', 'mailing', 'mailing/broadcasts']
   for (const section of [...workspacePages, ...projectPages]) {
     test(`the ${section} page is clean`, async ({ page, world }) => {
       const errors = trackPageErrors(page)
@@ -74,6 +74,37 @@ test.describe('workspace pages', () => {
     await page.getByRole('button', { name: /^Inspect the POST request/ }).click()
     await expect(page.getByRole('heading', { name: 'Headers' })).toBeVisible()
     await expectCleanPage(page, errors)
+  })
+
+  test('a mailing list and a draft broadcast are clean', async ({ page, world, baseURL }) => {
+    const errors = trackPageErrors(page)
+    const workspace = world.workspaces.main!.id
+    const headers = { Origin: new URL(baseURL!).origin }
+    const created = await page.request.post(`/api/v1/workspaces/${workspace}/mailing/lists`, {
+      data: { name: 'Newsletter', project_id: world.projects.site!.id, double_opt_in: false },
+      headers,
+    })
+    expect(created.status()).toBe(201)
+    const list = await created.json()
+    const contacts = `/api/v1/workspaces/${workspace}/mailing/lists/${list.id}/contacts`
+    await page.request.post(contacts, { data: { email: 'ada@e2e.test' }, headers })
+    const drafted = await page.request.post(`/api/v1/workspaces/${workspace}/mailing/broadcasts`, {
+      data: { list_id: list.id, subject: 'Hello', body_md: 'Hi **there**' },
+      headers,
+    })
+    expect(drafted.status()).toBe(201)
+    const broadcast = await drafted.json()
+    const project = `/w/${workspace}/p/${world.projects.site!.id}`
+
+    await page.goto(`${project}/mailing/lists/${list.id}`)
+    await expect(page.getByRole('row', { name: /ada@e2e\.test/ })).toBeVisible()
+    await expectCleanPage(page, errors)
+
+    await page.goto(`${project}/mailing/broadcasts/${broadcast.id}`)
+    await expect(page.frameLocator('iframe[title="Mail preview"]').getByText('there')).toBeVisible()
+    // The preview is the mail's own HTML in a sandbox without scripts, which
+    // axe can't enter; the mail template has its own snapshot tests.
+    await expectCleanPage(page, errors, { exclude: ['iframe[title="Mail preview"]'] })
   })
 
   const analyticsTabs = ['', '/events', '/funnels', '/people', '/retention', '/settings']
