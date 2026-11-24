@@ -294,6 +294,7 @@ const empty = computed(() => !looking.value && ordered.value.length === 0)
         <div
           v-if="open"
           ref="list"
+          data-floating
           :style="position"
           class="fixed z-60 max-h-80 overflow-auto rounded-box border border-base-300 bg-raised p-1.5 shadow-lg"
         >

@@ -10,8 +10,9 @@ const MIN_LIST_WIDTH = 224
  * below, is at least 224px (14rem) wide so a short toolbar trigger doesn't
  * open a cramped list, and shifts left to stay inside the viewport, which
  * matters near the right edge and on phones. Scrolling anything but the list
- * closes it, because the coordinates would go stale; `onClose` runs then, so
- * a caller with more state than `open` can reset it too.
+ * (or another floating surface, marked `data-floating`) closes it, because
+ * the coordinates would go stale; `onClose` runs then, so a caller with more
+ * state than `open` can reset it too.
  */
 export function useFloatingList(
   trigger: Ref<HTMLElement | undefined>,
@@ -41,7 +42,10 @@ export function useFloatingList(
   useEventListener(
     'scroll',
     (event: Event) => {
-      if (open.value && !list.value?.contains(event.target as Node)) onClose()
+      if (!open.value || list.value?.contains(event.target as Node)) return
+      // A list inside a popover scrolls without moving the popover's anchor.
+      if (event.target instanceof Element && event.target.closest('[data-floating]')) return
+      onClose()
     },
     { capture: true, passive: true },
   )

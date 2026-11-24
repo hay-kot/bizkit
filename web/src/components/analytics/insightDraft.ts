@@ -24,9 +24,12 @@ export interface InsightDraft {
   breakdownKey: string
 }
 
+/** The most filters a query takes; the server refuses more. */
+export const MAX_FILTERS = 10
+
 export const MEASURES: { value: Measure; label: string; description: string }[] = [
-  { value: 'total', label: 'Events', description: 'How many times it happened' },
-  { value: 'users', label: 'Users', description: 'How many people did it' },
+  { value: 'total', label: 'Total events', description: 'How many times it happened' },
+  { value: 'users', label: 'Unique users', description: 'How many people did it' },
   {
     value: 'share',
     label: 'Share of active users',
@@ -34,18 +37,34 @@ export const MEASURES: { value: Measure; label: string; description: string }[] 
   },
   {
     value: 'per_user',
-    label: 'Per-user distribution',
+    label: 'Times per user',
     description: 'People with a stored ID by how many times they did it',
   },
 ]
 
-export const FILTER_OPS: { value: FilterOp; label: string }[] = [
-  { value: 'is', label: 'is' },
-  { value: 'is_not', label: 'is not' },
-  { value: 'gt', label: '>' },
-  { value: 'lt', label: '<' },
-  { value: 'is_set', label: 'is set' },
+export const FILTER_OPS: { value: FilterOp; label: string; short: string }[] = [
+  { value: 'is', label: 'is', short: 'is' },
+  { value: 'is_not', label: 'is not', short: 'is not' },
+  { value: 'gt', label: 'greater than', short: '>' },
+  { value: 'lt', label: 'less than', short: '<' },
+  { value: 'is_set', label: 'is set', short: 'is set' },
 ]
+
+/**
+ * The comparisons that fit a key whose values take `types`. `gt` and `lt`
+ * never match text, so they only show when the key has numbers; a key the
+ * schema doesn't know (`undefined`) gets every comparison.
+ */
+export function opsFor(types: string[] | undefined): typeof FILTER_OPS {
+  if (!types || types.includes('number')) return FILTER_OPS
+  return FILTER_OPS.filter((o) => o.value !== 'gt' && o.value !== 'lt')
+}
+
+/** A filter as a chip reads it: `plan is pro`, `seats > 3`, `beta is set`. */
+export function describeFilter(filter: FilterDraft): string {
+  const op = FILTER_OPS.find((o) => o.value === filter.op)?.short ?? filter.op
+  return filter.op === 'is_set' ? `${filter.key} ${op}` : `${filter.key} ${op} ${filter.value}`
+}
 
 export function emptyInsight(): InsightDraft {
   return {
@@ -78,7 +97,7 @@ function filterOf(draft: FilterDraft): InsightFilter {
  * one (a number for gt and lt). Rows still being filled in are left out of
  * the query, so the result doesn't fail or drop to zero while typing.
  */
-function isComplete(draft: FilterDraft): boolean {
+export function isComplete(draft: FilterDraft): boolean {
   if (draft.key.trim() === '') return false
   if (draft.op === 'is_set') return true
   const text = draft.value.trim()
@@ -149,7 +168,7 @@ const MEASURE_WORDS: Record<Measure, string> = {
   total: 'Events',
   users: 'Users',
   share: 'Share of active users',
-  per_user: 'Per user',
+  per_user: 'Times per user',
 }
 
 /** A short line that says what an insight counts, for lists. */

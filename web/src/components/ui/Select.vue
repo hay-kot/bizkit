@@ -89,6 +89,12 @@ function onKey(event: KeyboardEvent) {
       pick(active.value)
       break
     case 'Escape':
+      // The open list owns this Escape, so a popover or dialog around the
+      // select stays open.
+      event.preventDefault()
+      event.stopPropagation()
+      open.value = false
+      break
     case 'Tab':
       open.value = false
       break
@@ -136,6 +142,7 @@ function onKey(event: KeyboardEvent) {
           v-if="open"
           :id="listId"
           ref="list"
+          data-floating
           role="listbox"
           :aria-label="label"
           :style="position"

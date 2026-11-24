@@ -42,7 +42,8 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 | `BarList` | A ranked list with a share bar behind each row (a `progress` element, so no width style), the top `limit` rows and a "Show all" button (`show-all`). |
 | `ReportGrid` | Lays report panels out two-up on wide screens, one column below, so the page needs no grid classes. |
 | `DashboardGrid`, `DashboardTile` | A dashboard's tiles on a 12-column grid (`gap-4`), one column below `lg`. Each tile is 4, 6, 8 or 12 columns wide (a third, half, two thirds, full) and a row is as tall as its tallest tile: tiles are `h-full`, the body is `flex-1`, and a compact chart (`TimeSeriesChart fill`) grows to the room, at least `min-h-48`. The tile is a panel: header `px-4 pt-4` (title link in `primary`, muted caption), body `px-4 pb-4`. In edit mode a bar on top holds the drag handle, a width `SegmentedControl` and Remove, and the title stops being a link. The handle reorders by pointer drag (a `primary` bar in the gutter shows the drop) or by arrow keys, and a live region says where the tile went. |
-| `SegmentedControl` | Two to five short, exclusive choices side by side (tile width; later Builder or Code). A radio group with one tab stop; arrow keys move the choice. A longer list is a `Select`. |
+| `SegmentedControl` | Two to five short, exclusive choices side by side (tile width, Builder or Code, Events or People). A radio group with one tab stop; arrow keys move the choice. A longer list is a `Select`. |
+| `Popover` | A short form that opens under its trigger on the `raised` surface (`w-80`, `p-4`), placed like a `Select` list: an insight filter's key, comparison and value. Non-modal: focus goes to its first field and back to the trigger; Escape, a click outside or tabbing away closes it, and a `Select` or `Combobox` list open inside it counts as inside. A bigger form is a `FormPanel`. |
 
 ## List page
 
@@ -83,6 +84,14 @@ Analytics. A read-only page of numbers for a date range.
 - Each panel loads and fails on its own: a panel shows its own skeleton or error alert, and the others still render.
 - A range with no data shows tiles at 0, a flat chart and "No data for this range" in each panel, not an empty-state card.
 - "Show all" opens the full list in a side panel, not a new page.
+
+## Query editor
+
+The insight builder, on the new and saved insight pages.
+
+- A toolbar with the `TimeRangePicker` on the left and a Builder or Code `SegmentedControl` on the right, then the editor panel, then the result panel. Both panels are full width.
+- Builder: one row per part of the query, a `w-28` muted label on the left (stacked above the control at phone width) and the control on the right: a `SegmentedControl` for the kind, `Combobox`es for names (grouped, with counts, from the schema lookups), a `Select` with descriptions for the measure, and filters as chips with "Add filter", each opening a `Popover`. Notes that explain a choice sit in a muted hint line under its row, not in a paragraph after the form.
+- Code: the query JSON in `JsonEditor` with a Run button and the Cmd/Ctrl+Enter hint. The JSON is the source of truth; when the Builder can't show it, the toggle stays on Code and an inline error says why.
 
 ## Rules for every page
 
