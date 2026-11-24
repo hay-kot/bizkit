@@ -140,7 +140,7 @@ watch(
             class="px-2.5 py-2 text-sm text-base-content/80"
           >
             <p>No projects yet.</p>
-            <RouterLink :to="`/w/${workspaceId}/projects`" class="link font-medium link-hover">
+            <RouterLink :to="`/w/${workspaceId}/projects`" class="link font-medium">
               Create a project
             </RouterLink>
           </div>

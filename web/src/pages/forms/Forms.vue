@@ -68,6 +68,7 @@ async function onCreate() {
       :columns="columns"
       :rows="forms?.items"
       :row-key="(f) => f.id"
+      :row-to="(r) => formPath(r.id)"
       :loading="isPending"
       :error="error"
       :empty="{
@@ -77,9 +78,7 @@ async function onCreate() {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="formPath(row.id)" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
         <span v-if="!row.enabled" class="ms-2 badge badge-ghost badge-sm">Disabled</span>
       </template>
       <template #cell-inbox="{ row }"

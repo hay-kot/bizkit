@@ -45,6 +45,7 @@ const columns = [
       :columns="columns"
       :rows="insights?.items"
       :row-key="(i) => i.id"
+      :row-to="(r) => `${base}/${r.id}`"
       :loading="isPending"
       :error="error"
       :empty="{
@@ -54,9 +55,7 @@ const columns = [
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="`${base}/${row.id}`" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-query="{ row }">
         <span class="line-clamp-1 text-sm">{{ describeQuery(row.query) }}</span>

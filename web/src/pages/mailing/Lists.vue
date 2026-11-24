@@ -83,6 +83,7 @@ async function onCreate() {
       :columns="columns"
       :rows="lists?.items"
       :row-key="(l) => l.id"
+      :row-to="(r) => listPath(r.id)"
       :loading="isPending"
       :error="error"
       label="Lists"
@@ -93,9 +94,7 @@ async function onCreate() {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="listPath(row.id)" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-consent="{ row }"
         ><span class="text-sm">{{ row.double_opt_in ? 'On' : 'Off' }}</span></template

@@ -120,7 +120,7 @@ const nameColumns = [
 const recentColumns = [
   { key: 'time', label: 'Time' },
   { key: 'name', label: 'Event' },
-  { key: 'person', label: 'Person' },
+  { key: 'person', label: 'Person', interactive: true },
   { key: 'page', label: 'Page' },
   { key: 'props', label: 'Properties' },
 ]
@@ -212,16 +212,9 @@ const viewingFacts = computed(() => {
           title: 'No custom events in this range',
           message: 'Send one with bizkit.track(name, props) on your site.',
         }"
+        @row-click="(n) => (selectedName = n.name)"
       >
-        <template #cell-name="{ row }">
-          <button
-            type="button"
-            class="link font-medium link-hover"
-            @click="selectedName = row.name"
-          >
-            {{ row.name }}
-          </button>
-        </template>
+        <template #cell-name="{ row }">{{ row.name }}</template>
         <template #cell-count="{ row }"
           ><span class="tabular-nums">{{ formatNumber(row.count) }}</span></template
         >
@@ -242,22 +235,18 @@ const viewingFacts = computed(() => {
         :loading="recent.isPending.value"
         :error="recent.error.value"
         :empty="{ title: 'No events in this range' }"
+        @row-click="(e) => (viewing = e)"
       >
-        <template #cell-time="{ row }">
-          <button type="button" class="link text-sm link-hover" @click="viewing = row">
-            {{ formatDateTime(row.ts) }}
-          </button>
-        </template>
+        <template #cell-time="{ row }"
+          ><span class="text-sm">{{ formatDateTime(row.ts) }}</span></template
+        >
         <template #cell-name="{ row }"
           ><span class="font-medium">{{ row.name }}</span></template
         >
         <template #cell-person="{ row }">
-          <RouterLink
-            v-if="row.person_id"
-            :to="personPath(row.person_id)"
-            class="link text-sm link-hover"
-            >{{ row.user_id ?? 'Person' }}</RouterLink
-          >
+          <RouterLink v-if="row.person_id" :to="personPath(row.person_id)" class="link text-sm">{{
+            row.user_id ?? 'Person'
+          }}</RouterLink>
           <span v-else class="text-sm text-base-content/70">Anonymous</span>
         </template>
         <template #cell-page="{ row }"

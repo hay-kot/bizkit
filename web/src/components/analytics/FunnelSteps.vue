@@ -52,7 +52,7 @@ const rows = computed(() => {
           <RouterLink
             v-if="droppedLink"
             :to="droppedLink(row.number)"
-            class="link tabular-nums link-hover"
+            class="link tabular-nums"
             :class="selected === row.number ? 'font-medium text-primary' : 'text-base-content/70'"
             :aria-current="selected === row.number ? 'true' : undefined"
           >

@@ -85,6 +85,7 @@ async function onCreate() {
       :columns="columns"
       :rows="broadcasts?.items"
       :row-key="(b) => b.id"
+      :row-to="(r) => broadcastPath(r.id)"
       :loading="isPending"
       :error="error"
       label="Broadcasts"
@@ -95,9 +96,7 @@ async function onCreate() {
       }"
     >
       <template #cell-subject="{ row }">
-        <RouterLink :to="broadcastPath(row.id)" class="link font-medium link-hover">
-          {{ row.subject }}
-        </RouterLink>
+        {{ row.subject }}
       </template>
       <template #cell-list="{ row }"
         ><span class="text-sm">{{ listName(row.list_id) }}</span></template

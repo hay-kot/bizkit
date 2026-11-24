@@ -48,25 +48,20 @@ function eventLabel(event: EventItem): string {
       </span>
     </template>
     <template #actions>
-      <RouterLink :to="close" class="link text-sm link-hover">Close</RouterLink>
+      <RouterLink :to="close" class="link text-sm">Close</RouterLink>
     </template>
     <DataTable
       :columns="columns"
       :rows="page?.items"
       :row-key="rowKey"
+      :row-to="(r) => (r.person_id ? personPath(r.person_id) : undefined)"
       :loading="loading"
       :error="error"
       :empty="{ title: 'Nobody dropped off here', message: 'Try a longer range.' }"
       label="People who dropped off"
     >
       <template #cell-person="{ row }">
-        <RouterLink
-          v-if="row.person_id"
-          :to="personPath(row.person_id)"
-          class="link font-medium link-hover"
-        >
-          {{ row.display ?? row.user_id }}
-        </RouterLink>
+        <template v-if="row.person_id">{{ row.display ?? row.user_id }}</template>
         <span v-else class="text-base-content/70">Anonymous visitor</span>
       </template>
       <template #cell-entered="{ row }">

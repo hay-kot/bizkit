@@ -444,7 +444,7 @@ function summaryOf(run: Run): string {
             <button
               v-if="resultOf(row)"
               type="button"
-              class="link text-sm font-medium link-hover"
+              class="link text-sm font-medium"
               @click="viewingCase = resultOf(row) ?? null"
             >
               {{ row.name }}
@@ -505,16 +505,12 @@ function summaryOf(run: Run): string {
               ? 'Runs show here as submissions come in.'
               : 'Runs show here after each event.',
           }"
+          @row-click="(r) => (viewing = r)"
         >
           <template #cell-when="{ row }">
-            <button
-              type="button"
-              class="link text-sm whitespace-nowrap link-hover"
-              :title="formatDateTime(row.created_at)"
-              @click="viewing = row"
-            >
+            <span class="text-sm whitespace-nowrap" :title="formatDateTime(row.created_at)">
               {{ formatRelative(row.created_at) }}
-            </button>
+            </span>
           </template>
           <template #cell-cause="{ row }">
             <span class="text-sm"

@@ -77,6 +77,7 @@ async function onCreate() {
       :columns="columns"
       :rows="funnels?.items"
       :row-key="(f) => f.id"
+      :row-to="(r) => funnelPath(r.id)"
       :loading="isPending"
       :error="error"
       :empty="{
@@ -86,9 +87,7 @@ async function onCreate() {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="funnelPath(row.id)" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-steps="{ row }">
         <span class="line-clamp-1 text-sm">{{ row.steps.map(describeStep).join(' → ') }}</span>

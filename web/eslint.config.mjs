@@ -47,6 +47,16 @@ const controlRestrictions = [
   },
 ]
 
+// Outside src/components/ui: a row's name is never a hover-underlined link,
+// because only its text would be the target. Inline links in prose keep `link`.
+const rowLinkRestrictions = [
+  {
+    pattern: '^link-hover$',
+    message:
+      '$0: for a row that opens a page or panel, use DataTable rowTo or @row-click, so the whole row is the target. Inline text links use `link`.',
+  },
+]
+
 // In src/pages: one column, width set on <Page>.
 const pageRestrictions = [
   {
@@ -136,7 +146,7 @@ export default tseslint.config(
     rules: {
       'better-tailwindcss/no-restricted-classes': [
         'error',
-        { restrict: [...tokenRestrictions, ...controlRestrictions] },
+        { restrict: [...tokenRestrictions, ...controlRestrictions, ...rowLinkRestrictions] },
       ],
       'vue/no-restricted-html-elements': [
         'error',
@@ -163,7 +173,14 @@ export default tseslint.config(
     rules: {
       'better-tailwindcss/no-restricted-classes': [
         'error',
-        { restrict: [...tokenRestrictions, ...controlRestrictions, ...pageRestrictions] },
+        {
+          restrict: [
+            ...tokenRestrictions,
+            ...controlRestrictions,
+            ...rowLinkRestrictions,
+            ...pageRestrictions,
+          ],
+        },
       ],
     },
   },

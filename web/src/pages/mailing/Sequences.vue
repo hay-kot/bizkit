@@ -106,6 +106,7 @@ async function onCreate() {
       :columns="columns"
       :rows="sequences?.items"
       :row-key="(s) => s.id"
+      :row-to="(r) => sequencePath(r.id)"
       :loading="isPending"
       :error="error"
       label="Sequences"
@@ -116,9 +117,7 @@ async function onCreate() {
       }"
     >
       <template #cell-name="{ row }">
-        <RouterLink :to="sequencePath(row.id)" class="link font-medium link-hover">
-          {{ row.name }}
-        </RouterLink>
+        {{ row.name }}
       </template>
       <template #cell-list="{ row }"
         ><span class="text-sm">{{ listName(row.list_id) }}</span></template
