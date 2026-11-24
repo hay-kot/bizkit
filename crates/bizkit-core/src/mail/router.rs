@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
+use anyhow::Context as _;
+
 use super::settings;
 use crate::Platform;
 use crate::deps::{Mail, MailError, Mailer, ThrottledMailer};
@@ -22,6 +24,9 @@ const CACHE_LIFE: Duration = Duration::from_mins(15);
 #[derive(Debug, Default)]
 pub struct MailRouter {
     cache: Mutex<HashMap<WorkspaceId, Cached>>,
+    /// Held while a mailer is built, so concurrent cache misses build one
+    /// mailer (and one rate budget) instead of one each.
+    building: tokio::sync::Mutex<()>,
 }
 
 #[derive(Debug)]
@@ -76,11 +81,12 @@ impl MailRouter {
             return Ok(None);
         };
         let now = platform.now();
-        if let Some(cached) = self.lock().get(&workspace_id)
-            && cached.updated_at == updated_at
-            && cached.built_at > now.minus(CACHE_LIFE)
-        {
-            return Ok(Some(Arc::clone(&cached.mailer)));
+        if let Some(mailer) = self.cached(workspace_id, updated_at, now) {
+            return Ok(Some(mailer));
+        }
+        let _building = self.building.lock().await;
+        if let Some(mailer) = self.cached(workspace_id, updated_at, now) {
+            return Ok(Some(mailer));
         }
         let Some(row) = settings::find(db, workspace_id)
             .await
@@ -114,24 +120,46 @@ impl MailRouter {
         Ok(Some(mailer))
     }
 
-    /// The Mailgun webhook signing key the workspace saved, or `None`.
+    /// The Mailgun webhook signing key the workspace saved, or `None`
+    /// (also when the instance has no secrets key to open it).
     ///
     /// # Errors
     ///
-    /// When the settings can't be read, or the instance has no secrets key.
+    /// When the settings can't be read or opened.
     pub async fn webhook_signing_key(
         &self,
         platform: &Platform,
         workspace_id: WorkspaceId,
     ) -> anyhow::Result<Option<String>> {
-        let Some(row) = settings::find(platform.db().read(), workspace_id).await? else {
+        let Some(row) = settings::find(platform.db().read(), workspace_id)
+            .await
+            .with_context(|| format!("reading the mail settings of workspace {workspace_id}"))?
+        else {
             return Ok(None);
         };
-        let secrets = platform
-            .secrets()
-            .ok_or_else(|| anyhow::anyhow!("this instance has no secrets key (secrets_key_env)"))?;
+        let Some(secrets) = platform.secrets() else {
+            tracing::warn!(
+                %workspace_id,
+                "a Mailgun event arrived for a workspace account, but this instance has no secrets key (secrets_key_env)"
+            );
+            return Ok(None);
+        };
         let opened = settings::open(secrets, workspace_id, &row.secrets)?;
         Ok(opened.mailgun_webhook_signing_key.filter(|key| !key.trim().is_empty()))
+    }
+
+    fn cached(
+        &self,
+        workspace_id: WorkspaceId,
+        updated_at: UnixMillis,
+        now: UnixMillis,
+    ) -> Option<Arc<dyn Mailer>> {
+        self.lock()
+            .get(&workspace_id)
+            .filter(|cached| {
+                cached.updated_at == updated_at && cached.built_at > now.minus(CACHE_LIFE)
+            })
+            .map(|cached| Arc::clone(&cached.mailer))
     }
 
     /// Drops the cached mailer, after the settings changed.

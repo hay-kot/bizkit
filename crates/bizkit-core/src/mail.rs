@@ -246,6 +246,9 @@ fn allowed_smtp_ip(ip: std::net::IpAddr) -> bool {
 /// Checks an SMTP host as typed: [`check_host`], with the loopback
 /// exception of [`allowed_smtp_ip`].
 pub(crate) fn check_smtp_host(host: &str) -> Result<(), EgressError> {
+    if !cfg!(feature = "test-hooks") && is_loopback_host(host) {
+        return Err(EgressError::Blocked { host: host.trim().to_owned() });
+    }
     match check_host(host) {
         Err(EgressError::Blocked { host: blocked })
             if blocked.parse().is_ok_and(allowed_smtp_ip) =>

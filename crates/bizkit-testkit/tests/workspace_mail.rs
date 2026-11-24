@@ -52,8 +52,8 @@ mod workspace_mail {
                 "domain": "mg.tallyho.example",
                 "region": "eu",
                 "api_key": "key-hunter2",
-                "webhook_signing_key": "whk-hunter2",
             },
+            "webhook_signing_key": "whk-hunter2",
         })
     }
 
@@ -114,10 +114,14 @@ mod workspace_mail {
         let switched = s.put(&mailgun()).await;
         switched.expect(StatusCode::OK);
         assert_eq!(switched["mailgun"]["has_api_key"], true, "api key");
-        assert_eq!(switched["mailgun"]["has_webhook_signing_key"], true, "webhook key");
+        assert_eq!(switched["has_webhook_signing_key"], true, "webhook key");
+        assert_eq!(switched["secrets_readable"], true, "readable");
         assert_eq!(switched["smtp"], Value::Null, "smtp gone");
         assert!(!switched.body.to_string().contains("hunter2"), "{}", switched.body);
-        assert_eq!(switched["mailgun"]["webhook_url"], Value::Null, "no mailing module, no URL");
+        assert_eq!(switched["webhook_url"], Value::Null, "no mailing module, no URL");
+
+        let back = s.put(&smtp()).await;
+        assert_eq!(back["has_webhook_signing_key"], true, "the webhook key outlives a switch");
     }
 
     #[tokio::test]
@@ -132,6 +136,13 @@ mod workspace_mail {
         assert_eq!(kept["smtp"]["has_password"], true, "kept");
         assert_eq!(kept["from_name"], "Tallyho News", "updated");
 
+        let mut anonymous = again.clone();
+        anonymous["smtp"].as_object_mut().unwrap().remove("username");
+        let dropped = s.put(&anonymous).await;
+        dropped.expect(StatusCode::OK);
+        assert_eq!(dropped["smtp"]["has_password"], false, "no user name, no password");
+        s.put(&smtp()).await.expect(StatusCode::OK);
+
         again["smtp"]["password"] = json!("");
         let removed = s.put(&again).await;
         removed.expect(StatusCode::UNPROCESSABLE_ENTITY);
@@ -142,6 +153,32 @@ mod workspace_mail {
         let refused = s.put(&switched).await;
         refused.expect(StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(fields(&refused), ["mailgun.api_key"], "a new provider needs its key");
+    }
+
+    #[tokio::test]
+    async fn a_kept_secret_only_goes_to_the_server_it_was_saved_for() {
+        let s = setup().await;
+        s.put(&smtp()).await.expect(StatusCode::OK);
+        let mut moved = smtp();
+        moved["smtp"].as_object_mut().unwrap().remove("password");
+        moved["smtp"]["host"] = json!("smtp.elsewhere.example");
+        let refused = s.put(&moved).await;
+        refused.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(fields(&refused), ["smtp.password"], "a new host needs the password again");
+
+        s.put(&mailgun()).await.expect(StatusCode::OK);
+        let mut other_domain = mailgun();
+        other_domain["mailgun"].as_object_mut().unwrap().remove("api_key");
+        other_domain["mailgun"]["domain"] = json!("mg.elsewhere.example");
+        let refused_key = s.put(&other_domain).await;
+        refused_key.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(fields(&refused_key), ["mailgun.api_key"], "a new domain needs the key again");
+
+        let mut cleared = smtp();
+        cleared["reply_to"] = json!("");
+        let saved = s.put(&cleared).await;
+        saved.expect(StatusCode::OK);
+        assert_eq!(saved["reply_to"], Value::Null, "an empty reply-to clears it");
     }
 
     #[tokio::test]

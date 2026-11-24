@@ -1581,6 +1581,11 @@ export type MailSettings = {
      * The sender's display name.
      */
     from_name: string;
+    /**
+     * Whether a Mailgun webhook signing key is saved. It works with
+     * either provider, so SMTP relayed through Mailgun reports bounces too.
+     */
+    has_webhook_signing_key: boolean;
     mailgun?: MailgunSettings | null;
     /**
      * Which service sends.
@@ -1590,12 +1595,22 @@ export type MailSettings = {
      * Where replies go, when not to the sender.
      */
     reply_to?: string | null;
+    /**
+     * False when the saved secrets don't open with the instance key (it
+     * changed): every send fails until the secrets are saved again.
+     */
+    secrets_readable: boolean;
     smtp?: SmtpSettings | null;
     /**
      * When the settings last changed.
      */
     updated_at: Timestamp;
     verified_at?: Timestamp | null;
+    /**
+     * Where to point a Mailgun event webhook, so bounces and complaints
+     * reach bizkit. Null without the mailing module.
+     */
+    webhook_url?: string | null;
 };
 
 /**
@@ -1633,11 +1648,6 @@ export type MailgunInput = {
      * The region. Default `us`.
      */
     region?: MailgunRegion;
-    /**
-     * The webhook signing key, to accept the account's bounce and
-     * complaint events. Write-only.
-     */
-    webhook_signing_key?: string | null;
 };
 
 /**
@@ -1658,18 +1668,9 @@ export type MailgunSettings = {
      */
     has_api_key: boolean;
     /**
-     * Whether a webhook signing key is saved.
-     */
-    has_webhook_signing_key: boolean;
-    /**
      * The region.
      */
     region: MailgunRegion;
-    /**
-     * Where to point the account's event webhook, so bounces and
-     * complaints reach bizkit. Null without the mailing module.
-     */
-    webhook_url?: string | null;
 };
 
 /**
@@ -7278,6 +7279,11 @@ export type MailSettingsPutData = {
          */
         reply_to?: string | null;
         smtp?: SmtpInput | null;
+        /**
+         * The Mailgun webhook signing key, to accept bounce and complaint
+         * events at `webhook_url`. Works with either provider. Write-only.
+         */
+        webhook_signing_key?: string | null;
     };
     path: {
         /**
@@ -10594,7 +10600,7 @@ export type MailingPublicMailgunWorkspaceEventsData = {
 
 export type MailingPublicMailgunWorkspaceEventsErrors = {
     /**
-     * Not a Mailgun event
+     * Not a Mailgun event, or not a workspace ID
      */
     400: string;
     /**

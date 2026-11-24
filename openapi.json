@@ -8586,6 +8586,13 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "webhook_signing_key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The Mailgun webhook signing key, to accept bounce and complaint\nevents at `webhook_url`. Works with either provider. Write-only."
                   }
                 },
                 "additionalProperties": false
@@ -15608,7 +15615,7 @@
             }
           },
           "400": {
-            "description": "Not a Mailgun event",
+            "description": "Not a Mailgun event, or not a workspace ID",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18921,6 +18928,8 @@
           "provider",
           "from_name",
           "from_address",
+          "has_webhook_signing_key",
+          "secrets_readable",
           "updated_at"
         ],
         "properties": {
@@ -18931,6 +18940,10 @@
           "from_name": {
             "type": "string",
             "description": "The sender's display name."
+          },
+          "has_webhook_signing_key": {
+            "type": "boolean",
+            "description": "Whether a Mailgun webhook signing key is saved. It works with\neither provider, so SMTP relayed through Mailgun reports bounces too."
           },
           "mailgun": {
             "oneOf": [
@@ -18953,6 +18966,10 @@
               "null"
             ],
             "description": "Where replies go, when not to the sender."
+          },
+          "secrets_readable": {
+            "type": "boolean",
+            "description": "False when the saved secrets don't open with the instance key (it\nchanged): every send fails until the secrets are saved again."
           },
           "smtp": {
             "oneOf": [
@@ -18979,6 +18996,13 @@
                 "type": "null"
               }
             ]
+          },
+          "webhook_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to point a Mailgun event webhook, so bounces and complaints\nreach bizkit. Null without the mailing module."
           }
         }
       },
@@ -19039,13 +19063,6 @@
           "region": {
             "$ref": "#/components/schemas/MailgunRegion",
             "description": "The region. Default `us`."
-          },
-          "webhook_signing_key": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The webhook signing key, to accept the account's bounce and\ncomplaint events. Write-only."
           }
         },
         "additionalProperties": false
@@ -19064,8 +19081,7 @@
         "required": [
           "domain",
           "region",
-          "has_api_key",
-          "has_webhook_signing_key"
+          "has_api_key"
         ],
         "properties": {
           "domain": {
@@ -19076,20 +19092,9 @@
             "type": "boolean",
             "description": "Whether an API key is saved."
           },
-          "has_webhook_signing_key": {
-            "type": "boolean",
-            "description": "Whether a webhook signing key is saved."
-          },
           "region": {
             "$ref": "#/components/schemas/MailgunRegion",
             "description": "The region."
-          },
-          "webhook_url": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Where to point the account's event webhook, so bounces and\ncomplaints reach bizkit. Null without the mailing module."
           }
         }
       },

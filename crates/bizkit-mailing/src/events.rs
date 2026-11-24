@@ -137,7 +137,7 @@ async fn find_delivery(
     request_body(content = Object, content_type = "application/json", description = "`{signature: {timestamp, token, signature}, \"event-data\": {...}}`"),
     responses(
         (status = 200, description = "Accepted", content_type = "text/plain", body = String),
-        (status = 400, description = "Not a Mailgun event", content_type = "text/plain", body = String),
+        (status = 400, description = "Not a Mailgun event, or not a workspace ID", content_type = "text/plain", body = String),
         (status = 401, description = "The signature is wrong, or the workspace saved no signing key", content_type = "text/plain", body = String),
         (status = 406, description = "A replayed token or a stale timestamp; Mailgun stops retrying", content_type = "text/plain", body = String),
         (status = 500, description = "Bizkit failed; Mailgun retries", content_type = "text/plain", body = String),
@@ -158,9 +158,12 @@ pub(crate) async fn mailgun(Extension(platform): Extension<Platform>, body: Byte
 /// `POST /events/mailgun/{workspace_id}`: a workspace account's events.
 pub(crate) async fn mailgun_workspace(
     Extension(platform): Extension<Platform>,
-    Path(workspace_id): Path<WorkspaceId>,
+    Path(workspace_id): Path<String>,
     body: Bytes,
 ) -> Response {
+    let Ok(workspace_id) = workspace_id.parse::<WorkspaceId>() else {
+        return plain(StatusCode::BAD_REQUEST, "Expected a workspace ID.\n");
+    };
     let key = match platform.mail().webhook_signing_key(&platform, workspace_id).await {
         Ok(key) => key,
         Err(err) => {

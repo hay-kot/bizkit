@@ -3628,13 +3628,6 @@ expression: tools
               "region": {
                 "$ref": "#/$defs/MailgunRegion",
                 "description": "The region. Default `us`."
-              },
-              "webhook_signing_key": {
-                "description": "The webhook signing key, to accept the account's bounce and\ncomplaint events. Write-only.",
-                "type": [
-                  "string",
-                  "null"
-                ]
               }
             },
             "required": [
@@ -3701,7 +3694,7 @@ expression: tools
           }
         },
         "additionalProperties": false,
-        "description": "New mail settings, replacing any saved ones. A secret left out keeps the\nsaved one when the provider stays the same; an empty string removes it.",
+        "description": "New mail settings, replacing any saved ones. A password or API key left\nout keeps the saved one only while the server it goes to (host, port and\nuser name, or Mailgun domain and region) stays the same. A left-out\nwebhook key is always kept. An empty string removes a secret.",
         "properties": {
           "from_address": {
             "description": "The sender's address. The account must be allowed to send from it.",
@@ -3742,6 +3735,13 @@ expression: tools
               {
                 "type": "null"
               }
+            ]
+          },
+          "webhook_signing_key": {
+            "description": "The Mailgun webhook signing key, to accept bounce and complaint\nevents at `webhook_url`. Works with either provider. Write-only.",
+            "type": [
+              "string",
+              "null"
             ]
           }
         },

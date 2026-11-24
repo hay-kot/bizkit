@@ -60,6 +60,15 @@ pub struct MailSettings {
     pub smtp: Option<SmtpSettings>,
     /// The Mailgun account, when `provider` is `mailgun`.
     pub mailgun: Option<MailgunSettings>,
+    /// Whether a Mailgun webhook signing key is saved. It works with
+    /// either provider, so SMTP relayed through Mailgun reports bounces too.
+    pub has_webhook_signing_key: bool,
+    /// Where to point a Mailgun event webhook, so bounces and complaints
+    /// reach bizkit. Null without the mailing module.
+    pub webhook_url: Option<String>,
+    /// False when the saved secrets don't open with the instance key (it
+    /// changed): every send fails until the secrets are saved again.
+    pub secrets_readable: bool,
     /// When a test mail last went out with these settings. Any change
     /// clears it.
     pub verified_at: Option<UnixMillis>,
@@ -91,11 +100,6 @@ pub struct MailgunSettings {
     pub region: MailgunRegion,
     /// Whether an API key is saved.
     pub has_api_key: bool,
-    /// Whether a webhook signing key is saved.
-    pub has_webhook_signing_key: bool,
-    /// Where to point the account's event webhook, so bounces and
-    /// complaints reach bizkit. Null without the mailing module.
-    pub webhook_url: Option<String>,
 }
 
 /// The result of a test send.
@@ -120,8 +124,10 @@ pub(crate) struct InWorkspace {
 }
 impl Validate for InWorkspace {}
 
-/// New mail settings, replacing any saved ones. A secret left out keeps the
-/// saved one when the provider stays the same; an empty string removes it.
+/// New mail settings, replacing any saved ones. A password or API key left
+/// out keeps the saved one only while the server it goes to (host, port and
+/// user name, or Mailgun domain and region) stays the same. A left-out
+/// webhook key is always kept. An empty string removes a secret.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PutMailSettings {
@@ -142,6 +148,10 @@ pub(crate) struct PutMailSettings {
     /// Required with `provider: mailgun`.
     #[serde(default)]
     pub(crate) mailgun: Option<MailgunInput>,
+    /// The Mailgun webhook signing key, to accept bounce and complaint
+    /// events at `webhook_url`. Works with either provider. Write-only.
+    #[serde(default)]
+    pub(crate) webhook_signing_key: Option<String>,
 }
 
 /// An SMTP server.
@@ -175,10 +185,6 @@ pub(crate) struct MailgunInput {
     /// The API key. Write-only.
     #[serde(default)]
     pub(crate) api_key: Option<String>,
-    /// The webhook signing key, to accept the account's bounce and
-    /// complaint events. Write-only.
-    #[serde(default)]
-    pub(crate) webhook_signing_key: Option<String>,
 }
 
 fn check_address(errors: &mut FieldErrors, field: &str, address: &str) {
@@ -218,9 +224,10 @@ impl Validate for PutMailSettings {
             errors.add("from_name", "must be on one line");
         }
         check_address(&mut errors, "from_address", &self.from_address);
-        if let Some(reply_to) = &self.reply_to {
+        if let Some(reply_to) = self.reply_to.as_ref().filter(|r| !r.trim().is_empty()) {
             check_address(&mut errors, "reply_to", reply_to);
         }
+        check_secret(&mut errors, "webhook_signing_key", self.webhook_signing_key.as_ref());
         match self.provider {
             AccountProvider::Smtp => {
                 if self.mailgun.is_some() {
@@ -235,8 +242,9 @@ impl Validate for PutMailSettings {
                         if smtp.port == 0 {
                             errors.add("smtp.port", "must be 1 to 65535");
                         }
-                        if smtp.security == SmtpSecurity::None && !is_loopback_host(&smtp.host) {
-                            errors.add("smtp.security", "must be tls or starttls off loopback");
+                        let plain_ok = cfg!(feature = "test-hooks") && is_loopback_host(&smtp.host);
+                        if smtp.security == SmtpSecurity::None && !plain_ok {
+                            errors.add("smtp.security", "must be tls or starttls");
                         }
                         if smtp.username.as_ref().is_some_and(|u| u.chars().count() > 254) {
                             errors.add("smtp.username", "must be at most 254 characters");
@@ -256,11 +264,6 @@ impl Validate for PutMailSettings {
                             errors.add("mailgun.domain", "must be a domain such as mg.example.com");
                         }
                         check_secret(&mut errors, "mailgun.api_key", mailgun.api_key.as_ref());
-                        check_secret(
-                            &mut errors,
-                            "mailgun.webhook_signing_key",
-                            mailgun.webhook_signing_key.as_ref(),
-                        );
                     }
                 }
             }
@@ -286,8 +289,16 @@ fn view(cx: &OpCtx, row: &MailRow) -> Result<MailSettings, ApiError> {
     let opened = cx
         .platform()
         .secrets()
-        .and_then(|secrets| settings::open(secrets, row.workspace_id, &row.secrets).ok())
-        .unwrap_or_default();
+        .map(|secrets| settings::open(secrets, row.workspace_id, &row.secrets))
+        .transpose();
+    let (opened, secrets_readable) = match opened {
+        Ok(opened) => (opened.unwrap_or_default(), true),
+        Err(err) => {
+            tracing::warn!(workspace_id = %row.workspace_id, "workspace mail secrets: {err:#}");
+            (SealedSecrets::default(), false)
+        }
+    };
+    let secrets_readable = secrets_readable && cx.platform().secrets().is_some();
     let smtp = match provider {
         AccountProvider::Smtp => Some(SmtpSettings {
             host: row.smtp_host.clone().unwrap_or_default(),
@@ -303,8 +314,6 @@ fn view(cx: &OpCtx, row: &MailRow) -> Result<MailSettings, ApiError> {
             domain: row.mailgun_domain.clone().unwrap_or_default(),
             region: row.mailgun_region().map_err(internal)?,
             has_api_key: opened.mailgun_api_key.is_some(),
-            has_webhook_signing_key: opened.mailgun_webhook_signing_key.is_some(),
-            webhook_url: webhook_url(cx, row.workspace_id),
         }),
         AccountProvider::Smtp => None,
     };
@@ -315,6 +324,9 @@ fn view(cx: &OpCtx, row: &MailRow) -> Result<MailSettings, ApiError> {
         reply_to: row.reply_to.clone(),
         smtp,
         mailgun,
+        has_webhook_signing_key: opened.mailgun_webhook_signing_key.is_some(),
+        webhook_url: webhook_url(cx, row.workspace_id),
+        secrets_readable,
         verified_at: row.verified_at,
         updated_at: row.updated_at,
     })
@@ -336,6 +348,65 @@ fn merge_secret(given: Option<String>, kept: Option<String>) -> Option<String> {
         Some(text) => Some(text),
         None => kept,
     }
+}
+
+/// Fills the SMTP half of `row`. A saved password is kept only for the
+/// server it was saved for; otherwise an admin could point the account at
+/// a host of their own and read the password from the AUTH exchange.
+fn apply_smtp(
+    row: &mut MailRow,
+    errors: &mut FieldErrors,
+    smtp: SmtpInput,
+    saved: Option<&MailRow>,
+    kept_password: Option<String>,
+) -> Option<String> {
+    let username = smtp.username.map(|u| u.trim().to_owned()).filter(|u| !u.is_empty());
+    let host = smtp.host.trim().to_owned();
+    let same_server = saved.is_some_and(|old| {
+        old.provider == AccountProvider::Smtp.as_str()
+            && old.smtp_host.as_deref() == Some(host.as_str())
+            && old.smtp_port == Some(i64::from(smtp.port))
+            && old.smtp_username == username
+    });
+    let kept_password = kept_password.filter(|_| same_server);
+    // A password without a user name is never sent, so it isn't kept.
+    let password = username.as_ref().and_then(|_| merge_secret(smtp.password, kept_password));
+    if username.is_some() && password.is_none() {
+        errors.add("smtp.password", "is required with a username");
+    }
+    row.smtp_host = Some(host);
+    row.smtp_port = Some(i64::from(smtp.port));
+    row.smtp_security = Some(smtp.security.as_str().to_owned());
+    row.smtp_username = username;
+    password
+}
+
+/// Fills the Mailgun half of `row`. A saved API key is kept only for the
+/// same domain and region.
+fn apply_mailgun(
+    row: &mut MailRow,
+    errors: &mut FieldErrors,
+    mailgun: MailgunInput,
+    saved: Option<&MailRow>,
+    kept_key: Option<String>,
+) -> Option<String> {
+    let domain = mailgun.domain.trim().to_ascii_lowercase();
+    let region = match mailgun.region {
+        MailgunRegion::Us => "us",
+        MailgunRegion::Eu => "eu",
+    };
+    let same_account = saved.is_some_and(|old| {
+        old.provider == AccountProvider::Mailgun.as_str()
+            && old.mailgun_domain.as_deref() == Some(domain.as_str())
+            && old.mailgun_region.as_deref() == Some(region)
+    });
+    let api_key = merge_secret(mailgun.api_key, kept_key.filter(|_| same_account));
+    if api_key.is_none() {
+        errors.add("mailgun.api_key", "is required");
+    }
+    row.mailgun_domain = Some(domain);
+    row.mailgun_region = Some(region.to_owned());
+    api_key
 }
 
 fn capped(text: &str) -> String {
@@ -393,11 +464,16 @@ impl Operation for MailSettingsPut {
         let existing = settings::find(&mut *tx, workspace_id).await?;
         let kept = existing
             .as_ref()
-            .filter(|row| row.provider == input.provider.as_str())
             .and_then(|row| settings::open(secrets, workspace_id, &row.secrets).ok())
             .unwrap_or_default();
         let mut errors = FieldErrors::default();
-        let mut sealed = SealedSecrets::default();
+        let mut sealed = SealedSecrets {
+            mailgun_webhook_signing_key: merge_secret(
+                input.webhook_signing_key,
+                kept.mailgun_webhook_signing_key,
+            ),
+            ..SealedSecrets::default()
+        };
         let mut row = MailRow {
             workspace_id,
             provider: input.provider.as_str().to_owned(),
@@ -420,30 +496,16 @@ impl Operation for MailSettingsPut {
                 .map_or(now, |row| now.max(UnixMillis(row.updated_at.0.saturating_add(1)))),
         };
         if let Some(smtp) = input.smtp {
-            let username = smtp.username.map(|u| u.trim().to_owned()).filter(|u| !u.is_empty());
-            sealed.smtp_password = merge_secret(smtp.password, kept.smtp_password);
-            if username.is_some() && sealed.smtp_password.is_none() {
-                errors.add("smtp.password", "is required with a username");
-            }
-            row.smtp_host = Some(smtp.host.trim().to_owned());
-            row.smtp_port = Some(i64::from(smtp.port));
-            row.smtp_security = Some(smtp.security.as_str().to_owned());
-            row.smtp_username = username;
+            sealed.smtp_password =
+                apply_smtp(&mut row, &mut errors, smtp, existing.as_ref(), kept.smtp_password);
         }
         if let Some(mailgun) = input.mailgun {
-            sealed.mailgun_api_key = merge_secret(mailgun.api_key, kept.mailgun_api_key);
-            sealed.mailgun_webhook_signing_key =
-                merge_secret(mailgun.webhook_signing_key, kept.mailgun_webhook_signing_key);
-            if sealed.mailgun_api_key.is_none() {
-                errors.add("mailgun.api_key", "is required");
-            }
-            row.mailgun_domain = Some(mailgun.domain.trim().to_ascii_lowercase());
-            row.mailgun_region = Some(
-                match mailgun.region {
-                    MailgunRegion::Us => "us",
-                    MailgunRegion::Eu => "eu",
-                }
-                .to_owned(),
+            sealed.mailgun_api_key = apply_mailgun(
+                &mut row,
+                &mut errors,
+                mailgun,
+                existing.as_ref(),
+                kept.mailgun_api_key,
             );
         }
         errors.into_result()?;

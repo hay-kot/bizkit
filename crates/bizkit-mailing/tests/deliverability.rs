@@ -436,7 +436,8 @@ mod deliverability {
             "provider": "mailgun",
             "from_name": "Deliv",
             "from_address": "news@mg.deliv.example",
-            "mailgun": {"domain": "mg.deliv.example", "api_key": "k", "webhook_signing_key": "ws-key"},
+            "mailgun": {"domain": "mg.deliv.example", "api_key": "k"},
+            "webhook_signing_key": "ws-key",
         });
         let saved = s
             .admin
@@ -444,7 +445,7 @@ mod deliverability {
             .await;
         saved.expect(StatusCode::OK);
         let hook = format!("/m/mailing/public/events/mailgun/{ws}");
-        assert_eq!(saved["mailgun"]["webhook_url"], format!("http://localhost:8484{hook}"), "url");
+        assert_eq!(saved["webhook_url"], format!("http://localhost:8484{hook}"), "url");
 
         let list = s.list("News").await;
         s.subscribed(&list, "ada@example.com").await;
@@ -482,6 +483,15 @@ mod deliverability {
             )
             .await
             .expect(StatusCode::UNAUTHORIZED);
+        s.app
+            .client()
+            .send_body(
+                Method::POST,
+                "/m/mailing/public/events/mailgun/not-an-id",
+                RawBody::new("application/json", "{}"),
+            )
+            .await
+            .expect(StatusCode::BAD_REQUEST);
     }
 
     fn at(s: &Setup, ahead: Duration) -> Value {
