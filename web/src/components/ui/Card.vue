@@ -24,10 +24,11 @@ const headingId = useId()
         <template v-if="$slots.actions" #actions><slot name="actions" /></template>
       </SectionHeading>
     </div>
-    <div class="flex flex-1 flex-col gap-4 p-4"><slot /></div>
+    <div v-if="$slots.default" class="flex flex-1 flex-col gap-4 p-4"><slot /></div>
     <div
       v-if="$slots.footer"
-      class="flex items-center justify-end gap-2 border-t border-base-300 px-4 py-3"
+      class="flex items-center justify-end gap-2 border-base-300 px-4 py-3"
+      :class="{ 'border-t': $slots.default }"
     >
       <slot name="footer" />
     </div>
