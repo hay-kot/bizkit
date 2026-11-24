@@ -71,6 +71,9 @@ pub struct RunRequest {
     pub hard: Duration,
     /// `ctx.secrets`; absent when `None`.
     pub secrets: Option<BTreeMap<String, String>>,
+    /// Secret names that don't open with the instance key. Reading one from
+    /// `ctx.secrets` throws, so only scripts that use it fail.
+    pub unreadable_secrets: Vec<String>,
     /// `ctx.fetch`; absent when `None`.
     pub fetch: Option<FetchBridge>,
     /// `ctx.mail`; absent when `None`.

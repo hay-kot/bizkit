@@ -365,6 +365,15 @@ mod api {
         assert_eq!(run["status"], "error", "{run}");
         assert!(run["error"].as_str().unwrap().contains("secret TOKEN"), "{run}");
 
+        let names_script =
+            s.script(POST, "export default (input, ctx) => Object.keys(ctx.secrets)").await;
+        let test =
+            format!("{}/extensions/scripts/{}/test", s.ws(), names_script["id"].as_str().unwrap());
+        let report: Value = s.admin.post(&test, &json!({})).await.expect(StatusCode::OK).json();
+        let listed = &report["items"][0]["run"];
+        assert_eq!(listed["status"], "ok", "a script that doesn't read it still runs: {listed}");
+        assert_eq!(listed["output"], json!(["TOKEN"]), "{listed}");
+
         s.put_secret("TOKEN", "fresh").await;
         assert_eq!(joined(&echo_token(&s).await), "fresh", "setting it again fixes it");
     }

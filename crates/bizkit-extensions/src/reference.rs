@@ -127,7 +127,9 @@ const ROWS: &[Row] = &[
         name: "ctx.secrets",
         signature: "Readonly<Record<string, string>>",
         summary: "The project's secrets by name, frozen. A missing name reads as undefined. Runs redact secret values from logs, errors and output.",
-        errors: &[],
+        errors: &[
+            "reading a secret that doesn't open with the instance's secrets key (the key changed) throws; set the secret again",
+        ],
         example: "const url = ctx.secrets.SLACK_WEBHOOK_URL; if (!url) throw new Error('set the SLACK_WEBHOOK_URL secret');",
     },
     Row {

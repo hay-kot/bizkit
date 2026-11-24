@@ -243,8 +243,12 @@ function removeSecret(secret: string) {
             >
             <template #meta>
               Set {{ formatDate(item.updated_at) }}
-              <span v-if="!item.readable" class="badge badge-sm badge-warning">
-                Doesn't open with this instance's key. Set it again.
+              <span
+                v-if="!item.readable"
+                class="badge badge-sm badge-warning"
+                title="The value doesn't open with this instance's secrets key. Scripts that read it fail until you set it again."
+              >
+                Set it again
               </span>
             </template>
             <template #trailing>

@@ -64,6 +64,7 @@ fn execute(work: Work, limits: PoolLimits) -> RunReport {
                 budget: CHECK_BUDGET,
                 hard: CHECK_BUDGET,
                 secrets: None,
+                unreadable_secrets: Vec::new(),
                 fetch: None,
                 mail: None,
             };
@@ -184,7 +185,14 @@ fn prelude<'js>(
     let secrets = req
         .secrets
         .as_ref()
-        .map(serde_json::to_string)
+        .map(|values| {
+            let mut all: serde_json::Map<String, serde_json::Value> =
+                values.iter().map(|(name, value)| (name.clone(), value.clone().into())).collect();
+            for name in &req.unreadable_secrets {
+                all.insert(name.clone(), serde_json::Value::Null);
+            }
+            serde_json::to_string(&all)
+        })
         .transpose()
         .map_err(|err| err.to_string())?;
     caught(ctx, setup.call((host, input, secrets)))

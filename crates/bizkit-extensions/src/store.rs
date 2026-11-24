@@ -422,6 +422,16 @@ pub(crate) async fn plaintext_secrets(
     .await
 }
 
+/// How many plaintext secrets the instance holds, across workspaces like
+/// [`plaintext_secrets`].
+pub(crate) async fn count_plaintext_secrets(exec: impl SqliteExecutor<'_>) -> sqlx::Result<i64> {
+    sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!: i64" FROM extension_secrets WHERE sealed IS NULL"#
+    )
+    .fetch_one(exec)
+    .await
+}
+
 /// Replaces a plaintext value with its sealed form.
 pub(crate) async fn seal_secret(
     exec: impl SqliteExecutor<'_>,

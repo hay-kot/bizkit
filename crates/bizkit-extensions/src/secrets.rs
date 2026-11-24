@@ -38,59 +38,65 @@ pub(crate) fn open(secrets: Option<&Secrets>, row: &StoredSecret) -> Option<Stri
     String::from_utf8(bytes.ok()?).ok()
 }
 
-/// Why a run can't have its project's secrets.
-#[derive(Debug)]
-pub(crate) enum LoadError {
-    Db(sqlx::Error),
-    /// The named secret doesn't open with this instance's key.
-    Unreadable(String),
+/// A project's secrets for a run.
+#[derive(Debug, Default)]
+pub(crate) struct Loaded {
+    /// The values by name.
+    pub(crate) values: BTreeMap<String, String>,
+    /// Names whose sealed value doesn't open: no key, or another key.
+    /// `ctx.secrets` throws when a script reads one, rather than handing it
+    /// `undefined`, which could skip a check the secret guards.
+    pub(crate) unreadable: Vec<String>,
 }
 
-/// A project's secrets by name, for a run. A secret that doesn't open fails
-/// the load: a script handed `undefined` could skip a check it guards, such
-/// as a signature check.
 pub(crate) async fn load(
     platform: &Platform,
     workspace_id: WorkspaceId,
     project_id: ProjectId,
-) -> Result<BTreeMap<String, String>, LoadError> {
-    let rows = store::project_secrets(platform.db().read(), workspace_id, project_id)
-        .await
-        .map_err(LoadError::Db)?;
-    rows.into_iter()
-        .map(|row| match open(platform.secrets(), &row) {
-            Some(value) => Ok((row.name, value)),
-            None => Err(LoadError::Unreadable(row.name)),
-        })
-        .collect()
+) -> sqlx::Result<Loaded> {
+    let rows = store::project_secrets(platform.db().read(), workspace_id, project_id).await?;
+    let mut loaded = Loaded::default();
+    for row in rows {
+        match open(platform.secrets(), &row) {
+            Some(value) => {
+                loaded.values.insert(row.name, value);
+            }
+            None => loaded.unreadable.push(row.name),
+        }
+    }
+    Ok(loaded)
 }
 
 /// Seals every plaintext secret when the instance has a key. Without one it
 /// only warns, and the plaintext rows keep working.
+///
+/// Sealing drops the plaintext, so the key the instance starts with must be
+/// the one it keeps: values sealed with a wrong key can't be recovered.
 pub(crate) async fn seal_plaintext(platform: &Platform) -> anyhow::Result<()> {
     let Some(secrets) = platform.secrets() else {
-        let rows = store::plaintext_secrets(platform.db().read())
+        let count = store::count_plaintext_secrets(platform.db().read())
             .await
-            .context("reading plaintext extension secrets")?;
-        if !rows.is_empty() {
+            .context("counting plaintext extension secrets")?;
+        if count > 0 {
             tracing::warn!(
-                count = rows.len(),
+                count,
                 "extension secrets are stored in plaintext; set secrets_key_env to seal them"
             );
         }
         return Ok(());
     };
-    let mut tx = platform.db().write().await?;
+    let mut tx = platform.db().write().await.context("opening a write for sealing secrets")?;
     let rows =
         store::plaintext_secrets(&mut *tx).await.context("reading plaintext extension secrets")?;
     for row in &rows {
         let Some(value) = &row.value else { continue };
-        let sealed = seal(secrets, row.workspace_id, row.project_id, &row.name, value)?;
+        let sealed = seal(secrets, row.workspace_id, row.project_id, &row.name, value)
+            .with_context(|| format!("sealing extension secret {}", row.name))?;
         store::seal_secret(&mut *tx, row, &sealed)
             .await
-            .with_context(|| format!("sealing extension secret {}", row.name))?;
+            .with_context(|| format!("storing sealed extension secret {}", row.name))?;
     }
-    tx.commit().await?;
+    tx.commit().await.context("committing sealed extension secrets")?;
     if !rows.is_empty() {
         tracing::info!(count = rows.len(), "sealed plaintext extension secrets");
     }

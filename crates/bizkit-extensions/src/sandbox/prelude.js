@@ -290,6 +290,25 @@
       },
     });
   }
-  if (secretsJson !== undefined) ctx.secrets = deepFreeze(JSON.parse(secretsJson));
+  if (secretsJson !== undefined) {
+    // A null value is a secret that doesn't open with the instance key: it
+    // throws when read, so scripts that never touch it keep running.
+    const secrets = {};
+    for (const [name, value] of Object.entries(JSON.parse(secretsJson))) {
+      if (value === null) {
+        Object.defineProperty(secrets, name, {
+          enumerable: true,
+          get() {
+            throw new Error(
+              `the secret ${name} doesn't open with this instance's secrets key; set it again`,
+            );
+          },
+        });
+      } else {
+        secrets[name] = value;
+      }
+    }
+    ctx.secrets = Object.freeze(secrets);
+  }
   return [deepFreeze(JSON.parse(inputJson)), Object.freeze(ctx)];
 })
