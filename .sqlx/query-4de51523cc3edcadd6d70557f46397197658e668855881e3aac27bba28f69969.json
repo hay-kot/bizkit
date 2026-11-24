@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MAX(contact_id) AS \"contact_id: ContactId\" FROM mailing_deliveries\n           WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'",
+  "describe": {
+    "columns": [
+      {
+        "name": "contact_id: ContactId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "4de51523cc3edcadd6d70557f46397197658e668855881e3aac27bba28f69969"
+}

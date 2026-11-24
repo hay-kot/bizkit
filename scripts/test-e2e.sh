@@ -60,7 +60,8 @@ mailpit_port="$(free_port)"
 base_url="http://127.0.0.1:$api_port"
 
 log "starting mailpit on $mailpit_port (smtp $smtp_port)"
-mailpit --listen "127.0.0.1:$mailpit_port" --smtp "127.0.0.1:$smtp_port" --database "$workdir/mailpit.db" \
+# Chaos lets the isolated project make SMTP reject mail (mailing resend).
+mailpit --listen "127.0.0.1:$mailpit_port" --smtp "127.0.0.1:$smtp_port" --database "$workdir/mailpit.db" --enable-chaos \
   >"$workdir/mailpit.log" 2>&1 &
 mailpit_pid=$!
 wait_for mailpit "http://127.0.0.1:$mailpit_port/api/v1/info" "$mailpit_pid"

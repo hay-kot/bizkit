@@ -23,6 +23,7 @@ impl Mailer for LogMailer {
             from = %self.from,
             to = %mail.to,
             subject = %mail.subject,
+            unsubscribe = mail.unsubscribe.as_ref().map(tracing::field::display),
             "mail (no smtp_url set, so it is logged instead of sent):\n{}",
             mail.text
         );

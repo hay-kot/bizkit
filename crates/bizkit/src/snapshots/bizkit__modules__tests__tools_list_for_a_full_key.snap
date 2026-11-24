@@ -2414,6 +2414,977 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create a draft broadcast to a list",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new draft broadcast.",
+        "properties": {
+          "body_md": {
+            "description": "The body in Markdown.",
+            "type": "string"
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list it goes to."
+          },
+          "subject": {
+            "description": "The subject line.",
+            "type": "string"
+          },
+          "tag": {
+            "description": "Only subscribers with this tag.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "list_id",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a draft broadcast",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a broadcast with its deliveries by status",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List broadcasts, newest first",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which broadcasts to list.",
+        "properties": {
+          "list_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ListId",
+                "description": "Only broadcasts to this list."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProjectId",
+                "description": "Only broadcasts to this project's lists."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Queue a sent broadcast's failed deliveries again; the others are not sent twice",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_resend"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Send a draft broadcast to its list's subscribers",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_send"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Send a broadcast once to a workspace member",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Where to send a test.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          },
+          "to": {
+            "description": "A workspace member's address.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "broadcast_id",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_test"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a draft broadcast",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a draft. Absent fields stay as they are.",
+        "properties": {
+          "body_md": {
+            "description": "The body in Markdown.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          },
+          "list_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ListId",
+                "description": "The list it goes to."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subject": {
+            "description": "The subject line.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tag": {
+            "description": "Only subscribers with this tag; `null` sends to all.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add an address to a mailing list",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An address to add.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          },
+          "name": {
+            "description": "A display name for `{{ name }}`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "description": "Labels for sending to part of the list.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "list_id",
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_contacts_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a pending or subscribed contact",
+      "inputSchema": {
+        "$defs": {
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A contact of a list.",
+        "properties": {
+          "contact_id": {
+            "$ref": "#/$defs/ContactId",
+            "description": "The contact."
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          }
+        },
+        "required": [
+          "list_id",
+          "contact_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_contacts_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a contact",
+      "inputSchema": {
+        "$defs": {
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A contact of a list.",
+        "properties": {
+          "contact_id": {
+            "$ref": "#/$defs/ContactId",
+            "description": "The contact."
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          }
+        },
+        "required": [
+          "list_id",
+          "contact_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_contacts_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List a mailing list's contacts, newest first",
+      "inputSchema": {
+        "$defs": {
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ContactStatus": {
+            "description": "Where a contact stands with a list.",
+            "enum": [
+              "pending",
+              "subscribed",
+              "unsubscribed"
+            ],
+            "type": "string"
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which contacts to list.",
+        "properties": {
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ContactId",
+                "description": "Only contacts older than this one, for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          },
+          "q": {
+            "description": "Only contacts whose address or name contains this text.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ContactStatus",
+                "description": "Only contacts with this status."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tag": {
+            "description": "Only contacts with this tag.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_contacts_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Unsubscribe a contact for good",
+      "inputSchema": {
+        "$defs": {
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A contact of a list.",
+        "properties": {
+          "contact_id": {
+            "$ref": "#/$defs/ContactId",
+            "description": "The contact."
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          }
+        },
+        "required": [
+          "list_id",
+          "contact_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_contacts_unsubscribe"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a contact's name or tags",
+      "inputSchema": {
+        "$defs": {
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a contact. Absent fields stay as they are.",
+        "properties": {
+          "contact_id": {
+            "$ref": "#/$defs/ContactId",
+            "description": "The contact."
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          },
+          "name": {
+            "description": "The display name; `null` removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "description": "Replaces the tags.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "list_id",
+          "contact_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_contacts_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the send log of a broadcast or a contact, newest first",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ContactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "DeliveryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "DeliveryStatus": {
+            "description": "Where a delivery stands.",
+            "enum": [
+              "queued",
+              "sent",
+              "failed",
+              "skipped"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which deliveries to list. Give exactly one of `broadcast_id` and\n`contact_id`.",
+        "properties": {
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DeliveryId",
+                "description": "Only deliveries older than this one, for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "broadcast_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/BroadcastId",
+                "description": "A broadcast's deliveries."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contact_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ContactId",
+                "description": "A contact's deliveries."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DeliveryStatus",
+                "description": "Only deliveries with this status."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "mailing_deliveries_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the forms of a project that a list can take addresses from",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which project's forms to show.",
+        "properties": {
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project."
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_forms_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create a mailing list in a project",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new list.",
+        "properties": {
+          "description": {
+            "description": "What subscribers get, for the team.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "double_opt_in": {
+            "description": "Whether API adds must confirm by mail. Default true. Form captures\nalways confirm.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "footer": {
+            "description": "Text at the bottom of every mail, such as a postal address.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_ids": {
+            "description": "Forms of the project whose submitters join the list.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "The display name, shown in every mail.",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/$defs/ProjectId",
+            "description": "The project it belongs to."
+          }
+        },
+        "required": [
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_lists_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete a mailing list with its contacts, broadcasts and send log",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of a workspace.",
+        "properties": {
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_lists_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Show a mailing list with its contact counts",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of a workspace.",
+        "properties": {
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_lists_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the mailing lists of a workspace",
+      "inputSchema": {
+        "$defs": {
+          "ProjectId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which lists to show.",
+        "properties": {
+          "project_id": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProjectId",
+                "description": "Only this project's lists."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "mailing_lists_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Change a mailing list's settings and linked forms",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes to a list. Absent fields stay as they are.",
+        "properties": {
+          "description": {
+            "description": "What subscribers get; `null` removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "double_opt_in": {
+            "description": "Whether API adds must confirm by mail.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "footer": {
+            "description": "The mail footer; `null` removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_ids": {
+            "description": "Replaces the linked forms.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          },
+          "name": {
+            "description": "The display name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_lists_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Render a mail in a list's layout without sending it",
+      "inputSchema": {
+        "$defs": {
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A mail to render.",
+        "properties": {
+          "body_md": {
+            "description": "The body in Markdown.",
+            "type": "string"
+          },
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list whose layout to use."
+          },
+          "subject": {
+            "description": "The subject line.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "list_id",
+          "subject",
+          "body_md"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_preview"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
         "readOnlyHint": true
       },
       "description": "List the members of a workspace",

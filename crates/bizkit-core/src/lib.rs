@@ -7,6 +7,7 @@
 mod app;
 pub mod auth;
 pub mod config;
+pub mod contacts;
 mod core_module;
 pub mod db;
 pub mod deps;
@@ -35,6 +36,11 @@ pub use crate::module::{DemoSeed, Lifecycle, Module, ModuleContext};
 /// Projects, for modules that keep data per project.
 pub mod projects {
     pub use crate::tenancy::projects::exists;
+}
+
+/// Workspace members, for modules that check an address against them.
+pub mod members {
+    pub use crate::tenancy::members::is_member_email;
 }
 
 /// The API types core's operations return.

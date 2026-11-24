@@ -26,6 +26,7 @@ bizkit-extensions = { path = "crates/bizkit-extensions" }
 bizkit-forms = { path = "crates/bizkit-forms" }
 bizkit-analytics = { path = "crates/bizkit-analytics" }
 bizkit-webhooks = { path = "crates/bizkit-webhooks" }
+bizkit-mailing = { path = "crates/bizkit-mailing" }
 bizkit-testkit = { path = "crates/bizkit-testkit" }
 bizkit-web = { path = "crates/bizkit-web" }
 
@@ -50,6 +51,7 @@ lettre = { version = "=0.11.24", default-features = false, features = ["builder"
 maxminddb = "=0.33.0"
 mime_guess = "2.0.5"
 proptest = "1.12.0"
+pulldown-cmark = { version = "=0.13.6", default-features = false, features = ["html"] }
 rand = "0.10.4"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 rquickjs = { version = "=0.14.0", default-features = false }

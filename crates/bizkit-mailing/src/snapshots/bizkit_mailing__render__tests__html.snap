@@ -1,0 +1,11 @@
+---
+source: crates/bizkit-mailing/src/render.rs
+expression: mail.html
+---
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#f3f4f6"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:8px"><tr><td style="padding:20px 28px;border-bottom:1px solid #e5e7eb;font:600 16px system-ui,sans-serif;color:#111827">Newsletter</td></tr><tr><td style="padding:24px 28px;font:15px/1.6 system-ui,sans-serif;color:#111827"><p>Hi Ada,</p>
+<p><strong>News</strong> for ada@example.com:</p>
+<ul>
+<li>one</li>
+<li><a href="https://example.com/two">two</a></li>
+</ul>
+</td></tr><tr><td style="padding:16px 28px;border-top:1px solid #e5e7eb;font:12px/1.5 system-ui,sans-serif;color:#6b7280"><p style="margin:0 0 8px">Newsletter</p><p style="margin:0 0 8px">1 Main St<br>Springfield</p><p style="margin:0"><a href="https://app.example.com/m/mailing/public/unsubscribe?t=abc" style="color:#6b7280">Unsubscribe</a></p></td></tr></table></td></tr></table></body></html>

@@ -35,7 +35,13 @@ pub fn mail(
         }
     }
     let _ignored = write!(text, "\nSee every submission: {link}\n");
-    Mail { to: to.to_owned(), subject: format!("New submission: {form_name}"), text, html: None }
+    Mail {
+        to: to.to_owned(),
+        subject: format!("New submission: {form_name}"),
+        text,
+        html: None,
+        unsubscribe: None,
+    }
 }
 
 #[cfg(test)]

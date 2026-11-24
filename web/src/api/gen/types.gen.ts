@@ -135,6 +135,67 @@ export type BreakdownRow = {
 };
 
 /**
+ * One mail to a list's subscribers.
+ */
+export type Broadcast = {
+    /**
+     * The body in Markdown. `{{ name }}` and `{{ email }}` are filled in.
+     */
+    body_md: string;
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    deliveries?: DeliveryCounts | null;
+    /**
+     * The broadcast ID.
+     */
+    id: BroadcastId;
+    /**
+     * The list it goes to.
+     */
+    list_id: ListId;
+    /**
+     * Subscribers it was queued for.
+     */
+    recipients: number;
+    sent_at?: Timestamp | null;
+    /**
+     * Where it stands.
+     */
+    status: BroadcastStatus;
+    /**
+     * The subject line.
+     */
+    subject: string;
+    /**
+     * Only subscribers with this tag, if set.
+     */
+    tag?: string | null;
+    /**
+     * When it last changed.
+     */
+    updated_at: Timestamp;
+};
+
+export type BroadcastId = string;
+
+/**
+ * Broadcasts of a workspace.
+ */
+export type BroadcastList = {
+    /**
+     * Newest first.
+     */
+    items: Array<Broadcast>;
+};
+
+/**
+ * Where a broadcast stands.
+ */
+export type BroadcastStatus = 'draft' | 'sending' | 'sent';
+
+/**
  * What a script on a hook point can use besides plain JavaScript.
  */
 export type Capability = 'log' | 'secrets' | 'fetch' | 'mail';
@@ -215,6 +276,86 @@ export type Cohort = {
 };
 
 /**
+ * An address on a list.
+ */
+export type Contact = {
+    /**
+     * When the address arrived.
+     */
+    created_at: Timestamp;
+    /**
+     * The address, in lower case.
+     */
+    email: string;
+    /**
+     * The contact ID.
+     */
+    id: ContactId;
+    /**
+     * The list.
+     */
+    list_id: ListId;
+    /**
+     * A display name for `{{ name }}`.
+     */
+    name?: string | null;
+    /**
+     * How the address arrived: `api`, `admin`, `seed` or `form:<form id>`.
+     */
+    source: string;
+    /**
+     * Where the contact stands.
+     */
+    status: ContactStatus;
+    subscribed_at?: Timestamp | null;
+    /**
+     * Labels for sending to part of a list.
+     */
+    tags: Array<string>;
+    unsubscribed_at?: Timestamp | null;
+    /**
+     * When the contact last changed.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * Contacts of a list by status.
+ */
+export type ContactCounts = {
+    /**
+     * Waiting to confirm.
+     */
+    pending: number;
+    /**
+     * Getting mail.
+     */
+    subscribed: number;
+    /**
+     * Opted out; they get no more mail from the list.
+     */
+    unsubscribed: number;
+};
+
+export type ContactId = string;
+
+/**
+ * A page of contacts, newest first.
+ */
+export type ContactPage = {
+    /**
+     * The contacts.
+     */
+    items: Array<Contact>;
+    next_before?: ContactId | null;
+};
+
+/**
+ * Where a contact stands with a list.
+ */
+export type ContactStatus = 'pending' | 'subscribed' | 'unsubscribed';
+
+/**
  * A new key and its token.
  */
 export type CreatedApiKey = {
@@ -255,6 +396,40 @@ export type Delivery = {
      */
     url: string;
 };
+
+/**
+ * A broadcast's deliveries by status.
+ */
+export type DeliveryCounts = {
+    /**
+     * Every attempt failed. "Resend to failed" queues these again.
+     */
+    failed: number;
+    /**
+     * Waiting to go out, or retrying.
+     */
+    queued: number;
+    /**
+     * Accepted by the mail server.
+     */
+    sent: number;
+    /**
+     * Not sent, because the contact left the list.
+     */
+    skipped: number;
+};
+
+export type DeliveryId = string;
+
+/**
+ * What a delivery was for.
+ */
+export type DeliveryKind = 'confirm' | 'broadcast' | 'step' | 'test';
+
+/**
+ * Where a delivery stands.
+ */
+export type DeliveryStatus = 'queued' | 'sent' | 'failed' | 'skipped';
 
 /**
  * What a breakdown groups by.
@@ -876,6 +1051,142 @@ export type InvitationList = {
     items: Array<Invitation>;
 };
 
+export type ListId = string;
+
+/**
+ * One mail the module sent or will send.
+ */
+export type MailDelivery = {
+    /**
+     * Attempts of the current send; a resend starts again from 1.
+     */
+    attempts: number;
+    broadcast_id?: BroadcastId | null;
+    contact_id?: ContactId | null;
+    /**
+     * When it was queued.
+     */
+    created_at: Timestamp;
+    /**
+     * Why the last attempt failed, or why it was skipped.
+     */
+    error?: string | null;
+    /**
+     * The delivery ID.
+     */
+    id: DeliveryId;
+    /**
+     * What it was for.
+     */
+    kind: DeliveryKind;
+    /**
+     * How often "Resend to failed" queued it again.
+     */
+    resends: number;
+    sent_at?: Timestamp | null;
+    /**
+     * Where it stands.
+     */
+    status: DeliveryStatus;
+    /**
+     * The subject line.
+     */
+    subject: string;
+    /**
+     * The recipient.
+     */
+    to_email: string;
+};
+
+/**
+ * A page of deliveries, newest first.
+ */
+export type MailDeliveryPage = {
+    /**
+     * The deliveries.
+     */
+    items: Array<MailDelivery>;
+    next_before?: DeliveryId | null;
+};
+
+/**
+ * A form a list can take addresses from.
+ */
+export type MailingForm = {
+    /**
+     * The form's ID.
+     */
+    id: string;
+    /**
+     * The form's name.
+     */
+    name: string;
+};
+
+/**
+ * The forms of a project, for linking them to a list.
+ */
+export type MailingFormList = {
+    /**
+     * Sorted by name. Empty when the forms module isn't installed.
+     */
+    items: Array<MailingForm>;
+};
+
+/**
+ * A mailing list. Contacts and their consent belong to one list.
+ */
+export type MailingList = {
+    counts?: ContactCounts | null;
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * What subscribers get, for the team.
+     */
+    description?: string | null;
+    /**
+     * New addresses from the API must confirm by mail before they get
+     * anything else. Addresses from forms always must.
+     */
+    double_opt_in: boolean;
+    /**
+     * Text at the bottom of every mail, such as a postal address.
+     */
+    footer?: string | null;
+    /**
+     * Forms whose submitters are added to the list.
+     */
+    form_ids: Array<string>;
+    /**
+     * The list ID.
+     */
+    id: ListId;
+    /**
+     * The display name. Mail shows it in the header and footer.
+     */
+    name: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * When its settings last changed.
+     */
+    updated_at: Timestamp;
+};
+
+/**
+ * Lists of a workspace.
+ */
+export type MailingListList = {
+    /**
+     * Sorted by name.
+     */
+    items: Array<MailingList>;
+};
+
 /**
  * The signed-in user.
  */
@@ -1096,6 +1407,24 @@ export type PersonSummary = {
 };
 
 /**
+ * A rendered mail.
+ */
+export type Preview = {
+    /**
+     * The HTML part.
+     */
+    html: string;
+    /**
+     * The subject line, with merge fields filled in.
+     */
+    subject: string;
+    /**
+     * The plain-text part.
+     */
+    text: string;
+};
+
+/**
  * A project.
  */
 export type Project = {
@@ -1175,6 +1504,16 @@ export type RequestSummary = {
      * The body size in bytes.
      */
     size: number;
+};
+
+/**
+ * What "Resend to failed" did.
+ */
+export type ResendReport = {
+    /**
+     * Failed deliveries put back in the queue; 0 when none had failed.
+     */
+    requeued: number;
 };
 
 /**
@@ -5107,6 +5446,1274 @@ export type InvitationsRevokeResponses = {
 
 export type InvitationsRevokeResponse = InvitationsRevokeResponses[keyof InvitationsRevokeResponses];
 
+export type MailingBroadcastsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        list_id?: ListId | null;
+        project_id?: ProjectId | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts';
+};
+
+export type MailingBroadcastsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsListError = MailingBroadcastsListErrors[keyof MailingBroadcastsListErrors];
+
+export type MailingBroadcastsListResponses = {
+    /**
+     * OK
+     */
+    200: BroadcastList;
+};
+
+export type MailingBroadcastsListResponse = MailingBroadcastsListResponses[keyof MailingBroadcastsListResponses];
+
+export type MailingBroadcastsCreateData = {
+    body: {
+        /**
+         * The body in Markdown.
+         */
+        body_md?: string;
+        /**
+         * The list it goes to.
+         */
+        list_id: ListId;
+        /**
+         * The subject line.
+         */
+        subject: string;
+        /**
+         * Only subscribers with this tag.
+         */
+        tag?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts';
+};
+
+export type MailingBroadcastsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsCreateError = MailingBroadcastsCreateErrors[keyof MailingBroadcastsCreateErrors];
+
+export type MailingBroadcastsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Broadcast;
+};
+
+export type MailingBroadcastsCreateResponse = MailingBroadcastsCreateResponses[keyof MailingBroadcastsCreateResponses];
+
+export type MailingBroadcastsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}';
+};
+
+export type MailingBroadcastsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsDeleteError = MailingBroadcastsDeleteErrors[keyof MailingBroadcastsDeleteErrors];
+
+export type MailingBroadcastsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type MailingBroadcastsDeleteResponse = MailingBroadcastsDeleteResponses[keyof MailingBroadcastsDeleteResponses];
+
+export type MailingBroadcastsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}';
+};
+
+export type MailingBroadcastsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsGetError = MailingBroadcastsGetErrors[keyof MailingBroadcastsGetErrors];
+
+export type MailingBroadcastsGetResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsGetResponse = MailingBroadcastsGetResponses[keyof MailingBroadcastsGetResponses];
+
+export type MailingBroadcastsUpdateData = {
+    body: {
+        /**
+         * The body in Markdown.
+         */
+        body_md?: string | null;
+        list_id?: ListId | null;
+        /**
+         * The subject line.
+         */
+        subject?: string | null;
+        /**
+         * Only subscribers with this tag; `null` sends to all.
+         */
+        tag?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}';
+};
+
+export type MailingBroadcastsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsUpdateError = MailingBroadcastsUpdateErrors[keyof MailingBroadcastsUpdateErrors];
+
+export type MailingBroadcastsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsUpdateResponse = MailingBroadcastsUpdateResponses[keyof MailingBroadcastsUpdateResponses];
+
+export type MailingBroadcastsResendData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resend';
+};
+
+export type MailingBroadcastsResendErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsResendError = MailingBroadcastsResendErrors[keyof MailingBroadcastsResendErrors];
+
+export type MailingBroadcastsResendResponses = {
+    /**
+     * OK
+     */
+    200: ResendReport;
+};
+
+export type MailingBroadcastsResendResponse = MailingBroadcastsResendResponses[keyof MailingBroadcastsResendResponses];
+
+export type MailingBroadcastsSendData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/send';
+};
+
+export type MailingBroadcastsSendErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsSendError = MailingBroadcastsSendErrors[keyof MailingBroadcastsSendErrors];
+
+export type MailingBroadcastsSendResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsSendResponse = MailingBroadcastsSendResponses[keyof MailingBroadcastsSendResponses];
+
+export type MailingBroadcastsTestData = {
+    body: {
+        /**
+         * A workspace member's address.
+         */
+        to: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/test';
+};
+
+export type MailingBroadcastsTestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsTestError = MailingBroadcastsTestErrors[keyof MailingBroadcastsTestErrors];
+
+export type MailingBroadcastsTestResponses = {
+    /**
+     * Created
+     */
+    201: MailDelivery;
+};
+
+export type MailingBroadcastsTestResponse = MailingBroadcastsTestResponses[keyof MailingBroadcastsTestResponses];
+
+export type MailingDeliveriesListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        before?: DeliveryId | null;
+        broadcast_id?: BroadcastId | null;
+        contact_id?: ContactId | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        status?: DeliveryStatus | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/deliveries';
+};
+
+export type MailingDeliveriesListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingDeliveriesListError = MailingDeliveriesListErrors[keyof MailingDeliveriesListErrors];
+
+export type MailingDeliveriesListResponses = {
+    /**
+     * OK
+     */
+    200: MailDeliveryPage;
+};
+
+export type MailingDeliveriesListResponse = MailingDeliveriesListResponses[keyof MailingDeliveriesListResponses];
+
+export type MailingFormsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/forms';
+};
+
+export type MailingFormsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingFormsListError = MailingFormsListErrors[keyof MailingFormsListErrors];
+
+export type MailingFormsListResponses = {
+    /**
+     * OK
+     */
+    200: MailingFormList;
+};
+
+export type MailingFormsListResponse = MailingFormsListResponses[keyof MailingFormsListResponses];
+
+export type MailingListsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        project_id?: ProjectId | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists';
+};
+
+export type MailingListsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingListsListError = MailingListsListErrors[keyof MailingListsListErrors];
+
+export type MailingListsListResponses = {
+    /**
+     * OK
+     */
+    200: MailingListList;
+};
+
+export type MailingListsListResponse = MailingListsListResponses[keyof MailingListsListResponses];
+
+export type MailingListsCreateData = {
+    body: {
+        /**
+         * What subscribers get, for the team.
+         */
+        description?: string | null;
+        /**
+         * Whether API adds must confirm by mail. Default true. Form captures
+         * always confirm.
+         */
+        double_opt_in?: boolean | null;
+        /**
+         * Text at the bottom of every mail, such as a postal address.
+         */
+        footer?: string | null;
+        /**
+         * Forms of the project whose submitters join the list.
+         */
+        form_ids?: Array<string>;
+        /**
+         * The display name, shown in every mail.
+         */
+        name: string;
+        /**
+         * The project it belongs to.
+         */
+        project_id: ProjectId;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists';
+};
+
+export type MailingListsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingListsCreateError = MailingListsCreateErrors[keyof MailingListsCreateErrors];
+
+export type MailingListsCreateResponses = {
+    /**
+     * Created
+     */
+    201: MailingList;
+};
+
+export type MailingListsCreateResponse = MailingListsCreateResponses[keyof MailingListsCreateResponses];
+
+export type MailingListsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}';
+};
+
+export type MailingListsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingListsDeleteError = MailingListsDeleteErrors[keyof MailingListsDeleteErrors];
+
+export type MailingListsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type MailingListsDeleteResponse = MailingListsDeleteResponses[keyof MailingListsDeleteResponses];
+
+export type MailingListsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}';
+};
+
+export type MailingListsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingListsGetError = MailingListsGetErrors[keyof MailingListsGetErrors];
+
+export type MailingListsGetResponses = {
+    /**
+     * OK
+     */
+    200: MailingList;
+};
+
+export type MailingListsGetResponse = MailingListsGetResponses[keyof MailingListsGetResponses];
+
+export type MailingListsUpdateData = {
+    body: {
+        /**
+         * What subscribers get; `null` removes it.
+         */
+        description?: string | null;
+        /**
+         * Whether API adds must confirm by mail.
+         */
+        double_opt_in?: boolean | null;
+        /**
+         * The mail footer; `null` removes it.
+         */
+        footer?: string | null;
+        /**
+         * Replaces the linked forms.
+         */
+        form_ids?: Array<string> | null;
+        /**
+         * The display name.
+         */
+        name?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}';
+};
+
+export type MailingListsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingListsUpdateError = MailingListsUpdateErrors[keyof MailingListsUpdateErrors];
+
+export type MailingListsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: MailingList;
+};
+
+export type MailingListsUpdateResponse = MailingListsUpdateResponses[keyof MailingListsUpdateResponses];
+
+export type MailingContactsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+    };
+    query?: {
+        before?: ContactId | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * Only contacts whose address or name contains this text.
+         */
+        q?: string | null;
+        status?: ContactStatus | null;
+        /**
+         * Only contacts with this tag.
+         */
+        tag?: string | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts';
+};
+
+export type MailingContactsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingContactsListError = MailingContactsListErrors[keyof MailingContactsListErrors];
+
+export type MailingContactsListResponses = {
+    /**
+     * OK
+     */
+    200: ContactPage;
+};
+
+export type MailingContactsListResponse = MailingContactsListResponses[keyof MailingContactsListResponses];
+
+export type MailingContactsCreateData = {
+    body: {
+        /**
+         * The address.
+         */
+        email: string;
+        /**
+         * A display name for `{{ name }}`.
+         */
+        name?: string | null;
+        /**
+         * Labels for sending to part of the list.
+         */
+        tags?: Array<string>;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts';
+};
+
+export type MailingContactsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingContactsCreateError = MailingContactsCreateErrors[keyof MailingContactsCreateErrors];
+
+export type MailingContactsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Contact;
+};
+
+export type MailingContactsCreateResponse = MailingContactsCreateResponses[keyof MailingContactsCreateResponses];
+
+export type MailingContactsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+        /**
+         * The contact.
+         */
+        contact_id: ContactId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts/{contact_id}';
+};
+
+export type MailingContactsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingContactsDeleteError = MailingContactsDeleteErrors[keyof MailingContactsDeleteErrors];
+
+export type MailingContactsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type MailingContactsDeleteResponse = MailingContactsDeleteResponses[keyof MailingContactsDeleteResponses];
+
+export type MailingContactsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+        /**
+         * The contact.
+         */
+        contact_id: ContactId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts/{contact_id}';
+};
+
+export type MailingContactsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingContactsGetError = MailingContactsGetErrors[keyof MailingContactsGetErrors];
+
+export type MailingContactsGetResponses = {
+    /**
+     * OK
+     */
+    200: Contact;
+};
+
+export type MailingContactsGetResponse = MailingContactsGetResponses[keyof MailingContactsGetResponses];
+
+export type MailingContactsUpdateData = {
+    body: {
+        /**
+         * The display name; `null` removes it.
+         */
+        name?: string | null;
+        /**
+         * Replaces the tags.
+         */
+        tags?: Array<string> | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+        /**
+         * The contact.
+         */
+        contact_id: ContactId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts/{contact_id}';
+};
+
+export type MailingContactsUpdateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingContactsUpdateError = MailingContactsUpdateErrors[keyof MailingContactsUpdateErrors];
+
+export type MailingContactsUpdateResponses = {
+    /**
+     * OK
+     */
+    200: Contact;
+};
+
+export type MailingContactsUpdateResponse = MailingContactsUpdateResponses[keyof MailingContactsUpdateResponses];
+
+export type MailingContactsUnsubscribeData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The list.
+         */
+        list_id: ListId;
+        /**
+         * The contact.
+         */
+        contact_id: ContactId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts/{contact_id}/unsubscribe';
+};
+
+export type MailingContactsUnsubscribeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingContactsUnsubscribeError = MailingContactsUnsubscribeErrors[keyof MailingContactsUnsubscribeErrors];
+
+export type MailingContactsUnsubscribeResponses = {
+    /**
+     * OK
+     */
+    200: Contact;
+};
+
+export type MailingContactsUnsubscribeResponse = MailingContactsUnsubscribeResponses[keyof MailingContactsUnsubscribeResponses];
+
+export type MailingPreviewData = {
+    body: {
+        /**
+         * The body in Markdown.
+         */
+        body_md: string;
+        /**
+         * The list whose layout to use.
+         */
+        list_id: ListId;
+        /**
+         * The subject line.
+         */
+        subject: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/preview';
+};
+
+export type MailingPreviewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingPreviewError = MailingPreviewErrors[keyof MailingPreviewErrors];
+
+export type MailingPreviewResponses = {
+    /**
+     * OK
+     */
+    200: Preview;
+};
+
+export type MailingPreviewResponse = MailingPreviewResponses[keyof MailingPreviewResponses];
+
 export type MembersListData = {
     body?: never;
     path: {
@@ -6093,6 +7700,129 @@ export type FormsPublicChallengeResponses = {
 };
 
 export type FormsPublicChallengeResponse = FormsPublicChallengeResponses[keyof FormsPublicChallengeResponses];
+
+export type MailingPublicConfirmPageData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The token from the confirm mail
+         */
+        t: string;
+    };
+    url: '/m/mailing/public/confirm';
+};
+
+export type MailingPublicConfirmPageErrors = {
+    /**
+     * The link is unknown or expired
+     */
+    404: string;
+};
+
+export type MailingPublicConfirmPageError = MailingPublicConfirmPageErrors[keyof MailingPublicConfirmPageErrors];
+
+export type MailingPublicConfirmPageResponses = {
+    /**
+     * The page
+     */
+    200: string;
+};
+
+export type MailingPublicConfirmPageResponse = MailingPublicConfirmPageResponses[keyof MailingPublicConfirmPageResponses];
+
+export type MailingPublicConfirmData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The token from the confirm mail
+         */
+        t: string;
+    };
+    url: '/m/mailing/public/confirm';
+};
+
+export type MailingPublicConfirmErrors = {
+    /**
+     * The link is unknown or expired
+     */
+    404: string;
+};
+
+export type MailingPublicConfirmError = MailingPublicConfirmErrors[keyof MailingPublicConfirmErrors];
+
+export type MailingPublicConfirmResponses = {
+    /**
+     * Subscribed
+     */
+    200: string;
+};
+
+export type MailingPublicConfirmResponse = MailingPublicConfirmResponses[keyof MailingPublicConfirmResponses];
+
+export type MailingPublicUnsubscribePageData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The token from a list mail
+         */
+        t: string;
+    };
+    url: '/m/mailing/public/unsubscribe';
+};
+
+export type MailingPublicUnsubscribePageErrors = {
+    /**
+     * The link is unknown
+     */
+    404: string;
+};
+
+export type MailingPublicUnsubscribePageError = MailingPublicUnsubscribePageErrors[keyof MailingPublicUnsubscribePageErrors];
+
+export type MailingPublicUnsubscribePageResponses = {
+    /**
+     * The page
+     */
+    200: string;
+};
+
+export type MailingPublicUnsubscribePageResponse = MailingPublicUnsubscribePageResponses[keyof MailingPublicUnsubscribePageResponses];
+
+export type MailingPublicUnsubscribeData = {
+    /**
+     * Optional; `List-Unsubscribe=One-Click` asks for a plain-text answer
+     */
+    body: string;
+    path?: never;
+    query: {
+        /**
+         * The token from a list mail
+         */
+        t: string;
+    };
+    url: '/m/mailing/public/unsubscribe';
+};
+
+export type MailingPublicUnsubscribeErrors = {
+    /**
+     * The link is unknown
+     */
+    404: string;
+};
+
+export type MailingPublicUnsubscribeError = MailingPublicUnsubscribeErrors[keyof MailingPublicUnsubscribeErrors];
+
+export type MailingPublicUnsubscribeResponses = {
+    /**
+     * Unsubscribed
+     */
+    200: string;
+};
+
+export type MailingPublicUnsubscribeResponse = MailingPublicUnsubscribeResponses[keyof MailingPublicUnsubscribeResponses];
 
 export type WebhooksPublicCaptureDeleteData = {
     /**

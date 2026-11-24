@@ -6,6 +6,7 @@
 //! page; those pages share the app's origin, so every echoed value is
 //! escaped and the responses forbid scripts.
 
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::time::Duration;
 
@@ -15,6 +16,8 @@ use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
+use bizkit_core::auth::is_plausible_email;
+use bizkit_core::contacts::{self, CaptureSource, ContactCaptured};
 use bizkit_core::error::ErrorBody;
 use bizkit_core::hooks::{HookResult, HookTarget};
 use bizkit_core::jobs::{Enqueue, SendMail};
@@ -27,7 +30,9 @@ use utoipa::{OpenApi, ToSchema};
 
 use super::bot::{self, ALTCHA_FIELD, Challenge, ChallengeSettings, SpamReason, VerifiedProof};
 use super::parse::{self, LIMITS, RawFields};
-use crate::api::{BotCheck, FieldValue, FormId, SubmissionId, SubmissionStatus};
+use crate::api::{
+    BotCheck, FieldDef, FieldKind, FieldValue, FormId, SubmissionId, SubmissionStatus,
+};
 use crate::hooks::{self, PRE_VALIDATE, SubmissionCreated, Verdict};
 use crate::store::{self, FormRow, SubmissionRow};
 use crate::{fields, notify, ops};
@@ -253,7 +258,7 @@ async fn challenge(
 struct Decision {
     status: SubmissionStatus,
     spam_reason: Option<String>,
-    data: std::collections::BTreeMap<String, FieldValue>,
+    data: BTreeMap<String, FieldValue>,
     proof: Option<VerifiedProof>,
 }
 
@@ -396,12 +401,15 @@ async fn store_submission(
             submission_id: row.id,
         };
         platform.bus().publish(&mut tx, &event).await?;
+        let defs = ops::decode_fields(form)?;
+        if let Some(captured) = captured_contact(form, &defs, &decision.data) {
+            platform.bus().publish(&mut tx, &captured).await?;
+        }
         if recent < NOTIFY_PER_HOUR {
             let link = platform
                 .base_url()
                 .join(&format!("/w/{}/p/{}/forms/{}", form.workspace_id, form.project_id, form.id))
                 .map_err(anyhow::Error::from)?;
-            let defs = ops::decode_fields(form)?;
             for to in ops::decode_notify(form)? {
                 let mail = notify::mail(&form.name, &defs, &decision.data, &link, &to);
                 platform.bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
@@ -414,9 +422,114 @@ async fn store_submission(
     Ok(())
 }
 
+/// The submitter's address for [`ContactCaptured`]: the first email field,
+/// or a plausible `email` value on a form without field definitions.
+fn captured_contact(
+    form: &FormRow,
+    defs: &[FieldDef],
+    data: &BTreeMap<String, FieldValue>,
+) -> Option<ContactCaptured> {
+    let first = |name: &str| data.get(name).and_then(|value| value.values().first());
+    let email = if defs.is_empty() {
+        first("email").filter(|email| is_plausible_email(email))?
+    } else {
+        defs.iter().find(|def| def.kind == FieldKind::Email).and_then(|def| first(&def.name))?
+    };
+    let name = first("name")
+        .map(|name| name.trim().chars().take(contacts::MAX_NAME).collect::<String>())
+        .filter(|name| !name.is_empty());
+    Some(ContactCaptured {
+        workspace_id: form.workspace_id,
+        project_id: form.project_id,
+        email: email.trim().to_owned(),
+        name,
+        source: CaptureSource { kind: hooks::FORM.id.to_owned(), id: form.id.to_string() },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn form() -> FormRow {
+        FormRow {
+            id: FormId::new(),
+            workspace_id: bizkit_core::ids::WorkspaceId::new(),
+            project_id: bizkit_core::ids::ProjectId::new(),
+            name: "Newsletter".to_owned(),
+            enabled: true,
+            fields: "[]".to_owned(),
+            bot_check: "honeypot".to_owned(),
+            min_fill_ms: 0,
+            redirect_url: None,
+            notify_emails: "[]".to_owned(),
+            challenge_key: String::new(),
+            created_at: bizkit_core::time::UnixMillis(0),
+            updated_at: bizkit_core::time::UnixMillis(0),
+        }
+    }
+
+    fn data(pairs: &[(&str, &str)]) -> BTreeMap<String, FieldValue> {
+        pairs.iter().map(|(k, v)| ((*k).to_owned(), FieldValue::One((*v).to_owned()))).collect()
+    }
+
+    fn def(name: &str, kind: FieldKind) -> FieldDef {
+        serde_json::from_value(serde_json::json!({ "name": name, "kind": kind })).expect("def")
+    }
+
+    #[test]
+    fn captures_the_first_email_field() {
+        let form = form();
+        let defs = [def("work", FieldKind::Text), def("contact", FieldKind::Email)];
+        let captured = captured_contact(
+            &form,
+            &defs,
+            &data(&[("contact", " ada@example.com "), ("name", "Ada")]),
+        )
+        .expect("captured");
+        assert_eq!(captured.email, "ada@example.com", "trimmed address");
+        assert_eq!(captured.name.as_deref(), Some("Ada"), "name");
+        assert_eq!(captured.source.kind, "forms.form", "source kind");
+        assert_eq!(captured.source.id, form.id.to_string(), "source id");
+        assert_eq!(captured.project_id, form.project_id, "project");
+    }
+
+    #[test]
+    fn a_form_without_an_email_field_captures_nothing() {
+        let defs = [def("message", FieldKind::Text)];
+        assert!(
+            captured_contact(&form(), &defs, &data(&[("message", "a@example.com")])).is_none(),
+            "no email field"
+        );
+    }
+
+    #[test]
+    fn a_form_without_definitions_uses_a_plausible_email_value() {
+        let form = form();
+        assert!(
+            captured_contact(&form, &[], &data(&[("email", "ada@example.com")])).is_some(),
+            "kept"
+        );
+        assert!(
+            captured_contact(&form, &[], &data(&[("email", "not an address")])).is_none(),
+            "checked"
+        );
+        assert!(captured_contact(&form, &[], &data(&[("message", "hi")])).is_none(), "absent");
+    }
+
+    #[test]
+    fn long_names_are_cut_and_blank_names_dropped() {
+        let form = form();
+        let long = "x".repeat(300);
+        let captured =
+            captured_contact(&form, &[], &data(&[("email", "a@example.com"), ("name", &long)]))
+                .expect("captured");
+        assert_eq!(captured.name.map(|n| n.chars().count()), Some(contacts::MAX_NAME), "cut");
+        let blank =
+            captured_contact(&form, &[], &data(&[("email", "a@example.com"), ("name", "  ")]))
+                .expect("captured");
+        assert_eq!(blank.name, None, "blank dropped");
+    }
 
     #[test]
     fn escapes_markup() {

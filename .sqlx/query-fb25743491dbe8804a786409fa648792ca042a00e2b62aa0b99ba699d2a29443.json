@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT b.id AS \"id: BroadcastId\", b.workspace_id AS \"workspace_id: WorkspaceId\",\n                  b.list_id AS \"list_id: ListId\", b.subject, b.body_md, b.tag, b.status,\n                  b.recipients, b.sent_at AS \"sent_at: UnixMillis\",\n                  b.created_at AS \"created_at: UnixMillis\", b.updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_broadcasts b\n           JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id\n           WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)\n             AND (?3 IS NULL OR b.list_id = ?3)\n           ORDER BY b.id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: BroadcastId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "list_id: ListId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "list_id"
+          }
+        }
+      },
+      {
+        "name": "subject",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "name": "body_md",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "body_md"
+          }
+        }
+      },
+      {
+        "name": "tag",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "tag"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "recipients",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "recipients"
+          }
+        }
+      },
+      {
+        "name": "sent_at: UnixMillis",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "sent_at"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "fb25743491dbe8804a786409fa648792ca042a00e2b62aa0b99ba699d2a29443"
+}
