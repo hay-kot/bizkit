@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_dashboard_tiles WHERE workspace_id = ? AND dashboard_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "5291a925737a3969e31ac1cbf303458675a30654444f3451ee64d5f40183507d"
+}

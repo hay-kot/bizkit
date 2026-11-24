@@ -63,6 +63,8 @@ mod perf {
             .send_body(http::Method::POST, "/m/analytics/public/e", body)
             .await
             .expect(StatusCode::ACCEPTED);
+        // The beacon waits in the writer's queue; writing it queues the rollup.
+        app.flush().await;
         app.clock.advance(Duration::from_mins(11));
         app.drain_jobs().await;
         println!("rolled up {DAYS} days in {:?}", rolling.elapsed());
@@ -70,6 +72,30 @@ mod perf {
         let rolled = timed("summary", Some(BUDGET), || admin.get(&summary)).await;
         assert_eq!(raw["totals"], rolled["totals"], "rollups give the raw numbers");
         timed("breakdown", Some(BUDGET), || admin.get(&breakdown)).await;
+
+        // The demo dashboard's four insights over the last 30 days, where
+        // every day is raw; a dashboard loads them side by side.
+        let month = time_of(now - 30 * 86_400_000);
+        let insights = [
+            json!({"kind": "people", "filters": [{"key": "api_tokens", "op": "gt", "value": 0}],
+                   "breakdown": {"source": "trait", "key": "plan"}}),
+            json!({"kind": "events", "event": "project_opened", "measure": "share"}),
+            json!({"kind": "events", "event": "project_opened", "measure": "per_user"}),
+            json!({"kind": "events", "event": "signup",
+                   "breakdown": {"source": "property", "key": "plan"}}),
+        ];
+        let started = Instant::now();
+        for query in insights {
+            let subject = query["event"].as_str().unwrap_or("people");
+            let label =
+                format!("insight {subject} {}", query["measure"].as_str().unwrap_or("count"));
+            let run = json!({"project_id": project, "from": month, "to": to, "query": query});
+            let path = format!("{base}/insights/query");
+            timed(&label, Some(BUDGET), || admin.post(&path, &run)).await;
+        }
+        let dashboard = started.elapsed();
+        println!("dashboard, four insights one after another: {dashboard:?}");
+        assert!(dashboard < Duration::from_secs(1), "the dashboard took {dashboard:?}");
     }
 
     /// Inserts [`EVENTS`] events over [`DAYS`] days from `start` straight
@@ -83,16 +109,19 @@ mod perf {
         sqlx::query(
             "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < ? - 1)
              INSERT INTO analytics_events (workspace_id, project_id, ts, day, name, path, referrer_host,
-                                           country, device, browser, os, visitor, person, source)
+                                           country, device, browser, os, visitor, person, props, source)
              SELECT ?, ?, ? + (i % ?) * 86400000 + (i % 86400000),
                     date((? + (i % ?) * 86400000) / 1000, 'unixepoch'),
-                    CASE WHEN i % 10 = 0 THEN 'signup' ELSE 'pageview' END,
+                    CASE i % 10 WHEN 0 THEN 'signup' WHEN 1 THEN 'project_opened' ELSE 'pageview' END,
                     '/p' || (i % 300),
                     CASE i % 4 WHEN 0 THEN 'google.com' WHEN 1 THEN 'news.ycombinator.com' ELSE NULL END,
                     CASE i % 3 WHEN 0 THEN 'US' WHEN 1 THEN 'DE' ELSE 'GB' END,
                     'desktop', 'Chrome', 'macOS',
                     (i * 7919) % 5000,
-                    'v:' || ((i * 7919) % 5000),
+                    CASE WHEN (i * 7919) % 2 = 0 THEN 'p:' ELSE 'v:' END || ((i * 7919) % 5000),
+                    CASE WHEN i % 10 < 2
+                         THEN json_object('plan', CASE i % 3 WHEN 0 THEN 'pro' ELSE 'free' END, 'n', i % 7)
+                    END,
                     'web'
              FROM n",
         )
@@ -103,6 +132,23 @@ mod perf {
         .bind(DAYS)
         .bind(start)
         .bind(DAYS)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        // Every other visitor is an identified person with traits, so share,
+        // per-user and people insights have rows to read.
+        sqlx::query(
+            "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 2 FROM n WHERE i < 4998)
+             INSERT INTO analytics_people (id, workspace_id, project_id, user_id, traits, first_seen, last_seen)
+             SELECT CAST(i AS TEXT), ?, ?, 'u' || i,
+                    json_object('plan', CASE i % 3 WHEN 0 THEN 'pro' ELSE 'free' END, 'api_tokens', i % 3),
+                    ?, ?
+             FROM n",
+        )
+        .bind(ws.to_string())
+        .bind(&project)
+        .bind(start)
+        .bind(start)
         .execute(&mut *tx)
         .await
         .unwrap();

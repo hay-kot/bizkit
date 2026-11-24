@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_dashboard_tiles (workspace_id, dashboard_id, insight_id, position)\n             VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "70bb046e5ae9041bdf04032812d2b320b7bbca55fe17a48343711760d07b8783"
+}

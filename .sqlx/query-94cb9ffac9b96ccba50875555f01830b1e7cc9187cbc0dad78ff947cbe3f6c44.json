@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT t.insight_id AS \"insight_id: InsightId\", d.id AS \"id: DashboardId\", d.name\n           FROM analytics_dashboard_tiles t JOIN analytics_dashboards d ON d.id = t.dashboard_id\n           WHERE d.workspace_id = ? AND d.project_id = ? ORDER BY d.name, d.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "insight_id: InsightId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_dashboard_tiles",
+            "name": "insight_id"
+          }
+        }
+      },
+      {
+        "name": "id: DashboardId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_dashboards",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_dashboards",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "94cb9ffac9b96ccba50875555f01830b1e7cc9187cbc0dad78ff947cbe3f6c44"
+}
