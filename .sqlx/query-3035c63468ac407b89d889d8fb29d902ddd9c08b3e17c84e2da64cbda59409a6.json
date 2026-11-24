@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT workspace_id AS \"workspace_id: WorkspaceId\", id AS \"id: DeliveryId\", to_email\n           FROM mailing_deliveries WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "id: DeliveryId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "to_email",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "to_email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3035c63468ac407b89d889d8fb29d902ddd9c08b3e17c84e2da64cbda59409a6"
+}

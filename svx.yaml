@@ -7,7 +7,11 @@ settings:
 
 services:
   mailpit:
-    run: exec mailpit --listen 127.0.0.1:$PORT --smtp 127.0.0.1:$PORT_SMTP --database $SVX_STACK_DIR/mailpit.db
+    # Chaos lets you make SMTP fail on purpose (PUT /api/v1/chaos), for
+    # example to see a broadcast pause after 20 failures and resume.
+    run: >-
+      exec mailpit --listen 127.0.0.1:$PORT --smtp 127.0.0.1:$PORT_SMTP
+      --database $SVX_STACK_DIR/mailpit.db --enable-chaos
     port: 8025
     ports: { smtp: 1025 }
     ready: { http: /api/v1/info }
@@ -23,6 +27,8 @@ services:
       --data-dir $SVX_STACK_DIR/data --smtp-url smtp://127.0.0.1:$SVX_PORT_MAILPIT_SMTP
     port: 8484
     depends: [mailpit]
+    env:
+      MAILGUN_WEBHOOK_KEY: dev-webhook-key # a dev-only key, to post signed sample events with curl
     ready: { http: /healthz, timeout: 5m } # the first cargo build is slow
     links: { OpenAPI: /api/openapi.json }
 

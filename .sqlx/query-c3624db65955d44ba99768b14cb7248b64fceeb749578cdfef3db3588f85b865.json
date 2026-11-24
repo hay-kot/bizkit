@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_broadcasts SET list_id = ?, subject = ?, body_md = ?, tag = ?, status = ?,\n                                       recipients = ?, sent_at = ?, updated_at = ?, send_at = ?,\n                                       paused_at = ?, pause_reason = ?, failures_in_row = ?\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 14
+    },
+    "nullable": []
+  },
+  "hash": "c3624db65955d44ba99768b14cb7248b64fceeb749578cdfef3db3588f85b865"
+}

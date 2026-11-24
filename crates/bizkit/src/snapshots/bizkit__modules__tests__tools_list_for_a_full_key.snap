@@ -2416,6 +2416,34 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Cancel a scheduled broadcast, so it is a draft again",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_cancel"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Create a draft broadcast to a list",
       "inputSchema": {
         "$defs": {
@@ -2591,7 +2619,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Send a draft broadcast to its list's subscribers",
+      "description": "Resume a paused broadcast and send the mail it held back",
       "inputSchema": {
         "$defs": {
           "BroadcastId": {
@@ -2605,6 +2633,49 @@ expression: tools
           "broadcast_id": {
             "$ref": "#/$defs/BroadcastId",
             "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_resume"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Send a draft broadcast to its list's subscribers, now or later",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "Timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "When to send a draft.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          },
+          "send_at": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Timestamp",
+                "description": "Send at this time instead of now: in the future and within a year.\nThe broadcast stays a draft, shown as `scheduled`, until then."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3857,6 +3928,117 @@ expression: tools
         "type": "object"
       },
       "name": "mailing_sequences_update"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Suppress an address in the workspace",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "An address to suppress.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          },
+          "note": {
+            "description": "Why, for the team.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_suppressions_create"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Remove a bounce or manual suppression",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A suppressed address.",
+        "properties": {
+          "email": {
+            "description": "The address.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_suppressions_delete"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the workspace's suppressed addresses",
+      "inputSchema": {
+        "$defs": {
+          "SuppressionReason": {
+            "description": "Why an address is suppressed.",
+            "enum": [
+              "bounce",
+              "complaint",
+              "manual"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Which suppressions to list.",
+        "properties": {
+          "after": {
+            "description": "Only addresses after this one, for the next page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "At most this many, 1-200. Default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only addresses that contain this text.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SuppressionReason",
+                "description": "Only suppressions with this reason."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "mailing_suppressions_list"
     },
     {
       "annotations": {

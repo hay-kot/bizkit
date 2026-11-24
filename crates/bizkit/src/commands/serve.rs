@@ -85,6 +85,13 @@ pub(crate) async fn serve(
     if let Some(smtp_url) = &args.smtp_url {
         config.mail.smtp_url = Some(smtp_url.clone());
     }
+    if let Some(var) = &config.mail.webhook_signing_key_env {
+        let key = std::env::var(var)
+            .with_context(|| format!("reading the mail webhook signing key from ${var}"))?;
+        // An empty key would make every forged signature valid.
+        anyhow::ensure!(!key.trim().is_empty(), "${var}, the mail webhook signing key, is empty");
+        config.mail.webhook_signing_key = Some(key);
+    }
     let listen = match config.listen {
         Some(listen) => listen,
         None => DEFAULT_LISTEN.parse().context("parsing the default listen address")?,

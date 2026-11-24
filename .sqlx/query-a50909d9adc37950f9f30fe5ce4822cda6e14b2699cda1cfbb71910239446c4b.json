@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_broadcasts\n           SET failures_in_row = failures_in_row + 1,\n               paused_at = CASE WHEN paused_at IS NULL AND failures_in_row + 1 >= ?3\n                                THEN ?5 ELSE paused_at END,\n               pause_reason = CASE WHEN paused_at IS NULL AND failures_in_row + 1 >= ?3\n                                   THEN ?4 ELSE pause_reason END\n           WHERE workspace_id = ?1 AND id = ?2\n           RETURNING failures_in_row = ?3 AS \"paused!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "paused!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a50909d9adc37950f9f30fe5ce4822cda6e14b2699cda1cfbb71910239446c4b"
+}

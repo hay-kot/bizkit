@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_deliveries SET parked_at = ?1\n         WHERE workspace_id = ?2 AND id = ?3\n           AND EXISTS (SELECT 1 FROM mailing_broadcasts b\n                       WHERE b.workspace_id = ?2 AND b.id = mailing_deliveries.broadcast_id\n                         AND b.paused_at IS NOT NULL)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "8bc365e7620a069fb999bf9ef62c548191c1f9acebe940092a587e8ea83fa335"
+}

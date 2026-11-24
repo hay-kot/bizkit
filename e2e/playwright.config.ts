@@ -19,12 +19,14 @@ export default defineConfig({
     { name: 'workflows', testDir: 'tests/workflows' },
     { name: 'features', testDir: 'tests/features' },
     // Tests that change shared state (Mailpit chaos, the server clock) run
-    // after every other project, one at a time.
+    // after every other project, one at a time: fullyParallel only orders
+    // the tests of one file, so one worker keeps two files apart too.
     {
       name: 'isolated',
       testDir: 'tests/isolated',
       dependencies: ['smoke', 'workflows', 'features'],
       fullyParallel: false,
+      workers: 1,
     },
   ],
 })

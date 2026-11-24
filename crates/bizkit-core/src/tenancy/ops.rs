@@ -818,6 +818,7 @@ impl Operation for InvitationsCreate {
             ),
             html: None,
             unsubscribe: None,
+            id: None,
         };
         cx.platform().bus().enqueue(&mut tx, &SendMail(mail), Enqueue::default()).await?;
         tx.commit().await?;

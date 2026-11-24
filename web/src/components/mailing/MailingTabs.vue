@@ -11,6 +11,7 @@ const tabs = computed(() => {
     { label: 'Lists', to: base, exact: true },
     { label: 'Broadcasts', to: `${base}/broadcasts` },
     { label: 'Sequences', to: `${base}/sequences` },
+    { label: 'Suppressions', to: `${base}/suppressions` },
   ]
 })
 </script>

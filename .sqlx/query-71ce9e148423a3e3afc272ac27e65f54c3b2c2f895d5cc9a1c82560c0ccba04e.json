@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM mailing_webhook_tokens WHERE seen_at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "71ce9e148423a3e3afc272ac27e65f54c3b2c2f895d5cc9a1c82560c0ccba04e"
+}

@@ -1,5 +1,5 @@
-//! The confirm and unsubscribe pages, nested at `/m/mailing/public`. They
-//! sit outside authentication. GETs only show a button, so mail scanners
+//! The confirm and unsubscribe pages and the provider event webhook, nested
+//! at `/m/mailing/public`. They sit outside authentication. GETs only show a button, so mail scanners
 //! that follow links don't confirm or unsubscribe anyone; the POSTs change
 //! state. Everything echoed is escaped.
 
@@ -8,7 +8,7 @@ use axum::body::Bytes;
 use axum::extract::Query;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse as _, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Extension, Router};
 use bizkit_core::Platform;
 use serde::Deserialize;
@@ -47,6 +47,7 @@ pub(crate) fn router() -> Router {
     Router::new()
         .route("/confirm", get(confirm_page).post(confirm_post))
         .route("/unsubscribe", get(unsubscribe_page).post(unsubscribe_post))
+        .route("/events/mailgun", post(crate::events::mailgun))
 }
 
 /// The token a link carries.
@@ -128,7 +129,13 @@ const fn unsubscribe_docs() {}
 
 /// The docs for the public routes, relative to the nest.
 #[derive(OpenApi)]
-#[openapi(paths(confirm_page_docs, confirm_docs, unsubscribe_page_docs, unsubscribe_docs))]
+#[openapi(paths(
+    confirm_page_docs,
+    confirm_docs,
+    unsubscribe_page_docs,
+    unsubscribe_docs,
+    crate::events::mailgun_docs
+))]
 pub(crate) struct PublicDocs;
 
 fn page(status: StatusCode, title: &str, body: &str) -> Response {

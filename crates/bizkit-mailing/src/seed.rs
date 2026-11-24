@@ -2,19 +2,24 @@
 
 use std::time::Duration;
 
+use anyhow::Context as _;
+
 use bizkit_core::DemoSeed;
 use bizkit_core::auth::random_token;
 use bizkit_core::db::{Db, WriteTx};
 use bizkit_core::time::UnixMillis;
 
 use crate::api::{
-    BroadcastId, BroadcastStatus, ContactId, ContactStatus, DeliveryId, DeliveryKind,
-    DeliveryStatus, EnrollmentId, EnrollmentStatus, ListId, SequenceId, SequenceTrigger, StepId,
+    BroadcastId, BroadcastStatus, ContactId, ContactStatus, DeliveryEvent, DeliveryId,
+    DeliveryKind, DeliveryStatus, EnrollmentId, EnrollmentStatus, ListId, SequenceId,
+    SequenceTrigger, StepId, SuppressionReason,
 };
 use crate::capture::FORM_KIND;
 use crate::store::{
-    self, BroadcastRow, ContactRow, DeliveryRow, EnrollmentRow, ListRow, SequenceRow, StepRow,
+    self, BroadcastRow, ContactRow, DeliveryFilter, DeliveryRow, EnrollmentRow, ListRow,
+    SequenceRow, StepRow,
 };
+use crate::suppress::{self, Suppress};
 
 const LIST: &str = "Newsletter";
 
@@ -36,6 +41,10 @@ pay for a year.\n\n- Same features\n- One invoice\n- Cancel any time\n\n\
 [Switch to annual](https://example.com/pricing)";
 
 const SEQUENCE: &str = "Welcome series";
+/// The contact whose broadcast mail bounced.
+const BOUNCED: &str = "grace@bizkit.test";
+/// An address suppressed by hand; it is on no list.
+const MANUAL: (&str, &str) = ("orders@bizkit.test", "Shared inbox; asked us to stop.");
 
 /// Delay in hours, subject and body of each welcome step.
 const STEPS: [(i64, &str, &str); 3] = [
@@ -71,8 +80,8 @@ fn days_ago(now: UnixMillis, days: u64) -> UnixMillis {
 /// Seeds the "Newsletter" list in the `website` project, linked to the
 /// demo Contact form, with five contacts, one sent broadcast with its send
 /// log, one draft and the welcome sequence. A list that already exists by
-/// name only gets the sequence, if it lacks one by that name. Nothing is
-/// queued, so the seed sends no mail.
+/// name only gets the sequence, if it lacks one by that name, and the
+/// suppressions. Nothing is queued, so the seed sends no mail.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let existing = store::list_lists(db.read(), seed.workspace_id, Some(project_id)).await?;
@@ -80,6 +89,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         // Stacks seeded before sequences existed get the sequence alone.
         let mut tx = db.write().await?;
         seed_sequence(&mut tx, &list, seed.now).await?;
+        seed_suppressions(&mut tx, &list, seed.now).await?;
         tx.commit().await?;
         seed.entities.insert(("mailing.list".to_owned(), LIST.to_owned()), list.id.to_string());
         return Ok(());
@@ -107,6 +117,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let subscribed = seed_contacts(&mut tx, &list, form, now).await?;
     seed_broadcasts(&mut tx, &list, &subscribed, now).await?;
     seed_sequence(&mut tx, &list, now).await?;
+    seed_suppressions(&mut tx, &list, now).await?;
     tx.commit().await?;
     seed.entities.insert(("mailing.list".to_owned(), LIST.to_owned()), list.id.to_string());
     Ok(())
@@ -169,26 +180,16 @@ async fn seed_broadcasts(
         sent_at: Some(sent_at),
         created_at: days_ago(now, 4),
         updated_at: sent_at,
+        send_at: None,
+        paused_at: None,
+        pause_reason: None,
+        failures_in_row: 0,
     };
     store::insert_broadcast(&mut **tx, &sent).await?;
     for contact in subscribed {
         let delivery = DeliveryRow {
-            id: DeliveryId::new(),
-            workspace_id: list.workspace_id,
-            list_id: list.id,
-            contact_id: Some(contact.id),
-            kind: DeliveryKind::Broadcast.as_str().to_owned(),
             broadcast_id: Some(sent.id),
-            enrollment_id: None,
-            step_id: None,
-            to_email: contact.email.clone(),
-            subject: sent.subject.clone(),
-            status: DeliveryStatus::Sent.as_str().to_owned(),
-            error: None,
-            attempts: 1,
-            resends: 0,
-            created_at: sent_at,
-            sent_at: Some(sent_at.plus(Duration::from_secs(2))),
+            ..sent_delivery(list, contact, DeliveryKind::Broadcast, &sent.subject, sent_at)
         };
         store::insert_delivery(&mut **tx, &delivery).await?;
     }
@@ -206,6 +207,94 @@ async fn seed_broadcasts(
     };
     store::insert_broadcast(&mut **tx, &draft).await?;
     Ok(())
+}
+
+/// Suppresses one address by hand, and marks the sent broadcast's mail to
+/// [`BOUNCED`] as a bounce with its suppression, as the Mailgun webhook
+/// would. Both steps skip what is already there.
+async fn seed_suppressions(
+    tx: &mut WriteTx,
+    list: &ListRow,
+    now: UnixMillis,
+) -> anyhow::Result<()> {
+    let manual = Suppress {
+        workspace_id: list.workspace_id,
+        email: MANUAL.0,
+        reason: SuppressionReason::Manual,
+        delivery_id: None,
+        note: Some(MANUAL.1.to_owned()),
+        now: days_ago(now, 6),
+    };
+    suppress::suppress(tx, manual).await?;
+
+    let Some(contact) =
+        store::find_contact_by_email(&mut **tx, list.workspace_id, list.id, BOUNCED)
+            .await
+            .context("finding the bounced contact")?
+    else {
+        return Ok(());
+    };
+    let filter = DeliveryFilter { contact_id: Some(contact.id), ..DeliveryFilter::default() };
+    let deliveries = store::list_deliveries(&mut **tx, list.workspace_id, &filter, 50)
+        .await
+        .context("loading the contact's deliveries")?;
+    let Some(delivery) = deliveries
+        .into_iter()
+        .find(|d| d.kind == DeliveryKind::Broadcast.as_str() && d.event.is_none())
+    else {
+        return Ok(());
+    };
+    let at = delivery.sent_at.unwrap_or(delivery.created_at).plus(Duration::from_mins(3));
+    store::mark_delivery_event(
+        &mut **tx,
+        list.workspace_id,
+        delivery.id,
+        DeliveryEvent::Bounced.as_str(),
+        at,
+    )
+    .await
+    .context("marking the bounce")?;
+    let bounce = Suppress {
+        workspace_id: list.workspace_id,
+        email: BOUNCED,
+        reason: SuppressionReason::Bounce,
+        delivery_id: Some(delivery.id),
+        note: None,
+        now: at,
+    };
+    suppress::suppress(tx, bounce).await?;
+    Ok(())
+}
+
+/// A delivery the mail server took two seconds after `at`.
+fn sent_delivery(
+    list: &ListRow,
+    contact: &ContactRow,
+    kind: DeliveryKind,
+    subject: &str,
+    at: UnixMillis,
+) -> DeliveryRow {
+    DeliveryRow {
+        id: DeliveryId::new(),
+        workspace_id: list.workspace_id,
+        list_id: list.id,
+        contact_id: Some(contact.id),
+        kind: kind.as_str().to_owned(),
+        broadcast_id: None,
+        enrollment_id: None,
+        step_id: None,
+        to_email: contact.email.clone(),
+        subject: subject.to_owned(),
+        status: DeliveryStatus::Sent.as_str().to_owned(),
+        error: None,
+        attempts: 1,
+        resends: 0,
+        created_at: at,
+        sent_at: Some(at.plus(Duration::from_secs(2))),
+        provider_id: None,
+        event: None,
+        event_at: None,
+    }
 }
 
 /// Inserts the 3-step welcome sequence with one completed and one exited
@@ -268,22 +357,9 @@ async fn seed_sequence(tx: &mut WriteTx, list: &ListRow, now: UnixMillis) -> any
         for step in steps.iter().take(reached) {
             at = at.plus(Duration::from_hours(u64::try_from(step.delay_hours).unwrap_or(0)));
             let delivery = DeliveryRow {
-                id: DeliveryId::new(),
-                workspace_id: list.workspace_id,
-                list_id: list.id,
-                contact_id: Some(contact.id),
-                kind: DeliveryKind::Step.as_str().to_owned(),
-                broadcast_id: None,
                 enrollment_id: Some(enrollment.id),
                 step_id: Some(step.id),
-                to_email: contact.email.clone(),
-                subject: step.subject.clone(),
-                status: DeliveryStatus::Sent.as_str().to_owned(),
-                error: None,
-                attempts: 1,
-                resends: 0,
-                created_at: at,
-                sent_at: Some(at.plus(Duration::from_secs(2))),
+                ..sent_delivery(list, &contact, DeliveryKind::Step, &step.subject, at)
             };
             store::insert_delivery(&mut **tx, &delivery).await?;
         }

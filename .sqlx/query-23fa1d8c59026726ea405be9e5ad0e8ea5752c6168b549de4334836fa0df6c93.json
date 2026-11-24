@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_deliveries SET parked_at = NULL\n           WHERE workspace_id = ? AND broadcast_id = ? AND parked_at IS NOT NULL\n           RETURNING id AS \"id: DeliveryId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: DeliveryId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_deliveries",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "23fa1d8c59026726ea405be9e5ad0e8ea5752c6168b549de4334836fa0df6c93"
+}

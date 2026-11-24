@@ -1,14 +1,16 @@
 import { useMutation, useQuery } from '@pinia/colada'
 import { useIntervalFn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
-import { toValue, watch } from 'vue'
+import { onScopeDispose, toValue, watch } from 'vue'
 
 import {
+  mailingBroadcastsCancelMutation,
   mailingBroadcastsCreateMutation,
   mailingBroadcastsDeleteMutation,
   mailingBroadcastsGetQuery,
   mailingBroadcastsListQuery,
   mailingBroadcastsResendMutation,
+  mailingBroadcastsResumeMutation,
   mailingBroadcastsSendMutation,
   mailingBroadcastsTestMutation,
   mailingBroadcastsUpdateMutation,
@@ -32,12 +34,16 @@ import {
   mailingSequencesGetQuery,
   mailingSequencesListQuery,
   mailingSequencesUpdateMutation,
+  mailingSuppressionsCreateMutation,
+  mailingSuppressionsDeleteMutation,
+  mailingSuppressionsListQuery,
 } from '@/api/gen/@pinia/colada.gen'
 import type {
   Broadcast,
   BroadcastStatus,
   Contact,
   ContactStatus,
+  DeliveryEvent,
   DeliveryStatus,
   Enrollment,
   EnrollmentStatus,
@@ -47,6 +53,8 @@ import type {
   Sequence,
   SequenceStep,
   SequenceTrigger,
+  Suppression,
+  SuppressionReason,
 } from '@/api/gen/types.gen'
 
 import { useInvalidate } from './keys'
@@ -56,6 +64,7 @@ export type {
   BroadcastStatus,
   Contact,
   ContactStatus,
+  DeliveryEvent,
   DeliveryStatus,
   Enrollment,
   EnrollmentStatus,
@@ -65,6 +74,8 @@ export type {
   Sequence,
   SequenceStep,
   SequenceTrigger,
+  Suppression,
+  SuppressionReason,
 }
 
 const LIST_QUERIES = ['mailingListsList', 'mailingListsGet']
@@ -196,7 +207,14 @@ export function useBroadcasts(
 
 const SENDING_POLL_MS = 2_000
 
-/** A broadcast; while it is sending, it refetches every two seconds. */
+/** The longest delay `setTimeout` takes; longer ones fire at once. */
+const MAX_TIMEOUT_MS = 2_147_483_647
+
+/**
+ * A broadcast; while it is sending, it refetches every two seconds, and a
+ * scheduled one refetches once its `send_at` has passed, so an open page
+ * sees it start.
+ */
 export function useBroadcast(
   workspaceId: MaybeRefOrGetter<string>,
   broadcastId: MaybeRefOrGetter<string>,
@@ -220,6 +238,25 @@ export function useBroadcast(
     (sending) => (sending ? poll.resume() : poll.pause()),
     { immediate: true },
   )
+  let start: ReturnType<typeof setTimeout> | undefined
+  const clearStart = () => clearTimeout(start)
+  watch(
+    () => (query.data.value?.status === 'scheduled' ? query.data.value.send_at : null),
+    (sendAt) => {
+      clearStart()
+      if (!sendAt) return
+      // At least a poll interval, so a start job running late doesn't spin.
+      const wait = Math.max(Date.parse(sendAt) - Date.now() + 1_000, SENDING_POLL_MS)
+      start = setTimeout(
+        () => {
+          if (query.asyncStatus.value !== 'loading') void query.refetch()
+        },
+        Math.min(wait, MAX_TIMEOUT_MS),
+      )
+    },
+    { immediate: true },
+  )
+  onScopeDispose(clearStart)
   return query
 }
 
@@ -251,6 +288,24 @@ export function useSendBroadcast() {
   const invalidate = useInvalidate()
   return useMutation({
     ...mailingBroadcastsSendMutation(),
+    onSettled: () => invalidate(...BROADCAST_QUERIES, 'mailingDeliveriesList'),
+  })
+}
+
+/** Turns a scheduled broadcast back into a draft. */
+export function useCancelBroadcast() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingBroadcastsCancelMutation(),
+    onSettled: () => invalidate(...BROADCAST_QUERIES),
+  })
+}
+
+/** Sends the mail a paused broadcast held back. */
+export function useResumeBroadcast() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingBroadcastsResumeMutation(),
     onSettled: () => invalidate(...BROADCAST_QUERIES, 'mailingDeliveriesList'),
   })
 }
@@ -380,4 +435,34 @@ export function useSequenceDeliveries(
       query: { sequence_id: toValue(sequenceId), limit: ROWS_SHOWN },
     }),
   )
+}
+
+/** The workspace's suppressed addresses, by address. */
+export function useSuppressions(
+  workspaceId: MaybeRefOrGetter<string>,
+  filter: MaybeRefOrGetter<{ reason?: SuppressionReason; q?: string }>,
+) {
+  return useQuery(() => {
+    const { reason, q } = toValue(filter)
+    return mailingSuppressionsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { limit: ROWS_SHOWN, reason, q: q?.trim() ? q.trim() : undefined },
+    })
+  })
+}
+
+export function useAddSuppression() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingSuppressionsCreateMutation(),
+    onSettled: () => invalidate('mailingSuppressionsList'),
+  })
+}
+
+export function useRemoveSuppression() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingSuppressionsDeleteMutation(),
+    onSettled: () => invalidate('mailingSuppressionsList'),
+  })
 }

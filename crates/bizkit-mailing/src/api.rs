@@ -141,16 +141,25 @@ pub enum BroadcastStatus {
     Sending,
     /// Every recipient's mail is queued or sent.
     Sent,
+    /// A draft waiting for `send_at`. Cancel it to edit it again.
+    Scheduled,
+    /// Stopped after too many deliveries failed in a row; `pause_reason`
+    /// says why. Resume sends the rest.
+    Paused,
 }
 
 impl BroadcastStatus {
-    /// The stored text.
+    /// The text, as stored for the first three. `scheduled` and `paused`
+    /// are never stored: the API derives them from `send_at` and
+    /// `paused_at`.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Draft => "draft",
             Self::Sending => "sending",
             Self::Sent => "sent",
+            Self::Scheduled => "scheduled",
+            Self::Paused => "paused",
         }
     }
 
@@ -185,6 +194,12 @@ pub struct Broadcast {
     pub recipients: u64,
     /// When sending started.
     pub sent_at: Option<UnixMillis>,
+    /// When a scheduled broadcast starts sending.
+    pub send_at: Option<UnixMillis>,
+    /// When the breaker paused it.
+    pub paused_at: Option<UnixMillis>,
+    /// Why it paused.
+    pub pause_reason: Option<String>,
     /// Its deliveries by status; only when getting one broadcast.
     pub deliveries: Option<DeliveryCounts>,
     /// When it was created.
@@ -204,6 +219,10 @@ pub struct DeliveryCounts {
     pub failed: u64,
     /// Not sent, because the contact left the list.
     pub skipped: u64,
+    /// Sent, then reported as a permanent bounce by the provider.
+    pub bounced: u64,
+    /// Sent, then reported as spam by the recipient.
+    pub complained: u64,
 }
 
 /// What "Resend to failed" did.
@@ -329,6 +348,102 @@ pub struct MailDelivery {
     pub created_at: UnixMillis,
     /// When the mail server took it.
     pub sent_at: Option<UnixMillis>,
+    /// The provider's message ID, or the `Message-ID` bizkit set.
+    pub provider_id: Option<String>,
+    /// What the provider reported after sending, if anything.
+    pub event: Option<DeliveryEvent>,
+    /// When the provider reported `event`.
+    pub event_at: Option<UnixMillis>,
+}
+
+/// What the mail provider reported about a sent mail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryEvent {
+    /// The recipient's server refused it for good.
+    Bounced,
+    /// The recipient marked it as spam.
+    Complained,
+}
+
+impl DeliveryEvent {
+    /// The stored text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bounced => "bounced",
+            Self::Complained => "complained",
+        }
+    }
+
+    /// Parses the stored text.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "bounced" => Some(Self::Bounced),
+            "complained" => Some(Self::Complained),
+            _ => None,
+        }
+    }
+}
+
+/// Why an address is suppressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SuppressionReason {
+    /// A mail to it bounced for good.
+    Bounce,
+    /// The recipient reported a mail as spam. It can't be removed.
+    Complaint,
+    /// A team member added it.
+    Manual,
+}
+
+impl SuppressionReason {
+    /// The stored text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bounce => "bounce",
+            Self::Complaint => "complaint",
+            Self::Manual => "manual",
+        }
+    }
+
+    /// Parses the stored text.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "bounce" => Some(Self::Bounce),
+            "complaint" => Some(Self::Complaint),
+            "manual" => Some(Self::Manual),
+            _ => None,
+        }
+    }
+}
+
+/// An address no list in the workspace mails.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Suppression {
+    /// The address, lower case.
+    pub email: String,
+    /// Why it is suppressed.
+    pub reason: SuppressionReason,
+    /// The delivery that bounced or drew the complaint.
+    pub delivery_id: Option<DeliveryId>,
+    /// A team member's note, for manual entries.
+    pub note: Option<String>,
+    /// When it was added.
+    pub created_at: UnixMillis,
+}
+
+/// A page of suppressions, by address.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SuppressionPage {
+    /// The suppressions.
+    pub items: Vec<Suppression>,
+    /// Pass as `after` for the next page; absent on the last one.
+    pub next_after: Option<String>,
 }
 
 /// A page of deliveries, newest first.

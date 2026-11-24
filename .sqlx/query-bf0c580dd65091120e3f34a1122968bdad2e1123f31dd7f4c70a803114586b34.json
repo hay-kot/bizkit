@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mailing_suppressions\n           (workspace_id, email, reason, delivery_id, note, created_at)\n         VALUES (?1, ?2, ?3, ?4, ?5, ?6)\n         ON CONFLICT (workspace_id, email) DO UPDATE\n           SET reason = excluded.reason, delivery_id = excluded.delivery_id,\n               created_at = excluded.created_at\n           WHERE excluded.reason = 'complaint' AND mailing_suppressions.reason != 'complaint'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "bf0c580dd65091120e3f34a1122968bdad2e1123f31dd7f4c70a803114586b34"
+}

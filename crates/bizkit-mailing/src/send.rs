@@ -7,23 +7,27 @@ use std::time::Duration;
 use anyhow::Context as _;
 use bizkit_core::Platform;
 use bizkit_core::db::WriteTx;
-use bizkit_core::deps::Mail;
+use bizkit_core::deps::{Mail, MailError};
 use bizkit_core::ids::WorkspaceId;
 use bizkit_core::jobs::{Enqueue, Job, JobCtx, JobHandler, Lane};
+use bizkit_core::time::UnixMillis;
 use serde::{Deserialize, Serialize};
 
 use crate::api::{
     BroadcastId, BroadcastStatus, ContactStatus, DeliveryId, DeliveryKind, DeliveryStatus,
     EnrollmentStatus,
 };
-use crate::public;
 use crate::render::{self, Frame, Merge, Rendered};
 use crate::store::{self, BroadcastRow, ContactRow, DeliveryRow, ListRow};
+use crate::{public, suppress};
 
 /// The longest error text kept on a delivery.
 const ERROR_CHARS: usize = 300;
 /// Deliveries one fan-out transaction inserts.
 pub const FAN_OUT_BATCH: i64 = 500;
+/// Deliveries of a broadcast that fail in a row before it pauses. A broken
+/// setup fails every mail, whatever the error class, so both count.
+pub const BREAKER_FAILURES: i64 = 20;
 
 /// The worker lane mailing jobs use, so a slow mail server never holds up
 /// sign-in mail.
@@ -53,6 +57,58 @@ pub(crate) struct FanOut {
 impl Job for FanOut {
     const KIND: &'static str = "mailing.broadcast";
     const LANE: Lane = MAILING;
+}
+
+/// Starts a scheduled broadcast at its `send_at`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct StartBroadcast {
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) broadcast_id: BroadcastId,
+    /// The `send_at` this job was queued for. A cancel, or a cancel and a
+    /// new schedule, changes the row, so a stale job does nothing.
+    pub(crate) due: UnixMillis,
+}
+
+impl Job for StartBroadcast {
+    const KIND: &'static str = "mailing.broadcast.start";
+    const LANE: Lane = MAILING;
+}
+
+/// Turns a draft into a sending broadcast and queues its fan-out.
+pub(crate) async fn start(
+    platform: &Platform,
+    tx: &mut WriteTx,
+    row: &mut BroadcastRow,
+) -> anyhow::Result<()> {
+    let now = platform.now();
+    BroadcastStatus::Sending.as_str().clone_into(&mut row.status);
+    row.sent_at = Some(now);
+    row.updated_at = now;
+    store::update_broadcast(&mut **tx, row).await.context("starting the broadcast")?;
+    let job = FanOut { workspace_id: row.workspace_id, broadcast_id: row.id };
+    platform.bus().enqueue(tx, &job, Enqueue::default()).await.context("queuing the fan-out")?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StartBroadcastHandler;
+
+impl JobHandler<StartBroadcast> for StartBroadcastHandler {
+    async fn handle(&self, cx: JobCtx, job: StartBroadcast) -> anyhow::Result<()> {
+        let platform = &cx.platform;
+        let mut tx = platform.db().write().await?;
+        let Some(mut row) = store::find_broadcast(&mut *tx, job.workspace_id, job.broadcast_id)
+            .await
+            .context("loading the broadcast")?
+        else {
+            return Ok(());
+        };
+        if row.status != BroadcastStatus::Draft.as_str() || row.send_at != Some(job.due) {
+            return Ok(());
+        }
+        start(platform, &mut tx, &mut row).await?;
+        tx.commit().await
+    }
 }
 
 /// Inserts `row` and enqueues its send, unless an equal delivery exists.
@@ -95,6 +151,9 @@ pub(crate) fn delivery(
         resends: 0,
         created_at: platform.now(),
         sent_at: None,
+        provider_id: None,
+        event: None,
+        event_at: None,
     }
 }
 
@@ -246,13 +305,89 @@ fn to_mail(to: &str, mail: Rendered, unsubscribe: Option<url::Url>) -> Mail {
         text: mail.text,
         html: Some(mail.html),
         unsubscribe,
+        id: None,
     }
 }
 
+/// The suppression check every kind but `test` gets: a test send goes to
+/// a team member who asked for it.
+async fn suppressed(platform: &Platform, delivery: &DeliveryRow) -> anyhow::Result<Option<String>> {
+    if delivery.kind == DeliveryKind::Test.as_str() {
+        return Ok(None);
+    }
+    let reason =
+        suppress::suppressed(platform.db().read(), delivery.workspace_id, &delivery.to_email)
+            .await
+            .context("checking the suppression list")?;
+    Ok(reason.map(|r| format!("suppressed: {}", r.as_str())))
+}
+
 async fn mark(platform: &Platform, delivery: &DeliveryRow) -> anyhow::Result<()> {
+    mark_counting(platform, delivery, Count::Nothing).await
+}
+
+/// What a send attempt adds to its broadcast's breaker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Count {
+    Nothing,
+    Success,
+    Failure,
+}
+
+/// Records the delivery and, for broadcast mail, updates the breaker in the
+/// same transaction.
+async fn mark_counting(
+    platform: &Platform,
+    delivery: &DeliveryRow,
+    count: Count,
+) -> anyhow::Result<()> {
     let mut tx = platform.db().write().await?;
     store::mark_delivery(&mut *tx, delivery).await.context("recording the delivery")?;
+    let broadcast_id =
+        delivery.broadcast_id.filter(|_| delivery.kind == DeliveryKind::Broadcast.as_str());
+    if let Some(broadcast_id) = broadcast_id {
+        match count {
+            Count::Nothing => {}
+            Count::Success => {
+                store::broadcast_send_ok(&mut *tx, delivery.workspace_id, broadcast_id)
+                    .await
+                    .context("resetting the breaker")?;
+            }
+            Count::Failure => {
+                let error = delivery.error.as_deref().unwrap_or("unknown error");
+                let reason = capped(&format!(
+                    "{BREAKER_FAILURES} deliveries failed in a row; the last: {error}"
+                ));
+                let paused = store::broadcast_send_failed(
+                    &mut *tx,
+                    delivery.workspace_id,
+                    broadcast_id,
+                    store::Pause { limit: BREAKER_FAILURES, reason: &reason, now: platform.now() },
+                )
+                .await
+                .context("counting the failure")?;
+                if paused {
+                    tracing::warn!(broadcast = %broadcast_id, "paused a broadcast: {reason}");
+                }
+            }
+        }
+    }
     tx.commit().await
+}
+
+/// Whether the delivery belongs to a paused broadcast. Its job then parks
+/// it instead of sending.
+async fn paused(platform: &Platform, delivery: &DeliveryRow) -> anyhow::Result<bool> {
+    let Some(broadcast_id) =
+        delivery.broadcast_id.filter(|_| delivery.kind == DeliveryKind::Broadcast.as_str())
+    else {
+        return Ok(false);
+    };
+    let broadcast =
+        store::find_broadcast(platform.db().read(), delivery.workspace_id, broadcast_id)
+            .await
+            .context("loading the broadcast")?;
+    Ok(broadcast.is_some_and(|b| b.paused_at.is_some()))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -277,7 +412,23 @@ impl JobHandler<Send> for SendHandler {
         else {
             return Ok(());
         };
-        let mail = match prepare(platform, &list, &delivery).await? {
+        if paused(platform, &delivery).await? {
+            let mut tx = platform.db().write().await?;
+            let parked =
+                store::park_if_paused(&mut *tx, delivery.workspace_id, delivery.id, platform.now())
+                    .await
+                    .context("parking the delivery")?;
+            tx.commit().await?;
+            if parked {
+                return Ok(());
+            }
+        }
+        if let Some(reason) = suppressed(platform, &delivery).await? {
+            DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
+            delivery.error = Some(reason);
+            return mark(platform, &delivery).await;
+        }
+        let mut mail = match prepare(platform, &list, &delivery).await? {
             Prepared::Mail(mail) => mail,
             Prepared::Skip(reason) => {
                 DeliveryStatus::Skipped.as_str().clone_into(&mut delivery.status);
@@ -285,6 +436,7 @@ impl JobHandler<Send> for SendHandler {
                 return mark(platform, &delivery).await;
             }
         };
+        mail.id = Some(delivery.id.to_string());
         delivery.attempts = i64::from(cx.attempt);
         let final_attempt = cx.attempt >= Send::MAX_ATTEMPTS;
         if final_attempt {
@@ -294,20 +446,30 @@ impl JobHandler<Send> for SendHandler {
             delivery.error = Some("the last attempt did not finish".to_owned());
             mark(platform, &delivery).await?;
         }
+        // The breaker counts deliveries, not attempts: only a first attempt
+        // that fails adds to it.
+        let failure = if cx.attempt == 1 { Count::Failure } else { Count::Nothing };
         match platform.deps().mailer.send(&mail).await {
-            Ok(()) => {
+            Ok(provider_id) => {
                 DeliveryStatus::Sent.as_str().clone_into(&mut delivery.status);
                 delivery.error = None;
                 delivery.sent_at = Some(platform.now());
-                mark(platform, &delivery).await
+                delivery.provider_id = provider_id;
+                mark_counting(platform, &delivery, Count::Success).await
             }
-            Err(err) => {
-                let error = capped(&format!("{err:#}"));
+            // Retrying can't help, so the row fails now and the job ends.
+            Err(MailError::Permanent(err)) => {
+                DeliveryStatus::Failed.as_str().clone_into(&mut delivery.status);
+                delivery.error = Some(capped(&err));
+                mark_counting(platform, &delivery, failure).await
+            }
+            Err(err @ MailError::Transient(_)) => {
+                let error = capped(&err.to_string());
                 let status =
                     if final_attempt { DeliveryStatus::Failed } else { DeliveryStatus::Queued };
                 status.as_str().clone_into(&mut delivery.status);
                 delivery.error = Some(error.clone());
-                mark(platform, &delivery).await?;
+                mark_counting(platform, &delivery, failure).await?;
                 anyhow::bail!("sending to {} failed: {error}", delivery.to_email)
             }
         }
@@ -328,7 +490,8 @@ impl JobHandler<FanOut> for FanOutHandler {
         else {
             return Ok(());
         };
-        if broadcast.status != BroadcastStatus::Sending.as_str() {
+        // A paused broadcast stops queuing; Resume queues this job again.
+        if broadcast.status != BroadcastStatus::Sending.as_str() || broadcast.paused_at.is_some() {
             return Ok(());
         }
         let Some(list) = store::find_list(&mut *tx, broadcast.workspace_id, broadcast.list_id)

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: BroadcastId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", subject, body_md, tag, status, recipients,\n                  sent_at AS \"sent_at: UnixMillis\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?",
+  "query": "SELECT id AS \"id: BroadcastId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", subject, body_md, tag, status, recipients,\n                  sent_at AS \"sent_at: UnixMillis\", created_at AS \"created_at: UnixMillis\",\n                  updated_at AS \"updated_at: UnixMillis\", send_at AS \"send_at: UnixMillis\",\n                  paused_at AS \"paused_at: UnixMillis\", pause_reason, failures_in_row\n           FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,50 @@
             "name": "updated_at"
           }
         }
+      },
+      {
+        "name": "send_at: UnixMillis",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "send_at"
+          }
+        }
+      },
+      {
+        "name": "paused_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "paused_at"
+          }
+        }
+      },
+      {
+        "name": "pause_reason",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "pause_reason"
+          }
+        }
+      },
+      {
+        "name": "failures_in_row",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "failures_in_row"
+          }
+        }
       }
     ],
     "parameters": {
@@ -139,8 +183,12 @@
       false,
       true,
       false,
+      false,
+      true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "41265788f6f29c5ff96d4976ac5347cdeed6b9e260cbcbb51dade4b9aef71f04"
+  "hash": "0dc83fbe98ad2ceb71d5799365cc9f68ea3a517215cd7ad8445f4d356451be25"
 }

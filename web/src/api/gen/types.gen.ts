@@ -156,9 +156,15 @@ export type Broadcast = {
      */
     list_id: ListId;
     /**
+     * Why it paused.
+     */
+    pause_reason?: string | null;
+    paused_at?: Timestamp | null;
+    /**
      * Subscribers it was queued for.
      */
     recipients: number;
+    send_at?: Timestamp | null;
     sent_at?: Timestamp | null;
     /**
      * Where it stands.
@@ -193,7 +199,7 @@ export type BroadcastList = {
 /**
  * Where a broadcast stands.
  */
-export type BroadcastStatus = 'draft' | 'sending' | 'sent';
+export type BroadcastStatus = 'draft' | 'sending' | 'sent' | 'scheduled' | 'paused';
 
 /**
  * What a script on a hook point can use besides plain JavaScript.
@@ -402,6 +408,14 @@ export type Delivery = {
  */
 export type DeliveryCounts = {
     /**
+     * Sent, then reported as a permanent bounce by the provider.
+     */
+    bounced: number;
+    /**
+     * Sent, then reported as spam by the recipient.
+     */
+    complained: number;
+    /**
      * Every attempt failed. "Resend to failed" queues these again.
      */
     failed: number;
@@ -418,6 +432,11 @@ export type DeliveryCounts = {
      */
     skipped: number;
 };
+
+/**
+ * What the mail provider reported about a sent mail.
+ */
+export type DeliveryEvent = 'bounced' | 'complained';
 
 export type DeliveryId = string;
 
@@ -1151,6 +1170,8 @@ export type MailDelivery = {
      * Why the last attempt failed, or why it was skipped.
      */
     error?: string | null;
+    event?: DeliveryEvent | null;
+    event_at?: Timestamp | null;
     /**
      * The delivery ID.
      */
@@ -1159,6 +1180,10 @@ export type MailDelivery = {
      * What it was for.
      */
     kind: DeliveryKind;
+    /**
+     * The provider's message ID, or the `Message-ID` bizkit set.
+     */
+    provider_id?: string | null;
     /**
      * How often "Resend to failed" queued it again.
      */
@@ -2194,6 +2219,48 @@ export type Summary = {
      */
     totals: Totals;
 };
+
+/**
+ * An address no list in the workspace mails.
+ */
+export type Suppression = {
+    /**
+     * When it was added.
+     */
+    created_at: Timestamp;
+    delivery_id?: DeliveryId | null;
+    /**
+     * The address, lower case.
+     */
+    email: string;
+    /**
+     * A team member's note, for manual entries.
+     */
+    note?: string | null;
+    /**
+     * Why it is suppressed.
+     */
+    reason: SuppressionReason;
+};
+
+/**
+ * A page of suppressions, by address.
+ */
+export type SuppressionPage = {
+    /**
+     * The suppressions.
+     */
+    items: Array<Suppression>;
+    /**
+     * Pass as `after` for the next page; absent on the last one.
+     */
+    next_after?: string | null;
+};
+
+/**
+ * Why an address is suppressed.
+ */
+export type SuppressionReason = 'bounce' | 'complaint' | 'manual';
 
 /**
  * An entity scripts can target.
@@ -5915,6 +5982,60 @@ export type MailingBroadcastsUpdateResponses = {
 
 export type MailingBroadcastsUpdateResponse = MailingBroadcastsUpdateResponses[keyof MailingBroadcastsUpdateResponses];
 
+export type MailingBroadcastsCancelData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/cancel';
+};
+
+export type MailingBroadcastsCancelErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsCancelError = MailingBroadcastsCancelErrors[keyof MailingBroadcastsCancelErrors];
+
+export type MailingBroadcastsCancelResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsCancelResponse = MailingBroadcastsCancelResponses[keyof MailingBroadcastsCancelResponses];
+
 export type MailingBroadcastsResendData = {
     body?: never;
     path: {
@@ -5969,8 +6090,64 @@ export type MailingBroadcastsResendResponses = {
 
 export type MailingBroadcastsResendResponse = MailingBroadcastsResendResponses[keyof MailingBroadcastsResendResponses];
 
-export type MailingBroadcastsSendData = {
+export type MailingBroadcastsResumeData = {
     body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resume';
+};
+
+export type MailingBroadcastsResumeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsResumeError = MailingBroadcastsResumeErrors[keyof MailingBroadcastsResumeErrors];
+
+export type MailingBroadcastsResumeResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsResumeResponse = MailingBroadcastsResumeResponses[keyof MailingBroadcastsResumeResponses];
+
+export type MailingBroadcastsSendData = {
+    body: {
+        send_at?: Timestamp | null;
+    };
     path: {
         /**
          * The workspace.
@@ -7351,6 +7528,179 @@ export type MailingEnrollmentsExitResponses = {
 
 export type MailingEnrollmentsExitResponse = MailingEnrollmentsExitResponses[keyof MailingEnrollmentsExitResponses];
 
+export type MailingSuppressionsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: {
+        /**
+         * Only addresses after this one, for the next page.
+         */
+        after?: string | null;
+        /**
+         * At most this many, 1-200. Default 50.
+         */
+        limit?: number | null;
+        /**
+         * Only addresses that contain this text.
+         */
+        q?: string | null;
+        reason?: SuppressionReason | null;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/mailing/suppressions';
+};
+
+export type MailingSuppressionsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSuppressionsListError = MailingSuppressionsListErrors[keyof MailingSuppressionsListErrors];
+
+export type MailingSuppressionsListResponses = {
+    /**
+     * OK
+     */
+    200: SuppressionPage;
+};
+
+export type MailingSuppressionsListResponse = MailingSuppressionsListResponses[keyof MailingSuppressionsListResponses];
+
+export type MailingSuppressionsCreateData = {
+    body: {
+        /**
+         * The address.
+         */
+        email: string;
+        /**
+         * Why, for the team.
+         */
+        note?: string | null;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/suppressions';
+};
+
+export type MailingSuppressionsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSuppressionsCreateError = MailingSuppressionsCreateErrors[keyof MailingSuppressionsCreateErrors];
+
+export type MailingSuppressionsCreateResponses = {
+    /**
+     * Created
+     */
+    201: Suppression;
+};
+
+export type MailingSuppressionsCreateResponse = MailingSuppressionsCreateResponses[keyof MailingSuppressionsCreateResponses];
+
+export type MailingSuppressionsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The address.
+         */
+        email: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/suppressions/{email}';
+};
+
+export type MailingSuppressionsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingSuppressionsDeleteError = MailingSuppressionsDeleteErrors[keyof MailingSuppressionsDeleteErrors];
+
+export type MailingSuppressionsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type MailingSuppressionsDeleteResponse = MailingSuppressionsDeleteResponses[keyof MailingSuppressionsDeleteResponses];
+
 export type MembersListData = {
     body?: never;
     path: {
@@ -8397,6 +8747,48 @@ export type MailingPublicConfirmResponses = {
 };
 
 export type MailingPublicConfirmResponse = MailingPublicConfirmResponses[keyof MailingPublicConfirmResponses];
+
+export type MailingPublicMailgunEventsData = {
+    /**
+     * `{signature: {timestamp, token, signature}, "event-data": {...}}`
+     */
+    body: {
+        [key: string]: unknown;
+    };
+    path?: never;
+    query?: never;
+    url: '/m/mailing/public/events/mailgun';
+};
+
+export type MailingPublicMailgunEventsErrors = {
+    /**
+     * Not a Mailgun event
+     */
+    400: string;
+    /**
+     * The signature is wrong, or no signing key is set
+     */
+    401: string;
+    /**
+     * A replayed token or a stale timestamp; Mailgun stops retrying
+     */
+    406: string;
+    /**
+     * Bizkit failed; Mailgun retries
+     */
+    500: string;
+};
+
+export type MailingPublicMailgunEventsError = MailingPublicMailgunEventsErrors[keyof MailingPublicMailgunEventsErrors];
+
+export type MailingPublicMailgunEventsResponses = {
+    /**
+     * Accepted
+     */
+    200: string;
+};
+
+export type MailingPublicMailgunEventsResponse = MailingPublicMailgunEventsResponses[keyof MailingPublicMailgunEventsResponses];
 
 export type MailingPublicUnsubscribePageData = {
     body?: never;

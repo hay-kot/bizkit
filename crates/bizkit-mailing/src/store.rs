@@ -56,6 +56,10 @@ pub(crate) struct BroadcastRow {
     pub(crate) sent_at: Option<UnixMillis>,
     pub(crate) created_at: UnixMillis,
     pub(crate) updated_at: UnixMillis,
+    pub(crate) send_at: Option<UnixMillis>,
+    pub(crate) paused_at: Option<UnixMillis>,
+    pub(crate) pause_reason: Option<String>,
+    pub(crate) failures_in_row: i64,
 }
 
 /// A `mailing_deliveries` row.
@@ -77,6 +81,9 @@ pub(crate) struct DeliveryRow {
     pub(crate) resends: i64,
     pub(crate) created_at: UnixMillis,
     pub(crate) sent_at: Option<UnixMillis>,
+    pub(crate) provider_id: Option<String>,
+    pub(crate) event: Option<String>,
+    pub(crate) event_at: Option<UnixMillis>,
 }
 
 /// A `mailing_sequences` row.
@@ -592,8 +599,9 @@ pub(crate) async fn insert_broadcast(
 ) -> sqlx::Result<()> {
     sqlx::query!(
         "INSERT INTO mailing_broadcasts (id, workspace_id, list_id, subject, body_md, tag, status,
-                                         recipients, sent_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                         recipients, sent_at, created_at, updated_at, send_at,
+                                         paused_at, pause_reason, failures_in_row)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.list_id,
@@ -605,6 +613,10 @@ pub(crate) async fn insert_broadcast(
         row.sent_at,
         row.created_at,
         row.updated_at,
+        row.send_at,
+        row.paused_at,
+        row.pause_reason,
+        row.failures_in_row,
     )
     .execute(exec)
     .await?;
@@ -618,7 +630,8 @@ pub(crate) async fn update_broadcast(
 ) -> sqlx::Result<()> {
     sqlx::query!(
         "UPDATE mailing_broadcasts SET list_id = ?, subject = ?, body_md = ?, tag = ?, status = ?,
-                                       recipients = ?, sent_at = ?, updated_at = ?
+                                       recipients = ?, sent_at = ?, updated_at = ?, send_at = ?,
+                                       paused_at = ?, pause_reason = ?, failures_in_row = ?
          WHERE workspace_id = ? AND id = ?",
         row.list_id,
         row.subject,
@@ -628,6 +641,10 @@ pub(crate) async fn update_broadcast(
         row.recipients,
         row.sent_at,
         row.updated_at,
+        row.send_at,
+        row.paused_at,
+        row.pause_reason,
+        row.failures_in_row,
         row.workspace_id,
         row.id,
     )
@@ -646,7 +663,8 @@ pub(crate) async fn find_broadcast(
         r#"SELECT id AS "id: BroadcastId", workspace_id AS "workspace_id: WorkspaceId",
                   list_id AS "list_id: ListId", subject, body_md, tag, status, recipients,
                   sent_at AS "sent_at: UnixMillis", created_at AS "created_at: UnixMillis",
-                  updated_at AS "updated_at: UnixMillis"
+                  updated_at AS "updated_at: UnixMillis", send_at AS "send_at: UnixMillis",
+                  paused_at AS "paused_at: UnixMillis", pause_reason, failures_in_row
            FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
         id,
@@ -668,7 +686,9 @@ pub(crate) async fn list_broadcasts(
         r#"SELECT b.id AS "id: BroadcastId", b.workspace_id AS "workspace_id: WorkspaceId",
                   b.list_id AS "list_id: ListId", b.subject, b.body_md, b.tag, b.status,
                   b.recipients, b.sent_at AS "sent_at: UnixMillis",
-                  b.created_at AS "created_at: UnixMillis", b.updated_at AS "updated_at: UnixMillis"
+                  b.created_at AS "created_at: UnixMillis", b.updated_at AS "updated_at: UnixMillis",
+                  b.send_at AS "send_at: UnixMillis", b.paused_at AS "paused_at: UnixMillis",
+                  b.pause_reason, b.failures_in_row
            FROM mailing_broadcasts b
            JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id
            WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)
@@ -697,6 +717,61 @@ pub(crate) async fn delete_broadcast(
     Ok(result.rows_affected() == 1)
 }
 
+/// Clears the breaker's count after a broadcast delivery went out.
+pub(crate) async fn broadcast_send_ok(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: BroadcastId,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_broadcasts SET failures_in_row = 0
+         WHERE workspace_id = ? AND id = ? AND failures_in_row != 0",
+        workspace_id,
+        id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// When the breaker pauses a broadcast, and what it records.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Pause<'a> {
+    pub(crate) limit: i64,
+    pub(crate) reason: &'a str,
+    pub(crate) now: UnixMillis,
+}
+
+/// Counts a delivery's first failed attempt toward the breaker and pauses
+/// the broadcast when the count reaches `pause.limit`. True when this call
+/// paused it.
+pub(crate) async fn broadcast_send_failed(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: BroadcastId,
+    pause: Pause<'_>,
+) -> sqlx::Result<bool> {
+    // The right-hand sides see the row as it was before the update.
+    let paused = sqlx::query_scalar!(
+        r#"UPDATE mailing_broadcasts
+           SET failures_in_row = failures_in_row + 1,
+               paused_at = CASE WHEN paused_at IS NULL AND failures_in_row + 1 >= ?3
+                                THEN ?5 ELSE paused_at END,
+               pause_reason = CASE WHEN paused_at IS NULL AND failures_in_row + 1 >= ?3
+                                   THEN ?4 ELSE pause_reason END
+           WHERE workspace_id = ?1 AND id = ?2
+           RETURNING failures_in_row = ?3 AS "paused!: bool""#,
+        workspace_id,
+        id,
+        pause.limit,
+        pause.reason,
+        pause.now,
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(paused.unwrap_or(false))
+}
+
 // ---------------------------------------------------------------- deliveries
 
 /// Inserts `row` unless the broadcast or the step already has a delivery for
@@ -708,8 +783,9 @@ pub(crate) async fn insert_delivery(
     let result = sqlx::query!(
         "INSERT OR IGNORE INTO mailing_deliveries
            (id, workspace_id, list_id, contact_id, kind, broadcast_id, enrollment_id, step_id,
-            to_email, subject, status, error, attempts, created_at, sent_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            to_email, subject, status, error, attempts, created_at, sent_at, provider_id, event,
+            event_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.list_id,
@@ -725,6 +801,9 @@ pub(crate) async fn insert_delivery(
         row.attempts,
         row.created_at,
         row.sent_at,
+        row.provider_id,
+        row.event,
+        row.event_at,
     )
     .execute(exec)
     .await?;
@@ -743,7 +822,8 @@ pub(crate) async fn find_delivery(
                   broadcast_id AS "broadcast_id: BroadcastId",
                   enrollment_id AS "enrollment_id: EnrollmentId", step_id AS "step_id: StepId",
                   to_email, subject, status, error, attempts, resends,
-                  created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis"
+                  created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis",
+                  provider_id, event, event_at AS "event_at: UnixMillis"
            FROM mailing_deliveries WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
         id,
@@ -758,12 +838,14 @@ pub(crate) async fn mark_delivery(
     row: &DeliveryRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "UPDATE mailing_deliveries SET status = ?, error = ?, attempts = ?, sent_at = ?
+        "UPDATE mailing_deliveries SET status = ?, error = ?, attempts = ?, sent_at = ?,
+           provider_id = ?
          WHERE workspace_id = ? AND id = ?",
         row.status,
         row.error,
         row.attempts,
         row.sent_at,
+        row.provider_id,
         row.workspace_id,
         row.id,
     )
@@ -786,7 +868,8 @@ pub(crate) async fn list_deliveries(
                   broadcast_id AS "broadcast_id: BroadcastId",
                   enrollment_id AS "enrollment_id: EnrollmentId", step_id AS "step_id: StepId",
                   to_email, subject, status, error, attempts, resends,
-                  created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis"
+                  created_at AS "created_at: UnixMillis", sent_at AS "sent_at: UnixMillis",
+                  provider_id, event, event_at AS "event_at: UnixMillis"
            FROM mailing_deliveries
            WHERE workspace_id = ?1 AND kind != 'test'
              AND (?2 IS NULL OR broadcast_id = ?2)
@@ -881,6 +964,8 @@ pub(crate) struct DeliveryCounts {
     pub(crate) sent: i64,
     pub(crate) failed: i64,
     pub(crate) skipped: i64,
+    pub(crate) bounced: i64,
+    pub(crate) complained: i64,
 }
 
 pub(crate) async fn broadcast_delivery_counts(
@@ -893,7 +978,9 @@ pub(crate) async fn broadcast_delivery_counts(
         r#"SELECT COALESCE(SUM(status = 'queued'), 0) AS "queued!: i64",
                   COALESCE(SUM(status = 'sent'), 0) AS "sent!: i64",
                   COALESCE(SUM(status = 'failed'), 0) AS "failed!: i64",
-                  COALESCE(SUM(status = 'skipped'), 0) AS "skipped!: i64"
+                  COALESCE(SUM(status = 'skipped'), 0) AS "skipped!: i64",
+                  COALESCE(SUM(event = 'bounced'), 0) AS "bounced!: i64",
+                  COALESCE(SUM(event = 'complained'), 0) AS "complained!: i64"
            FROM mailing_deliveries
            WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'"#,
         workspace_id,
@@ -921,6 +1008,254 @@ pub(crate) async fn requeue_failed(
     )
     .fetch_all(exec)
     .await
+}
+
+/// Parks a broadcast delivery while its broadcast is paused: its job ends,
+/// and only Resume queues it again. The pause is checked in the same
+/// statement, so a Resume that just ran can't leave the row parked with no
+/// job. False when the broadcast is no longer paused.
+pub(crate) async fn park_if_paused(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: DeliveryId,
+    now: UnixMillis,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "UPDATE mailing_deliveries SET parked_at = ?1
+         WHERE workspace_id = ?2 AND id = ?3
+           AND EXISTS (SELECT 1 FROM mailing_broadcasts b
+                       WHERE b.workspace_id = ?2 AND b.id = mailing_deliveries.broadcast_id
+                         AND b.paused_at IS NOT NULL)",
+        now,
+        workspace_id,
+        id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Unparks a broadcast's parked deliveries and returns their IDs, so each
+/// gets one new job.
+pub(crate) async fn unpark_deliveries(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    broadcast_id: BroadcastId,
+) -> sqlx::Result<Vec<DeliveryId>> {
+    sqlx::query_scalar!(
+        r#"UPDATE mailing_deliveries SET parked_at = NULL
+           WHERE workspace_id = ? AND broadcast_id = ? AND parked_at IS NOT NULL
+           RETURNING id AS "id: DeliveryId""#,
+        workspace_id,
+        broadcast_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// The delivery with this ID in any workspace, for provider events: the
+/// event carries only the ID bizkit gave the provider.
+pub(crate) async fn find_delivery_for_event(
+    exec: impl SqliteExecutor<'_>,
+    id: DeliveryId,
+) -> sqlx::Result<Option<(WorkspaceId, DeliveryId, String)>> {
+    let row = sqlx::query!(
+        r#"SELECT workspace_id AS "workspace_id: WorkspaceId", id AS "id: DeliveryId", to_email
+           FROM mailing_deliveries WHERE id = ?"#,
+        id,
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(row.map(|r| (r.workspace_id, r.id, r.to_email)))
+}
+
+/// The delivery whose provider message ID is `provider_id`, in any
+/// workspace.
+pub(crate) async fn find_delivery_by_provider_id(
+    exec: impl SqliteExecutor<'_>,
+    provider_id: &str,
+) -> sqlx::Result<Option<(WorkspaceId, DeliveryId, String)>> {
+    let row = sqlx::query!(
+        r#"SELECT workspace_id AS "workspace_id: WorkspaceId", id AS "id: DeliveryId", to_email
+           FROM mailing_deliveries WHERE provider_id = ? ORDER BY id DESC LIMIT 1"#,
+        provider_id,
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(row.map(|r| (r.workspace_id, r.id, r.to_email)))
+}
+
+/// Records a provider event on a delivery. A complaint wins over a bounce;
+/// the first time of each kind stays.
+pub(crate) async fn mark_delivery_event(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: DeliveryId,
+    event: &str,
+    at: UnixMillis,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_deliveries SET event = ?3, event_at = ?4
+         WHERE workspace_id = ?1 AND id = ?2
+           AND (event IS NULL OR (event = 'bounced' AND ?3 = 'complained'))",
+        workspace_id,
+        id,
+        event,
+        at,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------- suppressions
+
+/// A `mailing_suppressions` row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SuppressionRow {
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) email: String,
+    pub(crate) reason: String,
+    pub(crate) delivery_id: Option<DeliveryId>,
+    pub(crate) note: Option<String>,
+    pub(crate) created_at: UnixMillis,
+}
+
+/// Inserts `row` unless the address is already suppressed. A complaint
+/// replaces a bounce or manual entry, since it is the stronger reason and
+/// the one that can't be removed. True when the row was written.
+pub(crate) async fn upsert_suppression(
+    exec: impl SqliteExecutor<'_>,
+    row: &SuppressionRow,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "INSERT INTO mailing_suppressions
+           (workspace_id, email, reason, delivery_id, note, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT (workspace_id, email) DO UPDATE
+           SET reason = excluded.reason, delivery_id = excluded.delivery_id,
+               created_at = excluded.created_at
+           WHERE excluded.reason = 'complaint' AND mailing_suppressions.reason != 'complaint'",
+        row.workspace_id,
+        row.email,
+        row.reason,
+        row.delivery_id,
+        row.note,
+        row.created_at,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+pub(crate) async fn find_suppression(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<Option<SuppressionRow>> {
+    sqlx::query_as!(
+        SuppressionRow,
+        r#"SELECT workspace_id AS "workspace_id: WorkspaceId", email, reason,
+                  delivery_id AS "delivery_id: DeliveryId", note,
+                  created_at AS "created_at: UnixMillis"
+           FROM mailing_suppressions WHERE workspace_id = ? AND email = ?"#,
+        workspace_id,
+        email,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
+/// The filters of the suppression list.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SuppressionFilter<'a> {
+    /// A substring of the address.
+    pub(crate) q: Option<&'a str>,
+    pub(crate) reason: Option<&'a str>,
+    /// Addresses after this one, for the next page.
+    pub(crate) after: Option<&'a str>,
+}
+
+/// Suppressions by address, matching `filter`.
+pub(crate) async fn list_suppressions(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    filter: &SuppressionFilter<'_>,
+    limit: i64,
+) -> sqlx::Result<Vec<SuppressionRow>> {
+    sqlx::query_as!(
+        SuppressionRow,
+        r#"SELECT workspace_id AS "workspace_id: WorkspaceId", email, reason,
+                  delivery_id AS "delivery_id: DeliveryId", note,
+                  created_at AS "created_at: UnixMillis"
+           FROM mailing_suppressions
+           WHERE workspace_id = ?1
+             AND (?2 IS NULL OR instr(email, ?2) > 0)
+             AND (?3 IS NULL OR reason = ?3)
+             AND (?4 IS NULL OR email > ?4)
+           ORDER BY email LIMIT ?5"#,
+        workspace_id,
+        filter.q,
+        filter.reason,
+        filter.after,
+        limit,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+pub(crate) async fn delete_suppression(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query!(
+        "DELETE FROM mailing_suppressions WHERE workspace_id = ? AND email = ?",
+        workspace_id,
+        email,
+    )
+    .execute(exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Every contact row with `email` in the workspace, on any list.
+pub(crate) async fn contacts_by_email(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    email: &str,
+) -> sqlx::Result<Vec<ContactId>> {
+    sqlx::query_scalar!(
+        r#"SELECT id AS "id: ContactId" FROM mailing_contacts
+           WHERE workspace_id = ? AND email = ? ORDER BY id"#,
+        workspace_id,
+        email,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+// ---------------------------------------------------------------- webhook tokens
+
+/// Records a webhook token and drops tokens older than `cutoff`. False when
+/// the token was already seen: a replay.
+pub(crate) async fn claim_webhook_token(
+    exec: &mut sqlx::SqliteConnection,
+    token: &str,
+    now: UnixMillis,
+    cutoff: UnixMillis,
+) -> sqlx::Result<bool> {
+    sqlx::query!("DELETE FROM mailing_webhook_tokens WHERE seen_at < ?", cutoff)
+        .execute(&mut *exec)
+        .await?;
+    let result = sqlx::query!(
+        "INSERT OR IGNORE INTO mailing_webhook_tokens (token, seen_at) VALUES (?, ?)",
+        token,
+        now,
+    )
+    .execute(&mut *exec)
+    .await?;
+    Ok(result.rows_affected() == 1)
 }
 
 // ---------------------------------------------------------------- sequences

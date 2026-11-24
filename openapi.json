@@ -7278,6 +7278,116 @@
         "x-bizkit-scope": "mailing:write"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/cancel": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Cancel a scheduled broadcast, so it is a draft again",
+        "operationId": "mailing.broadcasts.cancel",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "broadcast_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/BroadcastId",
+              "description": "The broadcast."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Broadcast"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resend": {
       "post": {
         "tags": [
@@ -7388,12 +7498,122 @@
         "x-bizkit-scope": "mailing:write"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resume": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Resume a paused broadcast and send the mail it held back",
+        "operationId": "mailing.broadcasts.resume",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "broadcast_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/BroadcastId",
+              "description": "The broadcast."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Broadcast"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:write"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/send": {
       "post": {
         "tags": [
           "mailing"
         ],
-        "summary": "Send a draft broadcast to its list's subscribers",
+        "summary": "Send a draft broadcast to its list's subscribers, now or later",
         "operationId": "mailing.broadcasts.send",
         "parameters": [
           {
@@ -7415,6 +7635,30 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "send_at": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Timestamp",
+                        "description": "Send at this time instead of now: in the future and within a year.\nThe broadcast stays a draft, shown as `scheduled`, until then."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -10376,6 +10620,380 @@
         "x-bizkit-scope": "mailing:write"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mailing/suppressions": {
+      "get": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "List the workspace's suppressed addresses",
+        "operationId": "mailing.suppressions.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only addresses after this one, for the next page."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "description": "At most this many, 1-200. Default 50.",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Only addresses that contain this text."
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SuppressionReason",
+                  "description": "Only suppressions with this reason."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:read"
+      },
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Suppress an address in the workspace",
+        "operationId": "mailing.suppressions.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The address."
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Why, for the team."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suppression"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/mailing/suppressions/{email}": {
+      "delete": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Remove a bounce or manual suppression",
+        "operationId": "mailing.suppressions.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The address."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:admin"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/members": {
       "get": {
         "tags": [
@@ -12459,6 +13077,79 @@
         }
       }
     },
+    "/m/mailing/public/events/mailgun": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Receive Mailgun delivery events",
+        "description": "Mailgun's webhook, signed with the webhook signing key. Permanent failures and complaints mark the delivery and suppress the address in its workspace. Other events, and events for unknown mail, are accepted and ignored.",
+        "operationId": "mailing.public.mailgun_events",
+        "requestBody": {
+          "description": "`{signature: {timestamp, token, signature}, \"event-data\": {...}}`",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a Mailgun event",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The signature is wrong, or no signing key is set",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "406": {
+            "description": "A replayed token or a stale timestamp; Mailgun stops retrying",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Bizkit failed; Mailgun retries",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/m/mailing/public/unsubscribe": {
       "get": {
         "tags": [
@@ -13165,11 +13856,40 @@
             "$ref": "#/components/schemas/ListId",
             "description": "The list it goes to."
           },
+          "pause_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it paused."
+          },
+          "paused_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the breaker paused it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recipients": {
             "type": "integer",
             "format": "int64",
             "description": "Subscribers it was queued for.",
             "minimum": 0
+          },
+          "send_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When a scheduled broadcast starts sending."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sent_at": {
             "oneOf": [
@@ -13229,7 +13949,9 @@
         "enum": [
           "draft",
           "sending",
-          "sent"
+          "sent",
+          "scheduled",
+          "paused"
         ]
       },
       "Capability": {
@@ -13574,9 +14296,23 @@
           "queued",
           "sent",
           "failed",
-          "skipped"
+          "skipped",
+          "bounced",
+          "complained"
         ],
         "properties": {
+          "bounced": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sent, then reported as a permanent bounce by the provider.",
+            "minimum": 0
+          },
+          "complained": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sent, then reported as spam by the recipient.",
+            "minimum": 0
+          },
           "failed": {
             "type": "integer",
             "format": "int64",
@@ -13602,6 +14338,14 @@
             "minimum": 0
           }
         }
+      },
+      "DeliveryEvent": {
+        "type": "string",
+        "description": "What the mail provider reported about a sent mail.",
+        "enum": [
+          "bounced",
+          "complained"
+        ]
       },
       "DeliveryId": {
         "type": "string",
@@ -14804,6 +15548,28 @@
             ],
             "description": "Why the last attempt failed, or why it was skipped."
           },
+          "event": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryEvent",
+                "description": "What the provider reported after sending, if anything."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the provider reported `event`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "$ref": "#/components/schemas/DeliveryId",
             "description": "The delivery ID."
@@ -14811,6 +15577,13 @@
           "kind": {
             "$ref": "#/components/schemas/DeliveryKind",
             "description": "What it was for."
+          },
+          "provider_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's message ID, or the `Message-ID` bizkit set."
           },
           "resends": {
             "type": "integer",
@@ -16399,6 +17172,79 @@
             "description": "Counts for the range."
           }
         }
+      },
+      "Suppression": {
+        "type": "object",
+        "description": "An address no list in the workspace mails.",
+        "required": [
+          "email",
+          "reason",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was added."
+          },
+          "delivery_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryId",
+                "description": "The delivery that bounced or drew the complaint."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The address, lower case."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A team member's note, for manual entries."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SuppressionReason",
+            "description": "Why it is suppressed."
+          }
+        }
+      },
+      "SuppressionPage": {
+        "type": "object",
+        "description": "A page of suppressions, by address.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Suppression"
+            },
+            "description": "The suppressions."
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `after` for the next page; absent on the last one."
+          }
+        }
+      },
+      "SuppressionReason": {
+        "type": "string",
+        "description": "Why an address is suppressed.",
+        "enum": [
+          "bounce",
+          "complaint",
+          "manual"
+        ]
       },
       "TargetEntity": {
         "type": "object",
