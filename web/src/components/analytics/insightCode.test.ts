@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  builderOfCode,
   canonicalQuery,
   codeOf,
   currentQuery,
   draftOfCode,
   editorOfQuery,
+  runOfCode,
   saveBlocker,
 } from './insightCode'
 import { emptyInsight } from './insightDraft'
@@ -113,5 +115,84 @@ describe('insight code', () => {
     expect(canonicalQuery({ kind: 'events', event: 'a' })).not.toBe(
       canonicalQuery({ kind: 'events', event: 'b' }),
     )
+  })
+
+  it('keeps is values and event names exactly, spaces included', () => {
+    const code = JSON.stringify({
+      kind: 'events',
+      event: ' signup ',
+      filters: [{ key: 'plan', op: 'is', value: ' pro ' }],
+    })
+    const draft = draftOfCode(code)
+    expect(draft.ok).toBe(true)
+    if (!draft.ok) return
+    expect(draft.value.event).toBe(' signup ')
+    expect(draft.value.filters[0]?.value).toBe(' pro ')
+    expect(canonicalQuery(JSON.parse(codeOf(draft.value)))).toBe(canonicalQuery(JSON.parse(code)))
+  })
+
+  it.each([
+    ['a boolean', true],
+    ['a number as text', '3'],
+  ])('stays on Code when a gt value is %s, which the builder would change', (_, value) => {
+    const code = JSON.stringify({ kind: 'people', filters: [{ key: 'seats', op: 'gt', value }] })
+    expect(draftOfCode(code)).toEqual({
+      ok: false,
+      error: 'The builder would change this query, so it stays in Code.',
+    })
+  })
+
+  it('shows a gt filter with a number in the builder', () => {
+    const code = '{"kind": "people", "filters": [{"key": "seats", "op": "gt", "value": 3.5}]}'
+    expect(draftOfCode(code).ok).toBe(true)
+  })
+
+  it('compares saved queries without trimming or the builder round trip', () => {
+    const saved = { kind: 'events', event: 'a', filters: [{ key: 'plan', op: 'is', value: 'pro' }] }
+    const spaced = { ...saved, filters: [{ key: 'plan', op: 'is', value: ' pro ' }] }
+    expect(canonicalQuery(spaced)).not.toBe(canonicalQuery(saved))
+    expect(canonicalQuery({ ...saved, event: 'a ' })).not.toBe(canonicalQuery(saved))
+    // Key order and filled-in defaults ask the same question.
+    expect(
+      canonicalQuery({
+        breakdown: null,
+        filters: [{ value: 'pro', op: 'is', key: 'plan' }],
+        measure: 'total',
+        event: 'a',
+        kind: 'events',
+      }),
+    ).toBe(canonicalQuery(saved))
+    // The one allowed change: an is value as text.
+    const flag = { kind: 'people', filters: [{ key: 'beta', op: 'is', value: true }] }
+    expect(canonicalQuery(flag)).toBe(
+      canonicalQuery({ kind: 'people', filters: [{ key: 'beta', op: 'is', value: 'true' }] }),
+    )
+    // gt keeps its type: 3 and "3" are different queries.
+    const gt = (value: unknown) => ({ kind: 'people', filters: [{ key: 's', op: 'gt', value }] })
+    expect(canonicalQuery(gt(3))).not.toBe(canonicalQuery(gt('3')))
+    // A query the builder can't show still compares by its content.
+    const odd = { ...saved, limit: 5 }
+    expect(canonicalQuery(odd)).toBe(canonicalQuery({ ...odd }))
+    expect(canonicalQuery(odd)).not.toBe(canonicalQuery(saved))
+  })
+
+  it('clears the notice once Run parses the JSON', () => {
+    expect(runOfCode('{"kind":')).toMatchObject({ query: undefined, notice: /Invalid JSON/ })
+    expect(runOfCode('{"kind": "people"}')).toEqual({ query: { kind: 'people' }, notice: '' })
+  })
+
+  it('clears the notice once the builder can show the JSON', () => {
+    const editor = {
+      mode: 'code' as const,
+      draft: emptyInsight(),
+      code: '{"kind": "people", "x": 1}',
+    }
+    const stuck = builderOfCode(editor)
+    expect(stuck.editor).toBe(editor)
+    expect(stuck.notice).toMatch(/no field "x"/)
+    const fixed = builderOfCode({ ...editor, code: '{"kind": "people"}' })
+    expect(fixed.notice).toBe('')
+    expect(fixed.editor.mode).toBe('builder')
+    expect(fixed.editor.draft.kind).toBe('people')
   })
 })

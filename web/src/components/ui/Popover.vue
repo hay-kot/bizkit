@@ -11,7 +11,8 @@ import { useFloatingList } from './floatingList'
  * for `aria-controls`); the default slot gets `close`. Focus moves to the
  * panel's first field on open and back to the trigger on close. Escape, a
  * click outside or tabbing away closes it; lists that open inside it
- * (`Select`, `Combobox`) count as inside.
+ * (`Select`, `Combobox`) count as inside. A scroll moves it with its
+ * trigger rather than closing it.
  */
 defineProps<{ label: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -21,7 +22,9 @@ const panel = ref<HTMLElement>()
 const id = useId()
 const INSIDE = '[data-floating]'
 
-const { position, update } = useFloatingList(anchor, panel, open, () => close(false))
+const { position, update } = useFloatingList(anchor, panel, open, () => close(false), {
+  follow: true,
+})
 
 async function show() {
   update()
@@ -36,7 +39,10 @@ function close(refocus = true) {
   if (!open.value) return
   open.value = false
   emit('close')
-  if (refocus) anchor.value?.querySelector<HTMLElement>(`[aria-controls="${id}"]`)?.focus()
+  if (!refocus) return
+  // After the render, so a trigger that the change re-rendered (an edited
+  // filter chip) gets the focus, not <body>.
+  void nextTick(() => anchor.value?.querySelector<HTMLElement>(`[aria-controls="${id}"]`)?.focus())
 }
 
 function toggle() {

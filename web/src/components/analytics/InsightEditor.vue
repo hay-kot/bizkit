@@ -9,11 +9,11 @@ import type { DateRange } from '@/lib/range'
 import { type InsightQuery, useInsightResult } from '@/queries/analytics'
 
 import {
+  builderOfCode,
   codeOf,
-  draftOfCode,
   type EditorMode,
   type InsightEditorState,
-  parseCode,
+  runOfCode,
 } from './insightCode'
 import InsightControls from './InsightControls.vue'
 import { isRunnable, queryOf } from './insightDraft'
@@ -77,13 +77,9 @@ function toCode() {
 }
 
 function toBuilder() {
-  const next = draftOfCode(editor.value.code)
-  if (!next.ok) {
-    notice.value = `${next.error} Fix it here, or keep using Code.`
-    return
-  }
-  editor.value = { ...editor.value, mode: 'builder', draft: next.value }
-  notice.value = ''
+  const next = builderOfCode(editor.value)
+  editor.value = next.editor
+  notice.value = next.notice
 }
 
 const mode = computed({
@@ -96,13 +92,11 @@ const mode = computed({
 })
 
 function run() {
-  const parsed = parseCode(editor.value.code)
-  if (!parsed.ok) {
-    notice.value = parsed.error
-    return
-  }
-  const same = ran.value && JSON.stringify(ran.value.query) === JSON.stringify(parsed.value)
-  ran.value = { query: parsed.value, code: editor.value.code }
+  const { query, notice: error } = runOfCode(editor.value.code)
+  notice.value = error
+  if (!query) return
+  const same = ran.value && JSON.stringify(ran.value.query) === JSON.stringify(query)
+  ran.value = { query, code: editor.value.code }
   if (same) void result.refetch()
 }
 
@@ -158,13 +152,17 @@ const stale = computed(() => editor.value.mode === 'code' && ran.value?.code !==
     >
       Pick an event to see its numbers.
     </p>
-    <p v-else-if="!runnable" class="py-6 text-center text-sm text-base-content/70">
+    <p
+      v-else-if="editor.mode === 'code' && !runnable"
+      class="py-6 text-center text-sm text-base-content/70"
+    >
       Run the query to see its numbers.
     </p>
+    <!-- In the builder, a draft that hasn't settled yet is a result on its way. -->
     <InsightResultView
       v-else
       :result="result.data.value"
-      :loading="result.isLoading.value"
+      :loading="result.isLoading.value || !runnable"
       :error="result.error.value"
     />
   </section>

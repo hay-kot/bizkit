@@ -63,9 +63,8 @@ export function parseCode(code: string): Outcome<InsightQuery> {
 /**
  * The builder's draft for a parsed query, or why the builder can't show
  * it. The builder only switches to a draft that turns back into the same
- * query, so anything it would drop or change keeps the editor on Code.
- * Non-text `is` values are the one exception: the server compares them as
- * text, so `true` and `"true"` ask the same question.
+ * query (compared by `canonicalQuery`), so anything it would drop or change
+ * keeps the editor on Code.
  */
 export function draftOfValue(value: unknown): Outcome<InsightDraft> {
   const fail = (error: string): Outcome<InsightDraft> => ({ ok: false, error })
@@ -133,6 +132,9 @@ export function draftOfValue(value: unknown): Outcome<InsightDraft> {
   ) {
     return fail('Keys with spaces at the ends only work in Code.')
   }
+  if (canonicalQuery(queryOf(draft)) !== canonicalQuery(value)) {
+    return fail('The builder would change this query, so it stays in Code.')
+  }
   return { ok: true, value: draft }
 }
 
@@ -157,6 +159,30 @@ export function editorOfQuery(query: InsightQuery): InsightEditorState {
   return { mode: 'code', draft: emptyInsight(), code: JSON.stringify(query, null, 2) }
 }
 
+/**
+ * Code to the builder: the next editor state and the notice to show. On
+ * success the notice is empty, so an older error goes away.
+ */
+export function builderOfCode(editor: InsightEditorState): {
+  editor: InsightEditorState
+  notice: string
+} {
+  const next = draftOfCode(editor.code)
+  if (!next.ok) return { editor, notice: `${next.error} Fix it here, or keep using Code.` }
+  return { editor: { ...editor, mode: 'builder', draft: next.value }, notice: '' }
+}
+
+/**
+ * The Run button: the query to run, or no query and the parse error. On
+ * success the notice is empty, so an older error goes away.
+ */
+export function runOfCode(code: string): { query: InsightQuery | undefined; notice: string } {
+  const parsed = parseCode(code)
+  return parsed.ok
+    ? { query: parsed.value, notice: '' }
+    : { query: undefined, notice: parsed.error }
+}
+
 /** The query the editor holds now, from the draft or the JSON text. */
 export function currentQuery(editor: InsightEditorState): Outcome<InsightQuery> {
   if (editor.mode === 'code') return parseCode(editor.code)
@@ -171,11 +197,51 @@ export function saveBlocker(editor: InsightEditorState): string | undefined {
   return isRunnable(editor.draft) ? undefined : 'Pick an event first.'
 }
 
+function sortedKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortedKeys)
+  if (!isObject(value)) return value
+  return Object.fromEntries(
+    Object.keys(value)
+      .filter((key) => value[key] !== undefined)
+      .sort()
+      .map((key) => [key, sortedKeys(value[key])]),
+  )
+}
+
+function normalFilter(filter: unknown): unknown {
+  if (!isObject(filter)) return filter
+  const { value, ...rest } = filter
+  if (filter.op === 'is_set' && value == null) return rest
+  // The server compares is and is_not values as text, so `true` and
+  // "true" ask the same question. This is the one change of a value the
+  // builder may make.
+  if (
+    (filter.op === 'is' || filter.op === 'is_not') &&
+    (typeof value === 'number' || typeof value === 'boolean')
+  ) {
+    return { ...rest, value: String(value) }
+  }
+  return filter
+}
+
 /**
- * A query in one canonical text, so a saved query and the editor's compare
- * equal when they ask the same thing however they were written.
+ * A query in one canonical text: defaults filled in and keys sorted, with
+ * every value kept exactly as written (no trimming). A saved query and the
+ * editor's compare equal only when they ask the same thing.
  */
 export function canonicalQuery(query: unknown): string {
-  const draft = draftOfValue(query)
-  return draft.ok ? JSON.stringify(queryOf(draft.value)) : JSON.stringify(query)
+  if (!isObject(query)) return JSON.stringify(query)
+  const normal: Record<string, unknown> = {
+    ...query,
+    filters: Array.isArray(query.filters) ? query.filters.map(normalFilter) : (query.filters ?? []),
+    breakdown: query.breakdown ?? null,
+  }
+  if (query.kind === 'events') {
+    normal.event = query.event ?? ''
+    normal.measure = query.measure ?? 'total'
+  } else {
+    if (query.event === null) delete normal.event
+    if (query.measure === null) delete normal.measure
+  }
+  return JSON.stringify(sortedKeys(normal))
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
 import Combobox, { type ComboOption } from '@/components/ui/Combobox.vue'
 import Select from '@/components/ui/Select.vue'
@@ -11,7 +11,7 @@ import {
   useSchemaValues,
 } from '@/queries/analytics'
 
-import { type FilterDraft, isComplete, opsFor } from './insightDraft'
+import { type FilterDraft, isComplete, opsForChoice } from './insightDraft'
 
 /**
  * One filter in the builder's popover: the key from the schema (event
@@ -62,10 +62,7 @@ const keyOptions = computed((): ComboOption[] => {
   return options
 })
 const keyTypes = computed(() => keys.data.value?.items.find((k) => k.key === key.value)?.types)
-const ops = computed(() => opsFor(keyTypes.value))
-watch(ops, (allowed) => {
-  if (!allowed.some((o) => o.value === op.value)) op.value = 'is'
-})
+const ops = computed(() => opsForChoice(keyTypes.value, [props.initial.op, op.value]))
 const valueOptions = computed((): ComboOption[] =>
   (values.data.value?.items ?? []).map((v) => ({ value: v.value, count: v.count })),
 )

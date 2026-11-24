@@ -60,6 +60,17 @@ export function opsFor(types: string[] | undefined): typeof FILTER_OPS {
   return FILTER_OPS.filter((o) => o.value !== 'gt' && o.value !== 'lt')
 }
 
+/**
+ * The comparisons to offer for a key: those that fit its types, plus the
+ * ones in `keep` (the filter's saved op and the current choice). The type
+ * check only narrows new choices; it never hides or replaces an op the
+ * filter already has.
+ */
+export function opsForChoice(types: string[] | undefined, keep: FilterOp[]): typeof FILTER_OPS {
+  const fit = new Set(opsFor(types).map((o) => o.value))
+  return FILTER_OPS.filter((o) => fit.has(o.value) || keep.includes(o.value))
+}
+
 /** A filter as a chip reads it: `plan is pro`, `seats > 3`, `beta is set`. */
 export function describeFilter(filter: FilterDraft): string {
   const op = FILTER_OPS.find((o) => o.value === filter.op)?.short ?? filter.op
@@ -84,11 +95,13 @@ export function emptyFilter(): FilterDraft {
 function filterOf(draft: FilterDraft): InsightFilter {
   const key = draft.key.trim()
   if (draft.op === 'is_set') return { key, op: draft.op }
+  // gt and lt compare numbers. is and is_not send the text exactly as
+  // typed (a stored " pro " is a different value from "pro"), and the
+  // server also compares it as a number when it reads as one.
+  if (draft.op === 'is' || draft.op === 'is_not') return { key, op: draft.op, value: draft.value }
   const text = draft.value.trim()
   const number = Number(text)
-  // gt and lt compare numbers; is and is_not send text, which the server
-  // also compares as a number when it reads as one.
-  const numeric = (draft.op === 'gt' || draft.op === 'lt') && text !== '' && Number.isFinite(number)
+  const numeric = text !== '' && Number.isFinite(number)
   return { key, op: draft.op, value: numeric ? number : text }
 }
 
@@ -114,7 +127,33 @@ export function queryOf(draft: InsightDraft): InsightQuery {
       ? { source: draft.kind === 'people' ? ('trait' as const) : draft.breakdownSource, key }
       : null
   if (draft.kind === 'people') return { kind: 'people', filters, breakdown }
-  return { kind: 'events', event: draft.event.trim(), filters, measure: draft.measure, breakdown }
+  return { kind: 'events', event: draft.event, filters, measure: draft.measure, breakdown }
+}
+
+const BREAKDOWN_SOURCES: readonly BreakdownSource[] = ['property', 'trait']
+
+/** The breakdown picker's value for a source and key: `property:plan`. */
+export function breakdownChoice(source: BreakdownSource | '', key: string): string {
+  return source && key ? `${source}:${key}` : ''
+}
+
+/**
+ * The breakdown a picker value asks for. A listed value carries its source
+ * (`trait:plan`); anything else is a key typed by hand, which breaks down
+ * by the kind's own source: an event property for events, a trait for
+ * people.
+ */
+export function breakdownOfChoice(
+  value: string,
+  kind: InsightKind,
+): Pick<InsightDraft, 'breakdownSource' | 'breakdownKey'> {
+  if (value.trim() === '') return { breakdownSource: '', breakdownKey: '' }
+  const at = value.indexOf(':')
+  const source = BREAKDOWN_SOURCES.find((s) => s === value.slice(0, at))
+  if (at > 0 && source && value.length > at + 1) {
+    return { breakdownSource: source, breakdownKey: value.slice(at + 1) }
+  }
+  return { breakdownSource: kind === 'people' ? 'trait' : 'property', breakdownKey: value.trim() }
 }
 
 /** True when the draft can run: an events insight needs an event name. */

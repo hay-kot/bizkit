@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  breakdownOfChoice,
   describeQuery,
   draftFromLink,
   draftOf,
   emptyInsight,
   isRunnable,
   linkFromExplorer,
+  opsForChoice,
   queryOf,
 } from './insightDraft'
 import { insightView } from './insightView'
@@ -19,25 +21,27 @@ describe('insight drafts', () => {
     expect(isRunnable({ ...draft, event: 'signup' })).toBe(true)
   })
 
-  it('send numbers for gt and lt, text for is, and drop empty filters', () => {
+  it('send numbers for gt and lt, text for is as typed, and drop empty filters', () => {
     const draft = {
       ...emptyInsight(),
       event: ' signup ',
       filters: [
         { key: 'seats', op: 'gt' as const, value: ' 3 ' },
         { key: 'plan', op: 'is' as const, value: '2' },
+        { key: 'tier', op: 'is_not' as const, value: ' pro ' },
         { key: 'beta', op: 'is_set' as const, value: 'ignored' },
         { key: ' ', op: 'is' as const, value: 'x' },
       ],
     }
     expect(queryOf(draft)).toEqual({
       kind: 'events',
-      event: 'signup',
+      event: ' signup ',
       measure: 'total',
       breakdown: null,
       filters: [
         { key: 'seats', op: 'gt', value: 3 },
         { key: 'plan', op: 'is', value: '2' },
+        { key: 'tier', op: 'is_not', value: ' pro ' },
         { key: 'beta', op: 'is_set' },
       ],
     })
@@ -159,5 +163,48 @@ describe('insight views', () => {
     const view = insightView({ view: 'count', people: 137, known: 1204 })
     expect(view.headline.value).toBe('137')
     expect(view.caption).toBe('of 1,204 known')
+  })
+})
+
+describe('filter comparisons', () => {
+  const values = (ops: { value: string }[]) => ops.map((o) => o.value)
+
+  it('offer gt and lt for new choices only when the key has numbers', () => {
+    expect(values(opsForChoice(['string'], ['is']))).toEqual(['is', 'is_not', 'is_set'])
+    expect(values(opsForChoice(['string', 'number'], ['is']))).toContain('gt')
+    expect(values(opsForChoice(undefined, ['is']))).toContain('lt')
+  })
+
+  it('keep the saved op and the current choice even when the key types rule them out', () => {
+    expect(values(opsForChoice(['string'], ['gt', 'is']))).toEqual(['is', 'is_not', 'gt', 'is_set'])
+    expect(values(opsForChoice(['boolean'], ['is', 'lt']))).toContain('lt')
+  })
+})
+
+describe('breakdown choices', () => {
+  it('read a listed choice with its source', () => {
+    expect(breakdownOfChoice('trait:plan', 'events')).toEqual({
+      breakdownSource: 'trait',
+      breakdownKey: 'plan',
+    })
+    expect(breakdownOfChoice('property:a:b', 'events')).toEqual({
+      breakdownSource: 'property',
+      breakdownKey: 'a:b',
+    })
+  })
+
+  it("map a key typed by hand to the kind's source", () => {
+    expect(breakdownOfChoice('utm_source', 'events')).toEqual({
+      breakdownSource: 'property',
+      breakdownKey: 'utm_source',
+    })
+    expect(breakdownOfChoice('team:size', 'people')).toEqual({
+      breakdownSource: 'trait',
+      breakdownKey: 'team:size',
+    })
+  })
+
+  it('clear the breakdown for None', () => {
+    expect(breakdownOfChoice('', 'events')).toEqual({ breakdownSource: '', breakdownKey: '' })
   })
 })

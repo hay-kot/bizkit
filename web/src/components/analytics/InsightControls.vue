@@ -8,7 +8,6 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import Select from '@/components/ui/Select.vue'
 import type { DayRange } from '@/lib/range'
 import {
-  type BreakdownSource,
   eventOptions,
   type InsightKind,
   type Measure,
@@ -18,6 +17,8 @@ import {
 
 import InsightFilterForm from './InsightFilterForm.vue'
 import {
+  breakdownChoice,
+  breakdownOfChoice,
   describeFilter,
   emptyFilter,
   type FilterDraft,
@@ -92,16 +93,12 @@ const traitKeys = useSchemaKeys(
 )
 
 const NONE = ''
-const SEP = ':'
-function breakdownValue(source: BreakdownSource | '', key: string): string {
-  return source && key ? `${source}${SEP}${key}` : NONE
-}
 const breakdownChoices = computed((): ComboOption[] => {
   const options: ComboOption[] = [{ value: NONE, label: 'None' }]
   if (draft.value.kind === 'events') {
     for (const k of propertyKeys.data.value?.items ?? []) {
       options.push({
-        value: breakdownValue('property', k.key),
+        value: breakdownChoice('property', k.key),
         label: k.key,
         count: k.count,
         group: 'Event properties',
@@ -110,7 +107,7 @@ const breakdownChoices = computed((): ComboOption[] => {
   }
   for (const k of traitKeys.data.value?.items ?? []) {
     options.push({
-      value: breakdownValue('trait', k.key),
+      value: breakdownChoice('trait', k.key),
       label: k.key,
       count: k.count,
       group: 'Person traits',
@@ -127,18 +124,8 @@ const breakdownChoices = computed((): ComboOption[] => {
   return options
 })
 const breakdown = computed({
-  get: () => breakdownValue(draft.value.breakdownSource, draft.value.breakdownKey),
-  set: (value: string) => {
-    const at = value.indexOf(SEP)
-    if (value === NONE || at < 0) {
-      update({ breakdownSource: '', breakdownKey: '' })
-      return
-    }
-    update({
-      breakdownSource: value.slice(0, at) as BreakdownSource,
-      breakdownKey: value.slice(at + 1),
-    })
-  },
+  get: () => breakdownChoice(draft.value.breakdownSource, draft.value.breakdownKey),
+  set: (value: string) => update(breakdownOfChoice(value, draft.value.kind)),
 })
 const canBreakDown = computed(
   () => draft.value.kind === 'people' || draft.value.measure !== 'per_user',
@@ -223,7 +210,7 @@ const chip =
         <ul class="flex flex-wrap items-center gap-2" aria-label="Filters">
           <li
             v-for="(filter, at) in draft.filters"
-            :key="`${at}:${filter.key}`"
+            :key="at"
             class="flex items-center overflow-hidden rounded-field border border-base-300 bg-base-200"
           >
             <Popover :label="`Edit filter ${describeFilter(filter)}`">
@@ -311,6 +298,7 @@ const chip =
         label="Breakdown"
         name="insight-breakdown"
         placeholder="None"
+        allow-custom
         size="toolbar"
         class="w-full sm:w-72"
       />
