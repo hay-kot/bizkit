@@ -9,10 +9,12 @@ use bizkit_core::time::UnixMillis;
 
 use crate::api::{
     BroadcastId, BroadcastStatus, ContactId, ContactStatus, DeliveryId, DeliveryKind,
-    DeliveryStatus, ListId,
+    DeliveryStatus, EnrollmentId, EnrollmentStatus, ListId, SequenceId, SequenceTrigger, StepId,
 };
 use crate::capture::FORM_KIND;
-use crate::store::{self, BroadcastRow, ContactRow, DeliveryRow, ListRow};
+use crate::store::{
+    self, BroadcastRow, ContactRow, DeliveryRow, EnrollmentRow, ListRow, SequenceRow, StepRow,
+};
 
 const LIST: &str = "Newsletter";
 
@@ -33,18 +35,53 @@ const DRAFT_BODY: &str = "Hi {{ name }},\n\nAnnual billing is here: two months f
 pay for a year.\n\n- Same features\n- One invoice\n- Cancel any time\n\n\
 [Switch to annual](https://example.com/pricing)";
 
+const SEQUENCE: &str = "Welcome series";
+
+/// Delay in hours, subject and body of each welcome step.
+const STEPS: [(i64, &str, &str); 3] = [
+    (
+        0,
+        "Welcome to Tallyho",
+        "Hi {{ name }},\n\nThanks for joining. Over the next week we'll send two short \
+         notes to help you count what matters.\n\nThe Tallyho team",
+    ),
+    (
+        48,
+        "Count anything in three steps",
+        "Hi {{ name }},\n\n1. Make a tally\n2. Share the link\n3. Watch the numbers \
+         climb\n\n[Open Tallyho](https://example.com/app)",
+    ),
+    (
+        120,
+        "Teams, exports and what's next",
+        "Hi {{ name }},\n\nInvite your team, export to **CSV**, and tell us what to build \
+         next by replying to this mail.",
+    ),
+];
+
+/// Enrolled contacts: address, how many steps they got, and whether they
+/// left before the end.
+const ENROLLED: [(&str, usize, bool); 2] =
+    [("ada@bizkit.test", 3, false), ("grace@bizkit.test", 2, true)];
+
 fn days_ago(now: UnixMillis, days: u64) -> UnixMillis {
     now.minus(Duration::from_hours(24 * days))
 }
 
 /// Seeds the "Newsletter" list in the `website` project, linked to the
 /// demo Contact form, with five contacts, one sent broadcast with its send
-/// log and one draft. A list that already exists by name is left alone.
-/// Nothing is queued, so the seed sends no mail.
+/// log, one draft and the welcome sequence. A list that already exists by
+/// name only gets the sequence, if it lacks one by that name. Nothing is
+/// queued, so the seed sends no mail.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let existing = store::list_lists(db.read(), seed.workspace_id, Some(project_id)).await?;
-    if existing.iter().any(|list| list.name == LIST) {
+    if let Some(list) = existing.into_iter().find(|list| list.name == LIST) {
+        // Stacks seeded before sequences existed get the sequence alone.
+        let mut tx = db.write().await?;
+        seed_sequence(&mut tx, &list, seed.now).await?;
+        tx.commit().await?;
+        seed.entities.insert(("mailing.list".to_owned(), LIST.to_owned()), list.id.to_string());
         return Ok(());
     }
     let now = seed.now;
@@ -69,6 +106,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
 
     let subscribed = seed_contacts(&mut tx, &list, form, now).await?;
     seed_broadcasts(&mut tx, &list, &subscribed, now).await?;
+    seed_sequence(&mut tx, &list, now).await?;
     tx.commit().await?;
     seed.entities.insert(("mailing.list".to_owned(), LIST.to_owned()), list.id.to_string());
     Ok(())
@@ -167,5 +205,90 @@ async fn seed_broadcasts(
         ..sent
     };
     store::insert_broadcast(&mut **tx, &draft).await?;
+    Ok(())
+}
+
+/// Inserts the 3-step welcome sequence with one completed and one exited
+/// enrollment and their step mails. Seeded enrollments are never active:
+/// the seed can't queue the job that would advance them.
+async fn seed_sequence(tx: &mut WriteTx, list: &ListRow, now: UnixMillis) -> anyhow::Result<()> {
+    let existing = store::list_sequences(&mut **tx, list.workspace_id, None, Some(list.id)).await?;
+    if existing.iter().any(|sequence| sequence.name == SEQUENCE) {
+        return Ok(());
+    }
+    let created = days_ago(now, 30);
+    let sequence = SequenceRow {
+        id: SequenceId::new(),
+        workspace_id: list.workspace_id,
+        list_id: list.id,
+        name: SEQUENCE.to_owned(),
+        trigger: SequenceTrigger::OnJoin.as_str().to_owned(),
+        enabled: true,
+        created_at: created,
+        updated_at: created,
+    };
+    store::insert_sequence(&mut **tx, &sequence).await?;
+    let steps: Vec<StepRow> = STEPS
+        .iter()
+        .zip(0_i64..)
+        .map(|((delay_hours, subject, body_md), position)| StepRow {
+            id: StepId::new(),
+            workspace_id: list.workspace_id,
+            sequence_id: sequence.id,
+            position,
+            delay_hours: *delay_hours,
+            subject: (*subject).to_owned(),
+            body_md: (*body_md).to_owned(),
+        })
+        .collect();
+    store::set_steps(tx, list.workspace_id, sequence.id, &steps).await?;
+
+    for (email, reached, left) in ENROLLED {
+        let Some(contact) =
+            store::find_contact_by_email(&mut **tx, list.workspace_id, list.id, email).await?
+        else {
+            continue;
+        };
+        let mut at = contact.subscribed_at.unwrap_or(created);
+        let enrollment = EnrollmentRow {
+            id: EnrollmentId::new(),
+            workspace_id: list.workspace_id,
+            sequence_id: sequence.id,
+            contact_id: contact.id,
+            status: if left { EnrollmentStatus::Exited } else { EnrollmentStatus::Completed }
+                .as_str()
+                .to_owned(),
+            next_run_at: None,
+            created_at: at,
+            updated_at: at,
+        };
+        if !store::insert_enrollment(&mut **tx, &enrollment).await? {
+            continue;
+        }
+        for step in steps.iter().take(reached) {
+            at = at.plus(Duration::from_hours(u64::try_from(step.delay_hours).unwrap_or(0)));
+            let delivery = DeliveryRow {
+                id: DeliveryId::new(),
+                workspace_id: list.workspace_id,
+                list_id: list.id,
+                contact_id: Some(contact.id),
+                kind: DeliveryKind::Step.as_str().to_owned(),
+                broadcast_id: None,
+                enrollment_id: Some(enrollment.id),
+                step_id: Some(step.id),
+                to_email: contact.email.clone(),
+                subject: step.subject.clone(),
+                status: DeliveryStatus::Sent.as_str().to_owned(),
+                error: None,
+                attempts: 1,
+                resends: 0,
+                created_at: at,
+                sent_at: Some(at.plus(Duration::from_secs(2))),
+            };
+            store::insert_delivery(&mut **tx, &delivery).await?;
+        }
+        let ended = EnrollmentRow { updated_at: at, ..enrollment };
+        store::update_enrollment(&mut **tx, &ended).await?;
+    }
     Ok(())
 }

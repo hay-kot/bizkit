@@ -196,8 +196,8 @@ mod sequences {
         s.member.patch(&path, &json!({"enabled": false})).await.expect(StatusCode::OK);
         s.subscribe(&list, "late@example.com").await;
         s.app.drain_jobs().await;
-        assert!(s.enrollments(&sequence).await.is_empty());
-        assert!(s.subjects().is_empty());
+        assert!(s.enrollments(&sequence).await.is_empty(), "nobody enrolled");
+        assert!(s.subjects().is_empty(), "no mail");
     }
 
     #[tokio::test]
@@ -351,7 +351,7 @@ mod sequences {
         let path = format!("{}/sequences/{}", s.ws(), id(&sequence));
         s.member.delete(&path).await.expect(StatusCode::NO_CONTENT);
         s.after_hours(100).await;
-        assert!(s.subjects().is_empty());
+        assert!(s.subjects().is_empty(), "no mail after the delete");
         let page: Value = s
             .member
             .get(&format!("{}/deliveries?contact_id={}", s.ws(), id(&contact)))

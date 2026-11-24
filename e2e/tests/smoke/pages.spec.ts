@@ -27,7 +27,7 @@ test.describe('workspace pages', () => {
   })
 
   const workspacePages = ['projects', 'team', 'api-keys', 'settings']
-  const projectPages = ['forms', 'webhooks', 'extensions', 'mailing', 'mailing/broadcasts']
+  const projectPages = ['forms', 'webhooks', 'extensions', 'mailing', 'mailing/broadcasts', 'mailing/sequences']
   for (const section of [...workspacePages, ...projectPages]) {
     test(`the ${section} page is clean`, async ({ page, world }) => {
       const errors = trackPageErrors(page)
@@ -76,7 +76,7 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
-  test('a mailing list and a draft broadcast are clean', async ({ page, world, baseURL }) => {
+  test('a mailing list, a draft broadcast and a sequence are clean', async ({ page, world, baseURL }) => {
     const errors = trackPageErrors(page)
     const workspace = world.workspaces.main!.id
     const headers = { Origin: new URL(baseURL!).origin }
@@ -105,6 +105,21 @@ test.describe('workspace pages', () => {
     // The preview is the mail's own HTML in a sandbox without scripts, which
     // axe can't enter; the mail template has its own snapshot tests.
     await expectCleanPage(page, errors, { exclude: ['iframe[title="Mail preview"]'] })
+
+    const sequenced = await page.request.post(`/api/v1/workspaces/${workspace}/mailing/sequences`, {
+      data: {
+        list_id: list.id,
+        name: 'Welcome',
+        trigger: 'manual',
+        steps: [{ delay_hours: 0, subject: 'Welcome', body_md: 'Hi' }],
+      },
+      headers,
+    })
+    expect(sequenced.status()).toBe(201)
+    const sequence = await sequenced.json()
+    await page.goto(`${project}/mailing/sequences/${sequence.id}`)
+    await expect(page.getByRole('group', { name: 'Step 1' })).toBeVisible()
+    await expectCleanPage(page, errors)
   })
 
   const analyticsTabs = ['', '/events', '/funnels', '/people', '/retention', '/settings']
