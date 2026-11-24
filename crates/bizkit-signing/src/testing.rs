@@ -10,6 +10,17 @@ use lopdf::{Document, Object, Stream, dictionary};
 /// Never: the document is built in memory from fixed parts.
 #[must_use]
 pub fn sample_pdf(pages: &[&str]) -> Vec<u8> {
+    sample_pdf_padded(pages, 0)
+}
+
+/// [`sample_pdf`] at least `min_len` bytes long, for size limits. The
+/// padding is an unused stream of spaces.
+///
+/// # Panics
+///
+/// Never: the document is built in memory from fixed parts.
+#[must_use]
+pub fn sample_pdf_padded(pages: &[&str], min_len: usize) -> Vec<u8> {
     let mut doc = Document::with_version("1.7");
     let pages_id = doc.new_object_id();
     let font = doc.add_object(dictionary! {
@@ -44,6 +55,9 @@ pub fn sample_pdf(pages: &[&str]) -> Vec<u8> {
     );
     let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
     doc.trailer.set("Root", catalog);
+    if min_len > 0 {
+        doc.add_object(Stream::new(dictionary! {}, vec![b' '; min_len]));
+    }
     let mut out = Vec::new();
     // Writing to a Vec can't fail.
     let _ignored = doc.save_to(&mut out);

@@ -5,6 +5,8 @@ use bizkit_core::time::UnixMillis;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::fields::Field;
+
 bizkit_core::id_type!(SigningRequestId, "The ID of a signature request.");
 bizkit_core::id_type!(SignerId, "The ID of one signer of a signature request.");
 
@@ -57,6 +59,9 @@ pub struct Signer {
     pub name: String,
     /// Where their link goes.
     pub email: String,
+    /// Their group, 1 to 10. The lowest group with someone yet to sign
+    /// gets its links; equal numbers sign in parallel.
+    pub signing_order: u8,
     /// True once they signed.
     pub signed: bool,
     /// When they signed.
@@ -86,6 +91,9 @@ pub struct SigningRequest {
     pub original_sha256: String,
     /// SHA-256 of the sealed PDF, hex, once completed.
     pub signed_sha256: Option<String>,
+    /// Pages in the uploaded PDF. Empty only on requests made before
+    /// fields existed, until `signing.requests.fields.put` reads the file.
+    pub page_count: Option<u32>,
     /// In the order given.
     pub signers: Vec<Signer>,
     /// When it was created.
@@ -170,11 +178,13 @@ pub struct AuditEvent {
     pub detail: Option<String>,
 }
 
-/// A request with its audit trail.
+/// A request with its fields and audit trail.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SigningRequestDetail {
     /// The request.
     pub request: SigningRequest,
+    /// The fields on its pages, in the order given.
+    pub fields: Vec<Field>,
     /// Oldest first.
     pub events: Vec<AuditEvent>,
 }

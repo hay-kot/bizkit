@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: SigningRequestId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", title, message, status, file_name,\n                  original_sha256, signed_sha256, created_by AS \"created_by: UserId\", sender, failure,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\",\n                  sent_at AS \"sent_at: UnixMillis\", completed_at AS \"completed_at: UnixMillis\",\n                  voided_at AS \"voided_at: UnixMillis\"\n           FROM signing_requests WHERE workspace_id = ? AND project_id = ?\n           ORDER BY created_at DESC, id DESC LIMIT 200",
+  "query": "SELECT id AS \"id: SigningRequestId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  project_id AS \"project_id: ProjectId\", title, message, status, file_name,\n                  original_sha256, signed_sha256, created_by AS \"created_by: UserId\", sender, failure,\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\",\n                  sent_at AS \"sent_at: UnixMillis\", completed_at AS \"completed_at: UnixMillis\",\n                  voided_at AS \"voided_at: UnixMillis\", page_count\n           FROM signing_requests WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
@@ -189,6 +189,17 @@
             "name": "voided_at"
           }
         }
+      },
+      {
+        "name": "page_count",
+        "ordinal": 17,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_requests",
+            "name": "page_count"
+          }
+        }
       }
     ],
     "parameters": {
@@ -211,8 +222,9 @@
       false,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "12961209aa02e43bd284cc945a46873acd5aebf7d129273af220386965c187d0"
+  "hash": "5ef5bd3c1f751e9357a1d597ef0f37e28ece13fa99c166701be3e08080f65e91"
 }

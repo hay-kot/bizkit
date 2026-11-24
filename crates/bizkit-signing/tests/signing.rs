@@ -39,26 +39,52 @@ mod signing {
             format!("/api/v1/workspaces/{}/signing/{rest}", self.team.workspaces["main"].id)
         }
 
-        /// A sent request to Ada and Grace; their sign links, in that order.
-        async fn sent(&self) -> (String, Vec<String>) {
+        /// Creates a request to `signers`, gives each a signature field and
+        /// sends it. Returns its ID.
+        async fn send(&self, signers: &Value) -> String {
             let body = json!({
                 "project_id": self.team.projects["site"].id,
                 "title": "Services agreement",
                 "file_name": "agreement.pdf",
                 "pdf_base64": STANDARD.encode(sample_pdf(&["Terms"])),
-                "signers": [
-                    { "name": "Ada Lovelace", "email": "ada@example.test" },
-                    { "name": "Grace Hopper", "email": "grace@example.test" },
-                ],
+                "signers": signers,
             });
             let created = self.admin.post(&self.path("requests"), &body).await;
             created.expect(StatusCode::CREATED);
             let id = created["id"].as_str().unwrap().to_owned();
+            let fields: Vec<Value> = created["signers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|signer| {
+                    json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
+                            "x": 0.1, "y": 0.7, "width": 0.3, "height": 0.08 })
+                })
+                .collect();
+            self.admin
+                .send(
+                    Method::PUT,
+                    &self.path(&format!("requests/{id}/fields")),
+                    Some(&json!({ "fields": fields })),
+                )
+                .await
+                .expect(StatusCode::OK);
             self.admin
                 .post(&self.path(&format!("requests/{id}/send")), &json!({}))
                 .await
                 .expect(StatusCode::OK);
             self.app.drain_jobs().await;
+            id
+        }
+
+        /// A sent request to Ada and Grace; their sign links, in that order.
+        async fn sent(&self) -> (String, Vec<String>) {
+            let id = self
+                .send(&json!([
+                    { "name": "Ada Lovelace", "email": "ada@example.test" },
+                    { "name": "Grace Hopper", "email": "grace@example.test" },
+                ]))
+                .await;
             let mails = self.app.mail.sent();
             let link_for =
                 |to: &str| link(&mails.iter().find(|m| m.to == to).unwrap().text, "sign");
@@ -275,6 +301,10 @@ mod signing {
                 |n| json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test") }),
             )
             .collect();
+        let signers = Value::Array(signers);
+        for _ in 0..10 {
+            s.send(&signers).await;
+        }
         let body = json!({
             "project_id": s.team.projects["site"].id,
             "title": "Bulk",
@@ -282,13 +312,130 @@ mod signing {
             "pdf_base64": STANDARD.encode(sample_pdf(&["x"])),
             "signers": signers,
         });
-        for round in 0..11 {
-            let created = s.admin.post(&s.path("requests"), &body).await;
-            created.expect(StatusCode::CREATED);
-            let id = created["id"].as_str().unwrap();
-            let sent = s.admin.post(&s.path(&format!("requests/{id}/send")), &json!({})).await;
-            let expected = if round < 10 { StatusCode::OK } else { StatusCode::TOO_MANY_REQUESTS };
-            sent.expect(expected);
+        let created = s.admin.post(&s.path("requests"), &body).await;
+        created.expect(StatusCode::CREATED);
+        let id = created["id"].as_str().unwrap();
+        let fields: Vec<Value> = created["signers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|signer| {
+                json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
+                        "x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1 })
+            })
+            .collect();
+        s.admin
+            .send(
+                Method::PUT,
+                &s.path(&format!("requests/{id}/fields")),
+                Some(&json!({ "fields": fields })),
+            )
+            .await
+            .expect(StatusCode::OK);
+        s.admin
+            .post(&s.path(&format!("requests/{id}/send")), &json!({}))
+            .await
+            .expect(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn later_groups_count_toward_the_cap_at_the_first_send() {
+        let s = setup().await;
+        // 10 requests of 10 signers in two groups mail only 50 at first, but
+        // count 100.
+        let signers: Vec<Value> = (0..10)
+            .map(|n| {
+                json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test"),
+                        "signing_order": 1 + n / 5 })
+            })
+            .collect();
+        let signers = Value::Array(signers);
+        for _ in 0..10 {
+            s.send(&signers).await;
         }
+        assert_eq!(s.app.mail.sent().len(), 50, "only the first groups");
+        let created = s
+            .admin
+            .post(
+                &s.path("requests"),
+                &json!({
+                    "project_id": s.team.projects["site"].id,
+                    "title": "One too many",
+                    "file_name": "x.pdf",
+                    "pdf_base64": STANDARD.encode(sample_pdf(&["x"])),
+                    "signers": signers,
+                }),
+            )
+            .await;
+        let id = created["id"].as_str().unwrap();
+        let fields: Vec<Value> = created["signers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|signer| {
+                json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
+                        "x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1 })
+            })
+            .collect();
+        s.admin
+            .send(
+                Method::PUT,
+                &s.path(&format!("requests/{id}/fields")),
+                Some(&json!({ "fields": fields })),
+            )
+            .await
+            .expect(StatusCode::OK);
+        s.admin
+            .post(&s.path(&format!("requests/{id}/send")), &json!({}))
+            .await
+            .expect(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn signing_order_groups_get_their_links_in_turn() {
+        let s = setup().await;
+        let id = s
+            .send(&json!([
+                { "name": "Grace Hopper", "email": "grace@example.test", "signing_order": 5 },
+                { "name": "Ada Lovelace", "email": "ada@example.test", "signing_order": 2 },
+                { "name": "Alan Turing", "email": "alan@example.test", "signing_order": 5 },
+            ]))
+            .await;
+        let first = s.app.mail.take();
+        let to: Vec<&str> = first.iter().map(|m| m.to.as_str()).collect();
+        assert_eq!(to, ["ada@example.test"], "only the lowest group");
+
+        let ada = link(&first[0].text, "sign");
+        s.sign(&ada, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Ada Lovelace")])
+            .await
+            .expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let second = s.app.mail.take();
+        let mut together: Vec<&str> = second.iter().map(|m| m.to.as_str()).collect();
+        together.sort_unstable();
+        assert_eq!(together, ["alan@example.test", "grace@example.test"], "equal orders together");
+        let detail = s.detail(&id).await;
+        assert_eq!(detail["request"]["status"], "sent");
+        let kinds: Vec<&str> = detail["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["kind"].as_str().unwrap())
+            .collect();
+        assert_eq!(kinds, ["created", "sent", "signed", "sent", "sent"]);
+
+        let grace =
+            link(&second.iter().find(|m| m.to == "grace@example.test").unwrap().text, "sign");
+        s.sign(&grace, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Grace Hopper")])
+            .await
+            .expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        assert!(s.app.mail.take().is_empty(), "Alan's group is still signing");
+        let alan = link(&second.iter().find(|m| m.to == "alan@example.test").unwrap().text, "sign");
+        s.sign(&alan, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Alan Turing")])
+            .await
+            .expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        assert_eq!(s.detail(&id).await["request"]["status"], "completed");
     }
 }

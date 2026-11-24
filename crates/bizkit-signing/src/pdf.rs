@@ -13,16 +13,21 @@ use crate::signature::{PAD_HEIGHT, PAD_WIDTH, Signature};
 /// The time on an upload's dry-run seal; any time works.
 const DRY_RUN_AT: UnixMillis = UnixMillis(1_795_000_000_000);
 
-/// How long parsing an upload may take. Parsing runs off the async
-/// runtime; a hostile file that takes longer is refused.
-const PARSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long parsing a `pdf_base64` upload (at most 700 KiB) may take.
+/// Parsing runs off the async runtime; a hostile file that takes longer is
+/// refused.
+pub(crate) const BASE64_PARSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long parsing a multipart upload (at most 25 MiB) may take.
+pub(crate) const UPLOAD_PARSE_TIMEOUT: Duration = Duration::from_secs(20);
+/// The most pages a request's PDF may have.
+pub(crate) const MAX_PAGES: usize = 500;
 
 /// Uploads parse one at a time: a small file can inflate a lot.
 static PARSING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 
-/// Checks that `bytes` is a PDF bizkit can add pages to and seal. The error is a
-/// message for the `pdf_base64` field.
-pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
+/// Checks that `bytes` is a PDF bizkit can add pages to and seal, and
+/// returns its page count. The error is a message for the file's field.
+pub(crate) async fn check(bytes: Vec<u8>, timeout: Duration) -> Result<u32, &'static str> {
     if !bytes.starts_with(b"%PDF-") {
         return Err("must be a PDF");
     }
@@ -37,8 +42,12 @@ pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
         if doc.is_encrypted() || doc.encryption_state.is_some() {
             return Err("must not be encrypted or password-protected");
         }
-        if doc.get_pages().is_empty() {
+        let pages = doc.get_pages().len();
+        if pages == 0 {
             return Err("must have at least one page");
+        }
+        if pages > MAX_PAGES {
+            return Err("must have at most 500 pages");
         }
         // Seal a copy with a throwaway key now, so a file that can't take the
         // added pages or the seal is refused here instead of after everyone signed.
@@ -48,9 +57,9 @@ pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
             tracing::info!(error = format!("{err:#}"), "an upload can't be sealed");
             return Err("must be a PDF bizkit can add pages to and seal");
         }
-        Ok(())
+        u32::try_from(pages).map_err(|_| "must have at most 500 pages")
     });
-    match tokio::time::timeout(PARSE_TIMEOUT, parsed).await {
+    match tokio::time::timeout(timeout, parsed).await {
         Ok(Ok(result)) => result,
         Ok(Err(_)) | Err(_) => Err("must be a PDF that opens"),
     }
@@ -524,16 +533,29 @@ mod tests {
 
     #[tokio::test]
     async fn uploads_that_cant_be_sealed_are_refused() {
-        check(crate::testing::sample_pdf(&["One"])).await.unwrap();
+        assert_eq!(
+            check(crate::testing::sample_pdf(&["One", "Two"]), BASE64_PARSE_TIMEOUT).await,
+            Ok(2)
+        );
         let direct_tree = edited(|doc, pages_id| {
             let tree = doc.get_dictionary(pages_id).unwrap().clone();
             doc.catalog_mut().unwrap().set("Pages", tree);
         });
-        assert_eq!(check(direct_tree).await, Err("must have at least one page"));
+        assert_eq!(
+            check(direct_tree, BASE64_PARSE_TIMEOUT).await,
+            Err("must have at least one page")
+        );
         let no_kids = edited(|doc, pages_id| {
             doc.get_dictionary_mut(pages_id).unwrap().set("Kids", 7);
         });
-        assert!(check(no_kids).await.is_err());
+        assert!(check(no_kids, BASE64_PARSE_TIMEOUT).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn uploads_have_at_most_500_pages() {
+        let pages = vec!["x"; MAX_PAGES + 1];
+        let refused = check(crate::testing::sample_pdf(&pages), BASE64_PARSE_TIMEOUT).await;
+        assert_eq!(refused, Err("must have at most 500 pages"));
     }
 
     #[test]
