@@ -13,6 +13,7 @@ mod funnels;
 pub mod geo;
 pub mod hooks;
 mod ingest;
+mod insights;
 pub mod limit;
 pub mod names;
 mod ops;
@@ -164,6 +165,7 @@ impl Module for Analytics {
         explore::register(cx, &files)?;
         funnels::register(cx, &files)?;
         people::register(cx, &files)?;
+        insights::register(cx, &files, retention_days)?;
         cx.hook_target_kind(&hooks::GOAL, hooks::GoalTargets)?;
         let source = hooks::GoalHookSource(Arc::clone(&files));
         cx.async_hook::<hooks::GoalConverted, _>(hooks::GOAL_CONVERTED, source)?;

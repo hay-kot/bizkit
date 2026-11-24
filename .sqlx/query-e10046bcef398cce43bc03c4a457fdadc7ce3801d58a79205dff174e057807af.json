@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO analytics_dashboards (id, workspace_id, project_id, name, created_at, updated_at)\n         VALUES (?, ?, ?, ?, ?, ?)\n         ON CONFLICT (id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "e10046bcef398cce43bc03c4a457fdadc7ce3801d58a79205dff174e057807af"
+}

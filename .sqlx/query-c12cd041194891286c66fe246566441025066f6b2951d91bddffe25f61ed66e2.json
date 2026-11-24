@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT ? + ((ts - ?) / ?) * ? AS \"start!: i64\",\n                  COUNT(DISTINCT CASE WHEN name = ? AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (\n               CASE json_extract(f.value, '$.op')\n               WHEN 'is_not' THEN NOT EXISTS (SELECT 1 FROM json_each(COALESCE(e.props, '{}')) x\n                 WHERE x.key = json_extract(f.value, '$.k')\n                   AND (CASE WHEN x.type IN ('integer', 'real') AND json_extract(f.value, '$.n') IS NOT NULL\n                         THEN x.atom = json_extract(f.value, '$.n')\n                         ELSE (CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                               ELSE CAST(x.atom AS TEXT) END) = json_extract(f.value, '$.v') END))\n               ELSE EXISTS (SELECT 1 FROM json_each(COALESCE(e.props, '{}')) x\n                 WHERE x.key = json_extract(f.value, '$.k') AND CASE json_extract(f.value, '$.op')\n                   WHEN 'is' THEN (CASE WHEN x.type IN ('integer', 'real') AND json_extract(f.value, '$.n') IS NOT NULL\n                         THEN x.atom = json_extract(f.value, '$.n')\n                         ELSE (CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                               ELSE CAST(x.atom AS TEXT) END) = json_extract(f.value, '$.v') END)\n                   WHEN 'gt' THEN x.type IN ('integer', 'real') AND x.atom > json_extract(f.value, '$.n')\n                   WHEN 'lt' THEN x.type IN ('integer', 'real') AND x.atom < json_extract(f.value, '$.n')\n                   ELSE x.type <> 'null' END)\n               END)) THEN person END) AS \"users!: i64\",\n                  COUNT(DISTINCT person) AS \"active!: i64\"\n           FROM analytics_events e\n           WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n             AND substr(person, 1, 2) <> 'v:'\n           GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "start!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "users!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "active!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "c12cd041194891286c66fe246566441025066f6b2951d91bddffe25f61ed66e2"
+}

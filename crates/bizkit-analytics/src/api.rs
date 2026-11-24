@@ -15,6 +15,8 @@ use utoipa::openapi::schema::{KnownFormat, ObjectBuilder, Schema, SchemaFormat, 
 bizkit_core::id_type!(GoalId, "The ID of an analytics goal.");
 bizkit_core::id_type!(FunnelId, "The ID of an analytics funnel.");
 bizkit_core::id_type!(PersonId, "The ID of an identified person in analytics.");
+bizkit_core::id_type!(InsightId, "The ID of a saved analytics insight.");
+bizkit_core::id_type!(DashboardId, "The ID of an analytics dashboard.");
 
 /// A UTC calendar day, written `YYYY-MM-DD`. Analytics counts by UTC day.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH m AS (\n             SELECT (SELECT CASE t.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                             ELSE CAST(t.atom AS TEXT) END\n                      FROM json_each(p.traits) t WHERE t.key = ? AND t.type <> 'null') AS value\n             FROM analytics_people p\n             WHERE workspace_id = ? AND project_id = ?\n               AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (\n                 CASE json_extract(f.value, '$.op')\n                 WHEN 'is_not' THEN NOT EXISTS (SELECT 1 FROM json_each(p.traits) x\n                   WHERE x.key = json_extract(f.value, '$.k')\n                     AND (CASE WHEN x.type IN ('integer', 'real') AND json_extract(f.value, '$.n') IS NOT NULL\n                         THEN x.atom = json_extract(f.value, '$.n')\n                         ELSE (CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                               ELSE CAST(x.atom AS TEXT) END) = json_extract(f.value, '$.v') END))\n                 ELSE EXISTS (SELECT 1 FROM json_each(p.traits) x\n                   WHERE x.key = json_extract(f.value, '$.k') AND CASE json_extract(f.value, '$.op')\n                     WHEN 'is' THEN (CASE WHEN x.type IN ('integer', 'real') AND json_extract(f.value, '$.n') IS NOT NULL\n                         THEN x.atom = json_extract(f.value, '$.n')\n                         ELSE (CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                               ELSE CAST(x.atom AS TEXT) END) = json_extract(f.value, '$.v') END)\n                     WHEN 'gt' THEN x.type IN ('integer', 'real') AND x.atom > json_extract(f.value, '$.n')\n                     WHEN 'lt' THEN x.type IN ('integer', 'real') AND x.atom < json_extract(f.value, '$.n')\n                     ELSE x.type <> 'null' END)\n                 END))\n           ),\n           top AS (SELECT value FROM m GROUP BY value ORDER BY COUNT(*) DESC, value LIMIT ?),\n           t AS (SELECT value, EXISTS (SELECT 1 FROM top WHERE top.value IS m.value) AS in_top FROM m)\n           SELECT in_top AS \"in_top!: bool\", CASE WHEN in_top THEN value END AS \"value?: String\",\n                  COUNT(*) AS \"count!: i64\"\n           FROM t GROUP BY 1, 2",
+  "describe": {
+    "columns": [
+      {
+        "name": "in_top!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "value?: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "name": "count!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "f48e61c9a63ecf96d2ff4d1888a0456867b2fbea53d7cb5bc2997e7c639bdf0e"
+}
