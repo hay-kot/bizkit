@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { refDebounced, useIntervalFn } from '@vueuse/core'
-import { FlaskConical, Inbox, RotateCw, Send, Trash2 } from 'lucide-vue-next'
+import {
+  CalendarClock,
+  CalendarX,
+  FlaskConical,
+  Inbox,
+  Play,
+  RotateCw,
+  Send,
+  Trash2,
+} from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -25,11 +34,13 @@ import {
   type Preview,
   ROWS_SHOWN,
   useBroadcast,
+  useCancelBroadcast,
   useDeleteBroadcast,
   useDeliveries,
   useMailingList,
   usePreview,
   useResendBroadcast,
+  useResumeBroadcast,
   useSendBroadcast,
   useTestBroadcast,
   useUpdateBroadcast,
@@ -56,7 +67,11 @@ const { data: list } = useMailingList(
   () => broadcast.value?.list_id ?? null,
 )
 const isDraft = computed(() => broadcast.value?.status === 'draft')
+const isScheduled = computed(() => broadcast.value?.status === 'scheduled')
+const isPaused = computed(() => broadcast.value?.status === 'paused')
 const isSending = computed(() => broadcast.value?.status === 'sending')
+// A scheduled broadcast is still unsent: no log yet, and no edits.
+const hasLog = computed(() => !isDraft.value && !isScheduled.value)
 const {
   data: deliveries,
   isPending: deliveriesPending,
@@ -81,11 +96,13 @@ const logPoll = useIntervalFn(
 )
 // The failed count on the Resend button follows the log.
 watch(deliveries, () => {
-  if (!isDraft.value && broadcastStatus.value !== 'loading') void refetchBroadcast()
+  if (hasLog.value && broadcastStatus.value !== 'loading') void refetchBroadcast()
 })
+// A paused broadcast's queued rows wait for Resume, so the log stops polling.
 watch(
   () =>
-    !isDraft.value &&
+    hasLog.value &&
+    !isPaused.value &&
     (isSending.value || (deliveries.value?.items ?? []).some((d) => d.status === 'queued')),
   (waiting) => (waiting ? logPoll.resume() : logPoll.pause()),
   { immediate: true },
@@ -129,6 +146,8 @@ const update = useUpdateBroadcast()
 const remove = useDeleteBroadcast()
 const send = useSendBroadcast()
 const resend = useResendBroadcast()
+const cancel = useCancelBroadcast()
+const resume = useResumeBroadcast()
 const {
   mutateAsync: sendTest,
   reset: resetTest,
@@ -188,7 +207,9 @@ const facts = computed(() => {
     { key: 'status', label: 'Status' },
     { key: 'to', label: 'To', value: current.tag ? `Tagged “${current.tag}”` : 'Every subscriber' },
     { key: 'recipients', label: 'Recipients', value: recipientsText.value },
-    { key: 'sent', label: 'Sent', value: formatDate(current.sent_at) },
+    current.status === 'scheduled'
+      ? { key: 'sent', label: 'Sends', value: formatDateTime(current.send_at) }
+      : { key: 'sent', label: 'Sent', value: formatDate(current.sent_at) },
   ]
 })
 
@@ -244,6 +265,64 @@ function onSend() {
   })
 }
 
+const scheduleOpen = ref(false)
+const scheduleAt = ref('')
+const scheduling = computed(() => send.asyncStatus.value === 'loading')
+const scheduleError = computed(() => send.error.value)
+
+/** `datetime-local` wants local time without a zone: 2026-11-24T09:30. */
+function localInput(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`
+}
+
+function openSchedule() {
+  const inAnHour = new Date(Date.now() + 60 * 60 * 1000)
+  inAnHour.setMinutes(0, 0, 0)
+  scheduleAt.value = localInput(inAnHour)
+  send.reset()
+  scheduleOpen.value = true
+}
+
+async function onSchedule() {
+  const sendAt = new Date(scheduleAt.value).toISOString()
+  await send.mutateAsync({
+    path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
+    body: { send_at: sendAt },
+  })
+  scheduleOpen.value = false
+  toast(`Scheduled for ${formatDateTime(sendAt)}`)
+}
+
+function onCancel() {
+  return runAction({
+    run: () =>
+      cancel.mutateAsync({
+        path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
+      }),
+    success: 'Schedule cancelled; it is a draft again',
+  })
+}
+
+function onResume() {
+  return runAction({
+    confirm: {
+      title: 'Resume sending?',
+      message:
+        'Fix whatever made the mail fail first, or the broadcast pauses again after 20 failures.',
+      confirmLabel: 'Resume',
+      danger: false,
+    },
+    run: () =>
+      resume.mutateAsync({
+        path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
+      }),
+    success: 'Resumed',
+  })
+}
+
 function onDelete() {
   return runAction({
     confirm: {
@@ -270,10 +349,36 @@ const sendBlocked = computed(() => {
   if (body.value.trim() === '') return 'Write the body first'
   return undefined
 })
-const actions = computed(() =>
-  isDraft.value
+const actions = computed(() => {
+  if (isScheduled.value) {
+    return [
+      {
+        label: 'Cancel schedule',
+        icon: CalendarX,
+        run: () => void onCancel(),
+        disabled: cancel.asyncStatus.value === 'loading',
+      },
+    ]
+  }
+  if (isPaused.value) {
+    return [
+      {
+        label: 'Resume',
+        icon: Play,
+        run: () => void onResume(),
+        disabled: resume.asyncStatus.value === 'loading',
+      },
+    ]
+  }
+  return isDraft.value
     ? [
         { label: 'Test send', icon: FlaskConical, run: openTest, disabled: dirty.value },
+        {
+          label: 'Schedule',
+          icon: CalendarClock,
+          run: openSchedule,
+          disabled: sendBlocked.value !== undefined,
+        },
         {
           label: 'Send',
           icon: Send,
@@ -293,8 +398,21 @@ const actions = computed(() =>
             disabled: failed.value === 0 || resend.asyncStatus.value === 'loading',
           },
         ]
-      : [],
-)
+      : []
+})
+
+const description = computed(() => {
+  switch (broadcast.value?.status) {
+    case 'draft':
+      return 'A draft. Save it, send yourself a test, then send it now or schedule it.'
+    case 'scheduled':
+      return 'Scheduled. Cancel the schedule to edit it again.'
+    case 'paused':
+      return 'Paused: too many mails failed in a row. Mail already sent stays sent.'
+    default:
+      return 'Sent mail can’t change. The log shows each recipient.'
+  }
+})
 
 function onResend() {
   const count = failed.value
@@ -329,15 +447,7 @@ const columns = [
   <Page>
     <ErrorAlert v-if="broadcastError" :error="broadcastError" />
     <template v-else-if="broadcast">
-      <PageHeader
-        :section="projectName"
-        :title="broadcast.subject"
-        :description="
-          isDraft
-            ? 'A draft. Save it, send yourself a test, then send it to the list.'
-            : 'Sent mail can’t change. The log shows each recipient.'
-        "
-      >
+      <PageHeader :section="projectName" :title="broadcast.subject" :description="description">
         <DetailActions
           :actions="actions"
           :save="
@@ -357,6 +467,10 @@ const columns = [
           </template>
         </DetailActions>
       </PageHeader>
+
+      <div v-if="isPaused" role="alert" class="alert alert-warning">
+        <span>{{ broadcast.pause_reason }}. Fix the mail setup, then resume to send the rest.</span>
+      </div>
 
       <DescriptionList :items="facts">
         <template #status><StatusBadge :status="broadcast.status" /></template>
@@ -404,9 +518,10 @@ const columns = [
         <p v-else class="text-sm text-base-content/70">Add a subject to see the preview.</p>
       </Card>
 
-      <PageSection v-if="!isDraft" title="Send log">
+      <PageSection v-if="hasLog" title="Send log">
         <template #description>
-          The newest {{ ROWS_SHOWN }} recipients. Mail to people who left the list is skipped.
+          The newest {{ ROWS_SHOWN }} recipients. Mail to people who left the list or are suppressed
+          is skipped. Bounces and spam complaints show once the provider reports them.
         </template>
         <DataTable
           :columns="columns"
@@ -426,7 +541,12 @@ const columns = [
           <template #cell-to="{ row }"
             ><span class="text-sm font-medium">{{ row.to_email }}</span></template
           >
-          <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
+          <template #cell-status="{ row }"
+            ><span class="flex flex-wrap gap-1"
+              ><StatusBadge :status="row.status" /><StatusBadge
+                v-if="row.event"
+                :status="row.event" /></span
+          ></template>
           <template #cell-attempts="{ row }"
             ><span class="text-sm tabular-nums">{{ row.attempts }}</span
             ><span v-if="row.resends > 0" class="ms-2 badge badge-ghost badge-sm"
@@ -444,6 +564,28 @@ const columns = [
         </DataTable>
       </PageSection>
     </template>
+
+    <FormPanel
+      :open="scheduleOpen"
+      variant="dialog"
+      title="Schedule broadcast"
+      :description="`It goes to ${audience} at this time, your local time. Until then it can’t change; cancel the schedule to edit it.`"
+      submit-label="Schedule"
+      :pending="scheduling"
+      :error="scheduleError"
+      @close="scheduleOpen = false"
+      @submit="onSchedule"
+    >
+      <Field label="Send at">
+        <input
+          v-model="scheduleAt"
+          type="datetime-local"
+          name="broadcast-send-at"
+          required
+          class="input w-full"
+        />
+      </Field>
+    </FormPanel>
 
     <FormPanel
       :open="testOpen"

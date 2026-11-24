@@ -4,11 +4,13 @@ import type { MaybeRefOrGetter } from 'vue'
 import { toValue, watch } from 'vue'
 
 import {
+  mailingBroadcastsCancelMutation,
   mailingBroadcastsCreateMutation,
   mailingBroadcastsDeleteMutation,
   mailingBroadcastsGetQuery,
   mailingBroadcastsListQuery,
   mailingBroadcastsResendMutation,
+  mailingBroadcastsResumeMutation,
   mailingBroadcastsSendMutation,
   mailingBroadcastsTestMutation,
   mailingBroadcastsUpdateMutation,
@@ -32,12 +34,16 @@ import {
   mailingSequencesGetQuery,
   mailingSequencesListQuery,
   mailingSequencesUpdateMutation,
+  mailingSuppressionsCreateMutation,
+  mailingSuppressionsDeleteMutation,
+  mailingSuppressionsListQuery,
 } from '@/api/gen/@pinia/colada.gen'
 import type {
   Broadcast,
   BroadcastStatus,
   Contact,
   ContactStatus,
+  DeliveryEvent,
   DeliveryStatus,
   Enrollment,
   EnrollmentStatus,
@@ -47,6 +53,8 @@ import type {
   Sequence,
   SequenceStep,
   SequenceTrigger,
+  Suppression,
+  SuppressionReason,
 } from '@/api/gen/types.gen'
 
 import { useInvalidate } from './keys'
@@ -56,6 +64,7 @@ export type {
   BroadcastStatus,
   Contact,
   ContactStatus,
+  DeliveryEvent,
   DeliveryStatus,
   Enrollment,
   EnrollmentStatus,
@@ -65,6 +74,8 @@ export type {
   Sequence,
   SequenceStep,
   SequenceTrigger,
+  Suppression,
+  SuppressionReason,
 }
 
 const LIST_QUERIES = ['mailingListsList', 'mailingListsGet']
@@ -255,6 +266,24 @@ export function useSendBroadcast() {
   })
 }
 
+/** Turns a scheduled broadcast back into a draft. */
+export function useCancelBroadcast() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingBroadcastsCancelMutation(),
+    onSettled: () => invalidate(...BROADCAST_QUERIES),
+  })
+}
+
+/** Sends the mail a paused broadcast held back. */
+export function useResumeBroadcast() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingBroadcastsResumeMutation(),
+    onSettled: () => invalidate(...BROADCAST_QUERIES, 'mailingDeliveriesList'),
+  })
+}
+
 /** Queues a sent broadcast's failed deliveries again. */
 export function useResendBroadcast() {
   const invalidate = useInvalidate()
@@ -380,4 +409,34 @@ export function useSequenceDeliveries(
       query: { sequence_id: toValue(sequenceId), limit: ROWS_SHOWN },
     }),
   )
+}
+
+/** The workspace's suppressed addresses, by address. */
+export function useSuppressions(
+  workspaceId: MaybeRefOrGetter<string>,
+  filter: MaybeRefOrGetter<{ reason?: SuppressionReason; q?: string }>,
+) {
+  return useQuery(() => {
+    const { reason, q } = toValue(filter)
+    return mailingSuppressionsListQuery({
+      path: { workspace_id: toValue(workspaceId) },
+      query: { limit: ROWS_SHOWN, reason, q: q?.trim() ? q.trim() : undefined },
+    })
+  })
+}
+
+export function useAddSuppression() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingSuppressionsCreateMutation(),
+    onSettled: () => invalidate('mailingSuppressionsList'),
+  })
+}
+
+export function useRemoveSuppression() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...mailingSuppressionsDeleteMutation(),
+    onSettled: () => invalidate('mailingSuppressionsList'),
+  })
 }

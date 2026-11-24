@@ -1,4 +1,4 @@
-import { ListOrdered, Mail, Plus } from 'lucide-vue-next'
+import { Ban, ListOrdered, Mail, Plus } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 import MailingSection from '@/components/mailing/MailingSection.vue'
@@ -8,6 +8,7 @@ import List from '@/pages/mailing/List.vue'
 import Lists from '@/pages/mailing/Lists.vue'
 import Sequence from '@/pages/mailing/Sequence.vue'
 import Sequences from '@/pages/mailing/Sequences.vue'
+import Suppressions from '@/pages/mailing/Suppressions.vue'
 import { useMailingLists, useSequences } from '@/queries/mailing'
 
 import { defineWebModule } from './types'
@@ -21,6 +22,7 @@ export default defineWebModule({
     { path: 'mailing/broadcasts/:broadcastId', component: Broadcast },
     { path: 'mailing/sequences', component: Sequences },
     { path: 'mailing/sequences/:sequenceId', component: Sequence },
+    { path: 'mailing/suppressions', component: Suppressions },
   ],
   nav: [{ path: 'mailing', label: 'Mailing', icon: Mail, section: 'project', order: 103 }],
   entitySections: [{ key: 'mailing', component: MailingSection }],
@@ -50,8 +52,29 @@ export default defineWebModule({
         keywords: ['create', 'drip', 'welcome series', 'automation', 'email'],
         to: `${base}/sequences?new=1`,
       },
+      {
+        id: 'mailing:suppressions',
+        title: 'Suppressions',
+        group: 'Mailing',
+        order: 103,
+        icon: Ban,
+        kind: 'page',
+        scope: 'goto' as const,
+        keywords: ['bounces', 'complaints', 'blocked', 'do not mail', 'suppression list'],
+        to: `${base}/suppressions`,
+      },
       ...(cx.isAdmin
         ? [
+            {
+              id: 'mailing:new-suppression',
+              title: 'Suppress address',
+              group: 'Mailing',
+              order: 103,
+              icon: Ban,
+              kind: 'action',
+              keywords: ['block', 'stop mail', 'do not mail', 'suppression'],
+              to: `${base}/suppressions?new=1`,
+            },
             {
               id: 'mailing:new-list',
               title: 'New list',

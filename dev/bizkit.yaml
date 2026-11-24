@@ -7,6 +7,9 @@ server:
   trusted_proxies: 1
   mail:
     from: "bizkit dev <noreply@bizkit.test>"
+    # svx sets this variable for the api, so the Mailgun event webhook at
+    # /m/mailing/public/events/mailgun takes requests signed with it.
+    webhook_signing_key_env: MAILGUN_WEBHOOK_KEY
   auth:
     policies:
       - name: dev

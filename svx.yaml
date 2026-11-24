@@ -23,6 +23,8 @@ services:
       --data-dir $SVX_STACK_DIR/data --smtp-url smtp://127.0.0.1:$SVX_PORT_MAILPIT_SMTP
     port: 8484
     depends: [mailpit]
+    env:
+      MAILGUN_WEBHOOK_KEY: dev-webhook-key # a dev-only key, to post signed sample events with curl
     ready: { http: /healthz, timeout: 5m } # the first cargo build is slow
     links: { OpenAPI: /api/openapi.json }
 
