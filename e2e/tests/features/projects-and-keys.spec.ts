@@ -58,7 +58,9 @@ test.describe('as a member', () => {
 
   test('admin sections are hidden', async ({ page, world }) => {
     await page.goto(`/w/${world.workspaces.main!.id}/team`)
-    await expect(page.getByRole('link', { name: 'Team' })).toBeVisible()
+    const sidebar = page.getByRole('navigation', { name: 'Workspace', exact: true })
+    // The breadcrumb links the workspace, which this persona names "Team".
+    await expect(sidebar.getByRole('link', { name: 'Team' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'API keys' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Pending invitations' })).toHaveCount(0)

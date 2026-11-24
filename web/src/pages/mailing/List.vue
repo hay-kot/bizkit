@@ -225,7 +225,6 @@ const actions = computed(() => [
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       :title="list?.name ?? 'List'"
       :description="list?.description ?? 'Contacts of this list, newest first.'"
     >

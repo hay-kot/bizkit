@@ -340,7 +340,6 @@ const logColumns = [
     <ErrorAlert v-if="sequenceError" :error="sequenceError" />
     <template v-else-if="sequence">
       <PageHeader
-        :section="projectName"
         :title="sequence.name"
         description="Timed mails each enrolled contact gets in order. Edits apply to steps a contact hasn't reached."
       >

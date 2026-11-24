@@ -56,7 +56,6 @@ async function onCreate() {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       title="Forms"
       description="Collect submissions from your sites, with spam kept out."
     >

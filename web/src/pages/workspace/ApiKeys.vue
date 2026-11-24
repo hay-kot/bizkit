@@ -68,7 +68,6 @@ function onRevoke(key: ApiKey) {
 <template>
   <Page>
     <PageHeader
-      :section="workspaceName"
       title="API keys"
       description="Keys work in this workspace only, over the API and as MCP tools at /mcp."
     >

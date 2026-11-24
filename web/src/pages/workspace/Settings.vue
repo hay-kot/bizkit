@@ -28,7 +28,7 @@ async function onSave() {
 
 <template>
   <Page>
-    <PageHeader :section="workspaceName" title="Settings" />
+    <PageHeader title="Settings" />
     <form @submit.prevent="onSave">
       <Card title="General" description="The name shows in the switcher and in invitation emails.">
         <Field label="Name" width="md">

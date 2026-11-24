@@ -62,7 +62,7 @@ function onDelete(project: Project) {
 <template>
   <Page>
     <PageHeader
-      :section="workspaceName"
+      :icon="FolderKanban"
       title="Projects"
       description="Everything in a workspace hangs off a project."
     >

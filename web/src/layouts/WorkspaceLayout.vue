@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
 import { FolderX, Menu as MenuIcon, Search, X } from 'lucide-vue-next'
-import { inject, ref, unref, watch } from 'vue'
+import { computed, inject, provide, reactive, ref, unref, watch } from 'vue'
 import { useRoute, viewDepthKey } from 'vue-router'
 
 import EmptyState from '@/components/EmptyState.vue'
@@ -12,6 +12,7 @@ import SidebarLink from '@/components/SidebarLink.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import CommandPalette from '@/components/ui/CommandPalette.vue'
+import { PAGE_CONTEXT } from '@/components/ui/pageHeader'
 import { useCurrentProject } from '@/composables/useCurrentProject'
 import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
@@ -39,6 +40,22 @@ const {
   isPending: projectsPending,
   error: projectsError,
 } = useCurrentProject(() => props.workspaceId)
+
+// Project pages start their breadcrumb at the project, workspace pages at
+// the workspace.
+const rootCrumb = computed(() =>
+  route.params.projectId && project.value
+    ? { label: project.value.name, to: `/w/${props.workspaceId}/p/${project.value.id}` }
+    : { label: workspace.value?.name ?? '', to: `/w/${props.workspaceId}` },
+)
+const pageContext = reactive({
+  root: rootCrumb,
+  navTo: (item: NavItem) =>
+    item.section === 'project' && project.value
+      ? projectPath(props.workspaceId, project.value.id, item.path)
+      : `/w/${props.workspaceId}/${item.path}`,
+})
+provide(PAGE_CONTEXT, pageContext)
 const mobileOpen = ref(false)
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 

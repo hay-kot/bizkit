@@ -2,22 +2,22 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import Tabs from './Tabs.vue'
+import Tabs, { type Tab } from './Tabs.vue'
 
-const tabs = [
+const tabs: Tab[] = [
   { label: 'Overview', to: '/a', exact: true },
   { label: 'Funnels', to: '/a/funnels' },
   { label: 'Settings', to: '/a/settings' },
 ]
 
-async function mountAt(path: string) {
+async function mountAt(path: string, list: Tab[] = tabs) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:any(.*)*', component: { template: '<div />' } }],
   })
   await router.push(path)
   const wrapper = mount(Tabs, {
-    props: { tabs, label: 'Analytics' },
+    props: { tabs: list, label: 'Analytics' },
     global: { plugins: [router] },
   })
   return { router, wrapper }
@@ -50,5 +50,18 @@ describe('Tabs', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/a/settings')
     expect(current(wrapper)).toEqual(['Settings'])
+  })
+
+  it('stays active on its `also` paths', async () => {
+    const { wrapper } = await mountAt('/a/dashboards/7', [
+      ...tabs,
+      { label: 'Insights', to: '/a/insights', also: ['/a/dashboards'] },
+    ])
+    expect(current(wrapper)).toEqual(['Insights'])
+  })
+
+  it('shows a count after the label', async () => {
+    const { wrapper } = await mountAt('/a', [{ label: 'Overview', to: '/a', count: 1200 }])
+    expect(wrapper.get('a .badge').text()).toBe('1,200')
   })
 })

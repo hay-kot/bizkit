@@ -150,7 +150,6 @@ function removeSecret(secret: string) {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       title="Extensions"
       description="Scripts that run on this project's hook points, such as after each form submission."
     >

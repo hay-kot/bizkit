@@ -21,7 +21,7 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 | Block | Use |
 |---|---|
 | `Page` | The root of every page. `width`: `wide` (default) fills the content column, for every page in the workspace shell; `compact` is a one-card page without a header, centered (Invite). Owns the space between top-level blocks. |
-| `PageHeader` | Eyebrow (`section`), the title with actions on the same row, then the description. |
+| `PageHeader` | A breadcrumb row, the title row (a 32px icon tile in `primary`, the title, actions on the right), the description (`max-w-prose`, with an optional `docs` link) and a `tabs` slot. The icon comes from the route's module nav item and the breadcrumb from the workspace shell (project or workspace, then the module, then the title when it differs), so pages pass neither; `icon` and `crumbs` override them for a page outside a module (Projects, Home). The last crumb is never a link. |
 | `PageSection` | A titled block that isn't a card: a table or list with a heading and optional actions. |
 | `Card` | A bordered group of fields or facts. `#actions` in the heading, `#footer` for a right-aligned Save. |
 | `Field` | A label over its control, with a hint or error under it. It caps its own width so controls don't stretch on wide screens: `lg` (default, `max-w-3xl`) for text inputs, selects and textareas, `md` for short values such as names and IDs, `full` for a control that needs the room. |
@@ -29,8 +29,8 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 | `DescriptionList` | Read-only facts about the entity, straight under the header. |
 | `DetailActions` + `MenuItem` | A detail page's header actions: page buttons (`actions`), Save (`save`) and the "..." menu (`#menu`), all `btn-sm` in one style family. Save shows its own state: "Save", a disabled "Saved", or "Saving". Destructive menu items are `danger` and go last. |
 | `FormPanel` | Create and edit forms, as a side panel or a dialog. |
-| `Tabs` | Route links under a page header, one route per tab, for a feature with several pages (Analytics). The active tab gets `aria-current="page"`; a tab stays active on paths under it unless `exact`. |
-| `TabLayout`, `TabPage` | A feature with tabs is one parent route whose component wraps `TabLayout` (page, header and `Tabs`, rendered once) with the tabs as child routes. Each tab's page renders a `TabPage`, which sets the header's title, description and actions, so a tab switch swaps only the content (Analytics, Mailing). Detail pages without tabs stay outside the parent. |
+| `Tabs` | Route links in a page header's `tabs` slot, one route per tab, for a feature with several pages (Analytics). A full-width line runs under the row and the active tab is underlined in `primary` with `aria-current="page"`. A tab stays active on paths under it unless `exact`, and on the paths in `also`; `count` shows a badge after the label. |
+| `TabLayout`, `TabPage` | A feature with tabs is one parent route whose component wraps `TabLayout` (page, header and `Tabs` in the header, rendered once) with the tabs as child routes. Each tab's page renders a `TabPage`, which sets the header's title, description and actions, so a tab switch swaps only the content (Analytics, Mailing). Detail pages without tabs stay outside the parent. |
 | `DateRangePicker` | A report's range: a preset `Select` (Today to Last month) and two date fields for Custom. Days are `YYYY-MM-DD` in UTC; `presetRange` and `previousPeriod` in `lib/range.ts` do the math. |
 | `StatTiles` | A row of KPI tiles. With `previous` set, a tile shows the change as a percent with an arrow, green up and red down, or "new" when the previous value was 0. |
 | `TimeSeriesChart` | A line chart over time in hand-written SVG. Each `primary` series takes the next chart color (`chart-1` to `chart-4`: primary, secondary, accent, success) and the first gets an area; a `muted` series is the dashed previous period. Hover or arrow keys read a point. Empty data draws a flat baseline. |
@@ -49,7 +49,7 @@ Projects, Team, API keys, Forms, Extensions.
 
 Form, Script. One column, always: no side-by-side cards or sidebars.
 
-- `Page` (wide, so tables and editors fit) > `PageHeader` with the entity name as title and the project as eyebrow.
+- `Page` (wide, so tables and editors fit) > `PageHeader` with the entity name as title; the breadcrumb (`Project / Module / Entity`) comes on its own.
 - Header actions go through `DetailActions`: page-level buttons first, then Save, then the "..." menu with Delete last. Pages can't import `ActionsMenu` (ESLint), don't add their own buttons beside the group, and put no text label next to Save.
 - Facts in a `DescriptionList` under the header. Editable groups in `Card`s, data in `PageSection`s.
 - When the page edits the entity inline, one Save in the header (`DetailActions`' `save`) saves everything. Its label is the save state, so there is no separate status text.
@@ -68,7 +68,7 @@ Workspace settings, analytics settings.
 
 Analytics. A read-only page of numbers for a date range.
 
-- `Page` (wide) > `PageHeader` > `Tabs` when the feature has several pages > a toolbar row with the `DateRangePicker` and the page's toggles (compare) > `StatTiles` > `TimeSeriesChart` > `ReportGrid` of `PageSection`s, each holding a `BarList`.
+- `Page` (wide) > `PageHeader` (with `Tabs` in its `tabs` slot when the feature has several pages) > a toolbar row with the `DateRangePicker` and the page's toggles (compare) > `StatTiles` > `TimeSeriesChart` > `ReportGrid` of `PageSection`s, each holding a `BarList`.
 - The range lives in the URL query, so a link shares the exact view. Pass `today` to `DateRangePicker` from one place, in UTC.
 - Each panel loads and fails on its own: a panel shows its own skeleton or error alert, and the others still render.
 - A range with no data shows tiles at 0, a flat chart and "No data for this range" in each panel, not an empty-state card.

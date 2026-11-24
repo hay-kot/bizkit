@@ -71,3 +71,13 @@ export interface WebModule {
 export function defineWebModule(module: WebModule): WebModule {
   return module
 }
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    /**
+     * The sidebar entry a module route belongs to. `modules/index.ts` sets
+     * it, so page headers take their icon and breadcrumb from the module.
+     */
+    nav?: NavItem
+  }
+}

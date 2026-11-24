@@ -447,7 +447,7 @@ const columns = [
   <Page>
     <ErrorAlert v-if="broadcastError" :error="broadcastError" />
     <template v-else-if="broadcast">
-      <PageHeader :section="projectName" :title="broadcast.subject" :description="description">
+      <PageHeader :title="broadcast.subject" :description="description">
         <DetailActions
           :actions="actions"
           :save="

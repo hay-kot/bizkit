@@ -127,7 +127,6 @@ async function onSaveSettings() {
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       :title="endpoint?.name ?? 'Endpoint'"
       :description="
         endpoint && !endpoint.enabled

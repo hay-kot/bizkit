@@ -231,7 +231,6 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
 <template>
   <Page>
     <PageHeader
-      :section="projectName"
       :title="form?.name ?? 'Form'"
       :description="
         form && !form.enabled ? 'Disabled: submissions get a 404.' : 'Submissions from your site.'

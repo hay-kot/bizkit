@@ -314,7 +314,6 @@ function summaryOf(run: Run): string {
     <p v-if="scriptError" class="text-error">{{ errorMessage(scriptError) }}</p>
     <template v-else-if="script">
       <PageHeader
-        :section="projectName"
         :title="script.name"
         :description="
           hook
