@@ -26,7 +26,7 @@ test.describe('workspace pages', () => {
     await expectCleanPage(page, errors)
   })
 
-  const workspacePages = ['projects', 'team', 'api-keys', 'settings']
+  const workspacePages = ['projects', 'team', 'api-keys', 'settings', 'settings/email']
   const projectPages = [
     'forms',
     'webhooks',

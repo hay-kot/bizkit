@@ -1,4 +1,13 @@
-import { FolderKanban, KeyRound, LayoutGrid, LogOut, Plus, Settings, Users } from 'lucide-vue-next'
+import {
+  FolderKanban,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  Mail,
+  Plus,
+  Settings,
+  Users,
+} from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -6,7 +15,9 @@ import type { PaletteRow } from '@/palette/types'
 import { useSignOut } from '@/queries/auth'
 import { useProjects } from '@/queries/projects'
 
+import SettingsLayout from '@/components/workspace/SettingsLayout.vue'
 import ApiKeys from '@/pages/workspace/ApiKeys.vue'
+import WorkspaceEmail from '@/pages/workspace/Email.vue'
 import Projects from '@/pages/workspace/Projects.vue'
 import WorkspaceSettings from '@/pages/workspace/Settings.vue'
 import Team from '@/pages/workspace/Team.vue'
@@ -19,7 +30,14 @@ export default defineWebModule({
     { path: 'projects', component: Projects },
     { path: 'team', component: Team },
     { path: 'api-keys', component: ApiKeys },
-    { path: 'settings', component: WorkspaceSettings },
+    {
+      path: 'settings',
+      component: SettingsLayout,
+      children: [
+        { path: '', component: WorkspaceSettings },
+        { path: 'email', component: WorkspaceEmail },
+      ],
+    },
   ],
   nav: [
     { path: 'team', label: 'Team', icon: Users, section: 'workspace', order: 10 },
@@ -66,6 +84,21 @@ export default defineWebModule({
         keywords: ['create', 'add'],
         to: `/w/${cx.workspaceId}/projects?new=1`,
       },
+      ...(cx.isAdmin
+        ? [
+            {
+              id: 'settings:email',
+              title: 'Email settings',
+              group: 'Workspace',
+              order: 90,
+              icon: Mail,
+              kind: 'page',
+              scope: 'goto' as const,
+              keywords: ['mail', 'smtp', 'mailgun', 'sender', 'from address', 'reply-to'],
+              to: `/w/${cx.workspaceId}/settings/email`,
+            },
+          ]
+        : []),
       {
         id: 'workspaces:all',
         title: 'All workspaces',

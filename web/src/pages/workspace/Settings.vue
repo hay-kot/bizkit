@@ -5,9 +5,8 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import Card from '@/components/ui/Card.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Field from '@/components/ui/Field.vue'
-import Page from '@/components/ui/Page.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
+import TabPage from '@/components/ui/TabPage.vue'
 import { toast } from '@/lib/toast'
 import { useRenameWorkspace, useWorkspace } from '@/queries/workspaces'
 
@@ -27,8 +26,7 @@ async function onSave() {
 </script>
 
 <template>
-  <Page>
-    <PageHeader title="Settings" />
+  <TabPage title="Settings">
     <form @submit.prevent="onSave">
       <Card title="General" description="The name shows in the switcher and in invitation emails.">
         <Field label="Name" width="md">
@@ -71,5 +69,5 @@ async function onSave() {
         </template>
       </Card>
     </form>
-  </Page>
+  </TabPage>
 </template>

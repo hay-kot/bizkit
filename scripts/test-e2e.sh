@@ -74,6 +74,8 @@ server:
   listen: 127.0.0.1:$api_port
   base_url: $base_url
   data_dir: $workdir/data
+  # Seals workspace mail settings; the key is fresh for each run.
+  secrets_key_env: BIZKIT_SECRETS_KEY
   mail:
     from: "bizkit e2e <noreply@e2e.test>"
     smtp_url: smtp://127.0.0.1:$smtp_port
@@ -83,6 +85,9 @@ server:
         matches: ["*@signup.e2e.test"]
 YAML
 
+BIZKIT_SECRETS_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+export BIZKIT_SECRETS_KEY
+
 log "starting bizkit on $api_port"
 "$bin" --no-color --config "$workdir/bizkit.yaml" serve >"$workdir/bizkit.log" 2>&1 &
 server_pid=$!
@@ -90,6 +95,8 @@ wait_for bizkit "$base_url/healthz" "$server_pid"
 
 export BASE_URL="$base_url"
 export MAILPIT_URL="http://127.0.0.1:$mailpit_port"
+# Workspace mail settings in the suite point their SMTP host here.
+export MAILPIT_SMTP_PORT="$smtp_port"
 export E2E_SEED_CMD="$bin --config $workdir/bizkit.yaml dev"
 
 log "running playwright"

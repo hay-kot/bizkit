@@ -1,6 +1,7 @@
 import { type APIRequestContext, expect } from '@playwright/test'
 
 export const MAILPIT_URL = process.env.MAILPIT_URL ?? ''
+export const MAILPIT_SMTP_PORT = process.env.MAILPIT_SMTP_PORT ?? ''
 
 type Summary = { ID: string; To: { Address: string }[] | null }
 
