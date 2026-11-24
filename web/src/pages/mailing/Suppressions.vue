@@ -3,13 +3,11 @@ import { refDebounced } from '@vueuse/core'
 import { Ban, Download, Eraser, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 
-import MailingTabs from '@/components/mailing/MailingTabs.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
+import TabPage from '@/components/ui/TabPage.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
-import Page from '@/components/ui/Page.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
 import Select from '@/components/ui/Select.vue'
 import { useCreateIntent } from '@/composables/useCreateIntent'
@@ -139,12 +137,8 @@ function onRemove(row: Suppression) {
 </script>
 
 <template>
-  <Page>
-    <PageHeader
-      :section="projectName"
-      title="Mailing"
-      description="Lists people subscribe to, and the mail you send them."
-    >
+  <TabPage title="Mailing" description="Lists people subscribe to, and the mail you send them.">
+    <template #actions>
       <div v-if="isAdmin" class="flex flex-wrap gap-2">
         <button type="button" class="btn gap-1.5 btn-ghost btn-sm" @click="openAddress('export')">
           <Download class="size-4" aria-hidden="true" />Export address
@@ -156,9 +150,7 @@ function onRemove(row: Suppression) {
           <Plus class="size-4" aria-hidden="true" />Suppress address
         </button>
       </div>
-    </PageHeader>
-
-    <MailingTabs :workspace-id="workspaceId" :project-id="projectId" />
+    </template>
 
     <PageSection title="Suppressions">
       <template #description>
@@ -261,5 +253,5 @@ function onRemove(row: Suppression) {
         <input v-model="address" type="email" name="address-email" required class="input w-full" />
       </Field>
     </FormPanel>
-  </Page>
+  </TabPage>
 </template>

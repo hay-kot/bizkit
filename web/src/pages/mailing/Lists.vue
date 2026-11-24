@@ -3,13 +3,11 @@ import { Mail, Plus } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import MailingTabs from '@/components/mailing/MailingTabs.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
+import TabPage from '@/components/ui/TabPage.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
-import Page from '@/components/ui/Page.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import { useCreateIntent } from '@/composables/useCreateIntent'
 import { useIsAdmin } from '@/composables/useIsAdmin'
 import { formatDate } from '@/lib/format'
@@ -69,12 +67,8 @@ async function onCreate() {
 </script>
 
 <template>
-  <Page>
-    <PageHeader
-      :section="projectName"
-      title="Mailing"
-      description="Lists people subscribe to, and the mail you send them."
-    >
+  <TabPage title="Mailing" description="Lists people subscribe to, and the mail you send them.">
+    <template #actions>
       <button
         v-if="isAdmin"
         type="button"
@@ -83,9 +77,7 @@ async function onCreate() {
       >
         <Plus class="size-4" aria-hidden="true" />New list
       </button>
-    </PageHeader>
-
-    <MailingTabs :workspace-id="workspaceId" :project-id="projectId" />
+    </template>
 
     <DataTable
       :columns="columns"
@@ -145,5 +137,5 @@ async function onCreate() {
         Addresses from forms always confirm, whatever this says.
       </p>
     </FormPanel>
-  </Page>
+  </TabPage>
 </template>

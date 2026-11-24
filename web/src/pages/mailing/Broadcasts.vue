@@ -3,13 +3,11 @@ import { Plus, Send } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import MailingTabs from '@/components/mailing/MailingTabs.vue'
 import StatusBadge from '@/components/mailing/StatusBadge.vue'
+import TabPage from '@/components/ui/TabPage.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
-import Page from '@/components/ui/Page.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import Select from '@/components/ui/Select.vue'
 import { useCreateIntent } from '@/composables/useCreateIntent'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -76,18 +74,12 @@ async function onCreate() {
 </script>
 
 <template>
-  <Page>
-    <PageHeader
-      :section="projectName"
-      title="Mailing"
-      description="Lists people subscribe to, and the mail you send them."
-    >
+  <TabPage title="Mailing" description="Lists people subscribe to, and the mail you send them.">
+    <template #actions>
       <button type="button" class="btn gap-1.5 btn-primary btn-sm" @click="openPanel">
         <Plus class="size-4" aria-hidden="true" />New broadcast
       </button>
-    </PageHeader>
-
-    <MailingTabs :workspace-id="workspaceId" :project-id="projectId" />
+    </template>
 
     <DataTable
       :columns="columns"
@@ -150,5 +142,5 @@ async function onCreate() {
         <input v-model="subject" name="broadcast-subject" required class="input w-full" />
       </Field>
     </FormPanel>
-  </Page>
+  </TabPage>
 </template>

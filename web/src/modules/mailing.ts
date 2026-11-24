@@ -1,6 +1,7 @@
 import { Ban, ListOrdered, Mail, Plus } from 'lucide-vue-next'
 import { computed } from 'vue'
 
+import MailingLayout from '@/components/mailing/MailingLayout.vue'
 import MailingSection from '@/components/mailing/MailingSection.vue'
 import Broadcast from '@/pages/mailing/Broadcast.vue'
 import Broadcasts from '@/pages/mailing/Broadcasts.vue'
@@ -16,13 +17,20 @@ import { defineWebModule } from './types'
 export default defineWebModule({
   name: 'mailing',
   projectRoutes: [
-    { path: 'mailing', component: Lists },
+    {
+      path: 'mailing',
+      component: MailingLayout,
+      children: [
+        { path: '', component: Lists },
+        { path: 'broadcasts', component: Broadcasts },
+        { path: 'sequences', component: Sequences },
+        { path: 'suppressions', component: Suppressions },
+      ],
+    },
+    // Detail pages have their own header and no tabs.
     { path: 'mailing/lists/:listId', component: List },
-    { path: 'mailing/broadcasts', component: Broadcasts },
     { path: 'mailing/broadcasts/:broadcastId', component: Broadcast },
-    { path: 'mailing/sequences', component: Sequences },
     { path: 'mailing/sequences/:sequenceId', component: Sequence },
-    { path: 'mailing/suppressions', component: Suppressions },
   ],
   nav: [{ path: 'mailing', label: 'Mailing', icon: Mail, section: 'project', order: 103 }],
   entitySections: [{ key: 'mailing', component: MailingSection }],
