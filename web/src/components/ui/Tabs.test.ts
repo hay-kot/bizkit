@@ -6,7 +6,7 @@ import Tabs from './Tabs.vue'
 
 const tabs = [
   { label: 'Overview', to: '/a', exact: true },
-  { label: 'Funnels', to: '/a/funnels' },
+  { label: 'Funnels', to: '/a/funnels', also: ['/a/boards'] },
   { label: 'Settings', to: '/a/settings' },
 ]
 
@@ -41,6 +41,11 @@ describe('Tabs', () => {
 
   it('keeps a tab active on paths under it, but not an exact one', async () => {
     const { wrapper } = await mountAt('/a/funnels/42')
+    expect(current(wrapper)).toEqual(['Funnels'])
+  })
+
+  it('keeps a tab active on its extra paths', async () => {
+    const { wrapper } = await mountAt('/a/boards/7')
     expect(current(wrapper)).toEqual(['Funnels'])
   })
 

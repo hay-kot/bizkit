@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  canZoomOut,
+  MAX_RANGE_DAYS,
   addDays,
   msToNextUtcDay,
   presetRange,
@@ -171,6 +173,16 @@ describe('range', () => {
       expect(rangeLength(zoomed)).toBe(14)
       const nearEnd = zoomOut({ from: '2026-03-11', to: '2026-03-14' }, today)
       expect(nearEnd).toEqual({ preset: 'custom', from: '2026-03-08', to: today })
+    })
+
+    it('stops at the API limit', () => {
+      const long = { from: '2025-03-07', to: '2025-12-31' }
+      expect(canZoomOut(long)).toBe(true)
+      const wide = zoomOut(long, today)
+      expect(wide).toEqual({ preset: 'custom', from: '2025-01-16', to: '2026-02-19' })
+      expect(rangeLength(wide)).toBe(MAX_RANGE_DAYS)
+      expect(canZoomOut(wide)).toBe(false)
+      expect(zoomOut(wide, today)).toEqual(wide)
     })
 
     it('crosses a year boundary', () => {

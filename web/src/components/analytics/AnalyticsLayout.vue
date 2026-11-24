@@ -15,8 +15,7 @@ const tabs = computed(() => {
   return [
     { label: 'Overview', to: base, exact: true },
     { label: 'Events', to: `${base}/events` },
-    { label: 'Insights', to: `${base}/insights` },
-    { label: 'Dashboards', to: `${base}/dashboards` },
+    { label: 'Insights', to: `${base}/insights`, also: [`${base}/dashboards`] },
     { label: 'Funnels', to: `${base}/funnels` },
     { label: 'People', to: `${base}/people` },
     { label: 'Retention', to: `${base}/retention` },

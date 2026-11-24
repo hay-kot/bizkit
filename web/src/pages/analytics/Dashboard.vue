@@ -119,7 +119,7 @@ function onDelete() {
     },
     success: `Deleted ${label}`,
   }).then(async (deleted) => {
-    if (deleted) await router.push(`${base.value}/dashboards`)
+    if (deleted) await router.push(`${base.value}/insights`)
   })
 }
 </script>

@@ -77,6 +77,29 @@ describe('TimeRangePicker', () => {
     ])
   })
 
+  it('disables Zoom out at the API limit', () => {
+    mountPicker({ preset: 'custom', from: '2025-02-09', to: today })
+    expect(button('Zoom out').disabled).toBe(true)
+  })
+
+  it('refuses an absolute range longer than the API allows', async () => {
+    const picker = mountPicker({ preset: '30d', from: '2026-02-14', to: today })
+    await openPanel(picker)
+    const from = document.querySelector<HTMLInputElement>('input[type="date"]')!
+    from.value = '2025-02-08'
+    from.dispatchEvent(new Event('input'))
+    await picker.vm.$nextTick()
+    expect(document.querySelector('[role="alert"]')?.textContent?.trim()).toBe(
+      'Pick 400 days at most.',
+    )
+    expect(button('Apply').disabled).toBe(true)
+
+    from.value = '2025-02-09'
+    from.dispatchEvent(new Event('input'))
+    await picker.vm.$nextTick()
+    expect(button('Apply').disabled).toBe(false)
+  })
+
   it('picks a quick range, marks the active one and returns focus', async () => {
     const picker = mountPicker({ preset: '30d', from: '2026-02-14', to: today })
     await openPanel(picker)
@@ -157,5 +180,18 @@ describe('TimeRangePicker', () => {
     await picker.vm.$nextTick()
     expect(document.querySelector('[role="alert"]')?.textContent?.trim()).toBe('Pick both days.')
     expect(button('Apply').disabled).toBe(true)
+  })
+
+  it('hides a stale error when the range changes while open', async () => {
+    const picker = mountPicker({ preset: '7d', from: '2026-03-09', to: today })
+    await openPanel(picker)
+    const from = document.querySelector<HTMLInputElement>('input[type="date"]')!
+    from.value = ''
+    from.dispatchEvent(new Event('input'))
+    await picker.vm.$nextTick()
+    expect(document.querySelector('[role="alert"]')).not.toBeNull()
+
+    await picker.setProps({ range: { preset: 'custom', from: '2026-03-02', to: '2026-03-08' } })
+    expect(document.querySelector('[role="alert"]')).toBeNull()
   })
 })

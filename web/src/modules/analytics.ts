@@ -3,7 +3,6 @@ import { computed } from 'vue'
 
 import AnalyticsLayout from '@/components/analytics/AnalyticsLayout.vue'
 import Dashboard from '@/pages/analytics/Dashboard.vue'
-import Dashboards from '@/pages/analytics/Dashboards.vue'
 import Events from '@/pages/analytics/Events.vue'
 import Funnel from '@/pages/analytics/Funnel.vue'
 import Funnels from '@/pages/analytics/Funnels.vue'
@@ -34,7 +33,6 @@ export default defineWebModule({
         { path: 'insights', component: Insights },
         { path: 'insights/new', component: NewInsight },
         { path: 'insights/:insightId', component: Insight },
-        { path: 'dashboards', component: Dashboards },
         { path: 'dashboards/:dashboardId', component: Dashboard },
         { path: 'funnels', component: Funnels },
         { path: 'funnels/:funnelId', component: Funnel },
@@ -55,7 +53,7 @@ export default defineWebModule({
     const { data: goals } = useGoals(cx.workspaceId, cx.projectId)
     const { data: insights } = useInsights(cx.workspaceId, cx.projectId)
     const { data: dashboards } = useDashboards(cx.workspaceId, cx.projectId)
-    const page = (path: string, title: string): PaletteRow => ({
+    const page = (path: string, title: string, keywords: string[] = []): PaletteRow => ({
       id: `page:analytics:${path}`,
       title,
       group: 'Analytics',
@@ -63,13 +61,12 @@ export default defineWebModule({
       icon: ChartLine,
       kind: 'page',
       scope: 'goto',
-      keywords: ['go to', 'open', 'analytics'],
+      keywords: ['go to', 'open', 'analytics', ...keywords],
       to: `${base}/${path}`,
     })
     return computed((): PaletteRow[] => [
       page('events', 'Events'),
-      page('insights', 'Insights'),
-      page('dashboards', 'Dashboards'),
+      page('insights', 'Insights', ['dashboards']),
       page('funnels', 'Funnels'),
       page('people', 'People'),
       page('retention', 'Retention'),
@@ -92,7 +89,7 @@ export default defineWebModule({
         icon: Plus,
         kind: 'action',
         keywords: ['create', 'add', 'dashboard', 'analytics'],
-        to: `${base}/dashboards?new=1`,
+        to: `${base}/insights?new=1`,
       },
       {
         id: 'analytics:new-funnel',

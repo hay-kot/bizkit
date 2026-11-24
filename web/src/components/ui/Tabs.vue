@@ -6,6 +6,8 @@ export interface Tab {
   to: RouteLocationRaw
   /** Active only on this exact path, for a tab whose path prefixes the others. */
   exact?: boolean
+  /** More paths that keep the tab active, for pages that live under it elsewhere. */
+  also?: string[]
 }
 
 /**
@@ -19,9 +21,12 @@ const route = useRoute()
 const router = useRouter()
 
 function isActive(tab: Tab): boolean {
-  const path = router.resolve(tab.to).path.replace(/\/$/, '')
   const current = route.path.replace(/\/$/, '')
-  return current === path || (!tab.exact && current.startsWith(`${path}/`))
+  const matches = (to: RouteLocationRaw, exact = false) => {
+    const path = router.resolve(to).path.replace(/\/$/, '')
+    return current === path || (!exact && current.startsWith(`${path}/`))
+  }
+  return matches(tab.to, tab.exact) || (tab.also ?? []).some((path) => matches(path))
 }
 </script>
 

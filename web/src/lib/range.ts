@@ -58,6 +58,13 @@ export function savedPreset(preset: RangePreset): SavedPreset | undefined {
 
 const DAY_MS = 86_400_000
 
+/**
+ * The most days a range may cover, counting both ends. The analytics API
+ * refuses longer ranges (`MAX_RANGE_DAYS` in `crates/bizkit-analytics/src/stats.rs`
+ * rejects `to` 400 or more days after `from`); keep the two in step.
+ */
+export const MAX_RANGE_DAYS = 400
+
 function toTime(day: string): number {
   return Date.parse(`${day}T00:00:00Z`)
 }
@@ -127,15 +134,21 @@ export function shiftRange(range: DayRange, direction: -1 | 1, today: string): D
 }
 
 /**
- * Twice the days of `range`, centered on it, like Grafana's zoom out. The
- * extra odd day goes before it, so one day ending today widens to two days
- * ending today. When the end would pass `today`, the range moves back to
- * end today and keeps its doubled length.
+ * Twice the days of `range`, centered on it, like Grafana's zoom out, but
+ * never more than `MAX_RANGE_DAYS`. The extra odd day goes before it, so one
+ * day ending today widens to two days ending today. When the end would pass
+ * `today`, the range moves back to end today and keeps its new length.
  */
 export function zoomOut(range: DayRange, today: string): DateRange {
   const length = rangeLength(range)
-  const to = minDay(addDays(range.to, Math.floor(length / 2)), today)
-  return { preset: 'custom', from: addDays(to, 1 - 2 * length), to }
+  const zoomed = Math.min(2 * length, MAX_RANGE_DAYS)
+  const to = minDay(addDays(range.to, Math.floor((zoomed - length) / 2)), today)
+  return { preset: 'custom', from: addDays(to, 1 - zoomed), to }
+}
+
+/** False once `range` covers `MAX_RANGE_DAYS`, so zooming out would add nothing. */
+export function canZoomOut(range: DayRange): boolean {
+  return rangeLength(range) < MAX_RANGE_DAYS
 }
 
 function minDay(a: string, b: string): string {

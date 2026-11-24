@@ -135,7 +135,6 @@ test.describe('workspace pages', () => {
     '/events',
     '/insights',
     '/insights/new',
-    '/dashboards',
     '/funnels',
     '/people',
     '/retention',
