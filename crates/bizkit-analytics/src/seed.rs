@@ -418,17 +418,20 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
         }
         ensure_demo_site(db, seed, project_id).await.context("adding the demo site")?;
         let goals = store::list_goals(db.read(), seed.workspace_id, project_id).await?;
-        let file = open_empty(seed, project_id).await?;
-        if let Some(file) = &file {
-            website_events(file, seed, project_id, &goals)
-                .await
-                .context("seeding website events")?;
-            mark_events(db, file, seed, project_id).await?;
+        if let Some(file) = open_empty(seed, project_id).await? {
+            let filled = async {
+                website_events(&file, seed, project_id, &goals)
+                    .await
+                    .context("seeding website events")?;
+                mark_events(db, &file, seed, project_id).await
+            }
+            .await;
+            file.close().await;
+            filled?;
         }
         if let Some(goal) = goals.into_iter().find(|goal| goal.name == SIGNUP_GOAL) {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
         }
-        close(file).await;
     }
     if let Some(&project_id) = seed.project_ids.get("docs") {
         if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
@@ -437,12 +440,15 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
             store::insert_site(&mut *tx, &row).await.context("seeding the docs site")?;
             tx.commit().await?;
         }
-        let file = open_empty(seed, project_id).await?;
-        if let Some(file) = &file {
-            docs_events(file, seed, project_id).await.context("seeding docs events")?;
-            mark_events(db, file, seed, project_id).await?;
+        if let Some(file) = open_empty(seed, project_id).await? {
+            let filled = async {
+                docs_events(&file, seed, project_id).await.context("seeding docs events")?;
+                mark_events(db, &file, seed, project_id).await
+            }
+            .await;
+            file.close().await;
+            filled?;
         }
-        close(file).await;
     }
     Ok(())
 }
@@ -559,12 +565,6 @@ async fn open_empty(seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<Op
         return Ok(None);
     }
     Ok(Some(file))
-}
-
-async fn close(file: Option<ProjectDb>) {
-    if let Some(file) = file {
-        file.close().await;
-    }
 }
 
 async fn website_app_rows(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {

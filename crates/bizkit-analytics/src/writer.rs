@@ -10,8 +10,9 @@
 //! one window of queued events; a clean shutdown loses none.
 //!
 //! The app transaction runs in its own task, with its retries, so a busy
-//! app database never stops the queue from draining. An asked-for flush
-//! and stop wait for every one still running.
+//! app database never stops the queue from draining. One runs at a time,
+//! in flush order; what later flushes owe meanwhile merges into the next
+//! one. An asked-for flush and stop wait until nothing is owed.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,7 +21,7 @@ use anyhow::Context as _;
 use bizkit_core::Platform;
 use bizkit_core::jobs::Enqueue;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
-use tokio::task::{JoinHandle, JoinSet};
+use tokio::task::JoinHandle;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 
 use crate::cache::{CachedSite, Sites};
@@ -35,10 +36,6 @@ pub(crate) const FLUSH_EVENTS: usize = 1_000;
 /// Waits between attempts at a flush's app transaction.
 const SIDE_EFFECT_RETRIES: [Duration; 3] =
     [Duration::from_millis(100), Duration::from_millis(500), Duration::from_secs(2)];
-/// App transactions in flight at once; the next flush waits for one to end.
-const SIDE_EFFECT_TASKS: usize = 4;
-
-type Effects = JoinSet<anyhow::Result<()>>;
 
 /// One request's events and the queue room they hold until they commit.
 #[derive(Debug)]
@@ -97,7 +94,9 @@ impl WriterHandle {
             .map_err(|_| Submit::Failed(anyhow::anyhow!("the writer stopped")))
     }
 
-    /// Asks for a flush now. The future resolves after its side effects.
+    /// Asks for a flush now. The future resolves after its side effects and
+    /// fails only when the events failed to store; side-effect failures are
+    /// logged.
     pub(crate) fn flush(&self) -> impl Future<Output = anyhow::Result<()>> + use<> {
         let (answer, done) = oneshot::channel();
         let sent = self.tx.send(Msg::Flush(answer));
@@ -136,7 +135,7 @@ impl Writer {
     async fn run(self, mut rx: mpsc::UnboundedReceiver<Msg>, flush: Option<Duration>) {
         let mut pending: Vec<Queued> = Vec::new();
         let mut count = 0;
-        let mut effects = Effects::new();
+        let mut effects = Effects::default();
         // `interval` would tick at once; the first flush is one window out.
         let mut tick = flush.map(|window| {
             let mut tick = tokio::time::interval_at(Instant::now() + window, window);
@@ -150,8 +149,8 @@ impl Writer {
                     self.flush(&mut pending, &mut count, &mut effects).await.unwrap_or_default();
                     continue;
                 }
-                Some(done) = effects.join_next(), if !effects.is_empty() => {
-                    reaped(done).unwrap_or_default();
+                () = effects.finished() => {
+                    effects.start(&self.platform, &self.sites);
                     continue;
                 }
             };
@@ -170,12 +169,12 @@ impl Writer {
                 }
                 Some(Msg::Flush(answer)) => {
                     let result = self.flush(&mut pending, &mut count, &mut effects).await;
-                    let settled = settle(&mut effects).await;
-                    answer.send(result.and(settled)).unwrap_or_default();
+                    effects.settle(&self.platform, &self.sites).await;
+                    answer.send(result).unwrap_or_default();
                 }
                 Some(Msg::Stop(answer)) => {
                     self.flush(&mut pending, &mut count, &mut effects).await.unwrap_or_default();
-                    settle(&mut effects).await.unwrap_or_default();
+                    effects.settle(&self.platform, &self.sites).await;
                     answer.send(()).unwrap_or_default();
                     return;
                 }
@@ -183,10 +182,10 @@ impl Writer {
             }
         }
         self.flush(&mut pending, &mut count, &mut effects).await.unwrap_or_default();
-        settle(&mut effects).await.unwrap_or_default();
+        effects.settle(&self.platform, &self.sites).await;
     }
 
-    /// Commits `pending` and starts its side effects in `effects`. Failures
+    /// Commits `pending` and owes its side effects to `effects`. Failures
     /// are logged here; the result is for callers that asked for the flush.
     async fn flush(
         &self,
@@ -212,19 +211,8 @@ impl Writer {
             Ok(flushed) => (flushed, Ok(())),
             Err((flushed, err)) => (flushed, Err(err)),
         };
-        if owes_app(&site, &flushed) {
-            while effects.len() >= SIDE_EFFECT_TASKS {
-                if let Some(done) = effects.join_next().await {
-                    reaped(done).unwrap_or_default();
-                }
-            }
-            effects.spawn(side_effects(
-                self.platform.clone(),
-                Arc::clone(&self.sites),
-                site,
-                flushed,
-            ));
-        }
+        effects.owe(site, flushed);
+        effects.start(&self.platform, &self.sites);
         result
     }
 
@@ -343,23 +331,64 @@ async fn app_write(
     Ok(())
 }
 
-/// Waits for every side-effect task and returns the first failure.
-async fn settle(effects: &mut Effects) -> anyhow::Result<()> {
-    let mut first_err = None;
-    while let Some(done) = effects.join_next().await {
-        if let Err(err) = reaped(done) {
-            first_err.get_or_insert(err);
-        }
-    }
-    first_err.map_or(Ok(()), Err)
+/// A writer's side effects: at most one app transaction running, and what
+/// flushes owed since it started, merged.
+#[derive(Debug, Default)]
+struct Effects {
+    running: Option<JoinHandle<anyhow::Result<()>>>,
+    owed: Option<(Arc<CachedSite>, Flushed)>,
 }
 
-/// A finished side-effect task's result. The task logged its own failure.
-fn reaped(done: Result<anyhow::Result<()>, tokio::task::JoinError>) -> anyhow::Result<()> {
-    done.unwrap_or_else(|err| {
-        tracing::error!(error = %err, "an analytics side-effect task panicked");
-        Err(anyhow::anyhow!("a side-effect task panicked: {err}"))
-    })
+impl Effects {
+    fn owe(&mut self, site: Arc<CachedSite>, flushed: Flushed) {
+        if flushed.latest_day.is_none() && flushed.conversions.is_empty() {
+            return;
+        }
+        match &mut self.owed {
+            Some((owed_site, owed)) => {
+                *owed_site = site;
+                owed.latest_day = owed.latest_day.take().max(flushed.latest_day);
+                owed.conversions.extend(flushed.conversions);
+            }
+            None => self.owed = Some((site, flushed)),
+        }
+    }
+
+    /// Starts what is owed unless a transaction is already running.
+    fn start(&mut self, platform: &Platform, sites: &Arc<Sites>) {
+        if self.running.is_some() {
+            return;
+        }
+        let Some((site, flushed)) = self.owed.take() else { return };
+        if owes_app(&site, &flushed) {
+            let task = side_effects(platform.clone(), Arc::clone(sites), site, flushed);
+            self.running = Some(tokio::spawn(task));
+        }
+    }
+
+    /// Resolves when the running transaction ends, never when none runs.
+    /// The task logged its own failure.
+    async fn finished(&mut self) {
+        let Some(running) = self.running.as_mut() else {
+            return std::future::pending().await;
+        };
+        let ended = running.await;
+        self.running = None;
+        if let Err(err) = ended {
+            tracing::error!(error = %err, "an analytics side-effect task panicked");
+        }
+    }
+
+    /// Runs everything owed to the end.
+    async fn settle(&mut self, platform: &Platform, sites: &Arc<Sites>) {
+        loop {
+            self.start(platform, sites);
+            if self.running.is_none() {
+                return;
+            }
+            self.finished().await;
+        }
+    }
 }
 
 async fn next_tick(tick: Option<&mut Interval>) {

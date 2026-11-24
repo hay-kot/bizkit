@@ -552,6 +552,8 @@ mod ingest {
         false
     }
 
+    /// Builds with the flush timer, unlike the other tests: what it checks
+    /// is that timer flushes go on while the app database is busy.
     #[tokio::test]
     async fn a_busy_app_database_does_not_hold_up_ingest() {
         let s = setup_with(Analytics::default(), "cookieless").await;
@@ -575,6 +577,9 @@ mod ingest {
 
         drop(busy);
         s.app.flush().await;
+        s.app.drain_jobs().await;
+        let points: Vec<_> = s.hooks.dispatches().iter().map(|dispatch| dispatch.point).collect();
+        assert_eq!(points, [GOAL_CONVERTED.id], "the owed conversion lands once the app is free");
         file.close().await;
     }
 }

@@ -205,11 +205,25 @@ enum Unopened {
     Failed(anyhow::Error),
 }
 
+/// Held by a file's stop task until the file is closed. Whoever needs that
+/// project's file waits on it, so two writers never share one file.
+type Gate = Arc<Mutex<()>>;
+
+/// What [`Files`] guards with its one lock.
+#[derive(Debug, Default)]
+struct Open {
+    slots: HashMap<ProjectId, Arc<Slot>>,
+    /// Files a sweep is closing.
+    closing: HashMap<ProjectId, Gate>,
+    /// Set by `stop_all`: nothing opens after it.
+    stopped: bool,
+}
+
 /// Every open project file. A file nobody has asked for in [`FILE_IDLE`]
 /// is closed by the next sweep and opens again on its next use.
 #[derive(Debug)]
 pub(crate) struct Files {
-    open: Mutex<HashMap<ProjectId, Arc<Slot>>>,
+    open: Mutex<Open>,
     sites: Arc<Sites>,
     flush: Duration,
     limits: Limits,
@@ -222,7 +236,7 @@ pub(crate) struct Files {
 impl Files {
     pub(crate) fn new(sites: Arc<Sites>, flush: Duration, limits: Limits) -> Self {
         Self {
-            open: Mutex::new(HashMap::new()),
+            open: Mutex::new(Open::default()),
             sites,
             flush,
             limits,
@@ -242,29 +256,37 @@ impl Files {
     ///
     /// The map lock covers only finding the slot. Checking the site and
     /// opening the file (with its migrations) run on the project's own
-    /// cell, so a slow open holds up only that project.
+    /// cell, so a slow open holds up only that project. A file a sweep is
+    /// closing is waited for first.
     pub(crate) async fn get(
         &self,
         platform: &Platform,
         scope: Scope,
     ) -> anyhow::Result<Option<Arc<ProjectFile>>> {
-        let now = self.clock();
-        let (slot, idle) = {
+        let project_id = scope.project_id;
+        let slot = loop {
             let mut open = self.open.lock().await;
-            let slot = Arc::clone(open.entry(scope.project_id).or_default());
+            anyhow::ensure!(!open.stopped, "analytics is stopping");
+            if let Some(gate) = open.closing.get(&project_id).cloned() {
+                if gate.try_lock().is_err() {
+                    drop(open);
+                    drop(gate.lock().await);
+                    continue;
+                }
+                open.closing.remove(&project_id);
+            }
+            let now = self.clock();
+            let slot = Arc::clone(open.slots.entry(project_id).or_default());
             slot.used.store(now, Ordering::Relaxed);
-            let idle = self.sweep(&mut open, now);
+            self.sweep(&mut open, now).await;
             drop(open);
-            (slot, idle)
+            break slot;
         };
-        for file in idle {
-            file.stop().await;
-        }
         let opened = slot.file.get_or_try_init(|| open_file(platform, scope)).await.cloned();
         match opened {
             Ok(file) => Ok(Some(file)),
             Err(unopened) => {
-                self.forget(scope.project_id, &slot).await;
+                self.forget(project_id, &slot).await;
                 match unopened {
                     Unopened::NoSite => Ok(None),
                     Unopened::Failed(err) => Err(err),
@@ -273,30 +295,35 @@ impl Files {
         }
     }
 
-    /// Takes the idle files out of `open`, at most once per [`SWEEP_EVERY`].
-    fn sweep(&self, open: &mut HashMap<ProjectId, Arc<Slot>>, now: u64) -> Vec<Arc<ProjectFile>> {
+    /// At most once per [`SWEEP_EVERY`], moves the idle files to `closing`
+    /// and stops each in its own task, so the caller doesn't wait for them.
+    async fn sweep(&self, open: &mut Open, now: u64) {
         let last = self.swept.load(Ordering::Relaxed);
         if now.saturating_sub(last) < millis(SWEEP_EVERY) {
-            return Vec::new();
+            return;
         }
         self.swept.store(now, Ordering::Relaxed);
-        take_idle(open, now)
+        open.closing.retain(|_, gate| gate.try_lock().is_err());
+        for (project_id, file) in take_idle(&mut open.slots, now) {
+            let gate = Gate::default();
+            let closed = Arc::clone(&gate).lock_owned().await;
+            open.closing.insert(project_id, gate);
+            tokio::spawn(async move {
+                file.stop().await;
+                drop(closed);
+            });
+        }
     }
 
     /// Drops a slot whose open failed or found no site, unless another
     /// caller is still waiting on it and may open it yet.
     async fn forget(&self, project_id: ProjectId, slot: &Arc<Slot>) {
         let mut open = self.open.lock().await;
-        let ours = open.get(&project_id).is_some_and(|held| Arc::ptr_eq(held, slot));
+        let ours = open.slots.get(&project_id).is_some_and(|held| Arc::ptr_eq(held, slot));
         // The map and this caller: nobody else can still fill the cell.
         if ours && slot.file.get().is_none() && Arc::strong_count(slot) == 2 {
-            open.remove(&project_id);
+            open.slots.remove(&project_id);
         }
-    }
-
-    /// Every file open now.
-    async fn files(&self) -> Vec<Arc<ProjectFile>> {
-        self.open.lock().await.values().filter_map(|slot| slot.file.get().cloned()).collect()
     }
 
     /// The project's file for an operation that already checked the site;
@@ -342,13 +369,24 @@ impl Files {
         submitted
     }
 
-    /// Writes everything queued in every file, side effects included.
+    /// Writes everything queued in every file, side effects included, and
+    /// waits for files being opened or closed.
     pub(crate) async fn flush_all(&self) -> anyhow::Result<()> {
+        let (slots, gates) = {
+            let open = self.open.lock().await;
+            let slots: Vec<Arc<Slot>> = open.slots.values().cloned().collect();
+            (slots, open.closing.values().cloned().collect::<Vec<Gate>>())
+        };
         let mut first_err = None;
-        for file in self.files().await {
-            if let Err(err) = file.flush().await {
+        for slot in slots {
+            if let Some(file) = opened(&slot).await
+                && let Err(err) = file.flush().await
+            {
                 first_err.get_or_insert(err);
             }
+        }
+        for gate in gates {
+            drop(gate.lock().await);
         }
         first_err.map_or(Ok(()), Err)
     }
@@ -360,15 +398,17 @@ impl Files {
         data_dir: &Path,
         project_id: ProjectId,
     ) -> anyhow::Result<()> {
-        let slot = self.open.lock().await.remove(&project_id);
-        if let Some(slot) = slot {
-            // Waits for an open in progress and opens nothing itself: the
-            // init fails at once when no open is running.
-            let opened =
-                slot.file.get_or_try_init(|| async { Err::<_, Unopened>(Unopened::NoSite) }).await;
-            if let Ok(file) = opened {
-                file.stop().await;
-            }
+        let (slot, gate) = {
+            let mut open = self.open.lock().await;
+            (open.slots.remove(&project_id), open.closing.get(&project_id).cloned())
+        };
+        if let Some(gate) = gate {
+            drop(gate.lock().await);
+        }
+        if let Some(slot) = slot
+            && let Some(file) = opened(&slot).await
+        {
+            file.stop().await;
         }
         let path = project_db_path(data_dir, project_id);
         for suffix in ["", "-wal", "-shm"] {
@@ -387,15 +427,30 @@ impl Files {
         Ok(())
     }
 
-    /// Flushes and stops every writer and closes every file.
+    /// Flushes and stops every writer and closes every file, including
+    /// files being opened or closed. Later gets fail.
     pub(crate) async fn stop_all(&self) {
-        let slots: Vec<Arc<Slot>> = self.open.lock().await.drain().map(|(_, slot)| slot).collect();
+        let (slots, gates) = {
+            let mut open = self.open.lock().await;
+            open.stopped = true;
+            let slots: Vec<Arc<Slot>> = open.slots.drain().map(|(_, slot)| slot).collect();
+            (slots, open.closing.drain().map(|(_, gate)| gate).collect::<Vec<Gate>>())
+        };
         for slot in slots {
-            if let Some(file) = slot.file.get() {
+            if let Some(file) = opened(&slot).await {
                 file.stop().await;
             }
         }
+        for gate in gates {
+            drop(gate.lock().await);
+        }
     }
+}
+
+/// The slot's file, after waiting for an open in progress. Opens nothing
+/// itself: the init fails at once when no open is running.
+async fn opened(slot: &Slot) -> Option<Arc<ProjectFile>> {
+    slot.file.get_or_try_init(|| async { Err::<_, Unopened>(Unopened::NoSite) }).await.ok().cloned()
 }
 
 /// Checks for the project's site, then opens its file.
@@ -423,9 +478,12 @@ async fn open_file(platform: &Platform, scope: Scope) -> Result<Arc<ProjectFile>
 /// [`FILE_IDLE`] or more before `now`, and returns their files to stop.
 /// Callers hold the map lock, and new holders clone only under it, so a
 /// count of one can't change before the slot is gone.
-fn take_idle(open: &mut HashMap<ProjectId, Arc<Slot>>, now: u64) -> Vec<Arc<ProjectFile>> {
+fn take_idle(
+    slots: &mut HashMap<ProjectId, Arc<Slot>>,
+    now: u64,
+) -> Vec<(ProjectId, Arc<ProjectFile>)> {
     let mut idle = Vec::new();
-    open.retain(|_, slot| {
+    slots.retain(|project_id, slot| {
         let unused = now.saturating_sub(slot.used.load(Ordering::Relaxed)) >= millis(FILE_IDLE);
         if !unused || Arc::strong_count(slot) > 1 {
             return true;
@@ -433,7 +491,7 @@ fn take_idle(open: &mut HashMap<ProjectId, Arc<Slot>>, now: u64) -> Vec<Arc<Proj
         match slot.file.get() {
             Some(file) if Arc::strong_count(file) > 1 => true,
             Some(file) => {
-                idle.push(Arc::clone(file));
+                idle.push((*project_id, Arc::clone(file)));
                 false
             }
             None => false,
@@ -459,6 +517,10 @@ mod tests {
         Arc::new(Slot { file: OnceCell::new_with(file), used: AtomicU64::new(used) })
     }
 
+    fn files() -> Files {
+        Files::new(Arc::default(), Duration::from_millis(100), Limits::default())
+    }
+
     #[tokio::test]
     async fn only_idle_unshared_files_are_taken() {
         let dir = tempfile::tempdir().unwrap();
@@ -466,7 +528,7 @@ mod tests {
         let [idle, recent, held, waited, empty] = std::array::from_fn(|_| ProjectId::new());
         let held_file = file(dir.path(), "held").await;
         let waited_slot = slot(Some(file(dir.path(), "waited").await), 0);
-        let mut open = HashMap::from([
+        let mut slots = HashMap::from([
             (idle, slot(Some(file(dir.path(), "idle").await), 1_000)),
             (recent, slot(Some(file(dir.path(), "recent").await), 1_001)),
             (held, slot(Some(Arc::clone(&held_file)), 0)),
@@ -474,36 +536,74 @@ mod tests {
             (empty, slot(None, 0)),
         ]);
 
-        let taken = take_idle(&mut open, now);
+        let taken = take_idle(&mut slots, now);
 
-        assert_eq!(taken.len(), 1, "only the idle file");
-        assert!(!open.contains_key(&idle), "the idle file's slot is gone");
-        assert!(open.contains_key(&recent), "used within FILE_IDLE");
-        assert!(open.contains_key(&held), "an operation still holds the file");
-        assert!(open.contains_key(&waited), "a get still holds the slot");
-        assert!(!open.contains_key(&empty), "a slot that never opened is dropped");
-        for file in taken.into_iter().chain([held_file]) {
+        assert_eq!(taken.iter().map(|(id, _)| *id).collect::<Vec<_>>(), [idle], "the idle file");
+        assert!(!slots.contains_key(&idle), "the idle file's slot is gone");
+        assert!(slots.contains_key(&recent), "used within FILE_IDLE");
+        assert!(slots.contains_key(&held), "an operation still holds the file");
+        assert!(slots.contains_key(&waited), "a get still holds the slot");
+        assert!(!slots.contains_key(&empty), "a slot that never opened is dropped");
+        for (_, file) in taken {
             file.stop().await;
         }
-        for slot in open.into_values() {
+        held_file.stop().await;
+        for slot in slots.into_values() {
             if let Some(file) = slot.file.get() {
                 file.stop().await;
             }
         }
     }
 
-    #[test]
-    fn sweeps_at_most_once_per_interval() {
-        let files = Files::new(Arc::default(), Duration::from_millis(100), Limits::default());
-        let mut open = HashMap::from([(ProjectId::new(), slot(None, 0))]);
+    #[tokio::test]
+    async fn sweeps_at_most_once_per_interval() {
+        let files = files();
+        let mut open = Open::default();
+        open.slots.insert(ProjectId::new(), slot(None, 0));
         // Slots last used at 0 are idle from FILE_IDLE on.
         let first = millis(FILE_IDLE);
-        files.sweep(&mut open, first);
-        assert!(open.is_empty(), "the first sweep");
-        open.insert(ProjectId::new(), slot(None, 0));
-        files.sweep(&mut open, first + millis(SWEEP_EVERY) - 1);
-        assert_eq!(open.len(), 1, "not again within SWEEP_EVERY");
-        files.sweep(&mut open, first + millis(SWEEP_EVERY));
-        assert!(open.is_empty(), "again after SWEEP_EVERY");
+        files.sweep(&mut open, first).await;
+        assert!(open.slots.is_empty(), "the first sweep");
+        open.slots.insert(ProjectId::new(), slot(None, 0));
+        files.sweep(&mut open, first + millis(SWEEP_EVERY) - 1).await;
+        assert_eq!(open.slots.len(), 1, "not again within SWEEP_EVERY");
+        files.sweep(&mut open, first + millis(SWEEP_EVERY)).await;
+        assert!(open.slots.is_empty(), "again after SWEEP_EVERY");
+    }
+
+    #[tokio::test]
+    async fn a_swept_file_closes_behind_a_gate() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = files();
+        let project = ProjectId::new();
+        let swept = file(dir.path(), "swept").await;
+        {
+            let mut open = files.open.lock().await;
+            open.slots.insert(project, slot(Some(Arc::clone(&swept)), 0));
+        }
+        // Only the slot may hold the file for the sweep to take it.
+        let pool = swept.db.read().clone();
+        drop(swept);
+        {
+            let mut open = files.open.lock().await;
+            files.sweep(&mut open, millis(FILE_IDLE)).await;
+            assert!(open.slots.is_empty(), "the slot is gone");
+            assert!(open.closing.contains_key(&project), "the file is closing");
+            drop(open);
+        }
+        files.flush_all().await.unwrap();
+        assert!(pool.is_closed(), "flush_all waited for the close");
+    }
+
+    #[tokio::test]
+    async fn stop_all_closes_every_file_and_refuses_more() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = files();
+        let open_file = file(dir.path(), "open").await;
+        let pool = open_file.db.read().clone();
+        files.open.lock().await.slots.insert(ProjectId::new(), slot(Some(open_file), 0));
+        files.stop_all().await;
+        assert!(pool.is_closed(), "the open file is closed");
+        assert!(files.open.lock().await.stopped, "later gets fail");
     }
 }
