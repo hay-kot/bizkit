@@ -13857,7 +13857,7 @@
           "steps_done": {
             "type": "integer",
             "format": "int32",
-            "description": "Steps sent or skipped so far.",
+            "description": "Current steps of the sequence it got, sent or skipped.",
             "minimum": 0
           },
           "updated_at": {

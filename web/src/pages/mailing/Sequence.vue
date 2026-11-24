@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowDown, ArrowUp, Inbox, LogOut, Plus, Trash2, UserPlus, Users } from 'lucide-vue-next'
+import { refDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -79,7 +80,8 @@ const {
 interface DraftStep {
   key: string
   id?: string
-  delay_hours: number
+  // A string only while the input is empty.
+  delay_hours: number | string
   subject: string
   body_md: string
 }
@@ -168,7 +170,8 @@ function removeStep(index: number) {
   steps.value.splice(index, 1)
 }
 
-function waitText(hours: number, first: boolean): string {
+function waitText(value: number | string, first: boolean): string {
+  const hours = hoursOf(value)
   const after = first ? 'after enrolling' : 'after the step before'
   if (hours === 0) return first ? 'Sent right away' : 'Sent with the step before'
   if (hours % 24 === 0) {
@@ -200,10 +203,15 @@ const remove = useDeleteSequence()
 const enroll = useEnroll()
 const exit = useExitEnrollment()
 
+/** An emptied number input gives '' under v-model.number. */
+function hoursOf(value: number | string): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 function save() {
   return runAction({
-    run: () =>
-      update.mutateAsync({
+    run: async () => {
+      const saved = await update.mutateAsync({
         path: { workspace_id: props.workspaceId, sequence_id: props.sequenceId },
         body: {
           name: name.value.trim(),
@@ -211,12 +219,18 @@ function save() {
           enabled: enabled.value,
           steps: steps.value.map((step) => ({
             id: step.id ?? null,
-            delay_hours: step.delay_hours,
+            delay_hours: hoursOf(step.delay_hours),
             subject: step.subject.trim(),
             body_md: step.body_md,
           })),
         },
-      }),
+      })
+      // New steps get their IDs here; a second save must send them, or
+      // the server would add the same steps again.
+      steps.value = draftSteps(saved)
+      synced = saved
+      return saved
+    },
     success: 'Sequence saved',
   })
 }
@@ -245,10 +259,13 @@ function onDelete() {
 
 const enrollOpen = ref(false)
 const contactId = ref('')
+const contactSearch = ref('')
+const contactQuery = refDebounced(contactSearch, 250)
+// The picker lists the first page of matches; the search reaches the rest.
 const { data: subscribers } = useContacts(
   () => props.workspaceId,
   () => (enrollOpen.value ? (sequence.value?.list_id ?? null) : null),
-  () => ({ status: 'subscribed' }),
+  () => ({ status: 'subscribed', q: contactQuery.value }),
 )
 const enrolled = computed(
   () => new Set((enrollments.value?.items ?? []).map((enrollment) => enrollment.contact_id)),
@@ -259,10 +276,14 @@ const contactOptions = computed(() =>
     .map((contact) => ({ value: contact.id, label: contact.email })),
 )
 watch(contactOptions, (options) => {
-  if (enrollOpen.value && contactId.value === '' && options[0]) contactId.value = options[0].value
+  if (!enrollOpen.value) return
+  if (!options.some((option) => option.value === contactId.value)) {
+    contactId.value = options[0]?.value ?? ''
+  }
 })
 
 function openEnroll() {
+  contactSearch.value = ''
   contactId.value = contactOptions.value[0]?.value ?? ''
   enroll.reset()
   enrollOpen.value = true
@@ -547,8 +568,17 @@ const logColumns = [
       @close="enrollOpen = false"
       @submit="onEnroll"
     >
+      <Field label="Search">
+        <input
+          v-model="contactSearch"
+          type="search"
+          name="enroll-search"
+          class="input w-full"
+          placeholder="Address or name"
+        />
+      </Field>
       <p v-if="contactOptions.length === 0" class="text-sm text-base-content/80">
-        Every subscribed contact is already enrolled, or the list has none.
+        No subscribed contact to enroll matches.
       </p>
       <Field v-else label="Contact">
         <Select

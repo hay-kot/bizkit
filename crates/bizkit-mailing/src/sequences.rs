@@ -26,6 +26,9 @@ use crate::store::{self, ContactRow, EnrollmentRow, ListRow, SequenceRow, StepRo
 pub(crate) struct Advance {
     pub(crate) workspace_id: WorkspaceId,
     pub(crate) enrollment_id: EnrollmentId,
+    /// The `next_run_at` this job was queued for. A rescheduled enrollment
+    /// leaves its older jobs behind; they find another time and do nothing.
+    pub(crate) due: UnixMillis,
 }
 
 impl Job for Advance {
@@ -43,7 +46,11 @@ async fn schedule(
     enrollment: &EnrollmentRow,
     run_at: UnixMillis,
 ) -> anyhow::Result<()> {
-    let job = Advance { workspace_id: enrollment.workspace_id, enrollment_id: enrollment.id };
+    let job = Advance {
+        workspace_id: enrollment.workspace_id,
+        enrollment_id: enrollment.id,
+        due: run_at,
+    };
     platform.bus().enqueue(tx, &job, Enqueue { run_at: Some(run_at) }).await?;
     Ok(())
 }
@@ -89,7 +96,56 @@ pub(crate) async fn enroll_on_join(
         .await
         .context("finding the list's sequences")?;
     for sequence in &sequences {
+        // An empty run would complete at once and miss the steps written
+        // later.
+        if store::list_steps(&mut **tx, sequence.workspace_id, sequence.id)
+            .await
+            .context("loading the steps")?
+            .is_empty()
+        {
+            continue;
+        }
         enroll(platform, tx, sequence, contact).await?;
+    }
+    Ok(())
+}
+
+/// Moves the next run of the sequence's active enrollments to match its
+/// steps after an edit: the next step's delay counts from the last step
+/// mail (or from enrolling), and a run with no step left is due now so it
+/// completes.
+pub(crate) async fn reschedule(
+    platform: &Platform,
+    tx: &mut WriteTx,
+    sequence: &SequenceRow,
+) -> anyhow::Result<()> {
+    let now = platform.now();
+    let active = store::active_enrollments(&mut **tx, sequence.workspace_id, sequence.id)
+        .await
+        .context("loading active enrollments")?;
+    for mut enrollment in active {
+        let next = store::next_step(&mut **tx, sequence.workspace_id, sequence.id, enrollment.id)
+            .await
+            .context("finding the next step")?;
+        let due = match next {
+            Some(next) => {
+                let since = store::last_step_at(&mut **tx, enrollment.workspace_id, enrollment.id)
+                    .await
+                    .context("finding the last step mail")?
+                    .unwrap_or(enrollment.created_at);
+                after(since, next.delay_hours)
+            }
+            None => now,
+        };
+        if enrollment.next_run_at == Some(due) {
+            continue;
+        }
+        enrollment.next_run_at = Some(due);
+        enrollment.updated_at = now;
+        store::update_enrollment(&mut **tx, &enrollment)
+            .await
+            .context("rescheduling the enrollment")?;
+        schedule(platform, tx, &enrollment, due).await?;
     }
     Ok(())
 }
@@ -127,8 +183,8 @@ struct Run {
 }
 
 /// Reads what the run needs and asks the step-condition script. `None`
-/// when there is nothing to do: the enrollment ended, isn't due (a
-/// rescheduled enrollment leaves its older job behind), or a row is gone.
+/// when there is nothing to do: the enrollment ended, was rescheduled
+/// since the job was queued, or a row is gone.
 async fn load(platform: &Platform, job: &Advance) -> anyhow::Result<Option<Run>> {
     let db = platform.db().read();
     let Some(seen) = store::find_enrollment(db, job.workspace_id, job.enrollment_id)
@@ -138,7 +194,8 @@ async fn load(platform: &Platform, job: &Advance) -> anyhow::Result<Option<Run>>
         return Ok(None);
     };
     if seen.status != EnrollmentStatus::Active.as_str()
-        || seen.next_run_at.is_some_and(|at| at > platform.now())
+        || seen.next_run_at != Some(job.due)
+        || job.due > platform.now()
     {
         return Ok(None);
     }
@@ -177,7 +234,7 @@ async fn load(platform: &Platform, job: &Advance) -> anyhow::Result<Option<Run>>
 
 /// Records the run: the step's delivery and the next schedule, or the end
 /// of the enrollment. Does nothing when the enrollment changed since
-/// [`load`].
+/// [`load`], and runs again at once when the steps did.
 async fn record(platform: &Platform, run: Run) -> anyhow::Result<()> {
     let Run { seen, sequence, list, contact, subscribed, step, condition } = run;
     let now = platform.now();
@@ -200,6 +257,16 @@ async fn record(platform: &Platform, run: Run) -> anyhow::Result<()> {
         store::update_enrollment(&mut *tx, &enrollment).await.context("ending the run")?;
         return tx.commit().await;
     }
+    let current = store::next_step(&mut *tx, enrollment.workspace_id, sequence.id, enrollment.id)
+        .await
+        .context("finding the next step again")?;
+    if current.as_ref().map(|s| s.id) != step.as_ref().map(|s| s.id) {
+        // The steps changed while the script ran; a fresh run decides.
+        enrollment.next_run_at = Some(now);
+        schedule(platform, &mut tx, &enrollment, now).await?;
+        store::update_enrollment(&mut *tx, &enrollment).await.context("rerunning")?;
+        return tx.commit().await;
+    }
     if let Some(step) = &step {
         let mut row = send::delivery(
             platform,
@@ -211,16 +278,15 @@ async fn record(platform: &Platform, run: Run) -> anyhow::Result<()> {
         row.contact_id = Some(contact.id);
         row.enrollment_id = Some(enrollment.id);
         row.step_id = Some(step.id);
-        match condition {
-            Condition::Send => {
-                send::queue(platform, &mut tx, &row).await?;
-            }
+        let inserted = match condition {
+            Condition::Send => send::queue(platform, &mut tx, &row).await?,
             Condition::Skip(reason) => {
                 DeliveryStatus::Skipped.as_str().clone_into(&mut row.status);
                 row.error = Some(reason);
-                store::insert_delivery(&mut *tx, &row).await.context("recording the skip")?;
+                store::insert_delivery(&mut *tx, &row).await.context("recording the skip")?
             }
-        }
+        };
+        anyhow::ensure!(inserted, "step {} already has a delivery for {}", step.id, enrollment.id);
     }
     let next = store::next_step(&mut *tx, enrollment.workspace_id, sequence.id, enrollment.id)
         .await

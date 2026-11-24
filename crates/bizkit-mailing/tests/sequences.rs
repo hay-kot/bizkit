@@ -361,4 +361,62 @@ mod sequences {
         assert_eq!(page["items"][0]["status"], "skipped", "{page}");
         s.member.get(&path).await.expect(StatusCode::NOT_FOUND);
     }
+
+    #[tokio::test]
+    async fn waiting_runs_follow_edited_delays_and_removed_steps() {
+        let s = setup().await;
+        let list = s.list().await;
+        let sequence = s.sequence(&list, "on_join", welcome_steps()).await;
+        s.subscribe(&list, "ada@example.com").await;
+        s.app.drain_jobs().await;
+        assert_eq!(s.subjects(), ["Welcome"]);
+
+        let steps = s.get(&sequence).await["steps"].as_array().unwrap().clone();
+        let path = format!("{}/sequences/{}", s.ws(), id(&sequence));
+        let shorter = json!({"steps": [
+            {"id": steps[0]["id"], "delay_hours": 0, "subject": "Welcome", "body_md": "Hi"},
+            {"id": steps[1]["id"], "delay_hours": 2, "subject": "Day one", "body_md": "Tips"},
+        ]});
+        s.member.patch(&path, &shorter).await.expect(StatusCode::OK);
+        s.after_hours(2).await;
+        assert_eq!(s.subjects(), ["Day one"], "the shorter delay applies to the waiting run");
+        let enrollment = &s.enrollments(&sequence).await[0];
+        assert_eq!(
+            (enrollment["status"].clone(), enrollment["steps_done"].clone()),
+            (json!("completed"), json!(2)),
+            "{enrollment}"
+        );
+
+        s.subscribe(&list, "bo@example.com").await;
+        s.app.drain_jobs().await;
+        assert_eq!(s.subjects(), ["Welcome"]);
+        let only_first = json!({"steps": [
+            {"id": steps[0]["id"], "delay_hours": 0, "subject": "Welcome", "body_md": "Hi"},
+        ]});
+        s.member.patch(&path, &only_first).await.expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let runs = s.enrollments(&sequence).await;
+        assert!(runs.iter().all(|e| e["status"] == "completed"), "{runs:?}");
+        assert!(
+            runs.iter().all(|e| e["steps_done"] == 1),
+            "deleted steps don't count as done: {runs:?}"
+        );
+        s.after_hours(100).await;
+        assert!(s.subjects().is_empty(), "no mail from the old schedule");
+    }
+
+    #[tokio::test]
+    async fn empty_sequences_take_no_enrollments() {
+        let s = setup().await;
+        let list = s.list().await;
+        let sequence = s.sequence(&list, "on_join", json!([])).await;
+        let contact = s.subscribe(&list, "ada@example.com").await;
+        s.app.drain_jobs().await;
+        assert!(s.enrollments(&sequence).await.is_empty(), "on_join skips an empty sequence");
+        let path = format!("{}/sequences/{}/enrollments", s.ws(), id(&sequence));
+        s.member
+            .post(&path, &json!({"contact_id": id(&contact)}))
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+    }
 }

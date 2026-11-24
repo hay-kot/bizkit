@@ -508,7 +508,7 @@ pub struct Enrollment {
     pub email: String,
     /// Where it stands.
     pub status: EnrollmentStatus,
-    /// Steps sent or skipped so far.
+    /// Current steps of the sequence it got, sent or skipped.
     pub steps_done: u32,
     /// When the next step is due, while active.
     pub next_run_at: Option<UnixMillis>,

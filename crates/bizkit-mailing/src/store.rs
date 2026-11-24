@@ -1278,6 +1278,7 @@ pub(crate) async fn find_enrollment_view(
         r#"SELECT e.id AS "id: EnrollmentId", e.sequence_id AS "sequence_id: SequenceId",
                   e.contact_id AS "contact_id: ContactId", c.email, e.status,
                   (SELECT COUNT(*) FROM mailing_deliveries d
+                   JOIN mailing_steps s ON s.id = d.step_id AND s.sequence_id = e.sequence_id
                    WHERE d.workspace_id = e.workspace_id AND d.enrollment_id = e.id) AS "steps_done!: i64",
                   e.next_run_at AS "next_run_at: UnixMillis",
                   e.created_at AS "created_at: UnixMillis", e.updated_at AS "updated_at: UnixMillis"
@@ -1304,6 +1305,7 @@ pub(crate) async fn list_enrollments(
         r#"SELECT e.id AS "id: EnrollmentId", e.sequence_id AS "sequence_id: SequenceId",
                   e.contact_id AS "contact_id: ContactId", c.email, e.status,
                   (SELECT COUNT(*) FROM mailing_deliveries d
+                   JOIN mailing_steps s ON s.id = d.step_id AND s.sequence_id = e.sequence_id
                    WHERE d.workspace_id = e.workspace_id AND d.enrollment_id = e.id) AS "steps_done!: i64",
                   e.next_run_at AS "next_run_at: UnixMillis",
                   e.created_at AS "created_at: UnixMillis", e.updated_at AS "updated_at: UnixMillis"
@@ -1337,6 +1339,44 @@ pub(crate) async fn enrollment_counts(
            FROM mailing_enrollments WHERE workspace_id = ? AND sequence_id = ?"#,
         workspace_id,
         sequence_id,
+    )
+    .fetch_one(exec)
+    .await
+}
+
+/// The sequence's active enrollments.
+pub(crate) async fn active_enrollments(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    sequence_id: SequenceId,
+) -> sqlx::Result<Vec<EnrollmentRow>> {
+    sqlx::query_as!(
+        EnrollmentRow,
+        r#"SELECT id AS "id: EnrollmentId", workspace_id AS "workspace_id: WorkspaceId",
+                  sequence_id AS "sequence_id: SequenceId", contact_id AS "contact_id: ContactId",
+                  status, next_run_at AS "next_run_at: UnixMillis",
+                  created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
+           FROM mailing_enrollments
+           WHERE workspace_id = ? AND sequence_id = ? AND status = 'active'
+           ORDER BY id"#,
+        workspace_id,
+        sequence_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// When the enrollment's newest step mail was queued.
+pub(crate) async fn last_step_at(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    enrollment_id: EnrollmentId,
+) -> sqlx::Result<Option<UnixMillis>> {
+    sqlx::query_scalar!(
+        r#"SELECT MAX(created_at) AS "at: UnixMillis" FROM mailing_deliveries
+           WHERE workspace_id = ? AND enrollment_id = ?"#,
+        workspace_id,
+        enrollment_id,
     )
     .fetch_one(exec)
     .await

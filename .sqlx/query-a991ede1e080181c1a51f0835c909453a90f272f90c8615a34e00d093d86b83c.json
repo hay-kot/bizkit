@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT e.id AS \"id: EnrollmentId\", e.sequence_id AS \"sequence_id: SequenceId\",\n                  e.contact_id AS \"contact_id: ContactId\", c.email, e.status,\n                  (SELECT COUNT(*) FROM mailing_deliveries d\n                   WHERE d.workspace_id = e.workspace_id AND d.enrollment_id = e.id) AS \"steps_done!: i64\",\n                  e.next_run_at AS \"next_run_at: UnixMillis\",\n                  e.created_at AS \"created_at: UnixMillis\", e.updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_enrollments e\n           JOIN mailing_contacts c ON c.id = e.contact_id AND c.workspace_id = e.workspace_id\n           WHERE e.workspace_id = ?1 AND e.sequence_id = ?2\n             AND (?3 IS NULL OR e.status = ?3)\n             AND (?4 IS NULL OR e.id < ?4)\n           ORDER BY e.id DESC LIMIT ?5",
+  "query": "SELECT id AS \"id: EnrollmentId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  sequence_id AS \"sequence_id: SequenceId\", contact_id AS \"contact_id: ContactId\",\n                  status, next_run_at AS \"next_run_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_enrollments\n           WHERE workspace_id = ? AND sequence_id = ? AND status = 'active'\n           ORDER BY id",
   "describe": {
     "columns": [
       {
@@ -15,8 +15,19 @@
         }
       },
       {
-        "name": "sequence_id: SequenceId",
+        "name": "workspace_id: WorkspaceId",
         "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_enrollments",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "sequence_id: SequenceId",
+        "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -27,23 +38,12 @@
       },
       {
         "name": "contact_id: ContactId",
-        "ordinal": 2,
+        "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "mailing_enrollments",
             "name": "contact_id"
-          }
-        }
-      },
-      {
-        "name": "email",
-        "ordinal": 3,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "mailing_contacts",
-            "name": "email"
           }
         }
       },
@@ -59,14 +59,8 @@
         }
       },
       {
-        "name": "steps_done!: i64",
-        "ordinal": 5,
-        "type_info": "Integer",
-        "origin": "Expression"
-      },
-      {
         "name": "next_run_at: UnixMillis",
-        "ordinal": 6,
+        "ordinal": 5,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -77,7 +71,7 @@
       },
       {
         "name": "created_at: UnixMillis",
-        "ordinal": 7,
+        "ordinal": 6,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -88,7 +82,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 8,
+        "ordinal": 7,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -99,10 +93,9 @@
       }
     ],
     "parameters": {
-      "Right": 5
+      "Right": 2
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -113,5 +106,5 @@
       false
     ]
   },
-  "hash": "b66b917e88dc941ca35ea2c571e7f1b6d8177577c1ae7fe0d148c4d02caef6fa"
+  "hash": "a991ede1e080181c1a51f0835c909453a90f272f90c8615a34e00d093d86b83c"
 }

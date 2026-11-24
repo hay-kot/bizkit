@@ -416,7 +416,8 @@ impl Operation for SequencesUpdate {
     const PATH: &'static str = "/workspaces/{workspace_id}/mailing/sequences/{sequence_id}";
     const ACCESS: bizkit_core::ops::Access = WRITE;
     // Steps keep their IDs, so a contact never gets a step twice; a step
-    // added before a contact's current point is sent to it next.
+    // added before a contact's current point is sent to it next. Waiting
+    // runs move to the new delays.
     const SUMMARY: &'static str = "Change a sequence and its steps";
     const TAGS: &'static [&'static str] = TAGS;
 
@@ -438,6 +439,7 @@ impl Operation for SequencesUpdate {
             let existing = store::list_steps(&mut *tx, row.workspace_id, row.id).await?;
             let steps = step_rows(row.workspace_id, row.id, &existing, inputs)?;
             store::set_steps(&mut tx, row.workspace_id, row.id, &steps).await?;
+            sequences::reschedule(cx.platform(), &mut tx, &row).await?;
         }
         tx.commit().await?;
         Ok(full_sequence(cx.platform().db().read(), row).await?)
@@ -529,6 +531,11 @@ impl Operation for EnrollmentsCreate {
         };
         if contact.status != ContactStatus::Subscribed.as_str() {
             return Err(field_error("contact_id", "must be subscribed"));
+        }
+        // An empty run would complete at once and miss the steps written
+        // later, and the contact could not enroll again.
+        if store::list_steps(&mut *tx, sequence.workspace_id, sequence.id).await?.is_empty() {
+            return Err(field_error("sequence_id", "the sequence has no steps yet"));
         }
         let Some(row) = sequences::enroll(cx.platform(), &mut tx, &sequence, &contact).await?
         else {

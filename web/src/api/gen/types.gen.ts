@@ -564,7 +564,7 @@ export type Enrollment = {
      */
     status: EnrollmentStatus;
     /**
-     * Steps sent or skipped so far.
+     * Current steps of the sequence it got, sent or skipped.
      */
     steps_done: number;
     /**
