@@ -244,7 +244,7 @@ export const analyticsDashboardsListQuery = defineQueryOptions<Options<Analytics
 }));
 
 /**
- * Make a dashboard: a name and saved insights in order
+ * Make a dashboard: a name and tiles of saved insights, in order, each with a width
  */
 export const analyticsDashboardsCreateMutation = (options?: Partial<Options<AnalyticsDashboardsCreateData>>): UseMutationOptions<AnalyticsDashboardsCreateResponse, Options<AnalyticsDashboardsCreateData>, AnalyticsDashboardsCreateError> => ({
     mutation: async (vars) => {
@@ -274,7 +274,7 @@ export const analyticsDashboardsDeleteMutation = (options?: Partial<Options<Anal
 export const analyticsDashboardsGetQueryKey = (options: Options<AnalyticsDashboardsGetData>) => createQueryKey('analyticsDashboardsGet', options);
 
 /**
- * Show a dashboard and its insights in order
+ * Show a dashboard and its tiles in order
  */
 export const analyticsDashboardsGetQuery = defineQueryOptions<Options<AnalyticsDashboardsGetData>, AnalyticsDashboardsGetResponse, AnalyticsDashboardsGetError>((options: Options<AnalyticsDashboardsGetData>) => ({
     key: analyticsDashboardsGetQueryKey(options),
@@ -289,7 +289,7 @@ export const analyticsDashboardsGetQuery = defineQueryOptions<Options<AnalyticsD
 }));
 
 /**
- * Rename a dashboard or set its insights: the whole list, in order
+ * Rename a dashboard or set its tiles: the whole list, in order, with widths
  */
 export const analyticsDashboardsUpdateMutation = (options?: Partial<Options<AnalyticsDashboardsUpdateData>>): UseMutationOptions<AnalyticsDashboardsUpdateResponse, Options<AnalyticsDashboardsUpdateData>, AnalyticsDashboardsUpdateError> => ({
     mutation: async (vars) => {

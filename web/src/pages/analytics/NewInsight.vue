@@ -10,8 +10,10 @@ import DetailActions from '@/components/ui/DetailActions.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
 import { useReportRange } from '@/composables/useReportRange'
+import { runAction } from '@/lib/action'
 import { rangeToQuery, savedPreset } from '@/lib/range'
-import { useCreateInsight } from '@/queries/analytics'
+import { toast } from '@/lib/toast'
+import { useCreateInsight, useDashboard, useUpdateDashboard } from '@/queries/analytics'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
 const route = useRoute()
@@ -19,6 +21,11 @@ const router = useRouter()
 const { today, range } = useReportRange()
 const draft = ref(draftFromLink(route.query))
 const create = useCreateInsight()
+// Opened from a dashboard's Add insight panel: the saved insight joins that
+// dashboard and the user goes back to it.
+const dashboardId = typeof route.query.dashboard === 'string' ? route.query.dashboard : undefined
+const target = dashboardId ? useDashboard(() => props.workspaceId, dashboardId) : undefined
+const updateDashboard = useUpdateDashboard()
 const naming = ref(false)
 const name = ref('')
 
@@ -40,6 +47,29 @@ async function onSave() {
       range: savedPreset(range.value.preset) ?? '30d',
     },
   })
+  // Waits for the dashboard when it hasn't loaded yet. The insight is saved
+  // either way; when the dashboard is gone or refuses it (full), a toast
+  // says why and the user lands on the insight instead.
+  const board = target ? (await target.refresh()).data : undefined
+  if (target && !board) toast('Saved the insight, but its dashboard was not found', 'error')
+  const added =
+    board &&
+    (await runAction({
+      run: () =>
+        updateDashboard.mutateAsync({
+          path: { workspace_id: props.workspaceId, dashboard_id: board.id },
+          body: { tiles: [...board.tiles, { insight_id: insight.id, width: 6 }] },
+        }),
+      success: `Added to ${board.name}`,
+    }))
+  if (board && added) {
+    naming.value = false
+    await router.push({
+      path: `/w/${props.workspaceId}/p/${props.projectId}/analytics/dashboards/${board.id}`,
+      query: rangeToQuery(range.value),
+    })
+    return
+  }
   naming.value = false
   await router.push({
     path: `/w/${props.workspaceId}/p/${props.projectId}/analytics/insights/${insight.id}`,
@@ -64,6 +94,12 @@ async function onSave() {
         ]"
       />
     </template>
+    <p v-if="target?.data.value" class="text-sm text-base-content/70">
+      Saving adds it to {{ target.data.value.name }} and takes you back there.
+    </p>
+    <p v-else-if="target?.error.value" class="text-sm text-warning">
+      The dashboard this came from was not found. Saving keeps the insight on its own.
+    </p>
     <p v-if="!savedPreset(range.preset)" class="text-sm text-base-content/70">
       This range isn't saved. A saved insight opens on the last 30 days.
     </p>
@@ -79,7 +115,7 @@ async function onSave() {
       variant="dialog"
       title="Save insight"
       submit-label="Save insight"
-      :pending="create.isLoading.value"
+      :pending="create.isLoading.value || updateDashboard.isLoading.value"
       :error="create.error.value"
       @close="naming = false"
       @submit="onSave"

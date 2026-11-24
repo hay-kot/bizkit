@@ -1,8 +1,10 @@
 //! Saved insights (a name, a query and a default range) and dashboards (a
-//! name and an ordered list of insights). Both are app-database config.
+//! name and an ordered list of tiles, each an insight and a width). Both
+//! are app-database config.
 
 use std::collections::HashSet;
 
+use anyhow::Context as _;
 use bizkit_core::ApiError;
 use bizkit_core::ModuleContext;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
@@ -20,6 +22,10 @@ use crate::stats::site_scope;
 
 /// Insights per dashboard.
 pub(crate) const MAX_TILES: usize = 20;
+
+/// Tile widths in columns of the dashboard's 12-column grid: a third, a
+/// half, two thirds and the full row. The table's CHECK holds the same set.
+const TILE_WIDTHS: [u8; 4] = [4, 6, 8, 12];
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(InsightsList)?;
@@ -120,7 +126,18 @@ pub(crate) struct InsightList {
     pub(crate) items: Vec<Insight>,
 }
 
-/// A dashboard: insights in order, shown two to a row.
+/// One insight on a dashboard and how wide it shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Tile {
+    /// The insight, of the dashboard's project.
+    pub(crate) insight_id: InsightId,
+    /// Columns of a 12-column grid: 4, 6, 8 or 12. A row is as tall as its
+    /// tallest tile.
+    pub(crate) width: u8,
+}
+
+/// A dashboard: tiles in order, laid out left to right on a 12-column grid.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub(crate) struct Dashboard {
     /// The dashboard ID.
@@ -129,8 +146,8 @@ pub(crate) struct Dashboard {
     pub(crate) project_id: ProjectId,
     /// The display name.
     pub(crate) name: String,
-    /// Its insights, in order.
-    pub(crate) insight_ids: Vec<InsightId>,
+    /// Its tiles, in order.
+    pub(crate) tiles: Vec<Tile>,
     /// When it was made.
     pub(crate) created_at: UnixMillis,
     /// When it last changed.
@@ -226,13 +243,18 @@ impl Validate for UpdateInsight {
     }
 }
 
-fn check_tiles(errors: &mut FieldErrors, ids: &[InsightId]) {
-    if ids.len() > MAX_TILES {
-        errors.add("insight_ids", format!("must have at most {MAX_TILES} insights"));
+fn check_tiles(errors: &mut FieldErrors, tiles: &[Tile]) {
+    if tiles.len() > MAX_TILES {
+        errors.add("tiles", format!("must have at most {MAX_TILES} insights"));
     }
-    let unique: HashSet<&InsightId> = ids.iter().collect();
-    if unique.len() != ids.len() {
-        errors.add("insight_ids", "must not repeat an insight");
+    let unique: HashSet<InsightId> = tiles.iter().map(|tile| tile.insight_id).collect();
+    if unique.len() != tiles.len() {
+        errors.add("tiles", "must not repeat an insight");
+    }
+    for (at, tile) in tiles.iter().enumerate() {
+        if !TILE_WIDTHS.contains(&tile.width) {
+            errors.add(format!("tiles[{at}].width"), "must be 4, 6, 8 or 12");
+        }
     }
 }
 
@@ -246,16 +268,16 @@ pub(crate) struct CreateDashboard {
     project_id: ProjectId,
     /// The display name.
     name: String,
-    /// Insights of the project, in order; at most 20.
+    /// Tiles of the project's insights, in order; at most 20.
     #[serde(default)]
-    insight_ids: Vec<InsightId>,
+    tiles: Vec<Tile>,
 }
 
 impl Validate for CreateDashboard {
     fn validate(&self) -> Result<(), FieldErrors> {
         let mut errors = FieldErrors::default();
         check_name(&mut errors, "name", &self.name);
-        check_tiles(&mut errors, &self.insight_ids);
+        check_tiles(&mut errors, &self.tiles);
         errors.into_result()
     }
 }
@@ -282,10 +304,10 @@ pub(crate) struct UpdateDashboard {
     /// The display name.
     #[serde(default)]
     name: Option<String>,
-    /// The whole new list of insights, in order; at most 20. Add, remove
-    /// and reorder by sending the list.
+    /// The whole new list of tiles, in order; at most 20. Add, remove,
+    /// reorder and resize by sending the list.
     #[serde(default)]
-    insight_ids: Option<Vec<InsightId>>,
+    tiles: Option<Vec<Tile>>,
 }
 
 impl Validate for UpdateDashboard {
@@ -294,8 +316,8 @@ impl Validate for UpdateDashboard {
         if let Some(name) = &self.name {
             check_name(&mut errors, "name", name);
         }
-        if let Some(ids) = &self.insight_ids {
-            check_tiles(&mut errors, ids);
+        if let Some(tiles) = &self.tiles {
+            check_tiles(&mut errors, tiles);
         }
         errors.into_result()
     }
@@ -429,9 +451,10 @@ async fn tiles(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     project_id: ProjectId,
-) -> sqlx::Result<Vec<(DashboardId, InsightId)>> {
+) -> Result<Vec<(DashboardId, Tile)>, ApiError> {
     let rows = sqlx::query!(
-        r#"SELECT t.dashboard_id AS "dashboard_id: DashboardId", t.insight_id AS "insight_id: InsightId"
+        r#"SELECT t.dashboard_id AS "dashboard_id: DashboardId", t.insight_id AS "insight_id: InsightId",
+                  t.width
            FROM analytics_dashboard_tiles t JOIN analytics_dashboards d ON d.id = t.dashboard_id
            WHERE d.workspace_id = ? AND d.project_id = ? ORDER BY t.position"#,
         workspace_id,
@@ -439,16 +462,18 @@ async fn tiles(
     )
     .fetch_all(exec)
     .await?;
-    Ok(rows.into_iter().map(|row| (row.dashboard_id, row.insight_id)).collect())
+    rows.into_iter()
+        .map(|row| {
+            let width = u8::try_from(row.width)
+                .with_context(|| format!("tile width {} out of range", row.width))?;
+            Ok((row.dashboard_id, Tile { insight_id: row.insight_id, width }))
+        })
+        .collect()
 }
 
-fn dashboard_to_api(row: DashboardRow, tiles: &[(DashboardId, InsightId)]) -> Dashboard {
+fn dashboard_to_api(row: DashboardRow, tiles: &[(DashboardId, Tile)]) -> Dashboard {
     Dashboard {
-        insight_ids: tiles
-            .iter()
-            .filter(|(id, _)| *id == row.id)
-            .map(|(_, insight)| *insight)
-            .collect(),
+        tiles: tiles.iter().filter(|(id, _)| *id == row.id).map(|(_, tile)| *tile).collect(),
         id: row.id,
         project_id: row.project_id,
         name: row.name,
@@ -484,9 +509,10 @@ async fn set_tiles(
     conn: &mut sqlx::SqliteConnection,
     workspace_id: WorkspaceId,
     row: &DashboardRow,
-    ids: &[InsightId],
+    tiles: &[Tile],
 ) -> Result<(), ApiError> {
-    let wanted = serde_json::to_string(ids).map_err(anyhow::Error::from)?;
+    let ids: Vec<InsightId> = tiles.iter().map(|tile| tile.insight_id).collect();
+    let wanted = serde_json::to_string(&ids).map_err(anyhow::Error::from)?;
     let found = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "n!: i64" FROM analytics_insights
            WHERE workspace_id = ? AND project_id = ? AND id IN (SELECT value FROM json_each(?))"#,
@@ -496,9 +522,9 @@ async fn set_tiles(
     )
     .fetch_one(&mut *conn)
     .await?;
-    if usize::try_from(found).ok() != Some(ids.len()) {
+    if usize::try_from(found).ok() != Some(tiles.len()) {
         let mut errors = FieldErrors::default();
-        errors.add("insight_ids", "must all be insights of the dashboard's project");
+        errors.add("tiles", "must all be insights of the dashboard's project");
         return Err(errors.into());
     }
     sqlx::query!(
@@ -508,14 +534,15 @@ async fn set_tiles(
     )
     .execute(&mut *conn)
     .await?;
-    for (position, insight_id) in (0_i64..).zip(ids) {
+    for (position, tile) in (0_i64..).zip(tiles) {
         sqlx::query!(
-            "INSERT INTO analytics_dashboard_tiles (workspace_id, dashboard_id, insight_id, position)
-             VALUES (?, ?, ?, ?)",
+            "INSERT INTO analytics_dashboard_tiles (workspace_id, dashboard_id, insight_id, position, width)
+             VALUES (?, ?, ?, ?, ?)",
             workspace_id,
             row.id,
-            insight_id,
+            tile.insight_id,
             position,
+            tile.width,
         )
         .execute(&mut *conn)
         .await?;
@@ -710,7 +737,8 @@ impl Operation for DashboardsCreate {
     const METHOD: Method = Method::Post;
     const PATH: &'static str = "/workspaces/{workspace_id}/analytics/dashboards";
     const ACCESS: Access = WRITE;
-    const SUMMARY: &'static str = "Make a dashboard: a name and saved insights in order";
+    const SUMMARY: &'static str =
+        "Make a dashboard: a name and tiles of saved insights, in order, each with a width";
     const SUCCESS: Success = Success::Created;
     const TAGS: &'static [&'static str] = TAGS;
 
@@ -726,9 +754,9 @@ impl Operation for DashboardsCreate {
         };
         let mut tx = cx.write().await?;
         save_dashboard(&mut *tx, input.workspace_id, &row).await?;
-        set_tiles(&mut tx, input.workspace_id, &row, &input.insight_ids).await?;
+        set_tiles(&mut tx, input.workspace_id, &row, &input.tiles).await?;
         tx.commit().await?;
-        let tiles: Vec<_> = input.insight_ids.iter().map(|id| (row.id, *id)).collect();
+        let tiles: Vec<_> = input.tiles.iter().map(|tile| (row.id, *tile)).collect();
         Ok(dashboard_to_api(row, &tiles))
     }
 }
@@ -741,7 +769,7 @@ impl Operation for DashboardsGet {
     const METHOD: Method = Method::Get;
     const PATH: &'static str = "/workspaces/{workspace_id}/analytics/dashboards/{dashboard_id}";
     const ACCESS: Access = READ;
-    const SUMMARY: &'static str = "Show a dashboard and its insights in order";
+    const SUMMARY: &'static str = "Show a dashboard and its tiles in order";
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: InDashboard) -> Result<Dashboard, ApiError> {
@@ -761,7 +789,7 @@ impl Operation for DashboardsUpdate {
     const PATH: &'static str = "/workspaces/{workspace_id}/analytics/dashboards/{dashboard_id}";
     const ACCESS: Access = WRITE;
     const SUMMARY: &'static str =
-        "Rename a dashboard or set its insights: the whole list, in order";
+        "Rename a dashboard or set its tiles: the whole list, in order, with widths";
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: UpdateDashboard) -> Result<Dashboard, ApiError> {
@@ -772,8 +800,8 @@ impl Operation for DashboardsUpdate {
         }
         row.updated_at = cx.now();
         save_dashboard(&mut *tx, input.workspace_id, &row).await?;
-        if let Some(ids) = &input.insight_ids {
-            set_tiles(&mut tx, input.workspace_id, &row, ids).await?;
+        if let Some(new_tiles) = &input.tiles {
+            set_tiles(&mut tx, input.workspace_id, &row, new_tiles).await?;
         }
         let tiles = tiles(&mut *tx, input.workspace_id, row.project_id).await?;
         tx.commit().await?;
@@ -807,15 +835,16 @@ impl Operation for DashboardsDelete {
     }
 }
 
-/// Saves `insights` and a dashboard named `name` that shows them, unless
-/// the project has insights already. Returns whether it saved.
+/// Saves `insights` and a dashboard named `name` that shows them at the
+/// given widths, unless the project has insights already. Returns whether
+/// it saved.
 #[cfg(feature = "test-hooks")]
 pub(crate) async fn seed_dashboard(
     conn: &mut sqlx::SqliteConnection,
     scope: crate::report::Scope,
     now: UnixMillis,
     name: &str,
-    insights: &[(&str, InsightQuery)],
+    insights: &[(&str, InsightQuery, u8)],
 ) -> anyhow::Result<bool> {
     let has_insights = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM analytics_insights
@@ -828,8 +857,8 @@ pub(crate) async fn seed_dashboard(
     if has_insights {
         return Ok(false);
     }
-    let mut ids = Vec::new();
-    for (insight_name, query) in insights {
+    let mut tiles = Vec::new();
+    for (insight_name, query, width) in insights {
         let row = InsightRow {
             id: InsightId::new(),
             project_id: scope.project_id,
@@ -840,7 +869,7 @@ pub(crate) async fn seed_dashboard(
             updated_at: now,
         };
         save_insight(&mut *conn, scope.workspace_id, &row).await?;
-        ids.push(row.id);
+        tiles.push(Tile { insight_id: row.id, width: *width });
     }
     let board = DashboardRow {
         id: DashboardId::new(),
@@ -850,7 +879,7 @@ pub(crate) async fn seed_dashboard(
         updated_at: now,
     };
     save_dashboard(&mut *conn, scope.workspace_id, &board).await?;
-    set_tiles(conn, scope.workspace_id, &board, &ids)
+    set_tiles(conn, scope.workspace_id, &board, &tiles)
         .await
         .map_err(|err| anyhow::anyhow!("seeding dashboard tiles: {err:?}"))?;
     Ok(true)

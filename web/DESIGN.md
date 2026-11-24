@@ -41,6 +41,8 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 | `TimeSeriesChart` | A line chart over time in hand-written SVG. Each `primary` series takes the next chart color (`chart-1` to `chart-4`: primary, secondary, accent, success) and the first gets an area; a `muted` series is the dashed previous period. Hover or arrow keys read a point. Empty data draws a flat baseline. |
 | `BarList` | A ranked list with a share bar behind each row (a `progress` element, so no width style), the top `limit` rows and a "Show all" button (`show-all`). |
 | `ReportGrid` | Lays report panels out two-up on wide screens, one column below, so the page needs no grid classes. |
+| `DashboardGrid`, `DashboardTile` | A dashboard's tiles on a 12-column grid (`gap-4`), one column below `lg`. Each tile is 4, 6, 8 or 12 columns wide (a third, half, two thirds, full) and a row is as tall as its tallest tile: tiles are `h-full`, the body is `flex-1`, and a compact chart (`TimeSeriesChart fill`) grows to the room, at least `min-h-48`. The tile is a panel: header `px-4 pt-4` (title link in `primary`, muted caption), body `px-4 pb-4`. In edit mode a bar on top holds the drag handle, a width `SegmentedControl` and Remove, and the title stops being a link. The handle reorders by pointer drag (a `primary` bar in the gutter shows the drop) or by arrow keys, and a live region says where the tile went. |
+| `SegmentedControl` | Two to five short, exclusive choices side by side (tile width; later Builder or Code). A radio group with one tab stop; arrow keys move the choice. A longer list is a `Select`. |
 
 ## List page
 
@@ -91,7 +93,8 @@ Analytics. A read-only page of numbers for a date range.
 - **Forms.** `Field` puts the label over the control. One column. The submit button goes bottom right in panels, in the card footer on settings.
 - **Destructive actions.** Always confirm with `runAction({ confirm })` and name the thing. Never a primary-colored destructive button outside the confirm dialog. On detail pages, Delete lives in the `DetailActions` menu.
 - **Loading.** Skeletons on first load (`SkeletonRows`; `DataTable`, `List` and `CardGrid` handle their own), `SubmitButton`'s `pending` while saving.
-- **Grids.** A page that needs a grid of cards uses `CardGrid`; any other grid goes in a component, so the page itself stays one column.
+- **Grids.** A page that needs a grid of cards uses `CardGrid`, a dashboard `DashboardGrid`; any other grid goes in a component, so the page itself stays one column.
+- **Edit modes.** A page that edits a layout in place (a dashboard) enters it with a header button ("Edit layout") and leaves through Cancel and a primary Done. Changes collect locally, Done saves once, and leaving the page with changes asks to discard them through `runAction`.
 
 ## Command palette
 

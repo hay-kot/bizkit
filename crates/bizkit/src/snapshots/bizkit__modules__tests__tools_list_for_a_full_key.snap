@@ -9,7 +9,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Make a dashboard: a name and saved insights in order",
+      "description": "Make a dashboard: a name and tiles of saved insights, in order, each with a width",
       "inputSchema": {
         "$defs": {
           "InsightId": {
@@ -19,18 +19,32 @@ expression: tools
           "ProjectId": {
             "format": "uuid",
             "type": "string"
+          },
+          "Tile": {
+            "additionalProperties": false,
+            "description": "One insight on a dashboard and how wide it shows.",
+            "properties": {
+              "insight_id": {
+                "$ref": "#/$defs/InsightId",
+                "description": "The insight, of the dashboard's project."
+              },
+              "width": {
+                "description": "Columns of a 12-column grid: 4, 6, 8 or 12. A row is as tall as its\ntallest tile.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "insight_id",
+              "width"
+            ],
+            "type": "object"
           }
         },
         "additionalProperties": false,
         "description": "A new dashboard.",
         "properties": {
-          "insight_ids": {
-            "description": "Insights of the project, in order; at most 20.",
-            "items": {
-              "$ref": "#/$defs/InsightId"
-            },
-            "type": "array"
-          },
           "name": {
             "description": "The display name.",
             "type": "string"
@@ -38,6 +52,13 @@ expression: tools
           "project_id": {
             "$ref": "#/$defs/ProjectId",
             "description": "The project."
+          },
+          "tiles": {
+            "description": "Tiles of the project's insights, in order; at most 20.",
+            "items": {
+              "$ref": "#/$defs/Tile"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -81,7 +102,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": true
       },
-      "description": "Show a dashboard and its insights in order",
+      "description": "Show a dashboard and its tiles in order",
       "inputSchema": {
         "$defs": {
           "DashboardId": {
@@ -137,7 +158,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Rename a dashboard or set its insights: the whole list, in order",
+      "description": "Rename a dashboard or set its tiles: the whole list, in order, with widths",
       "inputSchema": {
         "$defs": {
           "DashboardId": {
@@ -147,6 +168,27 @@ expression: tools
           "InsightId": {
             "format": "uuid",
             "type": "string"
+          },
+          "Tile": {
+            "additionalProperties": false,
+            "description": "One insight on a dashboard and how wide it shows.",
+            "properties": {
+              "insight_id": {
+                "$ref": "#/$defs/InsightId",
+                "description": "The insight, of the dashboard's project."
+              },
+              "width": {
+                "description": "Columns of a 12-column grid: 4, 6, 8 or 12. A row is as tall as its\ntallest tile.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "insight_id",
+              "width"
+            ],
+            "type": "object"
           }
         },
         "additionalProperties": false,
@@ -156,20 +198,20 @@ expression: tools
             "$ref": "#/$defs/DashboardId",
             "description": "The dashboard."
           },
-          "insight_ids": {
-            "description": "The whole new list of insights, in order; at most 20. Add, remove\nand reorder by sending the list.",
-            "items": {
-              "$ref": "#/$defs/InsightId"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
           "name": {
             "description": "The display name.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "tiles": {
+            "description": "The whole new list of tiles, in order; at most 20. Add, remove,\nreorder and resize by sending the list.",
+            "items": {
+              "$ref": "#/$defs/Tile"
+            },
+            "type": [
+              "array",
               "null"
             ]
           }

@@ -168,8 +168,9 @@ export default tseslint.config(
   },
   {
     // See web/DESIGN.md. Repeats the shared lists because a later block's
-    // no-restricted-classes replaces the earlier one.
-    files: ['src/pages/**/*.vue'],
+    // no-restricted-classes replaces the earlier one. Analytics components
+    // are held to it too, so dashboard layout stays in DashboardGrid.
+    files: ['src/pages/**/*.vue', 'src/components/analytics/**/*.vue'],
     rules: {
       'better-tailwindcss/no-restricted-classes': [
         'error',

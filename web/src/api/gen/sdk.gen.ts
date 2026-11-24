@@ -187,7 +187,7 @@ export const analyticsDashboardsList = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Make a dashboard: a name and saved insights in order
+ * Make a dashboard: a name and tiles of saved insights, in order, each with a width
  */
 export const analyticsDashboardsCreate = <ThrowOnError extends boolean = false>(options: Options<AnalyticsDashboardsCreateData, ThrowOnError>): RequestResult<AnalyticsDashboardsCreateResponses, AnalyticsDashboardsCreateErrors, ThrowOnError> => (options.client ?? client).post<AnalyticsDashboardsCreateResponses, AnalyticsDashboardsCreateErrors, ThrowOnError>({
     security: [{
@@ -217,7 +217,7 @@ export const analyticsDashboardsDelete = <ThrowOnError extends boolean = false>(
 });
 
 /**
- * Show a dashboard and its insights in order
+ * Show a dashboard and its tiles in order
  */
 export const analyticsDashboardsGet = <ThrowOnError extends boolean = false>(options: Options<AnalyticsDashboardsGetData, ThrowOnError>): RequestResult<AnalyticsDashboardsGetResponses, AnalyticsDashboardsGetErrors, ThrowOnError> => (options.client ?? client).get<AnalyticsDashboardsGetResponses, AnalyticsDashboardsGetErrors, ThrowOnError>({
     security: [{
@@ -230,7 +230,7 @@ export const analyticsDashboardsGet = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
- * Rename a dashboard or set its insights: the whole list, in order
+ * Rename a dashboard or set its tiles: the whole list, in order, with widths
  */
 export const analyticsDashboardsUpdate = <ThrowOnError extends boolean = false>(options: Options<AnalyticsDashboardsUpdateData, ThrowOnError>): RequestResult<AnalyticsDashboardsUpdateResponses, AnalyticsDashboardsUpdateErrors, ThrowOnError> => (options.client ?? client).patch<AnalyticsDashboardsUpdateResponses, AnalyticsDashboardsUpdateErrors, ThrowOnError>({
     security: [{

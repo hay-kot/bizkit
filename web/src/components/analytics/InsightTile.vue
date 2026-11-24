@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { ArrowDown, ArrowUp, Ellipsis, X } from 'lucide-vue-next'
-import { useId } from 'vue'
-
-import Menu from '@/components/ui/Menu.vue'
-import MenuItem from '@/components/ui/MenuItem.vue'
+import type { HandleBindings } from '@/components/ui/DashboardGrid.vue'
+import DashboardTile from '@/components/ui/DashboardTile.vue'
+import type { TileWidth } from '@/components/ui/dashboardGrid'
 import type { DayRange } from '@/lib/range'
 import { type Insight, useInsightResult } from '@/queries/analytics'
 
@@ -19,11 +17,12 @@ const props = defineProps<{
   insight: Insight
   range: DayRange
   to: string
-  first: boolean
-  last: boolean
+  editing: boolean
+  handle: HandleBindings
+  locked?: boolean
 }>()
-defineEmits<{ up: []; down: []; remove: [] }>()
-const headingId = useId()
+const width = defineModel<TileWidth>('width', { required: true })
+defineEmits<{ remove: [] }>()
 const result = useInsightResult(
   () => props.workspaceId,
   () => props.insight.project_id,
@@ -33,49 +32,21 @@ const result = useInsightResult(
 </script>
 
 <template>
-  <section
-    class="flex flex-col gap-4 rounded-box border border-base-300 bg-base-100 p-4"
-    :aria-labelledby="headingId"
+  <DashboardTile
+    v-model:width="width"
+    :title="insight.name"
+    :description="describeQuery(insight.query)"
+    :to="to"
+    :editing="editing"
+    :handle="handle"
+    :locked="locked"
+    @remove="$emit('remove')"
   >
-    <div class="flex items-start justify-between gap-2">
-      <div class="flex min-w-0 flex-col">
-        <RouterLink :id="headingId" :to="to" class="link truncate font-medium">
-          {{ insight.name }}
-        </RouterLink>
-        <span class="truncate text-xs text-base-content/70">{{
-          describeQuery(insight.query)
-        }}</span>
-      </div>
-      <Menu :label="`${insight.name} tile`" align="end">
-        <template #trigger="{ open, toggle, controls }">
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            :aria-label="`${insight.name} tile actions`"
-            aria-haspopup="menu"
-            :aria-expanded="open"
-            :aria-controls="controls"
-            @click="toggle"
-          >
-            <Ellipsis class="size-4" aria-hidden="true" />
-          </button>
-        </template>
-        <MenuItem v-if="!first" @select="$emit('up')">
-          <ArrowUp class="size-4" aria-hidden="true" />Move up
-        </MenuItem>
-        <MenuItem v-if="!last" @select="$emit('down')">
-          <ArrowDown class="size-4" aria-hidden="true" />Move down
-        </MenuItem>
-        <MenuItem danger @select="$emit('remove')">
-          <X class="size-4" aria-hidden="true" />Remove from dashboard
-        </MenuItem>
-      </Menu>
-    </div>
     <InsightResultView
       :result="result.data.value"
       :loading="result.isLoading.value"
       :error="result.error.value"
       compact
     />
-  </section>
+  </DashboardTile>
 </template>

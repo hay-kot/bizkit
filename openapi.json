@@ -931,7 +931,7 @@
         "tags": [
           "analytics"
         ],
-        "summary": "Make a dashboard: a name and saved insights in order",
+        "summary": "Make a dashboard: a name and tiles of saved insights, in order, each with a width",
         "operationId": "analytics.dashboards.create",
         "parameters": [
           {
@@ -954,13 +954,6 @@
                   "name"
                 ],
                 "properties": {
-                  "insight_ids": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/InsightId"
-                    },
-                    "description": "Insights of the project, in order; at most 20."
-                  },
                   "name": {
                     "type": "string",
                     "description": "The display name."
@@ -968,6 +961,13 @@
                   "project_id": {
                     "$ref": "#/components/schemas/ProjectId",
                     "description": "The project."
+                  },
+                  "tiles": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Tile"
+                    },
+                    "description": "Tiles of the project's insights, in order; at most 20."
                   }
                 },
                 "additionalProperties": false
@@ -1054,7 +1054,7 @@
         "tags": [
           "analytics"
         ],
-        "summary": "Show a dashboard and its insights in order",
+        "summary": "Show a dashboard and its tiles in order",
         "operationId": "analytics.dashboards.get",
         "parameters": [
           {
@@ -1243,7 +1243,7 @@
         "tags": [
           "analytics"
         ],
-        "summary": "Rename a dashboard or set its insights: the whole list, in order",
+        "summary": "Rename a dashboard or set its tiles: the whole list, in order, with widths",
         "operationId": "analytics.dashboards.update",
         "parameters": [
           {
@@ -1271,22 +1271,22 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "insight_ids": {
-                    "type": [
-                      "array",
-                      "null"
-                    ],
-                    "items": {
-                      "$ref": "#/components/schemas/InsightId"
-                    },
-                    "description": "The whole new list of insights, in order; at most 20. Add, remove\nand reorder by sending the list."
-                  },
                   "name": {
                     "type": [
                       "string",
                       "null"
                     ],
                     "description": "The display name."
+                  },
+                  "tiles": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/components/schemas/Tile"
+                    },
+                    "description": "The whole new list of tiles, in order; at most 20. Add, remove,\nreorder and resize by sending the list."
                   }
                 },
                 "additionalProperties": false
@@ -16967,12 +16967,12 @@
       },
       "Dashboard": {
         "type": "object",
-        "description": "A dashboard: insights in order, shown two to a row.",
+        "description": "A dashboard: tiles in order, laid out left to right on a 12-column grid.",
         "required": [
           "id",
           "project_id",
           "name",
-          "insight_ids",
+          "tiles",
           "created_at",
           "updated_at"
         ],
@@ -16985,13 +16985,6 @@
             "$ref": "#/components/schemas/DashboardId",
             "description": "The dashboard ID."
           },
-          "insight_ids": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InsightId"
-            },
-            "description": "Its insights, in order."
-          },
           "name": {
             "type": "string",
             "description": "The display name."
@@ -16999,6 +16992,13 @@
           "project_id": {
             "$ref": "#/components/schemas/ProjectId",
             "description": "The project."
+          },
+          "tiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tile"
+            },
+            "description": "Its tiles, in order."
           },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -21068,6 +21068,27 @@
             "description": "The recorded run, with what the script returned and logged."
           }
         }
+      },
+      "Tile": {
+        "type": "object",
+        "description": "One insight on a dashboard and how wide it shows.",
+        "required": [
+          "insight_id",
+          "width"
+        ],
+        "properties": {
+          "insight_id": {
+            "$ref": "#/components/schemas/InsightId",
+            "description": "The insight, of the dashboard's project."
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Columns of a 12-column grid: 4, 6, 8 or 12. A row is as tall as its\ntallest tile.",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
       },
       "TimesBucket": {
         "type": "object",

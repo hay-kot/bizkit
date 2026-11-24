@@ -124,7 +124,7 @@ const target = ref(NEW_DASHBOARD)
 const dashboardName = ref('')
 const dashboardOptions = computed(() => [
   ...(dashboards.data.value?.items ?? [])
-    .filter((board) => !board.insight_ids.includes(props.insightId))
+    .filter((board) => !board.tiles.some((tile) => tile.insight_id === props.insightId))
     .map((board) => ({ value: board.id, label: board.name })),
   { value: NEW_DASHBOARD, label: 'New dashboard' },
 ])
@@ -150,7 +150,7 @@ async function onPin() {
       body: {
         project_id: props.projectId,
         name: dashboardName.value,
-        insight_ids: [props.insightId],
+        tiles: [{ insight_id: props.insightId, width: 6 }],
       },
     })
     boardId = board.id
@@ -158,7 +158,7 @@ async function onPin() {
     const board = dashboards.data.value?.items.find((b) => b.id === boardId)
     await updateDashboard.mutateAsync({
       path: { ...path, dashboard_id: boardId },
-      body: { insight_ids: [...(board?.insight_ids ?? []), props.insightId] },
+      body: { tiles: [...(board?.tiles ?? []), { insight_id: props.insightId, width: 6 }] },
     })
   }
   pinning.value = false

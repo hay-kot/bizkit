@@ -26,10 +26,12 @@ export interface ChartSeries {
 /**
  * A line chart over time, drawn as SVG. Hover, or focus and use the arrow
  * keys, to read a point. Screen readers get a summary and a hidden table.
+ * With `fill` the plot grows to the space its flex parent gives it, at
+ * least 12rem, and `height` only applies before the first layout.
  */
 const props = withDefaults(
-  defineProps<{ points: ChartPoint[]; series: ChartSeries[]; height?: number }>(),
-  { height: 240 },
+  defineProps<{ points: ChartPoint[]; series: ChartSeries[]; height?: number; fill?: boolean }>(),
+  { height: 240, fill: false },
 )
 
 // Static class strings, so Tailwind sees every one. Past four series the
@@ -62,8 +64,13 @@ const box = ref<HTMLElement>()
 const { width: measured } = useElementSize(box)
 // Before the first layout (and in tests) the box has no width yet.
 const width = computed(() => measured.value || 600)
+// In fill mode the SVG sits absolutely in its box, so the box's height comes
+// from the layout and never from the SVG it sizes.
+const plotBox = ref<HTMLElement>()
+const { height: measuredHeight } = useElementSize(plotBox)
+const drawHeight = computed(() => (props.fill && measuredHeight.value) || props.height)
 const plotWidth = computed(() => Math.max(1, width.value - PAD.left - PAD.right))
-const plotHeight = computed(() => Math.max(1, props.height - PAD.top - PAD.bottom))
+const plotHeight = computed(() => Math.max(1, drawHeight.value - PAD.top - PAD.bottom))
 const baseline = computed(() => PAD.top + plotHeight.value)
 
 const ticks = computed(() => {
@@ -170,7 +177,7 @@ const summary = computed(() => {
 </script>
 
 <template>
-  <div ref="box" class="relative w-full">
+  <div ref="box" class="relative w-full" :class="{ 'flex flex-1 flex-col': fill }">
     <ul
       v-if="series.length > 1"
       class="mb-2 flex flex-wrap gap-4 text-xs text-base-content/70"
@@ -181,115 +188,118 @@ const summary = computed(() => {
         {{ s.name }}
       </li>
     </ul>
-    <svg
-      :width="width"
-      :height="height"
-      :viewBox="`0 0 ${width} ${height}`"
-      role="img"
-      :aria-label="summary"
-      :tabindex="points.length ? 0 : undefined"
-      class="block overflow-visible rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      @pointermove="onPointer"
-      @pointerleave="active = undefined"
-      @focus="active = points.length ? points.length - 1 : undefined"
-      @blur="active = undefined"
-      @keydown="onKey"
-    >
-      <g aria-hidden="true">
-        <g v-for="tick in ticks" :key="tick">
-          <line
-            :x1="PAD.left"
-            :x2="width - PAD.right"
-            :y1="y(tick)"
-            :y2="y(tick)"
-            class="stroke-base-300"
-            :stroke-dasharray="tick === 0 ? undefined : '2 4'"
-          />
+    <div ref="plotBox" :class="{ 'relative min-h-48 flex-1': fill }">
+      <svg
+        :width="width"
+        :height="drawHeight"
+        :viewBox="`0 0 ${width} ${drawHeight}`"
+        role="img"
+        :aria-label="summary"
+        :tabindex="points.length ? 0 : undefined"
+        class="block overflow-visible rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        :class="{ 'absolute inset-0': fill }"
+        @pointermove="onPointer"
+        @pointerleave="active = undefined"
+        @focus="active = points.length ? points.length - 1 : undefined"
+        @blur="active = undefined"
+        @keydown="onKey"
+      >
+        <g aria-hidden="true">
+          <g v-for="tick in ticks" :key="tick">
+            <line
+              :x1="PAD.left"
+              :x2="width - PAD.right"
+              :y1="y(tick)"
+              :y2="y(tick)"
+              class="stroke-base-300"
+              :stroke-dasharray="tick === 0 ? undefined : '2 4'"
+            />
+            <text
+              :x="PAD.left - 8"
+              :y="y(tick)"
+              text-anchor="end"
+              dominant-baseline="middle"
+              class="fill-base-content/70 text-xs tabular-nums"
+            >
+              {{ formatCompactNumber(tick) }}
+            </text>
+          </g>
           <text
-            :x="PAD.left - 8"
-            :y="y(tick)"
-            text-anchor="end"
-            dominant-baseline="middle"
-            class="fill-base-content/70 text-xs tabular-nums"
+            v-for="tick in xLabels"
+            :key="tick.i"
+            :x="x(tick.i)"
+            :y="drawHeight - 8"
+            :text-anchor="tick.anchor"
+            class="fill-base-content/70 text-xs"
           >
-            {{ formatCompactNumber(tick) }}
+            {{ tick.label }}
           </text>
-        </g>
-        <text
-          v-for="tick in xLabels"
-          :key="tick.i"
-          :x="x(tick.i)"
-          :y="height - 8"
-          :text-anchor="tick.anchor"
-          class="fill-base-content/70 text-xs"
-        >
-          {{ tick.label }}
-        </text>
 
-        <template v-if="points.length">
-          <template v-for="s in lines" :key="`area-${s.name}`">
-            <path v-if="s.area" :d="s.area" class="fill-chart-1/10" />
+          <template v-if="points.length">
+            <template v-for="s in lines" :key="`area-${s.name}`">
+              <path v-if="s.area" :d="s.area" class="fill-chart-1/10" />
+            </template>
+            <path
+              v-for="(s, i) in lines"
+              :key="`line-${s.name}`"
+              :d="s.line"
+              fill="none"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              :stroke-dasharray="s.tone === 'muted' ? '4 4' : undefined"
+              class="stroke-2"
+              :class="tones[i]?.line"
+            />
           </template>
-          <path
-            v-for="(s, i) in lines"
-            :key="`line-${s.name}`"
-            :d="s.line"
-            fill="none"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            :stroke-dasharray="s.tone === 'muted' ? '4 4' : undefined"
-            class="stroke-2"
-            :class="tones[i]?.line"
-          />
-        </template>
 
-        <g v-if="active !== undefined && activePoint">
-          <line
-            :x1="x(active)"
-            :x2="x(active)"
-            :y1="PAD.top"
-            :y2="baseline"
-            class="stroke-base-content/30"
-          />
-          <circle
-            v-for="(s, i) in series"
-            :key="s.name"
-            :cx="x(active)"
-            :cy="y(activePoint.values[i] ?? 0)"
-            r="4"
-            class="stroke-base-100 stroke-2"
-            :class="tones[i]?.dot"
-          />
-          <!-- HTML inside the SVG, so the tooltip is placed with attributes rather than an inline style. -->
-          <foreignObject
-            :x="tooltipX"
-            :y="PAD.top"
-            :width="TOOLTIP_WIDTH"
-            :height="TOOLTIP_HEIGHT"
-            class="pointer-events-none overflow-visible"
-          >
-            <div class="flex" :class="tooltipOnLeft ? 'justify-end' : 'justify-start'">
-              <div
-                class="flex flex-col gap-0.5 rounded-box border border-base-300 bg-raised px-2.5 py-1.5 text-xs shadow-md"
-              >
-                <span class="font-medium whitespace-nowrap">{{ activePoint.label }}</span>
-                <span
-                  v-for="(s, i) in series"
-                  :key="s.name"
-                  class="flex items-center gap-2 whitespace-nowrap"
+          <g v-if="active !== undefined && activePoint">
+            <line
+              :x1="x(active)"
+              :x2="x(active)"
+              :y1="PAD.top"
+              :y2="baseline"
+              class="stroke-base-content/30"
+            />
+            <circle
+              v-for="(s, i) in series"
+              :key="s.name"
+              :cx="x(active)"
+              :cy="y(activePoint.values[i] ?? 0)"
+              r="4"
+              class="stroke-base-100 stroke-2"
+              :class="tones[i]?.dot"
+            />
+            <!-- HTML inside the SVG, so the tooltip is placed with attributes rather than an inline style. -->
+            <foreignObject
+              :x="tooltipX"
+              :y="PAD.top"
+              :width="TOOLTIP_WIDTH"
+              :height="TOOLTIP_HEIGHT"
+              class="pointer-events-none overflow-visible"
+            >
+              <div class="flex" :class="tooltipOnLeft ? 'justify-end' : 'justify-start'">
+                <div
+                  class="flex flex-col gap-0.5 rounded-box border border-base-300 bg-raised px-2.5 py-1.5 text-xs shadow-md"
                 >
-                  <span class="size-2 rounded-full" :class="tones[i]?.swatch"></span>
-                  <span class="text-base-content/70">{{ s.name }}</span>
-                  <span class="ml-auto font-medium tabular-nums">{{
-                    formatNumber(activePoint.values[i] ?? 0)
-                  }}</span>
-                </span>
+                  <span class="font-medium whitespace-nowrap">{{ activePoint.label }}</span>
+                  <span
+                    v-for="(s, i) in series"
+                    :key="s.name"
+                    class="flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <span class="size-2 rounded-full" :class="tones[i]?.swatch"></span>
+                    <span class="text-base-content/70">{{ s.name }}</span>
+                    <span class="ml-auto font-medium tabular-nums">{{
+                      formatNumber(activePoint.values[i] ?? 0)
+                    }}</span>
+                  </span>
+                </div>
               </div>
-            </div>
-          </foreignObject>
+            </foreignObject>
+          </g>
         </g>
-      </g>
-    </svg>
+      </svg>
+    </div>
     <p
       v-if="!points.length"
       class="absolute inset-0 flex items-center justify-center text-sm text-base-content/70"

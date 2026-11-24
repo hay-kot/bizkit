@@ -449,7 +449,7 @@ export type CreatedApiKey = {
 };
 
 /**
- * A dashboard: insights in order, shown two to a row.
+ * A dashboard: tiles in order, laid out left to right on a 12-column grid.
  */
 export type Dashboard = {
     /**
@@ -461,10 +461,6 @@ export type Dashboard = {
      */
     id: DashboardId;
     /**
-     * Its insights, in order.
-     */
-    insight_ids: Array<InsightId>;
-    /**
      * The display name.
      */
     name: string;
@@ -472,6 +468,10 @@ export type Dashboard = {
      * The project.
      */
     project_id: ProjectId;
+    /**
+     * Its tiles, in order.
+     */
+    tiles: Array<Tile>;
     /**
      * When it last changed.
      */
@@ -2971,6 +2971,21 @@ export type TestResult = {
 };
 
 /**
+ * One insight on a dashboard and how wide it shows.
+ */
+export type Tile = {
+    /**
+     * The insight, of the dashboard's project.
+     */
+    insight_id: InsightId;
+    /**
+     * Columns of a 12-column grid: 4, 6, 8 or 12. A row is as tall as its
+     * tallest tile.
+     */
+    width: number;
+};
+
+/**
  * People who did the event this many times.
  */
 export type TimesBucket = {
@@ -3597,10 +3612,6 @@ export type AnalyticsDashboardsListResponse = AnalyticsDashboardsListResponses[k
 export type AnalyticsDashboardsCreateData = {
     body: {
         /**
-         * Insights of the project, in order; at most 20.
-         */
-        insight_ids?: Array<InsightId>;
-        /**
          * The display name.
          */
         name: string;
@@ -3608,6 +3619,10 @@ export type AnalyticsDashboardsCreateData = {
          * The project.
          */
         project_id: ProjectId;
+        /**
+         * Tiles of the project's insights, in order; at most 20.
+         */
+        tiles?: Array<Tile>;
     };
     path: {
         /**
@@ -3756,14 +3771,14 @@ export type AnalyticsDashboardsGetResponse = AnalyticsDashboardsGetResponses[key
 export type AnalyticsDashboardsUpdateData = {
     body: {
         /**
-         * The whole new list of insights, in order; at most 20. Add, remove
-         * and reorder by sending the list.
-         */
-        insight_ids?: Array<InsightId> | null;
-        /**
          * The display name.
          */
         name?: string | null;
+        /**
+         * The whole new list of tiles, in order; at most 20. Add, remove,
+         * reorder and resize by sending the list.
+         */
+        tiles?: Array<Tile> | null;
     };
     path: {
         /**
