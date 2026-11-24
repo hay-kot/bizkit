@@ -39,7 +39,7 @@ const result = useInsightResult(
   >
     <div class="flex items-start justify-between gap-2">
       <div class="flex min-w-0 flex-col">
-        <RouterLink :id="headingId" :to="to" class="truncate font-medium text-primary">
+        <RouterLink :id="headingId" :to="to" class="link truncate font-medium">
           {{ insight.name }}
         </RouterLink>
         <span class="truncate text-xs text-base-content/70">{{

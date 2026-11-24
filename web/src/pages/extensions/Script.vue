@@ -505,10 +505,11 @@ function summaryOf(run: Run): string {
               ? 'Runs show here as submissions come in.'
               : 'Runs show here after each event.',
           }"
+          :row-title="(r) => formatDateTime(r.created_at)"
           @row-click="(r) => (viewing = r)"
         >
           <template #cell-when="{ row }">
-            <span class="text-sm whitespace-nowrap" :title="formatDateTime(row.created_at)">
+            <span class="text-sm whitespace-nowrap">
               {{ formatRelative(row.created_at) }}
             </span>
           </template>

@@ -121,8 +121,8 @@ const recentColumns = [
   { key: 'time', label: 'Time' },
   { key: 'name', label: 'Event' },
   { key: 'person', label: 'Person', interactive: true },
-  { key: 'page', label: 'Page' },
-  { key: 'props', label: 'Properties' },
+  { key: 'page', label: 'Page', interactive: true },
+  { key: 'props', label: 'Properties', interactive: true },
 ]
 
 function personPath(personId: string) {

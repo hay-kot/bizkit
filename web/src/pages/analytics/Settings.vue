@@ -116,7 +116,7 @@ const createGoal = useCreateGoal()
 const deleteGoal = useDeleteGoal()
 const goalColumns = [
   { key: 'name', label: 'Name' },
-  { key: 'match', label: 'Matches' },
+  { key: 'match', label: 'Matches', interactive: true },
   { key: 'actions', label: 'Actions', hidden: true, class: 'w-16 text-right', interactive: true },
 ]
 const goalKinds: { value: GoalKind; label: string }[] = [

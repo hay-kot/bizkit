@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T">
-import type { Component } from 'vue'
+import { computed, watchEffect, type Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -17,7 +17,7 @@ export interface Column {
   class?: string
   /**
    * The cell that carries the row's link or button when rows are clickable.
-   * Defaults to the first column.
+   * Defaults to the first column that is neither hidden nor interactive.
    */
   primary?: boolean
   /**
@@ -42,6 +42,11 @@ const props = withDefaults(
     rows: T[] | undefined
     rowKey: (row: T) => string
     rowTo?: (row: T) => RouteLocationRaw | undefined
+    /**
+     * A tooltip for the row's link or button. The hit area covers the row, so
+     * a `title` on anything else in a clickable row never shows.
+     */
+    rowTitle?: (row: T) => string | undefined
     loading?: boolean
     error?: unknown
     empty?: { title: string; message?: string; icon?: Component }
@@ -52,6 +57,7 @@ const props = withDefaults(
   }>(),
   {
     rowTo: undefined,
+    rowTitle: undefined,
     loading: false,
     error: undefined,
     empty: undefined,
@@ -70,7 +76,25 @@ defineSlots<
   }
 >()
 
-const primaryKey = () => (props.columns.find((c) => c.primary) ?? props.columns[0])?.key
+const primaryKey = computed(
+  () =>
+    (props.columns.find((c) => c.primary) ?? props.columns.find((c) => !c.hidden && !c.interactive))
+      ?.key,
+)
+
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    if (!props.rowTo && !props.onRowClick) return
+    const at = props.columns.findIndex((c) => c.key === primaryKey.value)
+    if (props.columns.slice(0, at + 1).some((c) => c.interactive)) {
+      console.warn(
+        `DataTable: the primary column "${primaryKey.value}" is interactive or comes after an interactive column, so the row's hit area covers that column's controls.`,
+      )
+    }
+  })
+}
+
+const entries = computed(() => (props.rows ?? []).map((row) => ({ row, to: props.rowTo?.(row) })))
 
 // One real link or button per row, stretched over the row by its ::after,
 // rather than a <tr role="link"> with a click handler: a real link keeps
@@ -81,8 +105,8 @@ const target = [
   'focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-primary',
 ]
 
-function clickable(row: T): boolean {
-  return props.rowTo?.(row) !== undefined || props.onRowClick !== undefined
+function clickable(to: RouteLocationRaw | undefined): boolean {
+  return to !== undefined || props.onRowClick !== undefined
 }
 
 function cellClass(column: Column) {
@@ -116,24 +140,28 @@ function cellClass(column: Column) {
       </thead>
       <tbody>
         <tr
-          v-for="row in rows"
+          v-for="{ row, to } in entries"
           :key="rowKey(row)"
           :class="[
-            clickable(row) ? 'relative cursor-pointer transition-colors hover:bg-base-200' : '',
+            clickable(to) ? 'relative cursor-pointer transition-colors hover:bg-base-200' : '',
             rowClass?.(row),
           ]"
         >
           <td v-for="column in columns" :key="column.key" :class="cellClass(column)">
-            <template v-if="column.key === primaryKey() && rowTo?.(row) !== undefined">
-              <RouterLink :to="rowTo(row)!" :class="target">
-                <slot :name="`cell-${column.key}`" :row="row" />
-              </RouterLink>
-            </template>
+            <RouterLink
+              v-if="column.key === primaryKey && to !== undefined"
+              :to="to"
+              :title="rowTitle?.(row)"
+              :class="target"
+            >
+              <slot :name="`cell-${column.key}`" :row="row" />
+            </RouterLink>
             <button
-              v-else-if="column.key === primaryKey() && onRowClick"
+              v-else-if="column.key === primaryKey && onRowClick"
               type="button"
               class="cursor-pointer text-start"
               :class="target"
+              :title="rowTitle?.(row)"
               @click="onRowClick(row)"
             >
               <slot :name="`cell-${column.key}`" :row="row" />

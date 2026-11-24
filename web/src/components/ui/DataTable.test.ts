@@ -167,4 +167,87 @@ describe('DataTable', () => {
     expect(cells[0]!.find('a').exists()).toBe(false)
     expect(cells[1]!.find('a').text()).toBe('Site')
   })
+
+  it('skips hidden and interactive columns when it picks the primary column', async () => {
+    const router = await withRouter()
+    const wrapper = mount(DataTable<Row>, {
+      props: {
+        columns: [
+          { key: 'actions', label: 'Actions', hidden: true },
+          { key: 'slug', label: 'Slug', interactive: true },
+          { key: 'name', label: 'Name' },
+        ],
+        rows,
+        rowKey: (r) => r.id,
+        rowTo: (r) => `/items/${r.id}`,
+      },
+      slots: { ...slots, 'cell-slug': ({ row }: { row: Row }) => h('code', row.id) },
+      global: { plugins: [router] },
+    })
+    const cells = wrapper.findAll('tbody tr')[0]!.findAll('td')
+    expect(cells[2]!.find('a').text()).toBe('Site')
+    expect(wrapper.findAll('tbody a')).toHaveLength(2)
+  })
+
+  it('warns when the primary column comes after an interactive one', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const router = await withRouter()
+    mount(DataTable<Row>, {
+      props: {
+        columns: [
+          { key: 'actions', label: 'Actions', interactive: true },
+          { key: 'name', label: 'Name', primary: true },
+        ],
+        rows,
+        rowKey: (r) => r.id,
+        rowTo: (r) => `/items/${r.id}`,
+      },
+      slots,
+      global: { plugins: [router] },
+    })
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0]![0]).toContain('"name"')
+
+    warn.mockClear()
+    mount(DataTable<Row>, {
+      props: { columns, rows, rowKey: (r) => r.id, rowTo: (r) => `/items/${r.id}` },
+      slots,
+      global: { plugins: [router] },
+    })
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('puts the row title on the link, the one element the pointer reaches', async () => {
+    const router = await withRouter()
+    const wrapper = mount(DataTable<Row>, {
+      props: {
+        columns,
+        rows,
+        rowKey: (r) => r.id,
+        rowTo: (r) => `/items/${r.id}`,
+        rowTitle: (r) => `Opened ${r.name}`,
+      },
+      slots,
+      global: { plugins: [router] },
+    })
+    expect(wrapper.find('tbody a').attributes('title')).toBe('Opened Site')
+
+    const clicks = mount(DataTable<Row>, {
+      props: { columns, rows, rowKey: (r) => r.id, onRowClick: () => {}, rowTitle: () => 'When' },
+      slots,
+    })
+    expect(clicks.find('tbody td button').attributes('title')).toBe('When')
+  })
+
+  it('calls rowTo once per row', async () => {
+    const router = await withRouter()
+    const rowTo = vi.fn((r: Row) => `/items/${r.id}`)
+    mount(DataTable<Row>, {
+      props: { columns, rows, rowKey: (r) => r.id, rowTo },
+      slots,
+      global: { plugins: [router] },
+    })
+    expect(rowTo).toHaveBeenCalledTimes(rows.length)
+  })
 })

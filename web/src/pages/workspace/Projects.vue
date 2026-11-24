@@ -24,7 +24,7 @@ const panelOpen = ref(false)
 useCreateIntent(openPanel)
 const columns = [
   { key: 'name', label: 'Name' },
-  { key: 'slug', label: 'Slug' },
+  { key: 'slug', label: 'Slug', interactive: true },
   { key: 'created', label: 'Created' },
   { key: 'actions', label: 'Actions', hidden: true, class: 'w-12 text-right', interactive: true },
 ]
