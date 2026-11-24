@@ -9,6 +9,7 @@ use bizkit_core::auth::{is_plausible_email, normalize_email};
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::jobs::Enqueue;
 use bizkit_core::ops::{Access, Level, Method, NoContent, OpCtx, Operation, Scope, Success};
+use bizkit_core::time::UnixMillis;
 use bizkit_core::validate::{FieldErrors, Validate, check_name, present};
 use bizkit_core::{ApiError, ModuleContext, Platform};
 use http::StatusCode;
@@ -24,7 +25,7 @@ use crate::api::{
 use crate::capture::FORM_KIND;
 use crate::contacts::{self, NewContact, Source};
 use crate::render::{self, Frame, Merge};
-use crate::send::{self, FanOut};
+use crate::send::{self, FanOut, StartBroadcast};
 use crate::store::{
     self, BroadcastRow, ContactFilter, ContactRow, DeliveryFilter, DeliveryRow, ListRow,
 };
@@ -42,6 +43,9 @@ pub(crate) const MAX_BODY: usize = 100_000;
 const MAX_TAGS: usize = 20;
 const MAX_TAG: usize = 50;
 const NOT_DRAFT: &str = "the broadcast was sent; only drafts change";
+const SCHEDULED: &str = "the broadcast is scheduled; cancel it first";
+/// How far ahead a broadcast can be scheduled.
+const MAX_SCHEDULE: Duration = Duration::from_hours(24 * 365);
 
 pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.scope_area("mailing", "Mailing lists, contacts, broadcasts and sequences")?;
@@ -65,6 +69,8 @@ pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
     cx.op(BroadcastsTest)?;
     cx.op(BroadcastsSend)?;
     cx.op(BroadcastsResend)?;
+    cx.op(BroadcastsCancel)?;
+    cx.op(BroadcastsResume)?;
     cx.op(DeliveriesList)?;
     cx.op(FormsList)?;
     crate::suppression_ops::register(cx)?;
@@ -172,9 +178,17 @@ pub(crate) fn contact_to_api(row: ContactRow) -> anyhow::Result<Contact> {
 }
 
 fn broadcast_to_api(row: BroadcastRow) -> anyhow::Result<Broadcast> {
+    let stored = BroadcastStatus::parse(&row.status)
+        .with_context(|| format!("unknown broadcast status {:?}", row.status))?;
+    let status = if row.paused_at.is_some() {
+        BroadcastStatus::Paused
+    } else if stored == BroadcastStatus::Draft && row.send_at.is_some() {
+        BroadcastStatus::Scheduled
+    } else {
+        stored
+    };
     Ok(Broadcast {
-        status: BroadcastStatus::parse(&row.status)
-            .with_context(|| format!("unknown broadcast status {:?}", row.status))?,
+        status,
         id: row.id,
         list_id: row.list_id,
         subject: row.subject,
@@ -182,6 +196,9 @@ fn broadcast_to_api(row: BroadcastRow) -> anyhow::Result<Broadcast> {
         tag: row.tag,
         recipients: count(row.recipients),
         sent_at: row.sent_at,
+        send_at: row.send_at,
+        paused_at: row.paused_at,
+        pause_reason: row.pause_reason,
         deliveries: None,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -674,6 +691,21 @@ pub(crate) struct TestBroadcast {
 }
 impl Validate for TestBroadcast {}
 
+/// When to send a draft.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SendBroadcast {
+    /// The workspace.
+    workspace_id: WorkspaceId,
+    /// The broadcast.
+    broadcast_id: BroadcastId,
+    /// Send at this time instead of now: in the future and within a year.
+    /// The broadcast stays a draft, shown as `scheduled`, until then.
+    #[serde(default)]
+    send_at: Option<UnixMillis>,
+}
+impl Validate for SendBroadcast {}
+
 /// Which deliveries to list. Give exactly one of `broadcast_id`,
 /// `contact_id` and `sequence_id`.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -1126,6 +1158,10 @@ impl Operation for BroadcastsCreate {
             sent_at: None,
             created_at: now,
             updated_at: now,
+            send_at: None,
+            paused_at: None,
+            pause_reason: None,
+            failures_in_row: 0,
         };
         store::insert_broadcast(&mut *tx, &row).await?;
         tx.commit().await?;
@@ -1179,6 +1215,9 @@ impl Operation for BroadcastsUpdate {
         if row.status != BroadcastStatus::Draft.as_str() {
             return Err(ApiError::Conflict(NOT_DRAFT.to_owned()));
         }
+        if row.send_at.is_some() {
+            return Err(ApiError::Conflict(SCHEDULED.to_owned()));
+        }
         if let Some(list_id) = input.list_id {
             if store::find_list(&mut *tx, input.workspace_id, list_id).await?.is_none() {
                 return Err(field_error("list_id", "is not a list of this workspace"));
@@ -1219,6 +1258,9 @@ impl Operation for BroadcastsDelete {
         let row = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
         if row.status != BroadcastStatus::Draft.as_str() {
             return Err(ApiError::Conflict(NOT_DRAFT.to_owned()));
+        }
+        if row.send_at.is_some() {
+            return Err(ApiError::Conflict(SCHEDULED.to_owned()));
         }
         store::delete_broadcast(&mut *tx, input.workspace_id, input.broadcast_id).await?;
         tx.commit().await?;
@@ -1264,30 +1306,47 @@ impl Operation for BroadcastsTest {
 
 struct BroadcastsSend;
 impl Operation for BroadcastsSend {
-    type Input = InBroadcast;
+    type Input = SendBroadcast;
     type Output = Broadcast;
     const ID: &'static str = "mailing.broadcasts.send";
     const METHOD: Method = Method::Post;
     const PATH: &'static str = "/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/send";
     const ACCESS: Access = WRITE;
-    const SUMMARY: &'static str = "Send a draft broadcast to its list's subscribers";
+    // With send_at, the draft waits as `scheduled` until then.
+    const SUMMARY: &'static str = "Send a draft broadcast to its list's subscribers, now or later";
     const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
     const TAGS: &'static [&'static str] = TAGS;
 
-    async fn call(&self, cx: OpCtx, input: InBroadcast) -> Result<Broadcast, ApiError> {
+    async fn call(&self, cx: OpCtx, input: SendBroadcast) -> Result<Broadcast, ApiError> {
         let platform = cx.platform();
+        let now = cx.now();
+        if let Some(at) = input.send_at
+            && (at <= now || at > now.plus(MAX_SCHEDULE))
+        {
+            return Err(field_error("send_at", "must be in the future and within a year"));
+        }
         let mut tx = cx.write().await?;
         let mut row = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
         if row.status != BroadcastStatus::Draft.as_str() {
             return Err(ApiError::Conflict(NOT_DRAFT.to_owned()));
         }
-        let now = cx.now();
-        BroadcastStatus::Sending.as_str().clone_into(&mut row.status);
-        row.sent_at = Some(now);
-        row.updated_at = now;
-        store::update_broadcast(&mut *tx, &row).await?;
-        let job = FanOut { workspace_id: row.workspace_id, broadcast_id: row.id };
-        platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
+        if row.send_at.is_some() {
+            return Err(ApiError::Conflict(SCHEDULED.to_owned()));
+        }
+        match input.send_at {
+            Some(at) => {
+                row.send_at = Some(at);
+                row.updated_at = now;
+                store::update_broadcast(&mut *tx, &row).await?;
+                let job = StartBroadcast {
+                    workspace_id: row.workspace_id,
+                    broadcast_id: row.id,
+                    due: at,
+                };
+                platform.bus().enqueue(&mut tx, &job, Enqueue { run_at: Some(at) }).await?;
+            }
+            None => send::start(platform, &mut tx, &mut row).await?,
+        }
         tx.commit().await?;
         Ok(broadcast_to_api(row)?)
     }
@@ -1316,6 +1375,11 @@ impl Operation for BroadcastsResend {
                 "only a sent broadcast resends; wait until every mail is queued".to_owned(),
             ));
         }
+        if row.paused_at.is_some() {
+            return Err(ApiError::Conflict(
+                "the broadcast is paused; resume it to send the rest".to_owned(),
+            ));
+        }
         let requeued = store::requeue_failed(&mut *tx, row.workspace_id, row.id).await?;
         for delivery_id in &requeued {
             let job = send::Send { workspace_id: row.workspace_id, delivery_id: *delivery_id };
@@ -1323,6 +1387,75 @@ impl Operation for BroadcastsResend {
         }
         tx.commit().await?;
         Ok(ResendReport { requeued: u64::try_from(requeued.len()).unwrap_or(u64::MAX) })
+    }
+}
+
+struct BroadcastsCancel;
+impl Operation for BroadcastsCancel {
+    type Input = InBroadcast;
+    type Output = Broadcast;
+    const ID: &'static str = "mailing.broadcasts.cancel";
+    const METHOD: Method = Method::Post;
+    const PATH: &'static str =
+        "/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/cancel";
+    const ACCESS: Access = WRITE;
+    const SUMMARY: &'static str = "Cancel a scheduled broadcast, so it is a draft again";
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: InBroadcast) -> Result<Broadcast, ApiError> {
+        let mut tx = cx.write().await?;
+        let mut row = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
+        if row.status != BroadcastStatus::Draft.as_str() || row.send_at.is_none() {
+            return Err(ApiError::Conflict("the broadcast is not scheduled".to_owned()));
+        }
+        // The queued start job finds send_at changed and does nothing.
+        row.send_at = None;
+        row.updated_at = cx.now();
+        store::update_broadcast(&mut *tx, &row).await?;
+        tx.commit().await?;
+        Ok(broadcast_to_api(row)?)
+    }
+}
+
+struct BroadcastsResume;
+impl Operation for BroadcastsResume {
+    type Input = InBroadcast;
+    type Output = Broadcast;
+    const ID: &'static str = "mailing.broadcasts.resume";
+    const METHOD: Method = Method::Post;
+    const PATH: &'static str =
+        "/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resume";
+    const ACCESS: Access = WRITE;
+    // Fix the mail setup first, or it pauses again.
+    const SUMMARY: &'static str = "Resume a paused broadcast and send the mail it held back";
+    const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT];
+    const TAGS: &'static [&'static str] = TAGS;
+
+    async fn call(&self, cx: OpCtx, input: InBroadcast) -> Result<Broadcast, ApiError> {
+        let platform = cx.platform();
+        let mut tx = cx.write().await?;
+        let mut row = broadcast_in(&mut *tx, input.workspace_id, input.broadcast_id).await?;
+        if row.paused_at.is_none() {
+            return Err(ApiError::Conflict("the broadcast is not paused".to_owned()));
+        }
+        row.paused_at = None;
+        row.pause_reason = None;
+        row.failures_in_row = 0;
+        row.updated_at = cx.now();
+        store::update_broadcast(&mut *tx, &row).await?;
+        // Only parked rows: a row whose job still waits to retry keeps that
+        // job, so no row gets two.
+        for delivery_id in store::unpark_deliveries(&mut *tx, row.workspace_id, row.id).await? {
+            let job = send::Send { workspace_id: row.workspace_id, delivery_id };
+            platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
+        }
+        if row.status == BroadcastStatus::Sending.as_str() {
+            let job = FanOut { workspace_id: row.workspace_id, broadcast_id: row.id };
+            platform.bus().enqueue(&mut tx, &job, Enqueue::default()).await?;
+        }
+        tx.commit().await?;
+        Ok(broadcast_to_api(row)?)
     }
 }
 

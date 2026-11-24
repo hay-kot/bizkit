@@ -169,6 +169,10 @@ async fn seed_broadcasts(
         sent_at: Some(sent_at),
         created_at: days_ago(now, 4),
         updated_at: sent_at,
+        send_at: None,
+        paused_at: None,
+        pause_reason: None,
+        failures_in_row: 0,
     };
     store::insert_broadcast(&mut **tx, &sent).await?;
     for contact in subscribed {

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT b.id AS \"id: BroadcastId\", b.workspace_id AS \"workspace_id: WorkspaceId\",\n                  b.list_id AS \"list_id: ListId\", b.subject, b.body_md, b.tag, b.status,\n                  b.recipients, b.sent_at AS \"sent_at: UnixMillis\",\n                  b.created_at AS \"created_at: UnixMillis\", b.updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_broadcasts b\n           JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id\n           WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)\n             AND (?3 IS NULL OR b.list_id = ?3)\n           ORDER BY b.id DESC",
+  "query": "SELECT b.id AS \"id: BroadcastId\", b.workspace_id AS \"workspace_id: WorkspaceId\",\n                  b.list_id AS \"list_id: ListId\", b.subject, b.body_md, b.tag, b.status,\n                  b.recipients, b.sent_at AS \"sent_at: UnixMillis\",\n                  b.created_at AS \"created_at: UnixMillis\", b.updated_at AS \"updated_at: UnixMillis\",\n                  b.send_at AS \"send_at: UnixMillis\", b.paused_at AS \"paused_at: UnixMillis\",\n                  b.pause_reason, b.failures_in_row\n           FROM mailing_broadcasts b\n           JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id\n           WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)\n             AND (?3 IS NULL OR b.list_id = ?3)\n           ORDER BY b.id DESC",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,50 @@
             "name": "updated_at"
           }
         }
+      },
+      {
+        "name": "send_at: UnixMillis",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "send_at"
+          }
+        }
+      },
+      {
+        "name": "paused_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "paused_at"
+          }
+        }
+      },
+      {
+        "name": "pause_reason",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "pause_reason"
+          }
+        }
+      },
+      {
+        "name": "failures_in_row",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_broadcasts",
+            "name": "failures_in_row"
+          }
+        }
       }
     ],
     "parameters": {
@@ -139,8 +183,12 @@
       false,
       true,
       false,
+      false,
+      true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "fb25743491dbe8804a786409fa648792ca042a00e2b62aa0b99ba699d2a29443"
+  "hash": "82e898d75bbd36112dca57205549585f2ef6acd7ec37bf098a4450288fef044a"
 }

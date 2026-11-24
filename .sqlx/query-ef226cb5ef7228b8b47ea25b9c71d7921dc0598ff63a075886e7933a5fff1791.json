@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_broadcasts SET failures_in_row = 0\n         WHERE workspace_id = ? AND id = ? AND failures_in_row != 0",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ef226cb5ef7228b8b47ea25b9c71d7921dc0598ff63a075886e7933a5fff1791"
+}

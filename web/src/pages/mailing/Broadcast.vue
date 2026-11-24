@@ -238,6 +238,7 @@ function onSend() {
     run: () =>
       send.mutateAsync({
         path: { workspace_id: props.workspaceId, broadcast_id: props.broadcastId },
+        body: {},
       }),
     success: 'Sending',
   })

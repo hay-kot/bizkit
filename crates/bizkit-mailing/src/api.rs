@@ -141,16 +141,25 @@ pub enum BroadcastStatus {
     Sending,
     /// Every recipient's mail is queued or sent.
     Sent,
+    /// A draft waiting for `send_at`. Cancel it to edit it again.
+    Scheduled,
+    /// Stopped after too many deliveries failed in a row; `pause_reason`
+    /// says why. Resume sends the rest.
+    Paused,
 }
 
 impl BroadcastStatus {
-    /// The stored text.
+    /// The text, as stored for the first three. `scheduled` and `paused`
+    /// are never stored: the API derives them from `send_at` and
+    /// `paused_at`.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Draft => "draft",
             Self::Sending => "sending",
             Self::Sent => "sent",
+            Self::Scheduled => "scheduled",
+            Self::Paused => "paused",
         }
     }
 
@@ -185,6 +194,12 @@ pub struct Broadcast {
     pub recipients: u64,
     /// When sending started.
     pub sent_at: Option<UnixMillis>,
+    /// When a scheduled broadcast starts sending.
+    pub send_at: Option<UnixMillis>,
+    /// When the breaker paused it.
+    pub paused_at: Option<UnixMillis>,
+    /// Why it paused.
+    pub pause_reason: Option<String>,
     /// Its deliveries by status; only when getting one broadcast.
     pub deliveries: Option<DeliveryCounts>,
     /// When it was created.

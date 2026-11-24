@@ -49,6 +49,7 @@ impl Module for Mailing {
         cx.job::<send::Send, _>(send::SendHandler)?;
         cx.job::<sequences::Advance, _>(sequences::AdvanceHandler)?;
         cx.job::<send::FanOut, _>(send::FanOutHandler)?;
+        cx.job::<send::StartBroadcast, _>(send::StartBroadcastHandler)?;
         cx.subscribe::<ContactCaptured, _>(capture::CaptureSubscriber)?;
         cx.public_routes(public::router(), public::PublicDocs::openapi())
     }

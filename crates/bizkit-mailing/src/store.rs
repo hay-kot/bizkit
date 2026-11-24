@@ -56,6 +56,10 @@ pub(crate) struct BroadcastRow {
     pub(crate) sent_at: Option<UnixMillis>,
     pub(crate) created_at: UnixMillis,
     pub(crate) updated_at: UnixMillis,
+    pub(crate) send_at: Option<UnixMillis>,
+    pub(crate) paused_at: Option<UnixMillis>,
+    pub(crate) pause_reason: Option<String>,
+    pub(crate) failures_in_row: i64,
 }
 
 /// A `mailing_deliveries` row.
@@ -595,8 +599,9 @@ pub(crate) async fn insert_broadcast(
 ) -> sqlx::Result<()> {
     sqlx::query!(
         "INSERT INTO mailing_broadcasts (id, workspace_id, list_id, subject, body_md, tag, status,
-                                         recipients, sent_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                         recipients, sent_at, created_at, updated_at, send_at,
+                                         paused_at, pause_reason, failures_in_row)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.list_id,
@@ -608,6 +613,10 @@ pub(crate) async fn insert_broadcast(
         row.sent_at,
         row.created_at,
         row.updated_at,
+        row.send_at,
+        row.paused_at,
+        row.pause_reason,
+        row.failures_in_row,
     )
     .execute(exec)
     .await?;
@@ -621,7 +630,8 @@ pub(crate) async fn update_broadcast(
 ) -> sqlx::Result<()> {
     sqlx::query!(
         "UPDATE mailing_broadcasts SET list_id = ?, subject = ?, body_md = ?, tag = ?, status = ?,
-                                       recipients = ?, sent_at = ?, updated_at = ?
+                                       recipients = ?, sent_at = ?, updated_at = ?, send_at = ?,
+                                       paused_at = ?, pause_reason = ?, failures_in_row = ?
          WHERE workspace_id = ? AND id = ?",
         row.list_id,
         row.subject,
@@ -631,6 +641,10 @@ pub(crate) async fn update_broadcast(
         row.recipients,
         row.sent_at,
         row.updated_at,
+        row.send_at,
+        row.paused_at,
+        row.pause_reason,
+        row.failures_in_row,
         row.workspace_id,
         row.id,
     )
@@ -649,7 +663,8 @@ pub(crate) async fn find_broadcast(
         r#"SELECT id AS "id: BroadcastId", workspace_id AS "workspace_id: WorkspaceId",
                   list_id AS "list_id: ListId", subject, body_md, tag, status, recipients,
                   sent_at AS "sent_at: UnixMillis", created_at AS "created_at: UnixMillis",
-                  updated_at AS "updated_at: UnixMillis"
+                  updated_at AS "updated_at: UnixMillis", send_at AS "send_at: UnixMillis",
+                  paused_at AS "paused_at: UnixMillis", pause_reason, failures_in_row
            FROM mailing_broadcasts WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
         id,
@@ -671,7 +686,9 @@ pub(crate) async fn list_broadcasts(
         r#"SELECT b.id AS "id: BroadcastId", b.workspace_id AS "workspace_id: WorkspaceId",
                   b.list_id AS "list_id: ListId", b.subject, b.body_md, b.tag, b.status,
                   b.recipients, b.sent_at AS "sent_at: UnixMillis",
-                  b.created_at AS "created_at: UnixMillis", b.updated_at AS "updated_at: UnixMillis"
+                  b.created_at AS "created_at: UnixMillis", b.updated_at AS "updated_at: UnixMillis",
+                  b.send_at AS "send_at: UnixMillis", b.paused_at AS "paused_at: UnixMillis",
+                  b.pause_reason, b.failures_in_row
            FROM mailing_broadcasts b
            JOIN mailing_lists l ON l.id = b.list_id AND l.workspace_id = b.workspace_id
            WHERE b.workspace_id = ?1 AND (?2 IS NULL OR l.project_id = ?2)
@@ -698,6 +715,61 @@ pub(crate) async fn delete_broadcast(
     .execute(exec)
     .await?;
     Ok(result.rows_affected() == 1)
+}
+
+/// Clears the breaker's count after a broadcast delivery went out.
+pub(crate) async fn broadcast_send_ok(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: BroadcastId,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_broadcasts SET failures_in_row = 0
+         WHERE workspace_id = ? AND id = ? AND failures_in_row != 0",
+        workspace_id,
+        id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// When the breaker pauses a broadcast, and what it records.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Pause<'a> {
+    pub(crate) limit: i64,
+    pub(crate) reason: &'a str,
+    pub(crate) now: UnixMillis,
+}
+
+/// Counts a delivery's first failed attempt toward the breaker and pauses
+/// the broadcast when the count reaches `pause.limit`. True when this call
+/// paused it.
+pub(crate) async fn broadcast_send_failed(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: BroadcastId,
+    pause: Pause<'_>,
+) -> sqlx::Result<bool> {
+    // The right-hand sides see the row as it was before the update.
+    let paused = sqlx::query_scalar!(
+        r#"UPDATE mailing_broadcasts
+           SET failures_in_row = failures_in_row + 1,
+               paused_at = CASE WHEN paused_at IS NULL AND failures_in_row + 1 >= ?3
+                                THEN ?5 ELSE paused_at END,
+               pause_reason = CASE WHEN paused_at IS NULL AND failures_in_row + 1 >= ?3
+                                   THEN ?4 ELSE pause_reason END
+           WHERE workspace_id = ?1 AND id = ?2
+           RETURNING failures_in_row = ?3 AS "paused!: bool""#,
+        workspace_id,
+        id,
+        pause.limit,
+        pause.reason,
+        pause.now,
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(paused.unwrap_or(false))
 }
 
 // ---------------------------------------------------------------- deliveries
@@ -930,6 +1002,43 @@ pub(crate) async fn requeue_failed(
         r#"UPDATE mailing_deliveries SET status = 'queued', resends = resends + 1
            WHERE workspace_id = ? AND broadcast_id = ? AND kind = 'broadcast'
              AND status = 'failed'
+           RETURNING id AS "id: DeliveryId""#,
+        workspace_id,
+        broadcast_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// Marks a broadcast delivery parked: its job ended because the broadcast
+/// is paused, and only Resume queues it again.
+pub(crate) async fn park_delivery(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    id: DeliveryId,
+    now: UnixMillis,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE mailing_deliveries SET parked_at = ? WHERE workspace_id = ? AND id = ?",
+        now,
+        workspace_id,
+        id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Unparks a broadcast's parked deliveries and returns their IDs, so each
+/// gets one new job.
+pub(crate) async fn unpark_deliveries(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    broadcast_id: BroadcastId,
+) -> sqlx::Result<Vec<DeliveryId>> {
+    sqlx::query_scalar!(
+        r#"UPDATE mailing_deliveries SET parked_at = NULL
+           WHERE workspace_id = ? AND broadcast_id = ? AND parked_at IS NOT NULL
            RETURNING id AS "id: DeliveryId""#,
         workspace_id,
         broadcast_id,

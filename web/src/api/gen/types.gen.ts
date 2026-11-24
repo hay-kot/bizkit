@@ -156,9 +156,15 @@ export type Broadcast = {
      */
     list_id: ListId;
     /**
+     * Why it paused.
+     */
+    pause_reason?: string | null;
+    paused_at?: Timestamp | null;
+    /**
      * Subscribers it was queued for.
      */
     recipients: number;
+    send_at?: Timestamp | null;
     sent_at?: Timestamp | null;
     /**
      * Where it stands.
@@ -193,7 +199,7 @@ export type BroadcastList = {
 /**
  * Where a broadcast stands.
  */
-export type BroadcastStatus = 'draft' | 'sending' | 'sent';
+export type BroadcastStatus = 'draft' | 'sending' | 'sent' | 'scheduled' | 'paused';
 
 /**
  * What a script on a hook point can use besides plain JavaScript.
@@ -5976,6 +5982,60 @@ export type MailingBroadcastsUpdateResponses = {
 
 export type MailingBroadcastsUpdateResponse = MailingBroadcastsUpdateResponses[keyof MailingBroadcastsUpdateResponses];
 
+export type MailingBroadcastsCancelData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/cancel';
+};
+
+export type MailingBroadcastsCancelErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsCancelError = MailingBroadcastsCancelErrors[keyof MailingBroadcastsCancelErrors];
+
+export type MailingBroadcastsCancelResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsCancelResponse = MailingBroadcastsCancelResponses[keyof MailingBroadcastsCancelResponses];
+
 export type MailingBroadcastsResendData = {
     body?: never;
     path: {
@@ -6030,8 +6090,64 @@ export type MailingBroadcastsResendResponses = {
 
 export type MailingBroadcastsResendResponse = MailingBroadcastsResendResponses[keyof MailingBroadcastsResendResponses];
 
-export type MailingBroadcastsSendData = {
+export type MailingBroadcastsResumeData = {
     body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The broadcast.
+         */
+        broadcast_id: BroadcastId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/mailing/broadcasts/{broadcast_id}/resume';
+};
+
+export type MailingBroadcastsResumeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type MailingBroadcastsResumeError = MailingBroadcastsResumeErrors[keyof MailingBroadcastsResumeErrors];
+
+export type MailingBroadcastsResumeResponses = {
+    /**
+     * OK
+     */
+    200: Broadcast;
+};
+
+export type MailingBroadcastsResumeResponse = MailingBroadcastsResumeResponses[keyof MailingBroadcastsResumeResponses];
+
+export type MailingBroadcastsSendData = {
+    body: {
+        send_at?: Timestamp | null;
+    };
     path: {
         /**
          * The workspace.

@@ -2416,6 +2416,34 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
+      "description": "Cancel a scheduled broadcast, so it is a draft again",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broadcast of a workspace.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_cancel"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
       "description": "Create a draft broadcast to a list",
       "inputSchema": {
         "$defs": {
@@ -2591,7 +2619,7 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Send a draft broadcast to its list's subscribers",
+      "description": "Resume a paused broadcast and send the mail it held back",
       "inputSchema": {
         "$defs": {
           "BroadcastId": {
@@ -2605,6 +2633,49 @@ expression: tools
           "broadcast_id": {
             "$ref": "#/$defs/BroadcastId",
             "description": "The broadcast."
+          }
+        },
+        "required": [
+          "broadcast_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_broadcasts_resume"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Send a draft broadcast to its list's subscribers, now or later",
+      "inputSchema": {
+        "$defs": {
+          "BroadcastId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "Timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "When to send a draft.",
+        "properties": {
+          "broadcast_id": {
+            "$ref": "#/$defs/BroadcastId",
+            "description": "The broadcast."
+          },
+          "send_at": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Timestamp",
+                "description": "Send at this time instead of now: in the future and within a year.\nThe broadcast stays a draft, shown as `scheduled`, until then."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

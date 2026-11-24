@@ -6,6 +6,7 @@ mod deliverability {
     use std::time::Duration;
 
     use bizkit_mailing::Mailing;
+    use bizkit_mailing::send::BREAKER_FAILURES;
     use bizkit_testkit::{ApiResponse, Manifest, Persona, RawBody, SpecClient, TestApp};
     use hmac::{KeyInit as _, Mac as _};
     use http::{Method, StatusCode};
@@ -364,5 +365,137 @@ mod deliverability {
         s.webhook(s.now_secs(), "t", json!({"event": "delivered"}))
             .await
             .expect(StatusCode::UNAUTHORIZED);
+    }
+
+    fn at(s: &Setup, ahead: Duration) -> Value {
+        serde_json::to_value(s.app.app().platform().now().plus(ahead)).unwrap()
+    }
+
+    #[tokio::test]
+    async fn the_breaker_pauses_a_failing_broadcast_and_resume_sends_the_rest() {
+        let s = setup().await;
+        let list = s.list("News").await;
+        let limit = usize::try_from(BREAKER_FAILURES).unwrap();
+        for i in 0..=limit {
+            s.subscribed(&list, &format!("c{i:02}@example.com")).await;
+        }
+        s.app.mail.fail_next(10_000);
+        let broadcast = s.send(&list).await;
+        let path = format!("{}/broadcasts/{}", s.ws(), id(&broadcast));
+        let paused: Value = s.admin.get(&path).await.expect(StatusCode::OK).json();
+        assert_eq!(paused["status"], "paused", "{paused}");
+        assert!(
+            paused["pause_reason"].as_str().unwrap().contains("20 deliveries failed in a row"),
+            "{paused}"
+        );
+        s.member.post(&format!("{path}/resend"), &json!({})).await.expect(StatusCode::CONFLICT);
+
+        // The failed rows wait to retry; the rest found the broadcast paused
+        // and parked.
+        let log = s.deliveries(&broadcast).await;
+        let failed = log.iter().filter(|d| d["attempts"] == 1).count();
+        assert_eq!(failed, limit, "{log:?}");
+        assert!(log.iter().all(|d| d["status"] == "queued"), "{log:?}");
+
+        s.app.mail.fail_next(0);
+        let resumed: Value = s
+            .member
+            .post(&format!("{path}/resume"), &json!({}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(resumed["status"], "sent", "{resumed}");
+        assert!(resumed["pause_reason"].is_null(), "{resumed}");
+        s.member.post(&format!("{path}/resume"), &json!({})).await.expect(StatusCode::CONFLICT);
+        s.app.drain_jobs().await;
+        assert_eq!(s.app.mail.take().len(), 1, "the parked row went out");
+        s.app.clock.advance(Duration::from_hours(2));
+        s.app.drain_jobs().await;
+
+        let mut to: Vec<String> = s.app.mail.take().into_iter().map(|m| m.to).collect();
+        to.sort();
+        to.dedup();
+        assert_eq!(to.len(), limit, "the retries went out, once each");
+        let final_log = s.deliveries(&broadcast).await;
+        assert!(final_log.iter().all(|d| d["status"] == "sent"), "{final_log:?}");
+    }
+
+    #[tokio::test]
+    async fn successes_reset_the_breaker() {
+        let s = setup().await;
+        let list = s.list("News").await;
+        for i in 0..BREAKER_FAILURES + 5 {
+            s.subscribed(&list, &format!("c{i:02}@example.com")).await;
+        }
+        s.app.mail.fail_next_permanent(u32::try_from(BREAKER_FAILURES - 1).unwrap());
+        let broadcast = s.send(&list).await;
+        let got: Value = s
+            .admin
+            .get(&format!("{}/broadcasts/{}", s.ws(), id(&broadcast)))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(got["status"], "sent", "{got}");
+        assert_eq!(got["deliveries"]["failed"], BREAKER_FAILURES - 1, "{got}");
+    }
+
+    #[tokio::test]
+    async fn scheduled_broadcasts_start_at_send_at_and_cancel_back_to_draft() {
+        let s = setup().await;
+        let list = s.list("News").await;
+        s.subscribed(&list, "ada@example.com").await;
+        let input = json!({"list_id": id(&list), "subject": "Hi", "body_md": "Hello"});
+        let draft: Value = s
+            .member
+            .post(&format!("{}/broadcasts", s.ws()), &input)
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        let path = format!("{}/broadcasts/{}", s.ws(), id(&draft));
+        let send = format!("{path}/send");
+
+        s.member
+            .post(&send, &json!({"send_at": at(&s, Duration::ZERO)}))
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+        s.member
+            .post(&send, &json!({"send_at": at(&s, Duration::from_hours(24 * 400))}))
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+
+        let scheduled: Value = s
+            .member
+            .post(&send, &json!({"send_at": at(&s, Duration::from_hours(1))}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(scheduled["status"], "scheduled", "{scheduled}");
+        s.member.patch(&path, &json!({"subject": "x"})).await.expect(StatusCode::CONFLICT);
+        s.member.delete(&path).await.expect(StatusCode::CONFLICT);
+        s.member.post(&send, &json!({})).await.expect(StatusCode::CONFLICT);
+        s.app.drain_jobs().await;
+        assert!(s.app.mail.take().is_empty(), "not before send_at");
+
+        let cancelled: Value = s
+            .member
+            .post(&format!("{path}/cancel"), &json!({}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(cancelled["status"], "draft", "{cancelled}");
+        s.member.post(&format!("{path}/cancel"), &json!({})).await.expect(StatusCode::CONFLICT);
+
+        s.member
+            .post(&send, &json!({"send_at": at(&s, Duration::from_hours(2))}))
+            .await
+            .expect(StatusCode::OK);
+        s.app.clock.advance(Duration::from_hours(1) + Duration::from_mins(1));
+        s.app.drain_jobs().await;
+        assert!(s.app.mail.take().is_empty(), "the cancelled schedule's job does nothing");
+        s.app.clock.advance(Duration::from_hours(1));
+        s.app.drain_jobs().await;
+        let started: Value = s.admin.get(&path).await.expect(StatusCode::OK).json();
+        assert_eq!(started["status"], "sent", "{started}");
+        assert_eq!(s.app.mail.take().len(), 1, "sent once");
     }
 }

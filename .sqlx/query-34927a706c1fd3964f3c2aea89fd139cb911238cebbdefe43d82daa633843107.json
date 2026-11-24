@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mailing_deliveries SET parked_at = ? WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "34927a706c1fd3964f3c2aea89fd139cb911238cebbdefe43d82daa633843107"
+}
