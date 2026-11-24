@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
 
 import { modules, projectNav, workspaceNav } from './index'
+
+/** A module's routes with children joined to their parent's path. */
+function flat(routes: RouteRecordRaw[] = []): RouteRecordRaw[] {
+  return routes.flatMap((route) => [
+    route,
+    ...flat(route.children).map((child) => ({
+      ...child,
+      path: child.path ? `${route.path}/${child.path}` : route.path,
+    })),
+  ]) as RouteRecordRaw[]
+}
+
+/** Paths a router resolves: leaves, not the layouts that wrap them. */
+const leaves = (routes: RouteRecordRaw[] = []) =>
+  flat(routes).filter((route) => !route.children?.length)
 
 describe('web modules', () => {
   it('only link the sidebar to routes they register in the same section', () => {
@@ -17,7 +33,7 @@ describe('web modules', () => {
 
   it('never collide on paths, names or sidebar order', () => {
     for (const key of ['projectRoutes', 'workspaceRoutes'] as const) {
-      const paths = modules.flatMap((m) => (m[key] ?? []).map((r) => r.path))
+      const paths = modules.flatMap((m) => leaves(m[key]).map((r) => r.path))
       expect(new Set(paths).size, key).toBe(paths.length)
     }
     const names = modules.map((m) => m.name)
@@ -38,9 +54,11 @@ describe('web modules', () => {
   })
 
   it('use relative paths', () => {
+    const all = (routes: RouteRecordRaw[] = []): RouteRecordRaw[] =>
+      routes.flatMap((route) => [route, ...all(route.children)])
     for (const route of modules.flatMap((m) => [
-      ...(m.workspaceRoutes ?? []),
-      ...(m.projectRoutes ?? []),
+      ...all(m.workspaceRoutes),
+      ...all(m.projectRoutes),
     ])) {
       expect(route.path.startsWith('/'), route.path).toBe(false)
     }

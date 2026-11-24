@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useAttrs } from 'vue'
 
-import Tabs from '@/components/ui/Tabs.vue'
+import TabLayout from '@/components/ui/TabLayout.vue'
 import { useIsAdmin } from '@/composables/useIsAdmin'
 
-const props = defineProps<{ workspaceId: string; projectId: string }>()
+/** The analytics pages' parent route: header and tabs, rendered once. */
+defineOptions({ inheritAttrs: false })
+const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
+const attrs = useAttrs()
 const isAdmin = useIsAdmin(() => props.workspaceId)
 
 const tabs = computed(() => {
@@ -20,8 +23,18 @@ const tabs = computed(() => {
     ...(isAdmin.value ? [{ label: 'Settings', to: `${base}/settings` }] : []),
   ]
 })
+const childProps = computed(() => ({
+  ...attrs,
+  workspaceId: props.workspaceId,
+  projectName: props.projectName,
+}))
 </script>
 
 <template>
-  <Tabs :tabs="tabs" label="Analytics pages" />
+  <TabLayout
+    :section="projectName"
+    :tabs="tabs"
+    label="Analytics pages"
+    :child-props="childProps"
+  />
 </template>

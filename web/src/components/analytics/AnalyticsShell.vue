@@ -5,18 +5,17 @@ import { computed, watch } from 'vue'
 
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import Page from '@/components/ui/Page.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
+import TabPage from '@/components/ui/TabPage.vue'
 import { useIsAdmin } from '@/composables/useIsAdmin'
 import { isSiteMissing, type Site, useSite } from '@/queries/analytics'
 
-import AnalyticsTabs from './AnalyticsTabs.vue'
 import SetupCard from './SetupCard.vue'
 
 /**
- * The frame of every analytics page: header, tabs, then the page once the
- * project's site is known.
+ * Every analytics page renders this inside `AnalyticsLayout`: its header
+ * (title, description, actions) goes to the layout's header, and the page
+ * shows once the project's site is known.
  *
  * - `setup` (Overview): the setup card until the first event arrives,
  *   polling while it waits.
@@ -65,11 +64,8 @@ const base = computed(() => `/w/${props.workspaceId}/p/${props.projectId}/analyt
 </script>
 
 <template>
-  <Page :width="width">
-    <PageHeader :section="projectName" :title="title" :description="description">
-      <slot name="actions" />
-    </PageHeader>
-    <AnalyticsTabs :workspace-id="workspaceId" :project-id="projectId" />
+  <TabPage :title="title" :description="description" :width="width">
+    <template v-if="$slots.actions" #actions><slot name="actions" /></template>
     <SkeletonRows v-if="isPending" :rows="4" />
     <ErrorAlert v-else-if="error && !missing" :error="error" />
     <slot v-else-if="ready && site" :site="site" />
@@ -94,5 +90,5 @@ const base = computed(() => `/w/${props.workspaceId}/p/${props.projectId}/analyt
         {{ missing ? 'Set up analytics' : isAdmin ? 'Get the snippet' : 'Open the overview' }}
       </RouterLink>
     </EmptyState>
-  </Page>
+  </TabPage>
 </template>
