@@ -11,7 +11,14 @@ use super::{Handlers, JobCtx, Lane};
 use crate::app::Platform;
 use crate::time::UnixMillis;
 
+/// The first idle poll. Each idle poll after it waits twice as long, up to
+/// `MAX_POLL`. Same-process jobs wake the loops at once; the poll only finds
+/// rows another process wrote (such as `bizkit dev seed-demo`), so they wait
+/// at most `MAX_POLL`.
 const POLL: Duration = Duration::from_secs(1);
+const MAX_POLL: Duration = Duration::from_secs(8);
+/// How often the housekeeping loop deletes old done jobs.
+const CLEANUP_EVERY: Duration = Duration::from_hours(1);
 pub(super) const LOCK: Duration = Duration::from_mins(5);
 const MAX_BACKOFF_SECS: u64 = 60 * 60;
 const KEEP_DONE: Duration = Duration::from_hours(7 * 24);
@@ -106,7 +113,8 @@ impl Worker {
 
     /// Runs jobs until `shutdown` fires, then returns once the jobs in flight
     /// finish. Each lane runs `concurrency` loops. Loops wake on commits that
-    /// wrote jobs, and poll every second for rows other processes wrote.
+    /// wrote jobs, and poll for rows other processes wrote: every second
+    /// after work, backing off to every `MAX_POLL` while idle.
     pub async fn run(&self, shutdown: CancellationToken) {
         if let Err(err) = self.requeue_stale().await {
             tracing::error!(error = format!("{err:#}"), "requeuing stale jobs");
@@ -127,11 +135,16 @@ impl Worker {
     async fn lane_loop(&self, lane: usize, housekeeping: bool, shutdown: CancellationToken) {
         let Some(lane) = self.inner.lanes.get(lane) else { return };
         let mut wake = self.inner.platform.db().jobs_written();
+        let mut idle = IdlePoll::default();
+        let mut cleanup = Cleanup::default();
         while !shutdown.is_cancelled() {
             wake.borrow_and_update();
             match self.tick(lane).await {
-                Ok(Some(_)) => continue,
-                Ok(None) if housekeeping => {
+                Ok(Some(_)) => {
+                    idle.reset();
+                    continue;
+                }
+                Ok(None) if housekeeping && cleanup.due(self.now()) => {
                     if let Err(err) = self.cleanup().await {
                         tracing::warn!(error = format!("{err:#}"), "deleting old jobs");
                     }
@@ -141,8 +154,8 @@ impl Worker {
             }
             tokio::select! {
                 () = shutdown.cancelled() => break,
-                _ = wake.changed() => {}
-                () = tokio::time::sleep(POLL) => {}
+                _ = wake.changed() => idle.reset(),
+                () = tokio::time::sleep(idle.next()) => {}
             }
         }
     }
@@ -356,6 +369,42 @@ impl Worker {
     }
 }
 
+/// How long an idle loop sleeps before it polls again: `POLL`, doubling on
+/// each idle poll up to `MAX_POLL`, and back to `POLL` after work or a wake.
+#[derive(Debug, Default)]
+struct IdlePoll {
+    polls: u32,
+}
+
+impl IdlePoll {
+    fn next(&mut self) -> Duration {
+        let wait = POLL.saturating_mul(2_u32.saturating_pow(self.polls)).min(MAX_POLL);
+        self.polls = self.polls.saturating_add(1).min(8);
+        wait
+    }
+
+    const fn reset(&mut self) {
+        self.polls = 0;
+    }
+}
+
+/// When the housekeeping loop next deletes old done jobs: at its first idle
+/// tick, then at most once per `CLEANUP_EVERY`.
+#[derive(Debug, Default)]
+struct Cleanup {
+    next: Option<UnixMillis>,
+}
+
+impl Cleanup {
+    fn due(&mut self, now: UnixMillis) -> bool {
+        if self.next.is_some_and(|next| now < next) {
+            return false;
+        }
+        self.next = Some(now.plus(CLEANUP_EVERY));
+        true
+    }
+}
+
 /// `min(2^attempts s, 1 h)`.
 fn backoff(attempts: i64) -> Duration {
     let exponent = u32::try_from(attempts.clamp(0, 12)).unwrap_or(12);
@@ -379,5 +428,28 @@ mod tests {
         assert_eq!(backoff(1), Duration::from_secs(2), "first retry");
         assert_eq!(backoff(3), Duration::from_secs(8), "third retry");
         assert_eq!(backoff(40), Duration::from_secs(MAX_BACKOFF_SECS), "capped at an hour");
+    }
+
+    #[test]
+    fn idle_polls_back_off_and_reset() {
+        let mut idle = IdlePoll::default();
+        let waits: Vec<u64> = (0..6).map(|_| idle.next().as_secs()).collect();
+        assert_eq!(waits, [1, 2, 4, 8, 8, 8], "doubling up to MAX_POLL");
+        idle.reset();
+        assert_eq!(idle.next(), POLL, "back to the first poll after work");
+    }
+
+    #[test]
+    fn cleanup_runs_once_per_interval() {
+        let start = UnixMillis(1_700_000_000_000);
+        let mut cleanup = Cleanup::default();
+        assert!(cleanup.due(start), "at the first idle tick");
+        assert!(!cleanup.due(start.plus(Duration::from_secs(1))), "not on the next tick");
+        assert!(!cleanup.due(start.plus(Duration::from_mins(59))), "not before an hour");
+        assert!(cleanup.due(start.plus(CLEANUP_EVERY)), "an hour later");
+        assert!(
+            !cleanup.due(start.plus(CLEANUP_EVERY + Duration::from_secs(1))),
+            "then waits again"
+        );
     }
 }
