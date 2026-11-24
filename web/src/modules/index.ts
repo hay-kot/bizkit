@@ -14,17 +14,22 @@ export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, 
 /** Every module's workspace routes, relative to `/w/:workspaceId/`. */
 export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) => m.workspaceRoutes ?? [])
 
-/** Every module's project routes, mounted under `p/:projectId/` with params as props. */
+/** Params as props, on a route and its children. */
+function withProps(route: RouteRecordRaw): RouteRecordRaw {
+  return {
+    ...route,
+    props: route.props ?? true,
+    ...(route.children ? { children: route.children.map(withProps) } : {}),
+  } as RouteRecordRaw
+}
+
+/**
+ * Every module's project routes, mounted under `p/:projectId/` with params
+ * as props. A route with children (a tabbed layout) passes params to them too.
+ */
 export const projectRoutes: RouteRecordRaw[] = modules
   .flatMap((m) => m.projectRoutes ?? [])
-  .map(
-    (route) =>
-      ({
-        ...route,
-        path: `p/:projectId/${route.path}`,
-        props: route.props ?? true,
-      }) as RouteRecordRaw,
-  )
+  .map((route) => withProps({ ...route, path: `p/:projectId/${route.path}` } as RouteRecordRaw))
 
 function navFor(section: NavSection): NavItem[] {
   return modules

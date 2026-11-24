@@ -16,6 +16,7 @@ import { useCurrentProject } from '@/composables/useCurrentProject'
 import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
 import { useIsAdmin } from '@/composables/useIsAdmin'
+import { routeKey } from '@/lib/routeKey'
 import { closePalette, openPalette, paletteOpen } from '@/palette/state'
 import { useMe } from '@/queries/auth'
 import { useWorkspace } from '@/queries/workspaces'
@@ -174,7 +175,7 @@ watch(
             >
               <component
                 :is="Component"
-                :key="child.path"
+                :key="routeKey(child, 1)"
                 :workspace-id="workspaceId"
                 :workspace-name="workspace?.name ?? ''"
                 :project-name="project?.name ?? ''"
