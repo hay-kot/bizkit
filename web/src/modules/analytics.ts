@@ -1,6 +1,7 @@
 import { ChartLine, Filter, LayoutDashboard, Lightbulb, Plus, Target } from 'lucide-vue-next'
 import { computed } from 'vue'
 
+import AnalyticsLayout from '@/components/analytics/AnalyticsLayout.vue'
 import Dashboard from '@/pages/analytics/Dashboard.vue'
 import Dashboards from '@/pages/analytics/Dashboards.vue'
 import Events from '@/pages/analytics/Events.vue'
@@ -24,19 +25,25 @@ const ORDER = 102
 export default defineWebModule({
   name: 'analytics',
   projectRoutes: [
-    { path: 'analytics', component: Overview },
-    { path: 'analytics/events', component: Events },
-    { path: 'analytics/insights', component: Insights },
-    { path: 'analytics/insights/new', component: NewInsight },
-    { path: 'analytics/insights/:insightId', component: Insight },
-    { path: 'analytics/dashboards', component: Dashboards },
-    { path: 'analytics/dashboards/:dashboardId', component: Dashboard },
-    { path: 'analytics/funnels', component: Funnels },
-    { path: 'analytics/funnels/:funnelId', component: Funnel },
-    { path: 'analytics/people', component: People },
-    { path: 'analytics/people/:personId', component: Person },
-    { path: 'analytics/retention', component: Retention },
-    { path: 'analytics/settings', component: Settings },
+    {
+      path: 'analytics',
+      component: AnalyticsLayout,
+      children: [
+        { path: '', component: Overview },
+        { path: 'events', component: Events },
+        { path: 'insights', component: Insights },
+        { path: 'insights/new', component: NewInsight },
+        { path: 'insights/:insightId', component: Insight },
+        { path: 'dashboards', component: Dashboards },
+        { path: 'dashboards/:dashboardId', component: Dashboard },
+        { path: 'funnels', component: Funnels },
+        { path: 'funnels/:funnelId', component: Funnel },
+        { path: 'people', component: People },
+        { path: 'people/:personId', component: Person },
+        { path: 'retention', component: Retention },
+        { path: 'settings', component: Settings },
+      ],
+    },
   ],
   nav: [
     { path: 'analytics', label: 'Analytics', icon: ChartLine, section: 'project', order: ORDER },
