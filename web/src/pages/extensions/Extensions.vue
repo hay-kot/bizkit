@@ -6,6 +6,8 @@ import DataTable from '@/components/ui/DataTable.vue'
 import NewScriptPanel from '@/components/extensions/NewScriptPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import List from '@/components/ui/List.vue'
+import ListItem from '@/components/ui/ListItem.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
@@ -95,11 +97,6 @@ const shownScripts = computed(() =>
     return script.targets.some((target) => target.id === targetFilter.value)
   }),
 )
-const secretColumns = [
-  { key: 'name', label: 'Name' },
-  { key: 'updated', label: 'Set' },
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-16 text-right' },
-]
 
 const panelOpen = ref(false)
 useCreateIntent(() => (panelOpen.value = true))
@@ -217,32 +214,36 @@ function removeSecret(secret: string) {
           <Plus class="size-4" aria-hidden="true" />Add secret
         </button>
       </template>
-      <DataTable
-        :columns="secretColumns"
-        :rows="secrets?.items"
-        :row-key="(s) => s.name"
+      <List
+        :items="secrets?.items"
+        :item-key="(s) => s.name"
         :loading="secretsPending"
         :error="secretsError"
         label="Secrets"
         :empty="{ icon: KeyRound, title: 'No secrets', message: 'Add a webhook URL or API token.' }"
       >
-        <template #cell-name="{ row }"
-          ><code class="text-sm">{{ row.name }}</code></template
-        >
-        <template #cell-updated="{ row }"
-          ><span class="text-sm">{{ formatDate(row.updated_at) }}</span></template
-        >
-        <template #cell-actions="{ row }">
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            :aria-label="`Delete ${row.name}`"
-            @click="removeSecret(row.name)"
-          >
-            <Trash2 class="size-4" aria-hidden="true" />
-          </button>
+        <template #item="{ item }">
+          <ListItem>
+            <template #leading
+              ><KeyRound class="size-4 shrink-0 text-base-content/70" aria-hidden="true"
+            /></template>
+            <template #title
+              ><code>{{ item.name }}</code></template
+            >
+            <template #meta>Set {{ formatDate(item.updated_at) }}</template>
+            <template #trailing>
+              <button
+                type="button"
+                class="btn btn-square btn-ghost btn-sm"
+                :aria-label="`Delete ${item.name}`"
+                @click="removeSecret(item.name)"
+              >
+                <Trash2 class="size-4" aria-hidden="true" />
+              </button>
+            </template>
+          </ListItem>
         </template>
-      </DataTable>
+      </List>
     </PageSection>
 
     <NewScriptPanel

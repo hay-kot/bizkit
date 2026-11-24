@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Mail, X } from 'lucide-vue-next'
 
-import DataTable from '@/components/ui/DataTable.vue'
+import Avatar from '@/components/ui/Avatar.vue'
+import List from '@/components/ui/List.vue'
+import ListItem from '@/components/ui/ListItem.vue'
 import { runAction } from '@/lib/action'
 import { formatShortDate, isPast } from '@/lib/format'
 import type { Invitation } from '@/queries/members'
@@ -11,12 +13,6 @@ const props = defineProps<{ workspaceId: string }>()
 defineEmits<{ invite: [] }>()
 const { data: invitations, isPending, error } = useInvitations(() => props.workspaceId)
 const revoke = useRevokeInvitation()
-const columns = [
-  { key: 'email', label: 'Email' },
-  { key: 'role', label: 'Role' },
-  { key: 'expires', label: 'Expires' },
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-12 text-right' },
-]
 
 function onRevoke(item: Invitation) {
   return runAction({
@@ -33,43 +29,44 @@ function onRevoke(item: Invitation) {
 </script>
 
 <template>
-  <div>
-    <DataTable
-      :columns="columns"
-      :rows="invitations?.items"
-      :row-key="(i) => i.id"
-      :loading="isPending"
-      :error="error"
-      label="Pending invitations"
-      :empty="{
-        icon: Mail,
-        title: 'No pending invitations',
-        message: 'Invite teammates or outside collaborators by email.',
-      }"
-    >
-      <template #cell-email="{ row }">{{ row.email }}</template>
-      <template #cell-role="{ row }"
-        ><span class="capitalize">{{ row.role }}</span></template
-      >
-      <template #cell-expires="{ row }">
-        <span v-if="isPast(row.expires_at)" class="badge badge-ghost badge-sm">expired</span>
-        <span v-else class="text-sm">{{ formatShortDate(row.expires_at) }}</span>
-      </template>
-      <template #cell-actions="{ row }">
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-sm"
-          :aria-label="`Revoke the invitation for ${row.email}`"
-          @click="onRevoke(row)"
+  <List
+    :items="invitations?.items"
+    :item-key="(i) => i.id"
+    :loading="isPending"
+    :error="error"
+    label="Pending invitations"
+    :empty="{
+      icon: Mail,
+      title: 'No pending invitations',
+      message: 'Invite teammates or outside collaborators by email.',
+    }"
+  >
+    <template #item="{ item }">
+      <ListItem :title="item.email">
+        <template #leading><Avatar :name="item.email" /></template>
+        <template #description
+          ><span class="capitalize">{{ item.role }}</span></template
         >
-          <X class="size-4" aria-hidden="true" />
-        </button>
-      </template>
-      <template #empty-action>
-        <button type="button" class="btn btn-primary btn-sm" @click="$emit('invite')">
-          Invite someone
-        </button>
-      </template>
-    </DataTable>
-  </div>
+        <template #meta>
+          <span v-if="isPast(item.expires_at)" class="badge badge-ghost badge-sm">expired</span>
+          <span v-else>Expires {{ formatShortDate(item.expires_at) }}</span>
+        </template>
+        <template #trailing>
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            :aria-label="`Revoke the invitation for ${item.email}`"
+            @click="onRevoke(item)"
+          >
+            <X class="size-4" aria-hidden="true" />
+          </button>
+        </template>
+      </ListItem>
+    </template>
+    <template #empty-action>
+      <button type="button" class="btn btn-primary btn-sm" @click="$emit('invite')">
+        Invite someone
+      </button>
+    </template>
+  </List>
 </template>

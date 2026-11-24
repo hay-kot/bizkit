@@ -27,6 +27,9 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 | `Field` | A label over its control, with a hint or error under it. It caps its own width so controls don't stretch on wide screens: `lg` (default, `max-w-3xl`) for text inputs, selects and textareas, `md` for short values such as names and IDs, `full` for a control that needs the room. |
 | `Select`, `Menu` | Popups on the `raised` surface. Options and menu items are at least 36px tall with `px-3`; a `Select` list is at least 14rem wide whatever its trigger. `size`: `md` (default, 40px) in forms, `toolbar` (36px) in toolbars and section actions, `sm` (32px) inside table rows and inline editors. The list shifts to stay inside the viewport. |
 | `DataTable` | Rows of data people scan and compare by column. `rowTo` makes each row open its page: the primary column (the one marked `primary`, else the first that is neither hidden nor interactive) renders the row's one real link in `text-primary font-medium`, never underlined, and its hit area stretches over the row, so the whole row is the target and middle-click and Cmd-click still open a new tab. `@row-click` does the same with a button, for rows that open a panel or filter the page. Only clickable rows get `cursor-pointer` and the hover background. A column with its own controls (row actions, a copy button, a link elsewhere) or text worth copying (a slug, a path) is `interactive`, so it sits above the row's hit area and its text stays selectable; keep the primary column before it (a dev warning says when it isn't). A `title` elsewhere in a clickable row never shows, so put the tooltip on the row with `rowTitle`. |
+| `List`, `ListItem` | Entities that read top to bottom, one per row, with no columns to compare (projects, team members, a person's events, a form's submissions, secrets). `List` owns the skeleton, error and empty state like `DataTable` and draws one bordered panel with dividers. `ListItem` is a row: `#leading` (avatar or icon), the title, a muted description, `#meta` on the right and `#trailing` actions. With `to` the title is the row's one real link, with `@select` its one button, in `text-primary font-medium`, stretched over the row like `DataTable`'s; `#trailing` stays clickable above it. Without either the row is plain and the title is not in the accent. |
+| `CardGrid`, `LinkCard` | A small set of big things (workspaces). `CardGrid` lays cards out one to four across, so the page stays one column; its `#end` cell holds a dashed "New ..." card. `LinkCard` is one card whose title is its link, stretched over the card, with `#leading`, `#meta` and corner `#actions`. |
+| `Timeline`, `TimelineItem` | Things that happen in order (a sequence's steps): a numbered `primary` marker per entry, a connector line down to the next, and an optional `#chip` on the line above an entry for what lies between (a delay). The entry's content is usually a card. |
 | `DescriptionList` | Read-only facts about the entity, straight under the header. |
 | `DetailActions` + `MenuItem` | A detail page's header actions: page buttons (`actions`), Save (`save`) and the "..." menu (`#menu`), all `btn-sm` in one style family. Save shows its own state: "Save", a disabled "Saved", or "Saving". Destructive menu items are `danger` and go last. |
 | `FormPanel` | Create and edit forms, as a side panel or a dialog. |
@@ -42,10 +45,12 @@ Colors live in `src/styles/theme.css` only. Surfaces step up like Grafana's, and
 
 Projects, Team, API keys, Forms, Extensions.
 
-- `Page` > `PageHeader` with the primary create button (`btn btn-primary btn-sm` with a Plus icon) > the main `DataTable` > more `PageSection`s.
-- The main table's empty state carries the same create action. Other tables get an empty state without one.
-- Each row opens its entity through `rowTo`, never through a `link link-hover` in the name cell (ESLint rejects `link-hover` outside `components/ui`). `link` stays for inline text links.
-- Row actions sit in the last column, marked `interactive` as icon buttons with an `aria-label`. Delete is a trash icon that confirms through `runAction`.
+**Table, list, cards or timeline.** Use `DataTable` when people scan and compare entries by column (People, Events, Contacts, send logs, deliveries, suppressions, API keys, Retention). Use `List` when each entry is one thing read top to bottom and the table would have two or three columns that nobody compares (Projects, Team, a person's events, a form's submissions, secrets). Use `CardGrid` for a few big things you pick one of (workspaces). Use `Timeline` when order and the gap between entries matter (sequence steps).
+
+- `Page` > `PageHeader` with the primary create button (`btn btn-primary btn-sm` with a Plus icon) > the main `DataTable` or `List` > more `PageSection`s.
+- The main table's or list's empty state carries the same create action. Others get an empty state without one.
+- Each row opens its entity through `rowTo` (or `ListItem`'s `to`), never through a `link link-hover` in the name cell (ESLint rejects `link-hover` outside `components/ui`). `link` stays for inline text links.
+- Row actions sit in the last column, marked `interactive`, or in a `ListItem`'s `#trailing`, as icon buttons with an `aria-label`. Delete is a trash icon that confirms through `runAction`.
 
 ## Detail page
 
@@ -81,11 +86,11 @@ Analytics. A read-only page of numbers for a date range.
 - **Width.** Every top-level block on a page is full width, so blocks line up with each other and from page to page. Narrow content goes inside a block: `Field` caps its control, and `PageHeader`, `SectionHeading` (and so `Card`) cap their descriptions at `max-w-prose`. Side-by-side panels exist only inside `ReportGrid`.
 - **Toolbars.** Every control in a toolbar row is 36px: `Select size="toolbar"`, `input h-9`, and a button beside them `btn h-9`. Controls in forms are 40px; controls inside table rows and inline editors are 32px (`Select size="sm"`, `input-sm`).
 - **Spacing.** `Page` puts `gap-8` between blocks, `PageSection` `gap-3` under its heading, `Card` `gap-4` in its body. Pages add no margins between their top-level blocks.
-- **Empty states.** `DataTable`'s `empty` prop: an icon, a title and one sentence. Only the main list adds a create action.
+- **Empty states.** `DataTable`'s and `List`'s `empty` prop: an icon, a title and one sentence. Only the main list adds a create action.
 - **Forms.** `Field` puts the label over the control. One column. The submit button goes bottom right in panels, in the card footer on settings.
 - **Destructive actions.** Always confirm with `runAction({ confirm })` and name the thing. Never a primary-colored destructive button outside the confirm dialog. On detail pages, Delete lives in the `DetailActions` menu.
-- **Loading.** Skeletons on first load (`SkeletonRows`, `DataTable` handles its own), `SubmitButton`'s `pending` while saving.
-- **Grids.** A page that needs a grid (the workspace cards on Home) puts it in a component, so the page itself stays one column.
+- **Loading.** Skeletons on first load (`SkeletonRows`; `DataTable`, `List` and `CardGrid` handle their own), `SubmitButton`'s `pending` while saving.
+- **Grids.** A page that needs a grid of cards uses `CardGrid`; any other grid goes in a component, so the page itself stays one column.
 
 ## Command palette
 

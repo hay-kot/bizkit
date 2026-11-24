@@ -2,15 +2,16 @@
 import { FolderKanban, Plus, Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
-import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import List from '@/components/ui/List.vue'
+import ListItem from '@/components/ui/ListItem.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useCreateIntent } from '@/composables/useCreateIntent'
 import { useSlugFromName } from '@/composables/useSlugFromName'
 import { runAction } from '@/lib/action'
-import { formatDate } from '@/lib/format'
+import { formatShortDate } from '@/lib/format'
 import { toast } from '@/lib/toast'
 import type { Project } from '@/queries/projects'
 import { useCreateProject, useDeleteProject, useProjects } from '@/queries/projects'
@@ -22,12 +23,6 @@ const remove = useDeleteProject()
 const form = useSlugFromName()
 const panelOpen = ref(false)
 useCreateIntent(openPanel)
-const columns = [
-  { key: 'name', label: 'Name' },
-  { key: 'slug', label: 'Slug', interactive: true },
-  { key: 'created', label: 'Created' },
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-12 text-right', interactive: true },
-]
 
 function openPanel() {
   form.reset()
@@ -71,42 +66,40 @@ function onDelete(project: Project) {
       </button>
     </PageHeader>
 
-    <DataTable
-      :columns="columns"
-      :rows="projects?.items"
-      :row-key="(p) => p.id"
-      :row-to="(r) => `/w/${workspaceId}/p/${r.id}`"
+    <List
+      :items="projects?.items"
+      :item-key="(p) => p.id"
       :loading="isPending"
       :error="error"
+      label="Projects"
       :empty="{
         icon: FolderKanban,
         title: 'No projects yet',
         message: 'Create a project for each site or app you run.',
       }"
     >
-      <template #cell-name="{ row }">
-        {{ row.name }}
-      </template>
-      <template #cell-slug="{ row }"
-        ><code class="text-sm">{{ row.slug }}</code></template
-      >
-      <template #cell-created="{ row }"
-        ><span class="text-sm">{{ formatDate(row.created_at) }}</span></template
-      >
-      <template #cell-actions="{ row }">
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-sm"
-          :aria-label="`Delete ${row.name}`"
-          @click="onDelete(row)"
-        >
-          <Trash2 class="size-4" aria-hidden="true" />
-        </button>
+      <template #item="{ item }">
+        <ListItem :to="`/w/${workspaceId}/p/${item.id}`" :title="item.name" selectable-description>
+          <template #description
+            ><code>{{ item.slug }}</code></template
+          >
+          <template #meta>Created {{ formatShortDate(item.created_at) }}</template>
+          <template #trailing>
+            <button
+              type="button"
+              class="btn btn-square btn-ghost btn-sm"
+              :aria-label="`Delete ${item.name}`"
+              @click="onDelete(item)"
+            >
+              <Trash2 class="size-4" aria-hidden="true" />
+            </button>
+          </template>
+        </ListItem>
       </template>
       <template #empty-action>
         <button type="button" class="btn btn-primary btn-sm" @click="openPanel">New project</button>
       </template>
-    </DataTable>
+    </List>
 
     <FormPanel
       :open="panelOpen"

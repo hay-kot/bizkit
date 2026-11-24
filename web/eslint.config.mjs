@@ -53,7 +53,7 @@ const rowLinkRestrictions = [
   {
     pattern: '^link-hover$',
     message:
-      '$0: for a row that opens a page or panel, use DataTable rowTo or @row-click, so the whole row is the target. Inline text links use `link`.',
+      '$0: for a row that opens a page or panel, use DataTable rowTo or @row-click, or ListItem to or @select, so the whole row is the target. Inline text links use `link`.',
   },
 ]
 

@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { ArrowDown, ArrowUp, Inbox, LogOut, Plus, Trash2, UserPlus, Users } from 'lucide-vue-next'
+import {
+  ArrowDown,
+  ArrowUp,
+  Clock,
+  Inbox,
+  LogOut,
+  Plus,
+  Trash2,
+  UserPlus,
+  Users,
+} from 'lucide-vue-next'
 import { refDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -19,6 +29,8 @@ import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
 import Select from '@/components/ui/Select.vue'
+import Timeline from '@/components/ui/Timeline.vue'
+import TimelineItem from '@/components/ui/TimelineItem.vue'
 import { runAction } from '@/lib/action'
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format'
 import {
@@ -356,7 +368,7 @@ const logColumns = [
 
       <DescriptionList :items="facts" />
 
-      <form id="sequence-form" class="flex flex-col gap-6" @submit.prevent="save">
+      <form id="sequence-form" class="flex flex-col gap-8" @submit.prevent="save">
         <Card title="Settings">
           <div class="flex flex-col gap-4">
             <Field label="Name">
@@ -377,86 +389,91 @@ const logColumns = [
           </div>
         </Card>
 
-        <Card
+        <PageSection
           title="Steps"
           description="{{ name }} and {{ email }} fill in. Each mail has the list's footer and unsubscribe link."
         >
-          <div class="flex flex-col gap-4">
-            <p v-if="steps.length === 0" class="text-sm text-base-content/70">
-              No steps yet. Add the first mail.
-            </p>
-            <fieldset
-              v-for="(step, index) in steps"
-              :key="step.key"
-              class="flex flex-col gap-3 rounded-box border border-base-300 bg-raised p-4"
-              :aria-label="`Step ${index + 1}`"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-semibold text-primary">Step {{ index + 1 }}</span>
-                <div class="flex gap-1">
-                  <button
-                    type="button"
-                    class="btn btn-square btn-ghost btn-sm"
-                    :aria-label="`Move step ${index + 1} up`"
-                    :disabled="index === 0"
-                    @click="moveStep(index, -1)"
-                  >
-                    <ArrowUp class="size-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-square btn-ghost btn-sm"
-                    :aria-label="`Move step ${index + 1} down`"
-                    :disabled="index === steps.length - 1"
-                    @click="moveStep(index, 1)"
-                  >
-                    <ArrowDown class="size-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-square btn-ghost btn-sm"
-                    :aria-label="`Remove step ${index + 1}`"
-                    @click="removeStep(index)"
-                  >
-                    <Trash2 class="size-4" aria-hidden="true" />
-                  </button>
+          <p v-if="steps.length === 0" class="text-sm text-base-content/70">
+            No steps yet. Add the first mail.
+          </p>
+          <Timeline v-else label="Steps">
+            <TimelineItem v-for="(step, index) in steps" :key="step.key" :number="index + 1">
+              <template #chip>
+                <Clock class="size-3.5" aria-hidden="true" />{{
+                  waitText(step.delay_hours, index === 0)
+                }}
+              </template>
+              <fieldset
+                class="flex min-w-0 flex-col gap-3 rounded-box border border-base-300 bg-base-100 p-4"
+                :aria-label="`Step ${index + 1}`"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span class="truncate font-medium">{{ step.subject.trim() || 'New step' }}</span>
+                  <div class="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      class="btn btn-square btn-ghost btn-sm"
+                      :aria-label="`Move step ${index + 1} up`"
+                      :disabled="index === 0"
+                      @click="moveStep(index, -1)"
+                    >
+                      <ArrowUp class="size-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-square btn-ghost btn-sm"
+                      :aria-label="`Move step ${index + 1} down`"
+                      :disabled="index === steps.length - 1"
+                      @click="moveStep(index, 1)"
+                    >
+                      <ArrowDown class="size-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-square btn-ghost btn-sm"
+                      :aria-label="`Remove step ${index + 1}`"
+                      @click="removeStep(index)"
+                    >
+                      <Trash2 class="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <Field label="Wait (hours)" :hint="waitText(step.delay_hours, index === 0)">
-                <input
-                  v-model.number="step.delay_hours"
-                  type="number"
-                  min="0"
-                  max="8760"
-                  required
-                  :name="`step-${index}-delay`"
-                  class="input w-32"
-                />
-              </Field>
-              <Field label="Subject">
-                <input
-                  v-model="step.subject"
-                  required
-                  :name="`step-${index}-subject`"
-                  class="input w-full"
-                />
-              </Field>
-              <Field label="Body" hint="Markdown.">
-                <textarea
-                  v-model="step.body_md"
-                  rows="6"
-                  :name="`step-${index}-body`"
-                  class="textarea w-full font-mono text-sm"
-                ></textarea>
-              </Field>
-            </fieldset>
-            <div>
-              <button type="button" class="btn gap-1.5 btn-sm" @click="addStep">
-                <Plus class="size-4" aria-hidden="true" />Add step
-              </button>
-            </div>
+                <Field label="Wait (hours)">
+                  <input
+                    v-model.number="step.delay_hours"
+                    type="number"
+                    min="0"
+                    max="8760"
+                    required
+                    :name="`step-${index}-delay`"
+                    class="input w-32"
+                  />
+                </Field>
+                <Field label="Subject">
+                  <input
+                    v-model="step.subject"
+                    required
+                    :name="`step-${index}-subject`"
+                    class="input w-full"
+                  />
+                </Field>
+                <Field label="Body" hint="Markdown.">
+                  <textarea
+                    v-model="step.body_md"
+                    rows="6"
+                    :name="`step-${index}-body`"
+                    class="textarea w-full font-mono text-sm"
+                  ></textarea>
+                </Field>
+              </fieldset>
+            </TimelineItem>
+          </Timeline>
+          <div>
+            <button type="button" class="btn gap-1.5 btn-sm" @click="addStep">
+              <Plus class="size-4" aria-hidden="true" />Add step
+            </button>
           </div>
-        </Card>
+        </PageSection>
       </form>
 
       <PageSection title="Enrollments">

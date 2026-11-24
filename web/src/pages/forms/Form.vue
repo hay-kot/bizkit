@@ -1,27 +1,30 @@
 <script setup lang="ts">
-import { Download, Eye, Inbox, Settings, ShieldAlert, Trash2 } from 'lucide-vue-next'
+import { Download, Inbox, Settings, ShieldAlert, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import EntitySections from '@/components/EntitySections.vue'
 import FieldsEditor from '@/components/forms/FieldsEditor.vue'
 import { fetchSnippet, htmlSnippet } from '@/components/forms/embed'
+import { fieldText, preview, sender } from '@/components/forms/submission'
+import Avatar from '@/components/ui/Avatar.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
-import DataTable from '@/components/ui/DataTable.vue'
 import DetailActions from '@/components/ui/DetailActions.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
+import List from '@/components/ui/List.vue'
+import ListItem from '@/components/ui/ListItem.vue'
 import MenuItem from '@/components/ui/MenuItem.vue'
 import Page from '@/components/ui/Page.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PageSection from '@/components/ui/PageSection.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
-import { formatDate } from '@/lib/format'
-import type { BotCheck, FieldDef, FieldValue, Submission, SubmissionStatus } from '@/queries/forms'
+import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
+import type { BotCheck, FieldDef, Submission, SubmissionStatus } from '@/queries/forms'
 import {
   downloadExport,
   SUBMISSIONS_SHOWN,
@@ -78,28 +81,7 @@ const botChecks = [
   },
 ]
 
-const columns = computed(() => [
-  { key: 'received', label: 'Received' },
-  { key: 'preview', label: 'Submission' },
-  ...(status.value === 'spam' ? [{ key: 'reason', label: 'Reason' }] : []),
-  { key: 'actions', label: 'Actions', hidden: true, class: 'w-32 text-right' },
-])
-
-function text(value: FieldValue | undefined): string {
-  if (value === undefined) return ''
-  return Array.isArray(value) ? value.join(', ') : value
-}
-
-function preview(submission: Submission): string {
-  const names = form.value?.fields.length
-    ? form.value.fields.map((f) => f.name)
-    : Object.keys(submission.data)
-  return names
-    .map((name) => text(submission.data[name]))
-    .filter((value) => value.length > 0)
-    .slice(0, 3)
-    .join(' · ')
-}
+const fields = computed(() => form.value?.fields ?? [])
 
 function labelOf(name: string): string {
   return form.value?.fields.find((f) => f.name === name)?.label ?? name
@@ -285,10 +267,9 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
         <Select v-model="status" :options="statuses" label="Show" size="toolbar" name="status" />
       </template>
 
-      <DataTable
-        :columns="columns"
-        :rows="submissions?.items"
-        :row-key="(s) => s.id"
+      <List
+        :items="submissions?.items"
+        :item-key="(s) => s.id"
         :loading="isPending"
         :error="error"
         label="Submissions"
@@ -301,50 +282,53 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
               : 'Post your site’s form to the endpoint above.',
         }"
       >
-        <template #cell-received="{ row }"
-          ><span class="text-sm whitespace-nowrap">{{ formatDate(row.created_at) }}</span></template
-        >
-        <template #cell-preview="{ row }"
-          ><span class="line-clamp-1 text-sm">{{ preview(row) || '(empty)' }}</span></template
-        >
-        <template #cell-reason="{ row }"
-          ><span class="badge badge-ghost badge-sm">{{
-            row.spam_reason ?? 'marked'
-          }}</span></template
-        >
-        <template #cell-actions="{ row }">
-          <div class="flex justify-end gap-1">
-            <button
-              type="button"
-              class="btn btn-square btn-ghost btn-sm"
-              :aria-label="`View submission from ${formatDate(row.created_at)}`"
-              @click="viewing = row"
-            >
-              <Eye class="size-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              class="btn btn-square btn-ghost btn-sm"
-              :aria-label="row.status === 'spam' ? 'Move to inbox' : 'Mark as spam'"
-              @click="move(row, row.status === 'spam' ? 'inbox' : 'spam')"
-            >
-              <component
-                :is="row.status === 'spam' ? Inbox : ShieldAlert"
-                class="size-4"
-                aria-hidden="true"
-              />
-            </button>
-            <button
-              type="button"
-              class="btn btn-square btn-ghost btn-sm"
-              aria-label="Delete submission"
-              @click="removeSubmission(row)"
-            >
-              <Trash2 class="size-4" aria-hidden="true" />
-            </button>
-          </div>
+        <template #item="{ item }">
+          <ListItem
+            :title="sender(fields, item)"
+            :description="preview(fields, item) || undefined"
+            :label="`${sender(fields, item)}, received ${formatDateTime(item.created_at)}`"
+            @select="viewing = item"
+          >
+            <template #leading><Avatar :name="sender(fields, item)" /></template>
+            <template #meta>
+              <span class="flex items-center gap-2 whitespace-nowrap">
+                <span v-if="item.status === 'spam'" class="badge badge-ghost badge-sm">{{
+                  item.spam_reason ?? 'marked'
+                }}</span>
+                <!-- relative lifts it above the row's hit area, so its title shows. -->
+                <time
+                  class="relative"
+                  :datetime="item.created_at"
+                  :title="formatDateTime(item.created_at)"
+                  >{{ formatRelative(item.created_at) }}</time
+                >
+              </span>
+            </template>
+            <template #trailing>
+              <button
+                type="button"
+                class="btn btn-square btn-ghost btn-sm"
+                :aria-label="item.status === 'spam' ? 'Move to inbox' : 'Mark as spam'"
+                @click="move(item, item.status === 'spam' ? 'inbox' : 'spam')"
+              >
+                <component
+                  :is="item.status === 'spam' ? Inbox : ShieldAlert"
+                  class="size-4"
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                type="button"
+                class="btn btn-square btn-ghost btn-sm"
+                aria-label="Delete submission"
+                @click="removeSubmission(item)"
+              >
+                <Trash2 class="size-4" aria-hidden="true" />
+              </button>
+            </template>
+          </ListItem>
         </template>
-      </DataTable>
+      </List>
 
       <p v-if="submissions?.next_before" class="text-sm text-base-content/80">
         Showing the newest {{ SUBMISSIONS_SHOWN }}. Export CSV for the rest.
@@ -368,7 +352,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       <dl v-if="viewing" class="flex flex-col gap-3 text-sm">
         <div v-for="(value, name) in viewing.data" :key="name">
           <dt class="font-medium">{{ labelOf(String(name)) }}</dt>
-          <dd class="break-words whitespace-pre-wrap">{{ text(value) }}</dd>
+          <dd class="break-words whitespace-pre-wrap">{{ fieldText(value) }}</dd>
         </div>
         <div v-if="viewing.spam_reason">
           <dt class="font-medium">Spam reason</dt>

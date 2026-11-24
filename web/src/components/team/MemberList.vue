@@ -2,7 +2,8 @@
 import { UserX } from 'lucide-vue-next'
 
 import Avatar from '@/components/ui/Avatar.vue'
-import DataTable from '@/components/ui/DataTable.vue'
+import List from '@/components/ui/List.vue'
+import ListItem from '@/components/ui/ListItem.vue'
 import Select from '@/components/ui/Select.vue'
 import { runAction } from '@/lib/action'
 import { useMe } from '@/queries/auth'
@@ -17,13 +18,6 @@ const remove = useRemoveMember()
 const roles = [
   { value: 'admin' as const, label: 'Admin' },
   { value: 'member' as const, label: 'Member' },
-]
-const columns = [
-  { key: 'member', label: 'Member' },
-  { key: 'role', label: 'Role', class: 'w-40' },
-  ...(props.isAdmin
-    ? [{ key: 'actions', label: 'Actions', hidden: true, class: 'w-12 text-right' }]
-    : []),
 ]
 
 function setRole(member: Member, role: Role) {
@@ -56,43 +50,45 @@ function onRemove(member: Member) {
 </script>
 
 <template>
-  <div>
-    <DataTable
-      :columns="columns"
-      :rows="members?.items"
-      :row-key="(m) => m.user_id"
-      :loading="isPending"
-      :error="error"
-      label="Members"
-    >
-      <template #cell-member="{ row }">
-        <div class="flex items-center gap-3">
-          <Avatar :name="row.email" size="sm" />
-          <span class="truncate">{{ row.email }}</span>
-          <span v-if="row.user_id === me?.id" class="badge badge-ghost badge-sm">you</span>
-        </div>
-      </template>
-      <template #cell-role="{ row }">
-        <Select
-          v-if="isAdmin"
-          :model-value="row.role"
-          :options="roles"
-          :label="`Role of ${row.email}`"
-          size="sm"
-          @update:model-value="setRole(row, $event)"
-        />
-        <span v-else class="text-sm capitalize">{{ row.role }}</span>
-      </template>
-      <template #cell-actions="{ row }">
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-sm"
-          :aria-label="`Remove ${row.email}`"
-          @click="onRemove(row)"
+  <List
+    :items="members?.items"
+    :item-key="(m) => m.user_id"
+    :loading="isPending"
+    :error="error"
+    label="Members"
+  >
+    <template #item="{ item }">
+      <ListItem>
+        <template #leading><Avatar :name="item.email" /></template>
+        <template #title
+          >{{ item.email }}
+          <span v-if="item.user_id === me?.id" class="ms-1 badge badge-ghost badge-sm"
+            >you</span
+          ></template
         >
-          <UserX class="size-4" aria-hidden="true" />
-        </button>
-      </template>
-    </DataTable>
-  </div>
+        <template v-if="!isAdmin" #meta>
+          <span class="capitalize">{{ item.role }}</span>
+        </template>
+        <template v-if="isAdmin" #trailing>
+          <div class="w-32">
+            <Select
+              :model-value="item.role"
+              :options="roles"
+              :label="`Role of ${item.email}`"
+              size="sm"
+              @update:model-value="setRole(item, $event)"
+            />
+          </div>
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            :aria-label="`Remove ${item.email}`"
+            @click="onRemove(item)"
+          >
+            <UserX class="size-4" aria-hidden="true" />
+          </button>
+        </template>
+      </ListItem>
+    </template>
+  </List>
 </template>
