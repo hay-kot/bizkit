@@ -11,8 +11,6 @@
 //! `share` and `per_user` leave `v:` out, as retention does, because a
 //! cookieless visitor can't be followed across days.
 
-use std::collections::HashMap;
-
 use bizkit_core::time::UnixMillis;
 use sqlx::SqlitePool;
 
@@ -209,7 +207,7 @@ async fn totals(pool: &SqlitePool, ask: &Ask<'_>) -> sqlx::Result<(i64, i64)> {
     Ok((row.count, row.users))
 }
 
-/// Identified people who did it, and active people, over the range.
+/// People with a stored ID who did it, and active people, over the range.
 async fn share_totals(pool: &SqlitePool, ask: &Ask<'_>) -> sqlx::Result<(i64, i64)> {
     let row = sqlx::query!(
         r#"SELECT COUNT(DISTINCT CASE WHEN name = ? AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (
@@ -246,8 +244,10 @@ async fn share_totals(pool: &SqlitePool, ask: &Ask<'_>) -> sqlx::Result<(i64, i6
     Ok((row.users, row.active))
 }
 
-/// The share of active people who did it, per bucket and over the range,
-/// from one pass that keeps a row per person and bucket.
+/// The share of active people who did it, per bucket and over the range.
+/// One scan fills a row per person and bucket; SQL counts it twice, by
+/// bucket and over the range, and only those counts come back. The range
+/// row has no `start`.
 async fn share_series(
     pool: &SqlitePool,
     ask: &Ask<'_>,
@@ -255,7 +255,8 @@ async fn share_series(
 ) -> sqlx::Result<InsightResult> {
     let (origin, bucket) = (range.from.start(), range.bucket_ms());
     let rows = sqlx::query!(
-        r#"SELECT ? + ((ts - ?) / ?) * ? AS "start!: i64", person AS "person!: String",
+        r#"WITH b AS MATERIALIZED (
+             SELECT ? + ((ts - ?) / ?) * ? AS start, person,
                   MAX(name = ? AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (
                CASE json_extract(f.value, '$.op')
                WHEN 'is_not' THEN NOT EXISTS (SELECT 1 FROM json_each(COALESCE(e.props, '{}')) x
@@ -273,11 +274,15 @@ async fn share_series(
                    WHEN 'gt' THEN x.type IN ('integer', 'real') AND x.atom > json_extract(f.value, '$.n')
                    WHEN 'lt' THEN x.type IN ('integer', 'real') AND x.atom < json_extract(f.value, '$.n')
                    ELSE x.type <> 'null' END)
-               END))) AS "did!: bool"
+               END))) AS did
            FROM analytics_events e
            WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?
              AND substr(person, 1, 2) <> 'v:'
-           GROUP BY 1, 2"#,
+           GROUP BY 1, 2)
+           SELECT start AS "start?: i64", SUM(did) AS "users!: i64", COUNT(*) AS "active!: i64"
+           FROM b GROUP BY start
+           UNION ALL
+           SELECT NULL, COUNT(DISTINCT CASE WHEN did THEN person END), COUNT(DISTINCT person) FROM b"#,
         origin,
         origin,
         bucket,
@@ -291,22 +296,14 @@ async fn share_series(
     )
     .fetch_all(pool)
     .await?;
-    let mut per_bucket: HashMap<i64, (i64, i64)> = HashMap::new();
-    let mut people: HashMap<&str, bool> = HashMap::new();
-    for row in &rows {
-        let (users, active) = per_bucket.entry(row.start).or_default();
-        *active += 1;
-        *users += i64::from(row.did);
-        *people.entry(&row.person).or_default() |= row.did;
-    }
-    let active = i64::try_from(people.len()).unwrap_or(i64::MAX);
-    let users = i64::try_from(people.values().filter(|did| **did).count()).unwrap_or(i64::MAX);
+    let (users, active) =
+        rows.iter().find(|row| row.start.is_none()).map_or((0, 0), |row| (row.users, row.active));
     let points = range
         .starts()
         .into_iter()
         .map(|start| {
-            let (did, seen) = per_bucket.get(&start.0).copied().unwrap_or_default();
-            InsightPoint { start, value: ratio(did, seen) }
+            let row = rows.iter().find(|row| row.start == Some(start.0));
+            InsightPoint { start, value: row.map_or(0.0, |row| ratio(row.users, row.active)) }
         })
         .collect();
     Ok(InsightResult::Series {
@@ -319,7 +316,7 @@ async fn share_series(
     })
 }
 
-/// Identified people by how many times they did it.
+/// People with a stored ID by how many times they did it.
 async fn distribution(
     pool: &SqlitePool,
     ask: &Ask<'_>,
@@ -443,7 +440,7 @@ async fn breakdown_groups(
 ) -> sqlx::Result<Vec<Grouped>> {
     let by_trait = by.source == BreakdownSource::Trait;
     let by_events = measure == Measure::Total;
-    let identified_only = measure == Measure::Share;
+    let stored_ids_only = measure == Measure::Share;
     let rows = sqlx::query!(
         r#"WITH m AS (
              SELECT CASE WHEN ? THEN
@@ -451,6 +448,7 @@ async fn breakdown_groups(
                          ELSE CAST(t.atom AS TEXT) END
                   FROM analytics_people pp, json_each(pp.traits) t
                   WHERE substr(e.person, 1, 2) = 'p:' AND pp.id = substr(e.person, 3)
+                    AND pp.workspace_id = e.workspace_id AND pp.project_id = e.project_id
                     AND t.key = ? AND t.type <> 'null')
                ELSE
                  (SELECT CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'
@@ -481,7 +479,7 @@ async fn breakdown_groups(
            ),
            top AS (
              SELECT value FROM m GROUP BY value
-             ORDER BY CASE WHEN ? THEN COUNT(*) ELSE COUNT(DISTINCT person) END DESC, value
+             ORDER BY CASE WHEN ? THEN COUNT(*) ELSE COUNT(DISTINCT person) END DESC, value IS NULL, value
              LIMIT ?
            ),
            t AS (SELECT value, person, EXISTS (SELECT 1 FROM top WHERE top.value IS m.value) AS in_top FROM m)
@@ -496,7 +494,7 @@ async fn breakdown_groups(
         ask.from,
         ask.to,
         ask.event,
-        identified_only,
+        stored_ids_only,
         ask.filters,
         by_events,
         TOP_VALUES,
@@ -579,7 +577,7 @@ async fn people_breakdown(
                      ELSE x.type <> 'null' END)
                  END))
            ),
-           top AS (SELECT value FROM m GROUP BY value ORDER BY COUNT(*) DESC, value LIMIT ?),
+           top AS (SELECT value FROM m GROUP BY value ORDER BY COUNT(*) DESC, value IS NULL, value LIMIT ?),
            t AS (SELECT value, EXISTS (SELECT 1 FROM top WHERE top.value IS m.value) AS in_top FROM m)
            SELECT in_top AS "in_top!: bool", CASE WHEN in_top THEN value END AS "value?: String",
                   COUNT(*) AS "count!: i64"

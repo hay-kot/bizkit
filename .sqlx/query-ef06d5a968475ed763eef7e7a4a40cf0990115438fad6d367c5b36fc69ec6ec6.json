@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH b AS MATERIALIZED (\n             SELECT ? + ((ts - ?) / ?) * ? AS start, person,\n                  MAX(name = ? AND NOT EXISTS (SELECT 1 FROM json_each(?) f WHERE NOT (\n               CASE json_extract(f.value, '$.op')\n               WHEN 'is_not' THEN NOT EXISTS (SELECT 1 FROM json_each(COALESCE(e.props, '{}')) x\n                 WHERE x.key = json_extract(f.value, '$.k')\n                   AND (CASE WHEN x.type IN ('integer', 'real') AND json_extract(f.value, '$.n') IS NOT NULL\n                         THEN x.atom = json_extract(f.value, '$.n')\n                         ELSE (CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                               ELSE CAST(x.atom AS TEXT) END) = json_extract(f.value, '$.v') END))\n               ELSE EXISTS (SELECT 1 FROM json_each(COALESCE(e.props, '{}')) x\n                 WHERE x.key = json_extract(f.value, '$.k') AND CASE json_extract(f.value, '$.op')\n                   WHEN 'is' THEN (CASE WHEN x.type IN ('integer', 'real') AND json_extract(f.value, '$.n') IS NOT NULL\n                         THEN x.atom = json_extract(f.value, '$.n')\n                         ELSE (CASE x.type WHEN 'true' THEN 'true' WHEN 'false' THEN 'false'\n                               ELSE CAST(x.atom AS TEXT) END) = json_extract(f.value, '$.v') END)\n                   WHEN 'gt' THEN x.type IN ('integer', 'real') AND x.atom > json_extract(f.value, '$.n')\n                   WHEN 'lt' THEN x.type IN ('integer', 'real') AND x.atom < json_extract(f.value, '$.n')\n                   ELSE x.type <> 'null' END)\n               END))) AS did\n           FROM analytics_events e\n           WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n             AND substr(person, 1, 2) <> 'v:'\n           GROUP BY 1, 2)\n           SELECT start AS \"start?: i64\", SUM(did) AS \"users!: i64\", COUNT(*) AS \"active!: i64\"\n           FROM b GROUP BY start\n           UNION ALL\n           SELECT NULL, COUNT(DISTINCT CASE WHEN did THEN person END), COUNT(DISTINCT person) FROM b",
+  "describe": {
+    "columns": [
+      {
+        "name": "start?: i64",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "users!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "active!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ef06d5a968475ed763eef7e7a4a40cf0990115438fad6d367c5b36fc69ec6ec6"
+}

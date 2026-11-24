@@ -17536,7 +17536,7 @@
           },
           {
             "type": "object",
-            "description": "Identified people by how many times they did the event.",
+            "description": "People with a stored ID by how many times they did the event.",
             "required": [
               "users",
               "buckets",

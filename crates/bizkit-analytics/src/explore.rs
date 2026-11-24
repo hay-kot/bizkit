@@ -353,6 +353,7 @@ impl Operation for EventsRecent {
                       p.id AS "person_id?: PersonId", p.user_id AS "user_id?"
                FROM analytics_events e
                LEFT JOIN analytics_people p ON p.id = substr(e.person, 3) AND substr(e.person, 1, 2) = 'p:'
+                 AND p.workspace_id = e.workspace_id AND p.project_id = e.project_id
                WHERE e.workspace_id = ? AND e.project_id = ? AND e.day >= ? AND e.day <= ? AND e.id < ?
                  AND (? IS NULL OR e.name = ?)
                  AND NOT EXISTS (

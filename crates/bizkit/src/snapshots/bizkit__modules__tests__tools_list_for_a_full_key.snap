@@ -1144,7 +1144,7 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
-        "readOnlyHint": false
+        "readOnlyHint": true
       },
       "description": "Run an insight query: events by total, users, share of active users or per-user count, or people by trait, with filters and an optional breakdown",
       "inputSchema": {
@@ -4524,7 +4524,7 @@ expression: tools
     {
       "annotations": {
         "destructiveHint": false,
-        "readOnlyHint": false
+        "readOnlyHint": true
       },
       "description": "Render a mail in a list's layout without sending it",
       "inputSchema": {

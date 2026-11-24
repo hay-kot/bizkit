@@ -37,10 +37,12 @@ pub(crate) enum Measure {
     Total,
     /// Distinct people who sent them. A cookieless visitor counts once a day.
     Users,
-    /// Distinct identified people who sent them, over the active people:
-    /// identified or aliased people with any event in the range.
+    /// Distinct people with a stored ID (identified, or the snippet's
+    /// anonymous ID) who sent them, over the active people: those with a
+    /// stored ID and any event in the range. Cookieless visitors are left out.
     Share,
-    /// Identified people by how many times they sent it: 1, 2, 3, 4, 5+.
+    /// People with a stored ID by how many times they sent it: 1, 2, 3, 4,
+    /// 5+. Cookieless visitors are left out.
     PerUser,
 }
 
@@ -329,7 +331,7 @@ pub(crate) enum InsightResult {
         #[serde(default)]
         raw_since: Option<Day>,
     },
-    /// Identified people by how many times they did the event.
+    /// People with a stored ID by how many times they did the event.
     Distribution {
         /// People who did it at least once.
         users: i64,

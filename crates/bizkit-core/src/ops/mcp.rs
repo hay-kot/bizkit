@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use tokio_util::sync::CancellationToken;
 
 use super::registry::Registry;
-use super::{Access, KeyPrincipal, Method, Principal};
+use super::{Access, KeyPrincipal, Level, Method, Principal};
 use crate::app::Platform;
 use crate::auth::middleware::Authn;
 use crate::error::ApiError;
@@ -34,13 +34,15 @@ pub(crate) fn tools(registry: &Registry) -> BTreeMap<String, McpTool> {
     registry
         .registered()
         .filter_map(|op| {
-            let Access::Workspace(_) = &op.meta.access else { return None };
+            let Access::Workspace(scope) = &op.meta.access else { return None };
             let name = tool_name(op.meta.id);
             let schema = input_schema(&op.input_schema, registry.components());
             let mut tool = Tool::new(name.clone(), op.meta.summary, Arc::new(schema));
+            // A read-scope POST (a query with a JSON body) changes nothing either.
+            let read_only = op.meta.method == Method::Get || scope.level() == Level::Read;
             tool.annotations = Some(
                 ToolAnnotations::new()
-                    .read_only(op.meta.method == Method::Get)
+                    .read_only(read_only)
                     .destructive(op.meta.method == Method::Delete),
             );
             Some((name, McpTool { op_id: op.meta.id, tool }))
