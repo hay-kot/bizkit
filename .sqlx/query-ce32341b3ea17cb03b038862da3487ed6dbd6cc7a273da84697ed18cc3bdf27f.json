@@ -1,0 +1,206 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: ContactId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  list_id AS \"list_id: ListId\", email, name, tags, attributes, status, source,\n                  confirm_token,\n                  confirm_sent_at AS \"confirm_sent_at: UnixMillis\", unsubscribe_token,\n                  subscribed_at AS \"subscribed_at: UnixMillis\",\n                  unsubscribed_at AS \"unsubscribed_at: UnixMillis\",\n                  created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n           FROM mailing_contacts WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ContactId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "list_id: ListId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "list_id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "tags",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "tags"
+          }
+        }
+      },
+      {
+        "name": "attributes",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "attributes"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "source",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "confirm_token",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "confirm_token"
+          }
+        }
+      },
+      {
+        "name": "confirm_sent_at: UnixMillis",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "confirm_sent_at"
+          }
+        }
+      },
+      {
+        "name": "unsubscribe_token",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "unsubscribe_token"
+          }
+        }
+      },
+      {
+        "name": "subscribed_at: UnixMillis",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "subscribed_at"
+          }
+        }
+      },
+      {
+        "name": "unsubscribed_at: UnixMillis",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "unsubscribed_at"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: UnixMillis",
+        "ordinal": 15,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ce32341b3ea17cb03b038862da3487ed6dbd6cc7a273da84697ed18cc3bdf27f"
+}

@@ -16,6 +16,106 @@ bizkit_core::id_type!(
 );
 bizkit_core::id_type!(EnrollmentId, "The ID of a contact's run through a sequence.");
 
+/// A contact attribute value: text, a number or a boolean.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AttributeValue {
+    /// `true` or `false`.
+    Bool(bool),
+    /// A number.
+    Number(serde_json::Number),
+    /// Text.
+    Text(String),
+}
+
+impl utoipa::PartialSchema for AttributeValue {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::{SchemaType, Type};
+        utoipa::openapi::ObjectBuilder::new()
+            .schema_type(SchemaType::from_iter([Type::String, Type::Number, Type::Boolean]))
+            .description(Some("A contact attribute value: text, a number or a boolean."))
+            .into()
+    }
+}
+
+impl ToSchema for AttributeValue {
+    fn name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("AttributeValue")
+    }
+}
+
+impl std::fmt::Display for AttributeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bool(value) => write!(f, "{value}"),
+            Self::Number(value) => write!(f, "{value}"),
+            Self::Text(value) => f.write_str(value),
+        }
+    }
+}
+
+/// A contact's attributes by key. Keys are lower-case letters, digits and
+/// `_`, starting with a letter.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Attributes(pub std::collections::BTreeMap<String, AttributeValue>);
+
+impl utoipa::PartialSchema for Attributes {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::{AdditionalProperties, Type};
+        utoipa::openapi::ObjectBuilder::new()
+            .schema_type(Type::Object)
+            .additional_properties(Some(AdditionalProperties::RefOr(
+                <AttributeValue as utoipa::PartialSchema>::schema(),
+            )))
+            .description(Some("A contact's attributes by key."))
+            .into()
+    }
+}
+
+impl ToSchema for Attributes {
+    fn name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("Attributes")
+    }
+}
+
+/// One attribute test of a segment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AttributeCondition {
+    /// The attribute key.
+    pub key: String,
+    /// The value it must have, of the same type: text `"42"` doesn't
+    /// match the number `42`.
+    pub equals: AttributeValue,
+}
+
+/// Which subscribers of a list a broadcast goes to. Every part that is set
+/// must match; an empty segment is every subscriber.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Segment {
+    /// Subscribers with every one of these tags.
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Subscribers whose attributes match each condition.
+    #[serde(default)]
+    pub attributes: Vec<AttributeCondition>,
+    /// Subscribers who joined at or after this time.
+    #[serde(default)]
+    pub joined_after: Option<UnixMillis>,
+    /// Subscribers who joined before this time.
+    #[serde(default)]
+    pub joined_before: Option<UnixMillis>,
+}
+
+/// How many subscribers a segment matches.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Audience {
+    /// The matching subscribers.
+    pub subscribers: u64,
+}
+
 /// A mailing list. Contacts and their consent belong to one list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct MailingList {
@@ -108,6 +208,8 @@ pub struct Contact {
     pub name: Option<String>,
     /// Labels for sending to part of a list.
     pub tags: Vec<String>,
+    /// Values for `{{ attr.key }}` merge fields and segments.
+    pub attributes: Attributes,
     /// Where the contact stands.
     pub status: ContactStatus,
     /// How the address arrived: `api`, `admin`, `seed` or `form:<form id>`.
@@ -184,10 +286,11 @@ pub struct Broadcast {
     pub list_id: ListId,
     /// The subject line.
     pub subject: String,
-    /// The body in Markdown. `{{ name }}` and `{{ email }}` are filled in.
+    /// The body in Markdown. `{{ name }}`, `{{ email }}` and
+    /// `{{ attr.key }}` are filled in.
     pub body_md: String,
-    /// Only subscribers with this tag, if set.
-    pub tag: Option<String>,
+    /// Which subscribers of the list get it.
+    pub segment: Segment,
     /// Where it stands.
     pub status: BroadcastStatus,
     /// Subscribers it was queued for.

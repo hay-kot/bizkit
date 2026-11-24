@@ -9256,16 +9256,13 @@
                     "$ref": "#/components/schemas/ListId",
                     "description": "The list it goes to."
                   },
+                  "segment": {
+                    "$ref": "#/components/schemas/Segment",
+                    "description": "Which subscribers get it; absent: every subscriber."
+                  },
                   "subject": {
                     "type": "string",
                     "description": "The subject line."
-                  },
-                  "tag": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "description": "Only subscribers with this tag."
                   }
                 },
                 "additionalProperties": false
@@ -9597,19 +9594,23 @@
                       }
                     ]
                   },
+                  "segment": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Segment",
+                        "description": "Replaces the segment."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "subject": {
                     "type": [
                       "string",
                       "null"
                     ],
                     "description": "The subject line."
-                  },
-                  "tag": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "description": "Only subscribers with this tag; `null` sends to all."
                   }
                 },
                 "additionalProperties": false
@@ -11179,6 +11180,123 @@
         "x-bizkit-scope": "mailing:admin"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/audience": {
+      "post": {
+        "tags": [
+          "mailing"
+        ],
+        "summary": "Count the subscribers of a list that a segment matches",
+        "operationId": "mailing.lists.audience",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ListId",
+              "description": "The list."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "segment": {
+                    "$ref": "#/components/schemas/Segment",
+                    "description": "The segment; absent: every subscriber."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Audience"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "mailing:read"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/mailing/lists/{list_id}/contacts": {
       "get": {
         "tags": [
@@ -11383,6 +11501,10 @@
                   "email"
                 ],
                 "properties": {
+                  "attributes": {
+                    "$ref": "#/components/schemas/Attributes",
+                    "description": "Values for `{{ attr.key }}` merge fields and segments. An address\nalready on the list keeps its attributes; change them with\n`mailing.contacts.update`."
+                  },
                   "email": {
                     "type": "string",
                     "description": "The address."
@@ -11713,7 +11835,7 @@
         "tags": [
           "mailing"
         ],
-        "summary": "Change a contact's name or tags",
+        "summary": "Change a contact's name, tags or attributes",
         "operationId": "mailing.contacts.update",
         "parameters": [
           {
@@ -11750,6 +11872,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "attributes": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Attributes",
+                        "description": "Replaces the attributes."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "name": {
                     "type": [
                       "string",
@@ -16437,6 +16570,60 @@
           }
         }
       },
+      "AttributeCondition": {
+        "type": "object",
+        "description": "One attribute test of a segment.",
+        "required": [
+          "key",
+          "equals"
+        ],
+        "properties": {
+          "equals": {
+            "$ref": "#/components/schemas/AttributeValue",
+            "description": "The value it must have, of the same type: text `\"42\"` doesn't\nmatch the number `42`."
+          },
+          "key": {
+            "type": "string",
+            "description": "The attribute key."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AttributeValue": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ],
+        "description": "A contact attribute value: text, a number or a boolean."
+      },
+      "Attributes": {
+        "type": "object",
+        "description": "A contact's attributes by key.",
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A contact attribute value: text, a number or a boolean."
+        }
+      },
+      "Audience": {
+        "type": "object",
+        "description": "How many subscribers a segment matches.",
+        "required": [
+          "subscribers"
+        ],
+        "properties": {
+          "subscribers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The matching subscribers.",
+            "minimum": 0
+          }
+        }
+      },
       "BodyEncoding": {
         "type": "string",
         "description": "How a request body is given.",
@@ -16554,6 +16741,7 @@
           "list_id",
           "subject",
           "body_md",
+          "segment",
           "status",
           "recipients",
           "created_at",
@@ -16562,7 +16750,7 @@
         "properties": {
           "body_md": {
             "type": "string",
-            "description": "The body in Markdown. `{{ name }}` and `{{ email }}` are filled in."
+            "description": "The body in Markdown. `{{ name }}`, `{{ email }}` and\n`{{ attr.key }}` are filled in."
           },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -16611,6 +16799,10 @@
             "description": "Subscribers it was queued for.",
             "minimum": 0
           },
+          "segment": {
+            "$ref": "#/components/schemas/Segment",
+            "description": "Which subscribers of the list get it."
+          },
           "send_at": {
             "oneOf": [
               {
@@ -16640,13 +16832,6 @@
           "subject": {
             "type": "string",
             "description": "The subject line."
-          },
-          "tag": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Only subscribers with this tag, if set."
           },
           "updated_at": {
             "$ref": "#/components/schemas/Timestamp",
@@ -16816,12 +17001,17 @@
           "list_id",
           "email",
           "tags",
+          "attributes",
           "status",
           "source",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "attributes": {
+            "$ref": "#/components/schemas/Attributes",
+            "description": "Values for `{{ attr.key }}` merge fields and segments."
+          },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "When the address arrived."
@@ -20270,6 +20460,49 @@
             "description": "The secrets, by name."
           }
         }
+      },
+      "Segment": {
+        "type": "object",
+        "description": "Which subscribers of a list a broadcast goes to. Every part that is set\nmust match; an empty segment is every subscriber.",
+        "properties": {
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttributeCondition"
+            },
+            "description": "Subscribers whose attributes match each condition."
+          },
+          "joined_after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "Subscribers who joined at or after this time."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "joined_before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "Subscribers who joined before this time."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Subscribers with every one of these tags."
+          }
+        },
+        "additionalProperties": false
       },
       "Sequence": {
         "type": "object",

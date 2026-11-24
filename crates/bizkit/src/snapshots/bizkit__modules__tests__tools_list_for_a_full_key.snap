@@ -3890,8 +3890,82 @@ expression: tools
       "description": "Create a draft broadcast to a list",
       "inputSchema": {
         "$defs": {
+          "AttributeCondition": {
+            "additionalProperties": false,
+            "description": "One attribute test of a segment.",
+            "properties": {
+              "equals": {
+                "$ref": "#/$defs/AttributeValue",
+                "description": "The value it must have, of the same type: text `\"42\"` doesn't\nmatch the number `42`."
+              },
+              "key": {
+                "description": "The attribute key.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "equals"
+            ],
+            "type": "object"
+          },
+          "AttributeValue": {
+            "description": "A contact attribute value: text, a number or a boolean.",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
           "ListId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "Segment": {
+            "additionalProperties": false,
+            "description": "Which subscribers of a list a broadcast goes to. Every part that is set\nmust match; an empty segment is every subscriber.",
+            "properties": {
+              "attributes": {
+                "description": "Subscribers whose attributes match each condition.",
+                "items": {
+                  "$ref": "#/$defs/AttributeCondition"
+                },
+                "type": "array"
+              },
+              "joined_after": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Timestamp",
+                    "description": "Subscribers who joined at or after this time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "joined_before": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Timestamp",
+                    "description": "Subscribers who joined before this time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tags": {
+                "description": "Subscribers with every one of these tags.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "Timestamp": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -3906,16 +3980,13 @@ expression: tools
             "$ref": "#/$defs/ListId",
             "description": "The list it goes to."
           },
+          "segment": {
+            "$ref": "#/$defs/Segment",
+            "description": "Which subscribers get it; absent: every subscriber."
+          },
           "subject": {
             "description": "The subject line.",
             "type": "string"
-          },
-          "tag": {
-            "description": "Only subscribers with this tag.",
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": [
@@ -4169,12 +4240,86 @@ expression: tools
       "description": "Change a draft broadcast",
       "inputSchema": {
         "$defs": {
+          "AttributeCondition": {
+            "additionalProperties": false,
+            "description": "One attribute test of a segment.",
+            "properties": {
+              "equals": {
+                "$ref": "#/$defs/AttributeValue",
+                "description": "The value it must have, of the same type: text `\"42\"` doesn't\nmatch the number `42`."
+              },
+              "key": {
+                "description": "The attribute key.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "equals"
+            ],
+            "type": "object"
+          },
+          "AttributeValue": {
+            "description": "A contact attribute value: text, a number or a boolean.",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
           "BroadcastId": {
             "format": "uuid",
             "type": "string"
           },
           "ListId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "Segment": {
+            "additionalProperties": false,
+            "description": "Which subscribers of a list a broadcast goes to. Every part that is set\nmust match; an empty segment is every subscriber.",
+            "properties": {
+              "attributes": {
+                "description": "Subscribers whose attributes match each condition.",
+                "items": {
+                  "$ref": "#/$defs/AttributeCondition"
+                },
+                "type": "array"
+              },
+              "joined_after": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Timestamp",
+                    "description": "Subscribers who joined at or after this time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "joined_before": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Timestamp",
+                    "description": "Subscribers who joined before this time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tags": {
+                "description": "Subscribers with every one of these tags.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "Timestamp": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -4203,15 +4348,19 @@ expression: tools
               }
             ]
           },
-          "subject": {
-            "description": "The subject line.",
-            "type": [
-              "string",
-              "null"
+          "segment": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Segment",
+                "description": "Replaces the segment."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
-          "tag": {
-            "description": "Only subscribers with this tag; `null` sends to all.",
+          "subject": {
+            "description": "The subject line.",
             "type": [
               "string",
               "null"
@@ -4233,6 +4382,18 @@ expression: tools
       "description": "Add an address to a mailing list",
       "inputSchema": {
         "$defs": {
+          "Attributes": {
+            "additionalProperties": {
+              "description": "A contact attribute value: text, a number or a boolean.",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "description": "A contact's attributes by key.",
+            "type": "object"
+          },
           "ListId": {
             "format": "uuid",
             "type": "string"
@@ -4241,6 +4402,10 @@ expression: tools
         "additionalProperties": false,
         "description": "An address to add.",
         "properties": {
+          "attributes": {
+            "$ref": "#/$defs/Attributes",
+            "description": "Values for `{{ attr.key }}` merge fields and segments. An address\nalready on the list keeps its attributes; change them with\n`mailing.contacts.update`."
+          },
           "email": {
             "description": "The address.",
             "type": "string"
@@ -4474,9 +4639,21 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": false
       },
-      "description": "Change a contact's name or tags",
+      "description": "Change a contact's name, tags or attributes",
       "inputSchema": {
         "$defs": {
+          "Attributes": {
+            "additionalProperties": {
+              "description": "A contact attribute value: text, a number or a boolean.",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "description": "A contact's attributes by key.",
+            "type": "object"
+          },
           "ContactId": {
             "format": "uuid",
             "type": "string"
@@ -4489,6 +4666,17 @@ expression: tools
         "additionalProperties": false,
         "description": "Changes to a contact. Absent fields stay as they are.",
         "properties": {
+          "attributes": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Attributes",
+                "description": "Replaces the attributes."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "contact_id": {
             "$ref": "#/$defs/ContactId",
             "description": "The contact."
@@ -4804,6 +4992,112 @@ expression: tools
         "type": "object"
       },
       "name": "mailing_forms_list"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Count the subscribers of a list that a segment matches",
+      "inputSchema": {
+        "$defs": {
+          "AttributeCondition": {
+            "additionalProperties": false,
+            "description": "One attribute test of a segment.",
+            "properties": {
+              "equals": {
+                "$ref": "#/$defs/AttributeValue",
+                "description": "The value it must have, of the same type: text `\"42\"` doesn't\nmatch the number `42`."
+              },
+              "key": {
+                "description": "The attribute key.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "equals"
+            ],
+            "type": "object"
+          },
+          "AttributeValue": {
+            "description": "A contact attribute value: text, a number or a boolean.",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "ListId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "Segment": {
+            "additionalProperties": false,
+            "description": "Which subscribers of a list a broadcast goes to. Every part that is set\nmust match; an empty segment is every subscriber.",
+            "properties": {
+              "attributes": {
+                "description": "Subscribers whose attributes match each condition.",
+                "items": {
+                  "$ref": "#/$defs/AttributeCondition"
+                },
+                "type": "array"
+              },
+              "joined_after": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Timestamp",
+                    "description": "Subscribers who joined at or after this time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "joined_before": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Timestamp",
+                    "description": "Subscribers who joined before this time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tags": {
+                "description": "Subscribers with every one of these tags.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "Timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A segment to count on a list.",
+        "properties": {
+          "list_id": {
+            "$ref": "#/$defs/ListId",
+            "description": "The list."
+          },
+          "segment": {
+            "$ref": "#/$defs/Segment",
+            "description": "The segment; absent: every subscriber."
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "type": "object"
+      },
+      "name": "mailing_lists_audience"
     },
     {
       "annotations": {

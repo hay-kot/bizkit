@@ -37,6 +37,8 @@ pub(crate) fn step_condition_input(
 ) -> anyhow::Result<Value> {
     let tags: Value = serde_json::from_str(&contact.tags)
         .with_context(|| format!("decoding the tags of contact {}", contact.id))?;
+    let attributes: Value = serde_json::from_str(&contact.attributes)
+        .with_context(|| format!("decoding the attributes of contact {}", contact.id))?;
     Ok(json!({
         "sequence": { "id": sequence.id, "name": sequence.name },
         "step": { "id": step.id, "position": step.position, "subject": step.subject },
@@ -44,6 +46,7 @@ pub(crate) fn step_condition_input(
             "email": contact.email,
             "name": contact.name,
             "tags": tags,
+            "attributes": attributes,
             "subscribed_at": contact.subscribed_at,
         },
     }))
@@ -61,6 +64,7 @@ fn step_condition_sample() -> Value {
             "email": "ada@example.com",
             "name": "Ada",
             "tags": ["trial"],
+            "attributes": { "plan": "pro", "seats": 5 },
             "subscribed_at": "2026-01-01T00:00:00Z",
         },
     })

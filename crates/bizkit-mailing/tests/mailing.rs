@@ -144,6 +144,17 @@ mod mailing {
         }
 
         /// Adds a subscribed contact through a list without double opt-in.
+        async fn audience(&self, list: &Value, segment: Value) -> u64 {
+            let path = format!("{}/lists/{}/audience", self.ws(), id(list));
+            let res: Value = self
+                .member
+                .post(&path, &json!({"segment": segment}))
+                .await
+                .expect(StatusCode::OK)
+                .json();
+            res["subscribers"].as_u64().unwrap()
+        }
+
         async fn subscribed(&self, list: &Value, email: &str, extra: Value) -> Value {
             let mut body = json!({"email": email});
             if let (Some(body), Some(extra)) = (body.as_object_mut(), extra.as_object()) {
@@ -542,11 +553,121 @@ mod mailing {
 
         let tagged = s.broadcast(&list, "VIP only").await;
         let tagged_path = format!("{}/broadcasts/{}", s.ws(), id(&tagged));
-        s.member.patch(&tagged_path, &json!({"tag": "vip"})).await.expect(StatusCode::OK);
+        s.member
+            .patch(&tagged_path, &json!({"segment": {"tags": ["vip"]}}))
+            .await
+            .expect(StatusCode::OK);
         s.member.post(&format!("{tagged_path}/send"), &json!({})).await.expect(StatusCode::OK);
         s.app.drain_jobs().await;
         let tagged_to: Vec<String> = s.app.mail.take().into_iter().map(|m| m.to).collect();
         assert_eq!(tagged_to, ["ida@example.com"], "tag");
+    }
+
+    #[tokio::test]
+    async fn contacts_keep_typed_attributes_and_mail_fills_them() {
+        let s = setup().await;
+        let list = s.list(json!({"double_opt_in": false})).await;
+        let ida = s
+            .subscribed(
+                &list,
+                "ida@example.com",
+                json!({"name": "Ida", "attributes": {"plan": "pro", "seats": 12, "trial": false}}),
+            )
+            .await;
+        assert_eq!(ida["attributes"], json!({"plan": "pro", "seats": 12, "trial": false}), "{ida}");
+
+        let path = format!("{}/{}", s.contacts(&list), id(&ida));
+        let updated: Value = s
+            .member
+            .patch(&path, &json!({"attributes": {"plan": "team"}}))
+            .await
+            .expect(StatusCode::OK)
+            .json();
+        assert_eq!(updated["attributes"], json!({"plan": "team"}), "update replaces the object");
+        let kept: Value =
+            s.member.patch(&path, &json!({"name": "Ida B"})).await.expect(StatusCode::OK).json();
+        assert_eq!(kept["attributes"], json!({"plan": "team"}), "absent keeps them");
+
+        for bad in [json!({"Plan": "x"}), json!({"1st": "x"}), json!({"plan": "x".repeat(501)})] {
+            s.member
+                .patch(&path, &json!({"attributes": bad}))
+                .await
+                .expect(StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        s.member
+            .patch(&path, &json!({"attributes": {"nested": {"a": 1}}}))
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+
+        let broadcast = s.broadcast(&list, "You are on {{ attr.plan }} [{{ attr.city }}]").await;
+        let send = format!("{}/broadcasts/{}/send", s.ws(), id(&broadcast));
+        s.member.post(&send, &json!({})).await.expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let mail = s.app.mail.take().pop().unwrap();
+        assert!(mail.text.contains("You are on team []"), "{}", mail.text);
+    }
+
+    #[tokio::test]
+    async fn segments_pick_subscribers_by_tags_attributes_and_join_date() {
+        let s = setup().await;
+        let list = s.list(json!({"double_opt_in": false})).await;
+        s.subscribed(
+            &list,
+            "ann@example.com",
+            json!({"tags": ["vip", "beta"], "attributes": {"plan": "pro", "seats": 5}}),
+        )
+        .await;
+        s.subscribed(
+            &list,
+            "bob@example.com",
+            json!({"tags": ["vip"], "attributes": {"plan": "free", "seats": 5.0}}),
+        )
+        .await;
+        s.app.clock.advance(Duration::from_hours(24));
+        let cy = s
+            .subscribed(
+                &list,
+                "cy@example.com",
+                json!({"attributes": {"plan": "pro", "seats": "5"}}),
+            )
+            .await;
+
+        assert_eq!(s.audience(&list, json!({})).await, 3, "every subscriber");
+        assert_eq!(s.audience(&list, json!({"tags": ["vip"]})).await, 2, "tag");
+        assert_eq!(s.audience(&list, json!({"tags": ["vip", "beta"]})).await, 1, "every tag");
+        let pro = json!({"attributes": [{"key": "plan", "equals": "pro"}]});
+        assert_eq!(s.audience(&list, pro.clone()).await, 2, "attribute");
+        assert_eq!(
+            s.audience(&list, json!({"attributes": [{"key": "seats", "equals": 5}]})).await,
+            2,
+            "numbers match numbers, integer or real; text \"5\" doesn't"
+        );
+        assert_eq!(
+            s.audience(&list, json!({"attributes": [{"key": "seats", "equals": "5"}]})).await,
+            1,
+            "text matches text"
+        );
+        let later = cy["subscribed_at"].clone();
+        assert_eq!(s.audience(&list, json!({"joined_after": later})).await, 1, "joined after");
+        assert_eq!(s.audience(&list, json!({"joined_before": later})).await, 2, "joined before");
+        s.member
+            .post(
+                &format!("{}/lists/{}/audience", s.ws(), id(&list)),
+                &json!({"segment": {"joined_after": later, "joined_before": later}}),
+            )
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+
+        let broadcast = s.broadcast(&list, "Hi").await;
+        let path = format!("{}/broadcasts/{}", s.ws(), id(&broadcast));
+        let segment = json!({"tags": ["vip"], "attributes": [{"key": "plan", "equals": "pro"}]});
+        let draft: Value =
+            s.member.patch(&path, &json!({"segment": segment})).await.expect(StatusCode::OK).json();
+        assert_eq!(draft["segment"]["tags"], json!(["vip"]), "{draft}");
+        s.member.post(&format!("{path}/send"), &json!({})).await.expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let to: Vec<String> = s.app.mail.take().into_iter().map(|m| m.to).collect();
+        assert_eq!(to, ["ann@example.com"], "the fan-out uses the segment");
     }
 
     #[tokio::test]

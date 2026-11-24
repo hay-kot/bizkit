@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: ContactId\", email FROM mailing_contacts c\n           WHERE workspace_id = ?1 AND list_id = ?2 AND status = 'subscribed'\n             AND NOT EXISTS (\n               SELECT 1 FROM json_each(?3, '$.tags') want\n               WHERE NOT EXISTS (SELECT 1 FROM json_each(c.tags) t WHERE t.value = want.value))\n             AND NOT EXISTS (\n               SELECT 1 FROM json_each(?3, '$.attributes') cond\n               WHERE NOT EXISTS (\n                 SELECT 1 FROM json_each(c.attributes) a\n                 WHERE a.key = json_extract(cond.value, '$.key')\n                   AND a.value = json_extract(cond.value, '$.equals')\n                   AND (CASE WHEN a.type IN ('integer', 'real') THEN 'number' ELSE a.type END)\n                     = (CASE WHEN json_type(cond.value, '$.equals') IN ('integer', 'real')\n                             THEN 'number' ELSE json_type(cond.value, '$.equals') END)))\n             AND (json_extract(?3, '$.joined_after') IS NULL\n                  OR subscribed_at >= json_extract(?3, '$.joined_after'))\n             AND (json_extract(?3, '$.joined_before') IS NULL\n                  OR subscribed_at < json_extract(?3, '$.joined_before'))\n             AND (?4 IS NULL OR id > ?4)\n           ORDER BY id LIMIT ?5",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ContactId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mailing_contacts",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c009c0453b840af5884d71c40fe650de49b2cdd471f87f870d13f9c68b4d1d6f"
+}
