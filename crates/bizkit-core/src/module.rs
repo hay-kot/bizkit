@@ -257,6 +257,9 @@ impl<'a> ModuleContext<'a> {
     /// Adds raw routes, nested at `/m/<module>`. `docs` describes them with
     /// paths relative to the nest. Handlers reach the platform through
     /// `Extension<Platform>` and the caller through `Extension<Authn>`.
+    /// `/public` and `/upload` under the nest are reserved for
+    /// [`Self::public_routes`] and [`Self::upload_routes`], so these routes
+    /// must not use them.
     ///
     /// # Errors
     ///
@@ -274,7 +277,8 @@ impl<'a> ModuleContext<'a> {
     /// authenticate layer: handlers get no `Extension<Authn>`, cookies and
     /// bearer tokens are never read, and the cookie CSRF check never
     /// applies. `docs` paths are relative to the nest. Handlers reach the
-    /// platform through `Extension<Platform>`.
+    /// platform through `Extension<Platform>`. The `/m/<module>/public`
+    /// prefix belongs to these routes alone.
     ///
     /// # Errors
     ///
@@ -291,11 +295,13 @@ impl<'a> ModuleContext<'a> {
     /// uploads, nested at `/m/<module>/upload`. They sit inside the
     /// authenticate layer like [`Self::routes`] (`Extension<Authn>`, the
     /// cookie CSRF check), with a body limit of [`MAX_UPLOAD_BYTES`] plus
-    /// 64 KiB and a 120 s timeout, instead of 1 MiB and 30 s. The limit
+    /// 64 KiB and a 300 s timeout, instead of 1 MiB and 30 s. The limit
     /// covers every extractor (axum's `DefaultBodyLimit` is off there), and
-    /// a body over it gets 413. Check access with
+    /// a body over it gets 413. Read each file part with
+    /// [`crate::upload::read_file`], which holds the file itself to
+    /// [`MAX_UPLOAD_BYTES`]. Check access with
     /// [`crate::ops::authorize_workspace`]. `docs` paths are relative to the
-    /// nest.
+    /// nest. The `/m/<module>/upload` prefix belongs to these routes alone.
     ///
     /// # Errors
     ///

@@ -38,7 +38,8 @@ use crate::tenancy::workspaces;
 use crate::time::UnixMillis;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-const UPLOAD_TIMEOUT: Duration = Duration::from_secs(120);
+/// Long enough for a full-size file over a 1 Mbit/s uplink (about 210 s).
+const UPLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 /// Room for the multipart framing around a file of `MAX_UPLOAD_BYTES`.
 const UPLOAD_BODY_BYTES: usize = MAX_UPLOAD_BYTES + 64 * 1024;
 
@@ -344,10 +345,14 @@ impl App {
             router = router.nest(&routes.nest(), routes.router.clone());
         }
         // Each stage carries its own body limit and timeout, because an inner
-        // layer can't raise the limit an outer one already enforces.
-        router = with_limits(router, crate::ops::http::MAX_BODY_BYTES, REQUEST_TIMEOUT);
+        // layer can't raise the limit an outer one already enforces. The
+        // authenticate layer goes inside each stage, so its session and key
+        // lookups run under that stage's timeout.
+        let authn = || middleware::from_fn_with_state(platform.clone(), authenticate);
+        router =
+            with_limits(router.layer(authn()), crate::ops::http::MAX_BODY_BYTES, REQUEST_TIMEOUT);
         for routes in self.routes_of(RouteKind::Upload) {
-            let nested = Router::new().nest(&routes.nest(), routes.router.clone());
+            let nested = Router::new().nest(&routes.nest(), routes.router.clone()).layer(authn());
             // The tower-http limit alone bounds these bodies. A second limit
             // from axum's extractors would wrap its error, and `Multipart`
             // would then answer an oversized chunked body with 500, not 413.
@@ -356,8 +361,7 @@ impl App {
                     .layer(DefaultBodyLimit::disable()),
             );
         }
-        router = router.layer(middleware::from_fn_with_state(platform.clone(), authenticate));
-        // Merged after the authenticate layer, so it never wraps them.
+        // Public routes never get the authenticate layer.
         for routes in self.routes_of(RouteKind::Public) {
             let nested = Router::new().nest(&routes.nest(), routes.router.clone());
             router = router.merge(with_limits(

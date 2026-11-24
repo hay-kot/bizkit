@@ -834,7 +834,7 @@ export type ErrorBody = {
 /**
  * The machine-readable error kind.
  */
-export type ErrorCode = 'bad_request' | 'unauthenticated' | 'forbidden' | 'not_found' | 'conflict' | 'validation' | 'rate_limited' | 'internal';
+export type ErrorCode = 'bad_request' | 'unauthenticated' | 'forbidden' | 'not_found' | 'conflict' | 'payload_too_large' | 'validation' | 'rate_limited' | 'internal';
 
 /**
  * The details of an [`ErrorBody`].

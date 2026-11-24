@@ -9,6 +9,7 @@ mod upload_routes {
     use axum::{Extension, Router};
     use bizkit_core::error::ErrorBody;
     use bizkit_core::ops::{Level, Scope, authorize_workspace};
+    use bizkit_core::upload::read_file;
     use bizkit_core::{ApiError, Authn, MAX_UPLOAD_BYTES, Module, ModuleContext, Platform};
     use bizkit_testkit::{Persona, RawBody, SpecClient, TestApp};
     use http::{Method, StatusCode};
@@ -33,7 +34,7 @@ mod upload_routes {
         loop {
             match multipart.next_field().await {
                 Ok(Some(field)) if field.name() == Some("file") => {
-                    return match field.bytes().await {
+                    return match read_file(field).await {
                         Ok(bytes) => (StatusCode::CREATED, bytes.len().to_string()).into_response(),
                         Err(err) => err.into_response(),
                     };
@@ -59,7 +60,10 @@ mod upload_routes {
             (status = 403, description = "Cross-site or missing scope", body = ErrorBody),
             (status = 404, description = "Not a member", body = ErrorBody),
             (status = 408, description = "Timed out"),
-            (status = 413, description = "Too large", content_type = "text/plain", body = String),
+            (status = 413, description = "Too large", content(
+                (String = "text/plain"),
+                (ErrorBody = "application/json"),
+            )),
             (status = 422, description = "Bad multipart", content_type = "text/plain", body = String),
         )
     )]
@@ -152,6 +156,14 @@ mod upload_routes {
         let path = format!("/m/probe/upload/workspaces/{ws}/files");
         let declared = post_declared(&session, &path, too_big, true).await;
         assert_eq!(declared, StatusCode::PAYLOAD_TOO_LARGE, "over the upload limit, by length");
+
+        let response =
+            session.send_body(Method::POST, &path, multipart(MAX_UPLOAD_BYTES + 1)).await;
+        assert_eq!(
+            (response.status, response["error"]["code"].as_str()),
+            (StatusCode::PAYLOAD_TOO_LARGE, Some("payload_too_large")),
+            "a file over MAX_UPLOAD_BYTES in a body under the limit"
+        );
     }
 
     #[tokio::test]

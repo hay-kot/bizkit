@@ -17736,6 +17736,7 @@
           "forbidden",
           "not_found",
           "conflict",
+          "payload_too_large",
           "validation",
           "rate_limited",
           "internal"

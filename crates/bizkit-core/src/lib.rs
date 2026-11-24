@@ -26,6 +26,7 @@ mod tenancy;
 #[cfg(feature = "test-hooks")]
 pub mod test_hooks;
 pub mod time;
+pub mod upload;
 pub mod usage;
 pub mod validate;
 
