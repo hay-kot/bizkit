@@ -280,6 +280,26 @@ mod pipeline {
     }
 
     #[tokio::test]
+    async fn deleting_a_goal_removes_conversions_still_queued() {
+        let s = setup(Analytics::manual_flush(), json!({})).await;
+        let body = json!({"project_id": s.project("site").to_string(), "name": "Signup", "kind": "event", "match": "signup"});
+        let goal: Value =
+            s.admin.post(&s.path("goals"), &body).await.expect(StatusCode::CREATED).json();
+        s.beacon("site", json!({"n": "signup"})).await;
+        let goal_path = s.path(&format!("goals/{}", goal["id"].as_str().unwrap()));
+        s.admin.delete(&goal_path).await.expect(StatusCode::NO_CONTENT);
+
+        s.app.flush().await;
+        let pool = project_pool(s.app.data_dir(), s.project("site")).await.unwrap();
+        let conversions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analytics_conversions")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(conversions, 0);
+        assert_eq!(s.stored("site").await, 1, "the event stays");
+    }
+
+    #[tokio::test]
     async fn deleting_a_project_removes_its_file_for_good() {
         let s = setup(Analytics::manual_flush(), json!({})).await;
         s.beacon("site", json!({"n": "pageview"})).await;

@@ -136,6 +136,18 @@ pub(crate) struct ProjectFile {
 }
 
 impl ProjectFile {
+    /// Writes what the project's writer has queued, side effects included.
+    pub(crate) async fn flush(&self) -> anyhow::Result<()> {
+        let flushed = match &*self.writer.lock().await {
+            WriterState::Running(handle) => Some(handle.flush()),
+            WriterState::Idle | WriterState::Stopped => None,
+        };
+        match flushed {
+            Some(flushed) => flushed.await,
+            None => Ok(()),
+        }
+    }
+
     /// Flushes and stops the writer, then closes the pools. Later submits fail.
     async fn stop(&self) {
         let state = std::mem::replace(&mut *self.writer.lock().await, WriterState::Stopped);
@@ -268,13 +280,7 @@ impl Files {
         let files: Vec<Arc<ProjectFile>> = self.open.lock().await.values().cloned().collect();
         let mut first_err = None;
         for file in files {
-            let flushed = match &*file.writer.lock().await {
-                WriterState::Running(handle) => Some(handle.flush()),
-                WriterState::Idle | WriterState::Stopped => None,
-            };
-            if let Some(flushed) = flushed
-                && let Err(err) = flushed.await
-            {
+            if let Err(err) = file.flush().await {
                 first_err.get_or_insert(err);
             }
         }

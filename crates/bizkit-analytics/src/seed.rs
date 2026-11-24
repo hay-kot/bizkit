@@ -435,9 +435,12 @@ async fn mark_events(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow:
 /// The project's file when it has no events yet.
 async fn open_empty(seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<Option<ProjectDb>> {
     let file = ProjectDb::open(&project_db_path(&seed.data_dir, project_id)).await?;
-    let events: i64 = sqlx::query_scalar!(r#"SELECT COUNT(*) AS "n!: i64" FROM analytics_events"#)
-        .fetch_one(file.read())
-        .await?;
+    let events: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "n!: i64" FROM analytics_events WHERE workspace_id = ?"#,
+        seed.workspace_id,
+    )
+    .fetch_one(file.read())
+    .await?;
     if events > 0 {
         file.close().await;
         return Ok(None);

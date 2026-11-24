@@ -31,14 +31,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Context as _, bail};
+use anyhow::Context as _;
 #[cfg(feature = "test-hooks")]
 use bizkit_core::DemoSeed;
 use bizkit_core::api::ProjectDeleted;
 use bizkit_core::jobs::{JobCtx, Subscriber};
 use bizkit_core::{Lifecycle, Module, ModuleContext};
 use futures::future::BoxFuture;
-use serde::Deserialize;
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer};
 use utoipa::OpenApi as _;
 
 use crate::files::{Files, Limits};
@@ -47,8 +48,8 @@ pub use crate::ops::MAX_HOSTNAMES;
 
 /// The default flush window, in milliseconds.
 const DEFAULT_FLUSH_MS: u16 = 100;
-/// The flush window's bounds. Above 250 ms a crash loses more than Hayden
-/// accepted; below 10 ms the writer commits nearly per request.
+/// The flush window's bounds. A crash must lose at most 250 ms of events;
+/// below 10 ms the writer commits nearly per request.
 const FLUSH_MS: std::ops::RangeInclusive<u16> = 10..=250;
 
 /// The `modules.analytics` config section.
@@ -64,8 +65,20 @@ pub struct AnalyticsConfig {
     pub raw_retention_days: Option<u16>,
     /// Milliseconds events wait in memory before they are written; default
     /// 100, 10 to 250. A crash loses at most this window of events.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "flush_ms")]
     pub flush_ms: Option<u16>,
+}
+
+fn flush_ms<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u16>, D::Error> {
+    let ms = u16::deserialize(deserializer)?;
+    if !FLUSH_MS.contains(&ms) {
+        return Err(D::Error::custom(format!(
+            "flush_ms is {ms}; it must be {} to {}",
+            FLUSH_MS.start(),
+            FLUSH_MS.end()
+        )));
+    }
+    Ok(Some(ms))
 }
 
 /// The analytics module.
@@ -131,13 +144,6 @@ impl Module for Analytics {
     fn register(&self, cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
         let config: AnalyticsConfig = cx.config()?;
         let flush_ms = config.flush_ms.unwrap_or(DEFAULT_FLUSH_MS);
-        if !FLUSH_MS.contains(&flush_ms) {
-            bail!(
-                "modules.analytics.flush_ms is {flush_ms}; it must be {} to {}",
-                FLUSH_MS.start(),
-                FLUSH_MS.end()
-            );
-        }
         let sites = Arc::new(cache::Sites::default());
         let flush = Duration::from_millis(u64::from(flush_ms));
         let files = Arc::new(Files::new(Arc::clone(&sites), flush, self.limits));

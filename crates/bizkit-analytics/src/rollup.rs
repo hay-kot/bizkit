@@ -58,6 +58,12 @@ impl JobHandler<Rollup> for RollupHandler {
         let today = Day::of(cx.platform.now());
         let scope = Scope { workspace_id: job.workspace_id, project_id: job.project_id };
         let Some(file) = self.files.get(&cx.platform, scope).await? else { return Ok(()) };
+        // Events still queued for a closed day would land after it is rolled,
+        // and reports never read raw events up to `rolled_through`. A failed
+        // flush already lost its events, so the rollup goes on.
+        if let Err(err) = file.flush().await {
+            tracing::warn!(error = format!("{err:#}"), project_id = %job.project_id, "flushing before a rollup failed");
+        }
         let rolled = roll(db, &file.db, &job, today).await?;
         let cutoff = today.plus_days(-i64::from(self.retention_days.max(MIN_RETENTION_DAYS)));
         let pruned = prune(&file.db, &job, cutoff, rolled).await?;

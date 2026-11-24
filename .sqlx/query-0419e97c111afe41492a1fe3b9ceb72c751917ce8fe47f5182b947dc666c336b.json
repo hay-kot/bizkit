@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) AS \"n!: i64\" FROM analytics_events",
+  "query": "SELECT COUNT(*) AS \"n!: i64\" FROM analytics_events WHERE workspace_id = ?",
   "describe": {
     "columns": [
       {
@@ -11,11 +11,11 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false
     ]
   },
-  "hash": "edffbc8b6f42de3a11e21165bad6ac047a2282c63f23b6124e2b2c4dedbfa401"
+  "hash": "0419e97c111afe41492a1fe3b9ceb72c751917ce8fe47f5182b947dc666c336b"
 }

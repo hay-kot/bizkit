@@ -235,13 +235,13 @@ mod tests {
         db.close().await;
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         assert_eq!(counts().await, first, "a run after the upgrade refills the files");
-        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let reopened = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
         let unmarked: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM analytics_sites WHERE last_event_day IS NULL")
-                .fetch_one(db.read())
+                .fetch_one(reopened.read())
                 .await
                 .unwrap();
-        db.close().await;
+        reopened.close().await;
         assert_eq!(unmarked, 0, "refilled sites report events");
     }
 }
