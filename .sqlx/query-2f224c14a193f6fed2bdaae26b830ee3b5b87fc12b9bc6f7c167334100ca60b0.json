@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT project_id AS \"project_id: ProjectId\", user_id, traits,\n                      first_seen AS \"first_seen: UnixMillis\", last_seen AS \"last_seen: UnixMillis\"\n               FROM analytics_people WHERE workspace_id = ? AND id = ?",
+  "query": "SELECT project_id AS \"project_id: ProjectId\", user_id, traits,\n                          first_seen AS \"first_seen: UnixMillis\", last_seen AS \"last_seen: UnixMillis\"\n                   FROM analytics_people WHERE workspace_id = ? AND id = ?",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "175743616c6dda9a2553df2ba86c6411ddc98d10792e823c4646e7fd82827b54"
+  "hash": "2f224c14a193f6fed2bdaae26b830ee3b5b87fc12b9bc6f7c167334100ca60b0"
 }

@@ -5,6 +5,8 @@
 //! funnel's window of the entry. Results read raw events by person key, so
 //! cookieless sites link only same-day steps (the visitor hash rotates).
 
+use std::sync::Arc;
+
 use bizkit_core::ApiError;
 use bizkit_core::ModuleContext;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
@@ -19,6 +21,7 @@ use sqlx::SqliteExecutor;
 use utoipa::ToSchema;
 
 use crate::api::{Day, FunnelId, GoalKind};
+use crate::files::Files;
 use crate::names;
 use crate::report::Scope;
 use crate::stats::{check_range, site_scope};
@@ -31,13 +34,13 @@ pub(crate) const STEPS: std::ops::RangeInclusive<usize> = 2..=8;
 const DEFAULT_WINDOW_DAYS: i64 = 7;
 const DAY_MS: i64 = 86_400_000;
 
-pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
+pub(crate) fn register(cx: &mut ModuleContext<'_>, files: &Arc<Files>) -> anyhow::Result<()> {
     cx.op(FunnelsList)?;
     cx.op(FunnelsCreate)?;
     cx.op(FunnelsGet)?;
     cx.op(FunnelsUpdate)?;
     cx.op(FunnelsDelete)?;
-    cx.op(FunnelsResults)
+    cx.op(FunnelsResults(Arc::clone(files)))
 }
 
 /// One funnel step.
@@ -464,7 +467,7 @@ impl Operation for FunnelsDelete {
     }
 }
 
-struct FunnelsResults;
+struct FunnelsResults(Arc<Files>);
 impl Operation for FunnelsResults {
     type Input = FunnelRange;
     type Output = FunnelResults;
@@ -480,12 +483,13 @@ impl Operation for FunnelsResults {
         let db = cx.platform().db();
         let funnel = to_api(find(db.read(), input.workspace_id, input.funnel_id).await?)?;
         let scope = Scope { workspace_id: input.workspace_id, project_id: funnel.project_id };
+        let file = self.0.for_op(cx.platform(), scope).await?;
         let last = input.to.plus_days(funnel.window_days);
         let entry_end = input.to.next().start().0;
         let window = funnel.window_days * DAY_MS;
         let mut counts = vec![0_i64; funnel.steps.len()];
         let mut person: Vec<StepEvent> = Vec::new();
-        let mut rows = step_events(db.read(), scope, input.from, last, &funnel.steps);
+        let mut rows = step_events(file.db.read(), scope, input.from, last, &funnel.steps);
         while let Some(event) = rows.try_next().await? {
             if person.last().is_some_and(|previous| previous.person != event.person) {
                 count_person(&mut counts, &funnel.steps, &person, entry_end, window);

@@ -6,6 +6,7 @@ mod reports {
     use std::time::Duration;
 
     use bizkit_analytics::Analytics;
+    use bizkit_analytics::testing::project_pool;
     use bizkit_testkit::{Manifest, Persona, RawBody, SpecClient, TestApp};
     use http::{HeaderName, Method, StatusCode, header};
     use serde_json::{Value, json};
@@ -24,7 +25,7 @@ mod reports {
 
     async fn setup(config: Value) -> Setup {
         let app = TestApp::builder()
-            .module(Analytics)
+            .module(Analytics::manual_flush())
             .config(move |c| {
                 c.trusted_proxies = 1;
                 c.modules.insert("analytics".to_owned(), config);
@@ -83,6 +84,11 @@ mod reports {
                 .send_body(Method::POST, "/m/analytics/public/e", raw)
                 .await
                 .expect(StatusCode::ACCEPTED);
+            self.app.flush().await;
+        }
+
+        async fn file(&self) -> sqlx::SqlitePool {
+            project_pool(self.app.data_dir(), self.team.projects["site"].id).await.unwrap()
         }
 
         /// Day one: two visitors, four pageviews, one signup.
@@ -130,7 +136,7 @@ mod reports {
 
         async fn daily_rows(&self) -> i64 {
             sqlx::query_scalar("SELECT count(*) FROM analytics_daily")
-                .fetch_one(self.app.app().platform().db().read())
+                .fetch_one(&self.file().await)
                 .await
                 .unwrap()
         }
@@ -211,13 +217,11 @@ mod reports {
                 .collect::<Vec<_>>(),
             [2, 1]
         );
-        let mut tx = s.app.app().platform().db().write().await.unwrap();
         sqlx::query("DELETE FROM analytics_events WHERE day = ?")
             .bind(DAY1)
-            .execute(&mut *tx)
+            .execute(&s.file().await)
             .await
             .unwrap();
-        tx.commit().await.unwrap();
         assert_eq!(
             s.summary(DAY1, DAY1, false).await["totals"],
             before,
@@ -277,7 +281,7 @@ mod reports {
         s.app.clock.advance(Duration::from_mins(11));
         s.app.drain_jobs().await;
         let raw: i64 = sqlx::query_scalar("SELECT count(*) FROM analytics_events")
-            .fetch_one(s.app.app().platform().db().read())
+            .fetch_one(&s.file().await)
             .await
             .unwrap();
         assert_eq!(raw, 1, "only today's event is left");

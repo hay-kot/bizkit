@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_goals WHERE workspace_id = ? AND id = ?\n           RETURNING project_id AS \"project_id: ProjectId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_goals",
+            "name": "project_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "20d6c75875b585045556e86f168a0e6755acbfd4b3613f37ff1fd6e9f920d061"
+}

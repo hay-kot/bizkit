@@ -164,7 +164,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "analytics")]
+    #[cfg(all(feature = "analytics", feature = "test-hooks"))]
     #[tokio::test]
     async fn seed_demo_fills_analytics_once() {
         let dir = tempfile::tempdir().unwrap();
@@ -177,19 +177,44 @@ mod tests {
                 "SELECT COUNT(*) FROM analytics_sites",
                 "SELECT COUNT(*) FROM analytics_goals",
                 "SELECT COUNT(*) FROM analytics_funnels",
-                "SELECT COUNT(DISTINCT day) FROM analytics_events",
-                "SELECT COUNT(*) FROM analytics_people",
-                "SELECT COUNT(*) FROM analytics_conversions",
-                "SELECT COUNT(*) FROM analytics_events",
             ] {
                 counts.push(sqlx::query_scalar::<_, i64>(sql).fetch_one(db.read()).await.unwrap());
             }
+            let projects: Vec<bizkit_core::ids::ProjectId> =
+                sqlx::query_scalar("SELECT project_id FROM analytics_sites ORDER BY project_id")
+                    .fetch_all(db.read())
+                    .await
+                    .unwrap();
             db.close().await;
+            // Events, people and conversions live in each project's file.
+            let mut file_counts = [0_i64; 4];
+            for project in projects {
+                let file =
+                    bizkit_analytics::testing::project_pool(&data_dir, project).await.unwrap();
+                for (at, sql) in [
+                    "SELECT COUNT(DISTINCT day) FROM analytics_events",
+                    "SELECT COUNT(*) FROM analytics_people",
+                    "SELECT COUNT(*) FROM analytics_conversions",
+                    "SELECT COUNT(*) FROM analytics_events",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    file_counts[at] +=
+                        sqlx::query_scalar::<_, i64>(sql).fetch_one(&file).await.unwrap();
+                }
+                file.close().await;
+            }
+            counts.extend(file_counts);
             counts
         };
         dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
         let first = counts().await;
-        assert_eq!(first[..4], [2, 2, 1, 14], "sites, goals, funnels, days: {first:?}");
+        assert_eq!(
+            first[..4],
+            [2, 2, 1, 28],
+            "sites, goals, funnels, days summed over two sites: {first:?}"
+        );
         assert!(
             first[4..].iter().all(|count| *count > 0),
             "people, conversions, events: {first:?}"

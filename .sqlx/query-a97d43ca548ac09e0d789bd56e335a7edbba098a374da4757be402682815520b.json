@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT project_id AS \"project_id: ProjectId\" FROM analytics_sites\n           WHERE workspace_id = ? ORDER BY created_at, project_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id: ProjectId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_sites",
+            "name": "project_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a97d43ca548ac09e0d789bd56e335a7edbba098a374da4757be402682815520b"
+}

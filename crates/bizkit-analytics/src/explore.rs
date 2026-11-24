@@ -5,6 +5,8 @@
 //! Property filters travel to SQLite as one JSON array, matched with
 //! `json_each`, so any number of them stays one static query.
 
+use std::sync::Arc;
+
 use bizkit_core::ApiError;
 use bizkit_core::ModuleContext;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
@@ -17,6 +19,7 @@ use sqlx::SqliteExecutor;
 use utoipa::ToSchema;
 
 use crate::api::{Day, Interval, PersonId};
+use crate::files::Files;
 use crate::names;
 use crate::report::Scope;
 use crate::stats::{check_range, site_scope};
@@ -28,9 +31,9 @@ const DEFAULT_PAGE: u32 = 50;
 const MAX_PAGE: u32 = 200;
 const MAX_FILTERS: usize = 10;
 
-pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
-    cx.op(EventsQuery)?;
-    cx.op(EventsRecent)
+pub(crate) fn register(cx: &mut ModuleContext<'_>, files: &Arc<Files>) -> anyhow::Result<()> {
+    cx.op(EventsQuery(Arc::clone(files)))?;
+    cx.op(EventsRecent(Arc::clone(files)))
 }
 
 /// The SQL side of a filter: the name (`None` is every custom event) and
@@ -124,7 +127,7 @@ pub(crate) struct EventStats {
     pub(crate) names: Vec<EventName>,
 }
 
-struct EventsQuery;
+struct EventsQuery(Arc<Files>);
 impl Operation for EventsQuery {
     type Input = QueryEvents;
     type Output = EventStats;
@@ -138,9 +141,11 @@ impl Operation for EventsQuery {
     async fn call(&self, cx: OpCtx, input: QueryEvents) -> Result<EventStats, ApiError> {
         let db = cx.platform().db();
         let (scope, _) = site_scope(db, input.workspace_id, input.project_id).await?;
+        let file = self.0.for_op(cx.platform(), scope).await?;
         let filter = filter(input.name.as_deref(), &input.props);
         let hourly = input.from == input.to;
-        let buckets = buckets(db.read(), scope, (input.from, input.to), &filter, hourly).await?;
+        let buckets =
+            buckets(file.db.read(), scope, (input.from, input.to), &filter, hourly).await?;
         let series = if hourly {
             (0..24)
                 .map(|hour| {
@@ -157,7 +162,7 @@ impl Operation for EventsQuery {
             }
             points
         };
-        let names = event_names(db.read(), scope, input.from, input.to, &filter.props).await?;
+        let names = event_names(file.db.read(), scope, input.from, input.to, &filter.props).await?;
         let interval = if hourly { Interval::Hour } else { Interval::Day };
         Ok(EventStats { interval, series, names })
     }
@@ -318,7 +323,7 @@ pub(crate) struct EventPage {
     pub(crate) next_before: Option<i64>,
 }
 
-struct EventsRecent;
+struct EventsRecent(Arc<Files>);
 impl Operation for EventsRecent {
     type Input = RecentEvents;
     type Output = EventPage;
@@ -332,6 +337,7 @@ impl Operation for EventsRecent {
     async fn call(&self, cx: OpCtx, input: RecentEvents) -> Result<EventPage, ApiError> {
         let db = cx.platform().db();
         let (scope, _) = site_scope(db, input.workspace_id, input.project_id).await?;
+        let file = self.0.for_op(cx.platform(), scope).await?;
         let filter = filter(input.name.as_deref(), &input.props);
         let limit = input.limit.unwrap_or(DEFAULT_PAGE);
         let (from, to) = (input.from.to_string(), input.to.to_string());
@@ -362,7 +368,7 @@ impl Operation for EventsRecent {
             filter.props,
             fetch,
         )
-        .fetch_all(db.read())
+        .fetch_all(file.db.read())
         .await?;
         let mut items: Vec<EventItem> = rows
             .into_iter()

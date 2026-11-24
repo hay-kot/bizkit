@@ -11,8 +11,10 @@ use bizkit_core::db::Db;
 use bizkit_core::ids::{ProjectId, WorkspaceId};
 use bizkit_core::time::UnixMillis;
 use serde_json::{Value, json};
+use sqlx::SqliteConnection;
 
 use crate::api::{Day, FunnelId, GoalId, PersonId};
+use crate::files::{ProjectDb, project_db_path};
 use crate::funnels::{self, FunnelRow};
 use crate::hooks::GOAL;
 use crate::store::{self, EventRow, GoalRow, SiteRow};
@@ -377,31 +379,66 @@ fn goal_row(
 
 /// Seeds analytics for the `website` project (identity after identify,
 /// with goals, a funnel and people) and the `docs` project (cookieless,
-/// pageviews only), and records the Signup goal in `seed.entities`. A
-/// project that already has a site is left alone.
+/// pageviews only), and records the Signup goal in `seed.entities`.
+///
+/// Each project has two idempotent steps: the app rows (site, goals,
+/// funnel) when it has no site, then the file rows (events, people,
+/// conversions) when its file has no events. App rows go first so a file
+/// only exists for a project with a site; a site that outlived its events
+/// (the move to project files dropped them) gets them back.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     if let Some(&project_id) = seed.project_ids.get("website") {
-        let found = store::find_site(db.read(), seed.workspace_id, project_id).await?;
-        if found.is_none() {
-            seed_website(db, seed, project_id).await.context("seeding website analytics")?;
+        if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
+            website_app_rows(db, seed, project_id).await.context("seeding the website site")?;
         }
         let goals = store::list_goals(db.read(), seed.workspace_id, project_id).await?;
+        let file = open_empty(seed, project_id).await?;
+        if let Some(file) = &file {
+            website_events(file, seed, project_id, &goals)
+                .await
+                .context("seeding website events")?;
+        }
         if let Some(goal) = goals.into_iter().find(|goal| goal.name == SIGNUP_GOAL) {
             seed.entities.insert((GOAL.id.to_owned(), SIGNUP_GOAL.to_owned()), goal.id.to_string());
         }
+        close(file).await;
     }
-    if let Some(&project_id) = seed.project_ids.get("docs")
-        && store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none()
-    {
-        seed_docs(db, seed, project_id).await.context("seeding docs analytics")?;
+    if let Some(&project_id) = seed.project_ids.get("docs") {
+        if store::find_site(db.read(), seed.workspace_id, project_id).await?.is_none() {
+            let mut tx = db.write().await?;
+            let row = site_row(seed, project_id, &json!([]), "cookieless");
+            store::insert_site(&mut *tx, &row).await.context("seeding the docs site")?;
+            tx.commit().await?;
+        }
+        let file = open_empty(seed, project_id).await?;
+        if let Some(file) = &file {
+            docs_events(file, seed, project_id).await.context("seeding docs events")?;
+        }
+        close(file).await;
     }
     Ok(())
 }
 
-async fn seed_website(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
-    let site = Site { workspace_id: seed.workspace_id, project_id, host: "example.com" };
-    let today = Day::of(seed.now);
-    let mut rng = Rng(0x5eed_0001);
+/// The project's file when it has no events yet.
+async fn open_empty(seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<Option<ProjectDb>> {
+    let file = ProjectDb::open(&project_db_path(&seed.data_dir, project_id)).await?;
+    let events: i64 = sqlx::query_scalar!(r#"SELECT COUNT(*) AS "n!: i64" FROM analytics_events"#)
+        .fetch_one(file.read())
+        .await?;
+    if events > 0 {
+        file.close().await;
+        return Ok(None);
+    }
+    Ok(Some(file))
+}
+
+async fn close(file: Option<ProjectDb>) {
+    if let Some(file) = file {
+        file.close().await;
+    }
+}
+
+async fn website_app_rows(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
     let signup = goal_row(seed, project_id, SIGNUP_GOAL, "event", "signup_completed");
     let pricing = goal_row(seed, project_id, "Viewed pricing", "page", "/pricing");
     let funnel = FunnelRow {
@@ -420,14 +457,25 @@ async fn seed_website(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow
         created_at: seed.now,
         updated_at: seed.now,
     };
-
     let mut tx = db.write().await?;
     let hostnames = json!(["example.com", "www.example.com"]);
     store::insert_site(&mut *tx, &site_row(seed, project_id, &hostnames, "after_identify")).await?;
     store::insert_goal(&mut *tx, &signup).await?;
     store::insert_goal(&mut *tx, &pricing).await?;
     funnels::save(&mut *tx, &funnel).await?;
+    tx.commit().await
+}
 
+async fn website_events(
+    file: &ProjectDb,
+    seed: &DemoSeed,
+    project_id: ProjectId,
+    goals: &[GoalRow],
+) -> anyhow::Result<()> {
+    let site = Site { workspace_id: seed.workspace_id, project_id, host: "example.com" };
+    let today = Day::of(seed.now);
+    let mut rng = Rng(0x5eed_0001);
+    let mut tx = file.write().await?;
     let mut people: Vec<Person> = Vec::new();
     for age in (0..DAYS).rev() {
         let day = today.plus_days(-age);
@@ -460,7 +508,7 @@ async fn seed_website(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow
         events.sort_by_key(|event| event.ts);
         for event in &events {
             store::insert_event(&mut *tx, event).await?;
-            for goal in [&signup, &pricing] {
+            for goal in goals {
                 if crate::write::converts(goal, event) {
                     store::insert_conversion(
                         &mut *tx,
@@ -474,14 +522,14 @@ async fn seed_website(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow
             }
         }
     }
-    tx.commit().await?;
+    tx.commit().await.context("committing website events")?;
     Ok(())
 }
 
 /// Stores the person a signup visit made, and moves the visit's events to
 /// them, as identify's backfill would.
 async fn identify(
-    tx: &mut bizkit_core::db::WriteTx,
+    tx: &mut SqliteConnection,
     seed: &DemoSeed,
     project_id: ProjectId,
     visit: &mut Visit,
@@ -489,10 +537,10 @@ async fn identify(
 ) -> anyhow::Result<Option<Person>> {
     let Some((user_id, traits)) = visit.signed_up.take() else { return Ok(None) };
     let Some(at) = visit.events.last().map(|event| event.ts) else { return Ok(None) };
-    let id = store::upsert_person(&mut **tx, seed.workspace_id, project_id, &user_id, at).await?;
-    store::set_person_traits(&mut **tx, seed.workspace_id, id, &traits.to_string()).await?;
+    let id = store::upsert_person(&mut *tx, seed.workspace_id, project_id, &user_id, at).await?;
+    store::set_person_traits(&mut *tx, seed.workspace_id, id, &traits.to_string()).await?;
     let anon_id = format!("anon-{:x}", rng.next());
-    store::set_alias(&mut **tx, seed.workspace_id, project_id, &anon_id, id).await?;
+    store::set_alias(&mut *tx, seed.workspace_id, project_id, &anon_id, id).await?;
     for event in &mut visit.events {
         event.person = format!("p:{id}");
     }
@@ -510,12 +558,14 @@ async fn identify(
     }))
 }
 
-async fn seed_docs(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::Result<()> {
+async fn docs_events(
+    file: &ProjectDb,
+    seed: &DemoSeed,
+    project_id: ProjectId,
+) -> anyhow::Result<()> {
     let site = Site { workspace_id: seed.workspace_id, project_id, host: "docs.example.com" };
     let today = Day::of(seed.now);
     let mut rng = Rng(0x5eed_0002);
-    let mut tx = db.write().await?;
-    store::insert_site(&mut *tx, &site_row(seed, project_id, &json!([]), "cookieless")).await?;
     let mut by_day: BTreeMap<String, Vec<EventRow>> = BTreeMap::new();
     for age in (0..DAYS).rev() {
         let day = today.plus_days(-age);
@@ -526,13 +576,14 @@ async fn seed_docs(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> anyhow::R
                 .extend(docs_visit(&mut rng, &site, day, seed.now));
         }
     }
+    let mut tx = file.write().await?;
     for mut events in by_day.into_values() {
         events.sort_by_key(|event| event.ts);
         for event in &events {
             store::insert_event(&mut *tx, event).await?;
         }
     }
-    tx.commit().await?;
+    tx.commit().await.context("committing docs events")?;
     Ok(())
 }
 

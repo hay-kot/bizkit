@@ -1,24 +1,22 @@
-//! The ingest write path, shared by the beacon route and the server ingest
-//! operation. Everything that can happen before the write transaction
-//! (parsing, lookups, hashing, the country lookup) has; the transaction holds only the
-//! inserts and updates, because one writer connection serves the whole app.
+//! Storing one event in its project file: the person, alias and backfill
+//! for `$identify`, else the event row and its goal conversions. The
+//! buffered writer calls this for each queued event inside its flush
+//! transaction; everything that can happen before (parsing, lookups,
+//! hashing, the country lookup) happened at ingest.
 
 use std::time::Duration;
 
 use anyhow::Context as _;
-use bizkit_core::Platform;
-use bizkit_core::db::WriteTx;
-use bizkit_core::jobs::Enqueue;
 use bizkit_core::time::UnixMillis;
 use serde_json::{Map, Value};
+use sqlx::SqliteConnection;
 
-use crate::api::{Day, PersonId};
+use crate::api::PersonId;
 use crate::beacon::{MAX_PROPS, Name};
-use crate::cache::{CachedSite, Sites};
+use crate::cache::CachedSite;
 use crate::enrich::Attribution;
 use crate::hooks::GoalConverted;
 use crate::report::Scope;
-use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow};
 use crate::ua::Agent;
 
@@ -61,57 +59,34 @@ pub(crate) struct Incoming {
     pub(crate) props: Option<Map<String, Value>>,
     pub(crate) traits: Option<Map<String, Value>>,
     pub(crate) origin: Origin,
+    /// When the server received it. The event's time and day come from
+    /// here, not from the flush, so an event queued just before midnight
+    /// stays on its day.
+    pub(crate) received: UnixMillis,
+    /// The UTC day of `received`.
+    pub(crate) day: String,
 }
 
-/// Stores `events` for `site` in one transaction: for each, the event row
-/// and its goal conversions, or for `$identify` the person, alias and
-/// backfill.
-pub(crate) async fn record(
-    platform: &Platform,
-    sites: &Sites,
-    site: &CachedSite,
-    events: &[Incoming],
-) -> anyhow::Result<()> {
-    let now = platform.now();
-    let day = Day::of(now).to_string();
-    let mut tx = platform.db().write().await?;
-    for event in events {
-        record_one(platform, &mut tx, site, event, &day).await?;
-    }
-    let advanced = site.row.last_event_day.as_deref() != Some(day.as_str())
-        && store::advance_event_day(&mut *tx, site.row.workspace_id, site.row.project_id, &day)
-            .await?;
-    if advanced {
-        let job = Rollup { workspace_id: site.row.workspace_id, project_id: site.row.project_id };
-        let opts = Enqueue { run_at: Some(now.plus(rollup::DELAY)) };
-        platform.bus().enqueue(&mut tx, &job, opts).await?;
-    }
-    tx.commit().await?;
-    if advanced {
-        sites.clear();
-    }
-    Ok(())
-}
-
-async fn record_one(
-    platform: &Platform,
-    tx: &mut WriteTx,
+/// Stores one event: for `$identify` the person, alias and backfill,
+/// else the event row and its goal conversions. Each first conversion is
+/// pushed to `converted` for the app side effects.
+pub(crate) async fn record_one(
+    conn: &mut SqliteConnection,
     site: &CachedSite,
     event: &Incoming,
-    day: &str,
+    converted: &mut Vec<GoalConverted>,
 ) -> anyhow::Result<()> {
-    let now = platform.now();
-    let person = resolve_person(tx, site, event, now).await?;
-    let visitor_key = format!("v:{day}:{}", event.visitor);
+    let person = resolve_person(conn, site, event).await?;
     if event.name == Name::Identify {
         if let Some(person) = person {
-            identify(tx, site, event, person, now).await?;
+            identify(conn, site, event, person).await?;
         }
         return Ok(());
     }
+    let visitor_key = format!("v:{}:{}", event.day, event.visitor);
     let key = person.map(person_key).or_else(|| event.anon_id.as_ref().map(|id| format!("a:{id}")));
-    let row = event_row(site, event, now, day, key.unwrap_or(visitor_key));
-    insert(platform, tx, site, &row).await
+    let row = event_row(site, event, key.unwrap_or(visitor_key));
+    insert(conn, site, &row, converted).await
 }
 
 fn person_key(id: PersonId) -> String {
@@ -121,20 +96,20 @@ fn person_key(id: PersonId) -> String {
 /// The person an event belongs to: by user ID (made on first sight), else
 /// by the anonymous ID's alias.
 async fn resolve_person(
-    tx: &mut WriteTx,
+    conn: &mut SqliteConnection,
     site: &CachedSite,
     event: &Incoming,
-    now: UnixMillis,
 ) -> anyhow::Result<Option<PersonId>> {
     let (workspace_id, project_id) = (site.row.workspace_id, site.row.project_id);
     if let Some(user_id) = &event.user_id {
-        let id = store::upsert_person(&mut **tx, workspace_id, project_id, user_id, now)
-            .await
-            .context("recording a person")?;
+        let id =
+            store::upsert_person(&mut *conn, workspace_id, project_id, user_id, event.received)
+                .await
+                .context("recording a person")?;
         return Ok(Some(id));
     }
     let Some(anon_id) = &event.anon_id else { return Ok(None) };
-    Ok(store::aliased_person(&mut **tx, workspace_id, project_id, anon_id).await?)
+    Ok(store::aliased_person(&mut *conn, workspace_id, project_id, anon_id).await?)
 }
 
 /// Merges traits, links the anonymous ID and moves this browser's earlier
@@ -142,31 +117,30 @@ async fn resolve_person(
 /// anonymous ID and, for the snippet, the last [`VISITOR_BACKFILL`] under
 /// the visitor hash. Events already under a person never move.
 async fn identify(
-    tx: &mut WriteTx,
+    conn: &mut SqliteConnection,
     site: &CachedSite,
     event: &Incoming,
     person: PersonId,
-    now: UnixMillis,
 ) -> anyhow::Result<()> {
     let (workspace_id, project_id) = (site.row.workspace_id, site.row.project_id);
     let scope = Scope { workspace_id, project_id };
     if let Some(traits) = event.traits.as_ref().filter(|traits| !traits.is_empty()) {
-        let stored = store::person_traits(&mut **tx, workspace_id, person).await?;
+        let stored = store::person_traits(&mut *conn, workspace_id, person).await?;
         let merged = merge_traits(&stored, traits);
-        store::set_person_traits(&mut **tx, workspace_id, person, &merged).await?;
+        store::set_person_traits(&mut *conn, workspace_id, person, &merged).await?;
     }
     let to = person_key(person);
     if let Some(anon_id) = &event.anon_id {
         let from = format!("a:{anon_id}");
-        store::set_alias(&mut **tx, workspace_id, project_id, anon_id, person).await?;
-        store::rekey_events(&mut **tx, scope, &from, &to, UnixMillis(0)).await?;
-        store::rekey_conversions(&mut **tx, workspace_id, &from, &to).await?;
+        store::set_alias(&mut *conn, workspace_id, project_id, anon_id, person).await?;
+        store::rekey_events(&mut *conn, scope, &from, &to, UnixMillis(0)).await?;
+        store::rekey_conversions(&mut *conn, workspace_id, &from, &to).await?;
     }
     if event.origin == Origin::Web {
-        let from = format!("v:{}:{}", Day::of(now), event.visitor);
-        let since = now.minus(VISITOR_BACKFILL);
-        store::rekey_events(&mut **tx, scope, &from, &to, since).await?;
-        store::rekey_conversions(&mut **tx, workspace_id, &from, &to).await?;
+        let from = format!("v:{}:{}", event.day, event.visitor);
+        let since = event.received.minus(VISITOR_BACKFILL);
+        store::rekey_events(&mut *conn, scope, &from, &to, since).await?;
+        store::rekey_conversions(&mut *conn, workspace_id, &from, &to).await?;
     }
     Ok(())
 }
@@ -183,19 +157,13 @@ fn merge_traits(stored: &str, new: &Map<String, Value>) -> String {
     Value::Object(traits).to_string()
 }
 
-fn event_row(
-    site: &CachedSite,
-    event: &Incoming,
-    ts: UnixMillis,
-    day: &str,
-    person: String,
-) -> EventRow {
+fn event_row(site: &CachedSite, event: &Incoming, person: String) -> EventRow {
     let attribution = &event.attribution;
     EventRow {
         workspace_id: site.row.workspace_id,
         project_id: site.row.project_id,
-        ts,
-        day: day.to_owned(),
+        ts: event.received,
+        day: event.day.clone(),
         name: event.name.as_str().to_owned(),
         path: event.path.clone(),
         host: event.host.clone(),
@@ -222,23 +190,22 @@ fn event_row(
 
 /// Inserts the event row, then records the goal conversions it makes.
 async fn insert(
-    platform: &Platform,
-    tx: &mut WriteTx,
+    conn: &mut SqliteConnection,
     site: &CachedSite,
     row: &EventRow,
+    converted: &mut Vec<GoalConverted>,
 ) -> anyhow::Result<()> {
-    let event_id = store::insert_event(&mut **tx, row).await.context("inserting an event")?;
+    let event_id = store::insert_event(&mut *conn, row).await.context("inserting an event")?;
     for goal in site.goals.iter().filter(|goal| converts(goal, row)) {
-        if store::insert_conversion(&mut **tx, row.workspace_id, goal.id, &row.day, &row.person)
+        if store::insert_conversion(&mut *conn, row.workspace_id, goal.id, &row.day, &row.person)
             .await?
         {
-            let converted = GoalConverted {
+            converted.push(GoalConverted {
                 workspace_id: row.workspace_id,
                 project_id: row.project_id,
                 goal_id: goal.id,
                 event_id,
-            };
-            platform.bus().publish(tx, &converted).await?;
+            });
         }
     }
     Ok(())

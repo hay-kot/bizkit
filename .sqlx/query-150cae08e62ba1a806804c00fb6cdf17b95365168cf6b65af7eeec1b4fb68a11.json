@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM analytics_conversions WHERE workspace_id = ? AND goal_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "150cae08e62ba1a806804c00fb6cdf17b95365168cf6b65af7eeec1b4fb68a11"
+}

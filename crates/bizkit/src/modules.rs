@@ -17,7 +17,7 @@ pub(crate) fn modules() -> Vec<Box<dyn Module>> {
     modules.push(Box::new(bizkit_webhooks::Webhooks));
     // Before extensions: its demo seed binds scripts to the seeded goals.
     #[cfg(feature = "analytics")]
-    modules.push(Box::new(bizkit_analytics::Analytics));
+    modules.push(Box::new(bizkit_analytics::Analytics::default()));
     #[cfg(feature = "extensions")]
     modules.push(Box::new(bizkit_extensions::Extensions::default()));
     modules
@@ -133,7 +133,13 @@ mod tests {
     #[test]
     fn migration_versions_are_unique() {
         let mut seen = BTreeSet::new();
-        for migrator in bizkit_core::migrators(&modules()) {
+        // Analytics' per-project files have their own set; the sqlx prepare
+        // database applies it into the same table as the app's.
+        #[cfg_attr(not(feature = "analytics"), expect(unused_mut, reason = "no extra sets"))]
+        let mut migrators = bizkit_core::migrators(&modules());
+        #[cfg(feature = "analytics")]
+        migrators.push(bizkit_analytics::project_migrator());
+        for migrator in migrators {
             for migration in migrator.iter() {
                 assert!(
                     seen.insert(migration.version),

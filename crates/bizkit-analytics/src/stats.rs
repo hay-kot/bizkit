@@ -2,6 +2,7 @@
 //! chart, and `stats.breakdown` for its ranked panels.
 
 use std::cmp::Reverse;
+use std::sync::Arc;
 
 use bizkit_core::ApiError;
 use bizkit_core::ModuleContext;
@@ -11,9 +12,11 @@ use bizkit_core::ops::{Access, Level, Method, OpCtx, Operation, Scope as AccessS
 use bizkit_core::time::UnixMillis;
 use bizkit_core::validate::{FieldErrors, Validate};
 use serde::Deserialize;
+use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 use crate::api::{Breakdown, BreakdownRow, Day, Dimension, Interval, SeriesPoint, Summary, Totals};
+use crate::files::Files;
 use crate::report::{self, Scope, Split};
 use crate::store;
 
@@ -25,9 +28,9 @@ const DEFAULT_LIMIT: usize = 10;
 const MAX_LIMIT: usize = 1_000;
 const HOUR_MS: i64 = 3_600_000;
 
-pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
-    cx.op(StatsSummary)?;
-    cx.op(StatsBreakdown)
+pub(crate) fn register(cx: &mut ModuleContext<'_>, files: &Arc<Files>) -> anyhow::Result<()> {
+    cx.op(StatsSummary(Arc::clone(files)))?;
+    cx.op(StatsBreakdown(Arc::clone(files)))
 }
 
 /// Adds errors for a range that is reversed or too long.
@@ -106,7 +109,7 @@ impl Validate for BreakdownQuery {
     }
 }
 
-struct StatsSummary;
+struct StatsSummary(Arc<Files>);
 impl Operation for StatsSummary {
     type Input = SummaryQuery;
     type Output = Summary;
@@ -119,8 +122,11 @@ impl Operation for StatsSummary {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: SummaryQuery) -> Result<Summary, ApiError> {
-        let db = cx.platform().db();
-        let (scope, rolled) = site_scope(db, input.workspace_id, input.project_id).await?;
+        let platform = cx.platform();
+        let (scope, rolled) =
+            site_scope(platform.db(), input.workspace_id, input.project_id).await?;
+        let file = self.0.for_op(platform, scope).await?;
+        let db = &Reports { app: platform.db().read(), file: file.db.read() };
         let (from, to) = (input.from, input.to);
         let current = totals(db, scope, report::split(from, to, rolled)).await?;
         let (interval, points) = series(db, scope, from, to, rolled).await?;
@@ -137,10 +143,18 @@ impl Operation for StatsSummary {
     }
 }
 
-async fn totals(db: &Db, scope: Scope, split: Split) -> Result<Totals, ApiError> {
-    let by_value = report::by_value(db.read(), scope, "total", split).await?;
+/// The two databases a report reads: goals from the app, counts from the
+/// project file.
+struct Reports<'a> {
+    app: &'a SqlitePool,
+    file: &'a SqlitePool,
+}
+
+async fn totals(db: &Reports<'_>, scope: Scope, split: Split) -> Result<Totals, ApiError> {
+    let by_value = report::by_value(db.file, scope, "total", split).await?;
     let counts = by_value.get("").copied().unwrap_or_default();
-    let conversions = report::goal_conversions(db.read(), scope, split).await?.values().sum();
+    let goals = store::list_goals(db.app, scope.workspace_id, scope.project_id).await?;
+    let conversions = report::goal_conversions(db.file, scope, &goals, split).await?.values().sum();
     Ok(Totals {
         visitors: counts.visitors,
         pageviews: counts.pageviews,
@@ -153,14 +167,14 @@ async fn totals(db: &Db, scope: Scope, split: Split) -> Result<Totals, ApiError>
 /// hours with no events are zero. A rolled-up day whose raw events were
 /// pruned has no hours, so it gets one daily point.
 async fn series(
-    db: &Db,
+    db: &Reports<'_>,
     scope: Scope,
     from: Day,
     to: Day,
     rolled: Option<Day>,
 ) -> Result<(Interval, Vec<SeriesPoint>), ApiError> {
     if from == to {
-        let hours = report::hourly(db.read(), scope, from).await?;
+        let hours = report::hourly(db.file, scope, from).await?;
         let pruned = hours.is_empty() && rolled.is_some_and(|rolled| from <= rolled);
         if !pruned {
             let points = (0..24)
@@ -173,7 +187,7 @@ async fn series(
             return Ok((Interval::Hour, points));
         }
     }
-    let days = report::daily(db.read(), scope, report::split(from, to, rolled)).await?;
+    let days = report::daily(db.file, scope, report::split(from, to, rolled)).await?;
     let mut points = Vec::new();
     let mut day = from;
     while day <= to {
@@ -184,7 +198,7 @@ async fn series(
     Ok((Interval::Day, points))
 }
 
-struct StatsBreakdown;
+struct StatsBreakdown(Arc<Files>);
 impl Operation for StatsBreakdown {
     type Input = BreakdownQuery;
     type Output = Breakdown;
@@ -197,13 +211,16 @@ impl Operation for StatsBreakdown {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: BreakdownQuery) -> Result<Breakdown, ApiError> {
-        let db = cx.platform().db();
-        let (scope, rolled) = site_scope(db, input.workspace_id, input.project_id).await?;
+        let platform = cx.platform();
+        let (scope, rolled) =
+            site_scope(platform.db(), input.workspace_id, input.project_id).await?;
+        let file = self.0.for_op(platform, scope).await?;
+        let db = &Reports { app: platform.db().read(), file: file.db.read() };
         let split = report::split(input.from, input.to, rolled);
         let mut items = if input.dimension == Dimension::Goal {
             goal_rows(db, scope, split).await?
         } else {
-            report::by_value(db.read(), scope, input.dimension.as_str(), split)
+            report::by_value(db.file, scope, input.dimension.as_str(), split)
                 .await?
                 .into_iter()
                 .map(|(value, counts)| BreakdownRow {
@@ -229,10 +246,14 @@ impl Operation for StatsBreakdown {
 }
 
 /// Every goal, including those with no conversions in the range.
-async fn goal_rows(db: &Db, scope: Scope, split: Split) -> Result<Vec<BreakdownRow>, ApiError> {
-    let goals = store::list_goals(db.read(), scope.workspace_id, scope.project_id).await?;
-    let conversions = report::goal_conversions(db.read(), scope, split).await?;
-    let total = report::by_value(db.read(), scope, "total", split).await?;
+async fn goal_rows(
+    db: &Reports<'_>,
+    scope: Scope,
+    split: Split,
+) -> Result<Vec<BreakdownRow>, ApiError> {
+    let goals = store::list_goals(db.app, scope.workspace_id, scope.project_id).await?;
+    let conversions = report::goal_conversions(db.file, scope, &goals, split).await?;
+    let total = report::by_value(db.file, scope, "total", split).await?;
     let visitors = total.get("").map_or(0, |counts| counts.visitors);
     Ok(goals
         .into_iter()

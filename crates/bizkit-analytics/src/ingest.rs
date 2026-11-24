@@ -21,28 +21,31 @@ use crate::api::{Day, IdentityMode};
 use crate::beacon::{self, Beacon, Name};
 use crate::cache::{CachedSite, Salts, Sites};
 use crate::enrich::{self, Who};
+use crate::files::{Files, Submit};
 use crate::geo::Geo;
 use crate::limit::Limiter;
 use crate::names;
-use crate::write::{self, Incoming, Origin};
+use crate::write::{Incoming, Origin};
 
 const SNIPPET: &str = include_str!("snippet.js");
 /// How long browsers keep a site's snippet. Identity mode changes reach
 /// visitors within this time.
 const SNIPPET_MAX_AGE: &str = "public, max-age=300";
 
-/// The module's shared ingest state: caches, the rate limiter and the country lookup.
-#[derive(Debug, Default)]
+/// The module's shared ingest state: caches, the rate limiter, the
+/// country lookup and the project files events are queued for.
+#[derive(Debug)]
 pub(crate) struct Ingest {
-    pub(crate) sites: Sites,
+    pub(crate) sites: Arc<Sites>,
     pub(crate) salts: Salts,
     pub(crate) limiter: Limiter,
     pub(crate) geo: Geo,
+    pub(crate) files: Arc<Files>,
 }
 
 impl Ingest {
-    pub(crate) fn new(geo: Geo) -> Self {
-        Self { geo, ..Self::default() }
+    pub(crate) fn new(geo: Geo, sites: Arc<Sites>, files: Arc<Files>) -> Self {
+        Self { sites, salts: Salts::default(), limiter: Limiter::default(), geo, files }
     }
 }
 
@@ -141,6 +144,7 @@ enum Dropped {
     Host,
     Limited,
     Cookieless,
+    Full,
 }
 
 impl fmt::Display for Dropped {
@@ -152,6 +156,7 @@ impl fmt::Display for Dropped {
             Self::Host => f.write_str("host not allowed"),
             Self::Limited => f.write_str("rate limited"),
             Self::Cookieless => f.write_str("identify on a cookieless site"),
+            Self::Full => f.write_str("the project's queue is full"),
         }
     }
 }
@@ -213,8 +218,11 @@ async fn accept(
         return Ok(Err(Dropped::Limited));
     }
     let event = enrich_beacon(ingest, platform, &site, beacon, Who::Web { ip, ua }).await?;
-    write::record(platform, &ingest.sites, &site, &[event]).await?;
-    Ok(Ok(()))
+    match ingest.files.submit(platform, site, vec![event]).await {
+        Ok(()) => Ok(Ok(())),
+        Err(Submit::Full) => Ok(Err(Dropped::Full)),
+        Err(Submit::Failed(err)) => Err(err),
+    }
 }
 
 async fn enrich_beacon(
@@ -225,7 +233,9 @@ async fn enrich_beacon(
     who: Who<'_>,
 ) -> anyhow::Result<Incoming> {
     let Who::Web { ip, ua } = who else { anyhow::bail!("beacons come from browsers") };
-    let salt = ingest.salts.get(platform.db(), Day::of(platform.now())).await?;
+    let received = platform.now();
+    let day = Day::of(received);
+    let salt = ingest.salts.get(platform.db(), day).await?;
     let country = match ip {
         Some(ip) => ingest.geo.country(ip).await,
         None => None,
@@ -243,6 +253,8 @@ async fn enrich_beacon(
         props: beacon.props,
         traits: beacon.traits,
         origin: Origin::Web,
+        received,
+        day: day.to_string(),
     })
 }
 

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(SUM(visitors), 0) AS \"visitors!: i64\" FROM analytics_daily\n                   WHERE workspace_id = ? AND project_id = ? AND dimension = ? AND value = ?\n                     AND day >= ? AND day <= ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "visitors!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "601c2d8af1d600e6e9175752936049041c898687057493a0dcc2a43624108830"
+}

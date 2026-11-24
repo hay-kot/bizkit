@@ -1092,6 +1092,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -10084,14 +10094,14 @@
       },
       "Ingested": {
         "type": "object",
-        "description": "How many events were recorded.",
+        "description": "How many events were accepted.",
         "required": [
           "accepted"
         ],
         "properties": {
           "accepted": {
             "type": "integer",
-            "description": "Events recorded, counting `$identify` calls.",
+            "description": "Events accepted, counting `$identify` calls. They are written in\nbatches and show in reports within the flush window (100 ms by\ndefault).",
             "minimum": 0
           }
         }

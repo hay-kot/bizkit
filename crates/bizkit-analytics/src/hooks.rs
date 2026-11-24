@@ -2,6 +2,8 @@
 //! converts on a goal, at most once per goal, person and UTC day. Scripts
 //! bind to goals.
 
+use std::sync::Arc;
+
 use anyhow::Context as _;
 use async_trait::async_trait;
 use bizkit_core::Platform;
@@ -14,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::api::GoalId;
+use crate::files::Files;
+use crate::report::Scope;
 use crate::store::{self, GoalRow, HookEventRow};
 
 /// Published in the ingest transaction when a person converts on a goal for
@@ -123,26 +127,33 @@ impl TargetResolver for GoalTargets {
 }
 
 /// Builds the `analytics.goal_converted` target and input from the event.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct GoalHookSource;
+#[derive(Debug, Clone)]
+pub(crate) struct GoalHookSource(pub(crate) Arc<Files>);
 
 impl GoalHookSource {
     /// The goal and event, or None when either is gone (a deleted goal, or
     /// an event pruned before the run).
     async fn load(
+        &self,
         cx: &JobCtx,
         event: &GoalConverted,
     ) -> anyhow::Result<Option<(GoalRow, HookEventRow)>> {
-        let db = cx.platform.db().read();
-        let goal = store::find_goals(db, event.workspace_id, &[event.goal_id])
+        let goal = store::find_goals(cx.platform.db().read(), event.workspace_id, &[event.goal_id])
             .await
             .context("loading the goal")?
             .into_iter()
             .next();
         let Some(goal) = goal else { return Ok(None) };
-        let row = store::find_hook_event(db, event.workspace_id, event.project_id, event.event_id)
-            .await
-            .context("loading the event")?;
+        let scope = Scope { workspace_id: event.workspace_id, project_id: event.project_id };
+        let Some(file) = self.0.get(&cx.platform, scope).await? else { return Ok(None) };
+        let row = store::find_hook_event(
+            file.db.read(),
+            event.workspace_id,
+            event.project_id,
+            event.event_id,
+        )
+        .await
+        .context("loading the event")?;
         Ok(row.map(|row| (goal, row)))
     }
 }
@@ -153,7 +164,7 @@ impl HookSource<GoalConverted> for GoalHookSource {
         cx: &JobCtx,
         event: &GoalConverted,
     ) -> anyhow::Result<Option<HookTarget>> {
-        Ok(Self::load(cx, event).await?.map(|(goal, _)| HookTarget {
+        Ok(self.load(cx, event).await?.map(|(goal, _)| HookTarget {
             workspace_id: goal.workspace_id,
             project_id: goal.project_id,
             entity: Some(goal.id.to_string()),
@@ -161,7 +172,7 @@ impl HookSource<GoalConverted> for GoalHookSource {
     }
 
     async fn input(&self, cx: &JobCtx, event: &GoalConverted) -> anyhow::Result<Option<Value>> {
-        Ok(Self::load(cx, event).await?.map(|(goal, row)| goal_converted_input(&goal, &row)))
+        Ok(self.load(cx, event).await?.map(|(goal, row)| goal_converted_input(&goal, &row)))
     }
 }
 

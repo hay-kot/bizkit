@@ -20,7 +20,7 @@ mod product {
     }
 
     async fn setup() -> Setup {
-        let app = TestApp::builder().module(Analytics).build().await;
+        let app = TestApp::builder().module(Analytics::manual_flush()).build().await;
         let team = app.seed(Persona::Team, "product").await;
         let admin = app.with_session(&team.accounts["admin"].session_token);
         let member = app.with_session(&team.accounts["member"].session_token);
@@ -49,6 +49,7 @@ mod product {
                 )
                 .await
                 .expect(StatusCode::OK);
+            self.app.flush().await;
         }
 
         async fn get(&self, rest: &str) -> Value {

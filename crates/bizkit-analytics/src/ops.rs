@@ -14,6 +14,7 @@ use utoipa::ToSchema;
 use crate::api::{Goal, GoalId, GoalKind, GoalList, IdentityMode, Site};
 use crate::ingest::Ingest;
 use crate::names;
+use crate::report::Scope as ReportScope;
 use crate::store::{self, GoalRow, SiteRow};
 
 const READ: Access = Access::Workspace(Scope::new("analytics", Level::Read));
@@ -370,9 +371,19 @@ impl Operation for GoalsDelete {
 
     async fn call(&self, cx: OpCtx, input: InGoal) -> Result<NoContent, ApiError> {
         let mut tx = cx.write().await?;
-        let deleted = store::delete_goal(&mut *tx, input.workspace_id, input.goal_id).await?;
+        let project_id = store::delete_goal(&mut *tx, input.workspace_id, input.goal_id)
+            .await?
+            .ok_or(ApiError::NotFound)?;
         tx.commit().await?;
         self.0.sites.clear();
-        if deleted { Ok(NoContent) } else { Err(ApiError::NotFound) }
+        let scope = ReportScope { workspace_id: input.workspace_id, project_id };
+        let file = self.0.files.get(cx.platform(), scope).await?;
+        if let Some(file) = file {
+            let mut file_tx = file.db.write().await?;
+            store::delete_goal_conversions(&mut *file_tx, input.workspace_id, input.goal_id)
+                .await?;
+            file_tx.commit().await.context("committing a goal's conversion cleanup")?;
+        }
+        Ok(NoContent)
     }
 }

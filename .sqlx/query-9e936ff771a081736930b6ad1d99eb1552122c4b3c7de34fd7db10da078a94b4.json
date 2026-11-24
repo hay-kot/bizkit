@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(DISTINCT day || ':' || visitor) AS \"visitors!: i64\"\n                   FROM analytics_events\n                   WHERE workspace_id = ? AND project_id = ? AND day >= ? AND day <= ?\n                     AND ((? = 'page' AND name = 'pageview' AND path = ?)\n                       OR (? = 'event' AND name = ?))",
+  "describe": {
+    "columns": [
+      {
+        "name": "visitors!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9e936ff771a081736930b6ad1d99eb1552122c4b3c7de34fd7db10da078a94b4"
+}

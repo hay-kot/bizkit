@@ -1,6 +1,7 @@
 //! Identified people, their timelines, and weekly retention cohorts.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 
 use bizkit_core::ApiError;
 use bizkit_core::ModuleContext;
@@ -14,8 +15,11 @@ use utoipa::ToSchema;
 
 use crate::api::{Day, PersonId};
 use crate::explore::EventItem;
+use crate::files::Files;
 use crate::names;
+use crate::report::Scope;
 use crate::stats::{check_range, site_scope};
+use crate::store;
 
 const READ: Access = Access::Workspace(AccessScope::new("analytics", Level::Read));
 const TAGS: &[&str] = &["analytics"];
@@ -24,10 +28,10 @@ const MAX_PAGE: u32 = 200;
 /// Weeks after the cohort week that retention reports.
 pub(crate) const RETENTION_WEEKS: usize = 8;
 
-pub(crate) fn register(cx: &mut ModuleContext<'_>) -> anyhow::Result<()> {
-    cx.op(PeopleList)?;
-    cx.op(PeopleGet)?;
-    cx.op(Retention)
+pub(crate) fn register(cx: &mut ModuleContext<'_>, files: &Arc<Files>) -> anyhow::Result<()> {
+    cx.op(PeopleList(Arc::clone(files)))?;
+    cx.op(PeopleGet(Arc::clone(files)))?;
+    cx.op(Retention(Arc::clone(files)))
 }
 
 fn check_limit(errors: &mut FieldErrors, limit: Option<u32>) {
@@ -108,7 +112,7 @@ fn like_pattern(q: &str) -> String {
     pattern
 }
 
-struct PeopleList;
+struct PeopleList(Arc<Files>);
 impl Operation for PeopleList {
     type Input = ListPeople;
     type Output = PersonPage;
@@ -120,6 +124,10 @@ impl Operation for PeopleList {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: ListPeople) -> Result<PersonPage, ApiError> {
+        let scope = Scope { workspace_id: input.workspace_id, project_id: input.project_id };
+        let Some(file) = self.0.get(cx.platform(), scope).await? else {
+            return Ok(PersonPage { items: Vec::new(), next_before: None });
+        };
         let limit = input.limit.unwrap_or(DEFAULT_PAGE);
         let pattern = input.q.as_deref().filter(|q| !q.trim().is_empty()).map(like_pattern);
         let fetch = i64::from(limit) + 1;
@@ -141,7 +149,7 @@ impl Operation for PeopleList {
             pattern,
             fetch,
         )
-        .fetch_all(cx.platform().db().read())
+        .fetch_all(file.db.read())
         .await?;
         let mut items: Vec<PersonSummary> = rows
             .into_iter()
@@ -212,7 +220,7 @@ pub(crate) struct PersonDetail {
     pub(crate) next_before: Option<i64>,
 }
 
-struct PeopleGet;
+struct PeopleGet(Arc<Files>);
 impl Operation for PeopleGet {
     type Input = InPerson;
     type Output = PersonDetail;
@@ -224,17 +232,29 @@ impl Operation for PeopleGet {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: InPerson) -> Result<PersonDetail, ApiError> {
-        let db = cx.platform().db();
-        let person = sqlx::query!(
-            r#"SELECT project_id AS "project_id: ProjectId", user_id, traits,
-                      first_seen AS "first_seen: UnixMillis", last_seen AS "last_seen: UnixMillis"
-               FROM analytics_people WHERE workspace_id = ? AND id = ?"#,
-            input.workspace_id,
-            input.person_id,
-        )
-        .fetch_optional(db.read())
-        .await?
-        .ok_or(ApiError::NotFound)?;
+        let platform = cx.platform();
+        // The input has no project, so look in each site's file; a
+        // workspace has few sites.
+        let projects = store::list_site_projects(platform.db().read(), input.workspace_id).await?;
+        let mut found = None;
+        for project_id in projects {
+            let scope = Scope { workspace_id: input.workspace_id, project_id };
+            let Some(file) = self.0.get(platform, scope).await? else { continue };
+            let person = sqlx::query!(
+                r#"SELECT project_id AS "project_id: ProjectId", user_id, traits,
+                          first_seen AS "first_seen: UnixMillis", last_seen AS "last_seen: UnixMillis"
+                   FROM analytics_people WHERE workspace_id = ? AND id = ?"#,
+                input.workspace_id,
+                input.person_id,
+            )
+            .fetch_optional(file.db.read())
+            .await?;
+            if let Some(person) = person {
+                found = Some((file, person));
+                break;
+            }
+        }
+        let (file, person) = found.ok_or(ApiError::NotFound)?;
         let limit = input.limit.unwrap_or(DEFAULT_PAGE);
         let key = format!("p:{}", input.person_id);
         let before = input.before.unwrap_or(i64::MAX);
@@ -252,7 +272,7 @@ impl Operation for PeopleGet {
             before,
             fetch,
         )
-        .fetch_all(db.read())
+        .fetch_all(file.db.read())
         .await?;
         let mut events: Vec<EventItem> = rows
             .into_iter()
@@ -338,7 +358,7 @@ pub(crate) struct RetentionTable {
     pub(crate) cohorts: Vec<Cohort>,
 }
 
-struct Retention;
+struct Retention(Arc<Files>);
 impl Operation for Retention {
     type Input = RetentionQuery;
     type Output = RetentionTable;
@@ -351,8 +371,9 @@ impl Operation for Retention {
     const TAGS: &'static [&'static str] = TAGS;
 
     async fn call(&self, cx: OpCtx, input: RetentionQuery) -> Result<RetentionTable, ApiError> {
-        let db = cx.platform().db();
-        let (scope, _) = site_scope(db, input.workspace_id, input.project_id).await?;
+        let platform = cx.platform();
+        let (scope, _) = site_scope(platform.db(), input.workspace_id, input.project_id).await?;
+        let file = self.0.for_op(platform, scope).await?;
         let first_week = monday(input.from);
         let today = Day::of(cx.now());
         let weeks = i64::try_from(RETENTION_WEEKS).unwrap_or(8);
@@ -371,7 +392,7 @@ impl Operation for Retention {
             from,
             to,
         )
-        .fetch_all(db.read())
+        .fetch_all(file.db.read())
         .await?;
         // A person active before the window isn't new in it, though the
         // window's rows alone would make their first day look like it.
@@ -384,7 +405,7 @@ impl Operation for Retention {
             scope.project_id,
             from,
         )
-        .fetch_all(db.read())
+        .fetch_all(file.db.read())
         .await?
         .into_iter()
         .collect();
