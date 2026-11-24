@@ -11,31 +11,38 @@ use std::time::Duration;
 
 use anyhow::{Context as _, bail};
 use bizkit_core::time::UnixMillis;
-use cms::builder::{SignedDataBuilder, SignerInfoBuilder};
-use cms::cert::{CertificateChoices, IssuerAndSerialNumber};
-use cms::content_info::ContentInfo;
-use cms::signed_data::{EncapsulatedContentInfo, SignerIdentifier};
-use der::asn1::{GeneralizedTime, OctetString, SetOfVec};
-use der::{Any, Decode as _, Encode as _, Sequence};
+use der::asn1::{GeneralizedTime, ObjectIdentifier, OctetString, SetOfVec};
+use der::{Any, Decode as _, Encode as _, Sequence, ValueOrd};
 use lopdf::{Dictionary, Document, Object, ObjectId, StringFormat, dictionary};
+use p256::ecdsa::signature::Signer as _;
 use p256::ecdsa::{DerSignature, SigningKey};
-use sha2_010::{Digest as _, Sha256};
+use sha2::{Digest as _, Sha256};
 use x509_cert::Certificate;
 use x509_cert::attr::Attribute;
-use x509_cert::builder::{Builder as _, CertificateBuilder, Profile};
+use x509_cert::builder::profile::BuilderProfile;
+use x509_cert::builder::{Builder as _, CertificateBuilder};
+use x509_cert::certificate::TbsCertificate;
+use x509_cert::ext::pkix::{BasicConstraints, KeyUsage, KeyUsages, SubjectKeyIdentifier};
+use x509_cert::ext::{Extension, ToExtension as _};
 use x509_cert::name::Name;
 use x509_cert::serial_number::SerialNumber;
-use x509_cert::spki::{AlgorithmIdentifierOwned, ObjectIdentifier, SubjectPublicKeyInfoOwned};
+use x509_cert::spki::{
+    AlgorithmIdentifierOwned, SubjectPublicKeyInfoOwned, SubjectPublicKeyInfoRef,
+};
 use x509_cert::time::{Time, Validity};
 
 /// Room for the CMS signature, in bytes; written as twice as many hex digits.
 const CONTENTS_SIZE: usize = 8192;
-/// A `ByteRange` wide enough for any file this module writes, patched in place.
+/// A `/ByteRange` wide enough for any file this module writes, patched in place.
 const BYTE_RANGE_PLACEHOLDER: [i64; 4] = [0, 9_999_999_999, 9_999_999_999, 9_999_999_999];
 const CERT_YEARS: u64 = 20;
 
 const ID_DATA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.7.1");
+const ID_SIGNED_DATA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.7.2");
+const ID_CONTENT_TYPE: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.3");
+const ID_MESSAGE_DIGEST: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.4");
 const ID_SHA_256: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
+const ID_ECDSA_WITH_SHA_256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
 const ID_AA_SIGNING_CERTIFICATE_V2: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.16.2.47");
 
@@ -63,14 +70,97 @@ struct SigningCertificateV2 {
     certs: Vec<EssCertIdV2>,
 }
 
+/// CMS `ContentInfo` (RFC 5652) holding a `SignedData`.
+#[derive(Debug, Sequence)]
+struct ContentInfo {
+    content_type: ObjectIdentifier,
+    #[asn1(context_specific = "0", tag_mode = "EXPLICIT")]
+    content: Any,
+}
+
+/// CMS `EncapsulatedContentInfo` with no content: the signature is detached.
+#[derive(Debug, Clone, Sequence)]
+struct EncapsulatedContentInfo {
+    econtent_type: ObjectIdentifier,
+}
+
+/// CMS `IssuerAndSerialNumber`.
+#[derive(Debug, Clone, Sequence, ValueOrd)]
+struct IssuerAndSerialNumber {
+    issuer: Name,
+    serial_number: SerialNumber,
+}
+
+/// CMS `SignerInfo`, version 1 (the signer is named by issuer and serial).
+#[derive(Debug, Clone, Sequence, ValueOrd)]
+struct SignerInfo {
+    version: u8,
+    sid: IssuerAndSerialNumber,
+    digest_algorithm: AlgorithmIdentifierOwned,
+    #[asn1(context_specific = "0", tag_mode = "IMPLICIT")]
+    signed_attrs: SetOfVec<Attribute>,
+    signature_algorithm: AlgorithmIdentifierOwned,
+    signature: OctetString,
+}
+
+/// CMS `SignedData`, version 1.
+#[derive(Debug, Sequence)]
+struct SignedData {
+    version: u8,
+    digest_algorithms: SetOfVec<AlgorithmIdentifierOwned>,
+    encap_content_info: EncapsulatedContentInfo,
+    #[asn1(context_specific = "0", tag_mode = "IMPLICIT")]
+    certificates: SetOfVec<Certificate>,
+    signer_infos: SetOfVec<SignerInfo>,
+}
+
+/// A self-signed end-entity certificate that may sign documents: not a CA,
+/// key usage digitalSignature and nonRepudiation, which signature checkers
+/// look for.
+struct SealProfile {
+    subject: Name,
+}
+
+impl BuilderProfile for SealProfile {
+    fn get_issuer(&self, subject: &Name) -> Name {
+        subject.clone()
+    }
+
+    fn get_subject(&self) -> Name {
+        self.subject.clone()
+    }
+
+    fn build_extensions(
+        &self,
+        spk: SubjectPublicKeyInfoRef<'_>,
+        _issuer_spk: SubjectPublicKeyInfoRef<'_>,
+        tbs: &TbsCertificate,
+    ) -> x509_cert::builder::Result<Vec<Extension>> {
+        let mut extensions = Vec::new();
+        let constraints = BasicConstraints { ca: false, path_len_constraint: None };
+        extensions.push(constraints.to_extension(tbs.subject(), &extensions)?);
+        let usage = KeyUsage(KeyUsages::DigitalSignature | KeyUsages::NonRepudiation);
+        extensions.push(usage.to_extension(tbs.subject(), &extensions)?);
+        let ski = SubjectKeyIdentifier::try_from(spk)?;
+        extensions.push(ski.to_extension(tbs.subject(), &extensions)?);
+        Ok(extensions)
+    }
+}
+
 fn generalized(at: UnixMillis) -> anyhow::Result<GeneralizedTime> {
     let secs = u64::try_from(at.0 / 1000).context("a time before 1970")?;
     GeneralizedTime::from_unix_duration(Duration::from_secs(secs)).context("encoding a time")
 }
 
+fn attribute(oid: ObjectIdentifier, value: Any) -> anyhow::Result<Attribute> {
+    let mut values = SetOfVec::new();
+    values.insert(value).context("an attribute value")?;
+    Ok(Attribute { oid, values })
+}
+
 impl SealKey {
-    /// A new key and a self-signed leaf certificate for `common_name`,
-    /// valid for 20 years from `now`.
+    /// A new key and a self-signed certificate for `common_name`, valid for
+    /// 20 years from `now`.
     pub(crate) fn generate(common_name: &str, now: UnixMillis) -> anyhow::Result<Self> {
         let key = loop {
             let seed = Sha256::digest(bizkit_core::auth::random_token().as_bytes());
@@ -88,28 +178,19 @@ impl SealKey {
             *first &= 0x7f;
         }
         let serial = SerialNumber::new(&serial).context("a certificate serial")?;
-        let name = format!(
-            "CN={},O=bizkit",
-            common_name.replace([',', '=', '+', '"', '\\', '<', '>', ';'], " ")
+        let clean = common_name.replace([',', '=', '+', '"', '\\', '<', '>', ';'], " ");
+        let subject =
+            Name::from_str(&format!("CN={clean},O=bizkit")).context("the certificate name")?;
+        let validity = Validity::new(
+            Time::GeneralTime(generalized(now)?),
+            Time::GeneralTime(generalized(now.plus(Duration::from_hours(CERT_YEARS * 365 * 24)))?),
         );
-        let subject = Name::from_str(&name).context("the certificate name")?;
-        let validity = Validity {
-            not_before: Time::GeneralTime(generalized(now)?),
-            not_after: Time::GeneralTime(generalized(
-                now.plus(Duration::from_hours(CERT_YEARS * 365 * 24)),
-            )?),
-        };
         let spki =
-            SubjectPublicKeyInfoOwned::from_key(*key.verifying_key()).context("the public key")?;
-        let profile = Profile::Leaf {
-            issuer: subject.clone(),
-            enable_key_agreement: false,
-            enable_key_encipherment: false,
-        };
-        let builder = CertificateBuilder::new(profile, serial, validity, subject, spki, &key)
+            SubjectPublicKeyInfoOwned::from_key(key.verifying_key()).context("the public key")?;
+        let builder = CertificateBuilder::new(SealProfile { subject }, serial, validity, spki)
             .context("building the seal certificate")?;
         let certificate =
-            builder.build::<DerSignature>().context("signing the seal certificate")?;
+            builder.build::<_, DerSignature>(&key).context("signing the seal certificate")?;
         Ok(Self { key, certificate })
     }
 
@@ -132,51 +213,60 @@ impl SealKey {
         &self.certificate
     }
 
-    /// A detached CMS `SignedData` over `digest` (SHA-256 of the signed bytes).
+    /// A detached CMS `SignedData` over `digest` (SHA-256 of the signed bytes),
+    /// with the signed attributes `PAdES` B-B asks for and no signing-time.
     fn cms(&self, digest: &[u8]) -> anyhow::Result<Vec<u8>> {
-        let content = EncapsulatedContentInfo { econtent_type: ID_DATA, econtent: None };
         let sha256 = AlgorithmIdentifierOwned { oid: ID_SHA_256, parameters: None };
-        let tbs = &self.certificate.tbs_certificate;
-        let sid = SignerIdentifier::IssuerAndSerialNumber(IssuerAndSerialNumber {
-            issuer: tbs.issuer.clone(),
-            serial_number: tbs.serial_number.clone(),
-        });
+        let ecdsa = AlgorithmIdentifierOwned { oid: ID_ECDSA_WITH_SHA_256, parameters: None };
         let cert_der = self.certificate.to_der().context("encoding the certificate")?;
         let ess = SigningCertificateV2 {
             certs: vec![EssCertIdV2 {
                 cert_hash: OctetString::new(Sha256::digest(&cert_der).to_vec())
-                    .context("a cert hash")?,
+                    .context("a certificate hash")?,
             }],
         };
-        let ess_value = Any::encode_from(&ess).context("encoding signing-certificate-v2")?;
-        let mut values = SetOfVec::new();
-        values.insert(ess_value).context("signing-certificate-v2 values")?;
-        let ess_attr = Attribute { oid: ID_AA_SIGNING_CERTIFICATE_V2, values };
-
-        let mut info =
-            SignerInfoBuilder::new(&self.key, sid, sha256.clone(), &content, Some(digest))
-                .map_err(|err| cms_error(&err, "starting the signer info"))?;
-        info.add_signed_attribute(ess_attr)
-            .map_err(|err| cms_error(&err, "adding signing-certificate-v2"))?;
-        let mut signed = SignedDataBuilder::new(&content);
-        signed
-            .add_digest_algorithm(sha256)
-            .map_err(|err| cms_error(&err, "adding the digest algorithm"))?;
-        signed
-            .add_certificate(CertificateChoices::Certificate(self.certificate.clone()))
-            .map_err(|err| cms_error(&err, "adding the certificate"))?;
-        signed
-            .add_signer_info::<_, DerSignature>(info)
-            .map_err(|err| cms_error(&err, "signing"))?;
-        let content_info: ContentInfo =
-            signed.build().map_err(|err| cms_error(&err, "building SignedData"))?;
-        content_info.to_der().context("encoding SignedData")
+        let mut signed_attrs = SetOfVec::new();
+        for attr in [
+            attribute(ID_CONTENT_TYPE, Any::encode_from(&ID_DATA)?)?,
+            attribute(ID_MESSAGE_DIGEST, Any::encode_from(&OctetString::new(digest.to_vec())?)?)?,
+            attribute(ID_AA_SIGNING_CERTIFICATE_V2, Any::encode_from(&ess)?)?,
+        ] {
+            signed_attrs.insert(attr).context("a signed attribute")?;
+        }
+        // The signature covers the attributes encoded as a SET (RFC 5652 5.4).
+        let to_sign = signed_attrs.to_der().context("encoding the signed attributes")?;
+        let signature: DerSignature = self.key.sign(&to_sign);
+        let tbs = &self.certificate.tbs_certificate();
+        let signer = SignerInfo {
+            version: 1,
+            sid: IssuerAndSerialNumber {
+                issuer: tbs.issuer().clone(),
+                serial_number: tbs.serial_number().clone(),
+            },
+            digest_algorithm: sha256.clone(),
+            signed_attrs,
+            signature_algorithm: ecdsa,
+            signature: OctetString::new(signature.to_bytes().to_vec()).context("the signature")?,
+        };
+        let mut digest_algorithms = SetOfVec::new();
+        digest_algorithms.insert(sha256).context("the digest algorithm")?;
+        let mut certificates = SetOfVec::new();
+        certificates.insert(self.certificate.clone()).context("the certificate")?;
+        let mut signer_infos = SetOfVec::new();
+        signer_infos.insert(signer).context("the signer info")?;
+        let signed_data = SignedData {
+            version: 1,
+            digest_algorithms,
+            encap_content_info: EncapsulatedContentInfo { econtent_type: ID_DATA },
+            certificates,
+            signer_infos,
+        };
+        let info = ContentInfo {
+            content_type: ID_SIGNED_DATA,
+            content: Any::encode_from(&signed_data).context("encoding SignedData")?,
+        };
+        info.to_der().context("encoding ContentInfo")
     }
-}
-
-/// cms's builder error is not a std error.
-fn cms_error(err: &cms::builder::Error, doing: &str) -> anyhow::Error {
-    anyhow::anyhow!("{doing}: {err:?}")
 }
 
 /// The signature dictionary's `/M`: `D:YYYYMMDDHHmmSSZ`.
@@ -314,7 +404,6 @@ pub(crate) fn seal(mut doc: Document, key: &SealKey, at: UnixMillis) -> anyhow::
 
 #[cfg(test)]
 mod tests {
-    use cms::signed_data::SignedData;
     use p256::ecdsa::signature::Verifier as _;
     use p256::ecdsa::{Signature, VerifyingKey};
 
@@ -356,9 +445,10 @@ mod tests {
 
         // The CMS may be followed by zero padding; DER decoding stops at its end.
         let info = ContentInfo::from_der(&der[..der_len(&der)]).unwrap();
+        assert_eq!(info.content_type, ID_SIGNED_DATA);
         let data: SignedData = info.content.decode_as().unwrap();
-        let signer = data.signer_infos.0.as_slice().first().unwrap();
-        let attrs = signer.signed_attrs.as_ref().unwrap();
+        let signer = data.signer_infos.as_slice().first().unwrap();
+        let attrs = &signer.signed_attrs;
         let md = attrs
             .iter()
             .find(|attr| attr.oid == ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.4"))
@@ -373,7 +463,7 @@ mod tests {
         );
         assert!(attrs.iter().any(|attr| attr.oid == ID_AA_SIGNING_CERTIFICATE_V2));
 
-        let spki = &key.certificate().tbs_certificate.subject_public_key_info;
+        let spki = key.certificate().tbs_certificate().subject_public_key_info();
         let verifying = VerifyingKey::from_sec1_bytes(spki.subject_public_key.raw_bytes()).unwrap();
         let signature = Signature::from_der(signer.signature.as_bytes()).unwrap();
         verifying.verify(&attrs.to_der().unwrap(), &signature).unwrap();
@@ -398,7 +488,7 @@ mod tests {
     fn der_len(bytes: &[u8]) -> usize {
         let mut reader = der::SliceReader::new(bytes).unwrap();
         let header = <der::Header as der::Decode>::decode(&mut reader).unwrap();
-        let len: usize = header.length.try_into().unwrap();
+        let len: usize = header.length().try_into().unwrap();
         len + usize::try_from(u32::from(header.encoded_len().unwrap())).unwrap()
     }
 }

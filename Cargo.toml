@@ -78,13 +78,13 @@ url = { version = "=2.5.9", features = ["serde"] }
 utoipa = { version = "6.0.0", features = ["uuid", "openapi_extensions", "preserve_order"] }
 uuid = { version = "=1.29.2", features = ["v7", "serde"] }
 
-# Doc signing: the RustCrypto 0.2/0.13 line, the newest with a stable cms.
-cms = { version = "=0.2.3", features = ["builder"] }
-der = { version = "=0.7.10", features = ["alloc", "derive", "oid"] }
+# Doc signing. The p256 0.14 line has crypto-bigint 0.7 (RUSTSEC-2026-0387
+# fixed); CMS is hand-encoded with der, since cms 0.3 is only a release
+# candidate and cms 0.2 needs the old line and rsa (RUSTSEC-2023-0071).
+der = { version = "=0.8.3", features = ["alloc", "derive", "oid"] }
 lopdf = { version = "=0.42.0", default-features = false }
-p256 = { version = "=0.13.2", features = ["ecdsa"] }
-sha2-010 = { package = "sha2", version = "0.10.9", features = ["oid"] }
-x509-cert = { version = "=0.2.5", features = ["builder"] }
+p256 = { version = "=0.14.0", features = ["ecdsa"] }
+x509-cert = { version = "=0.3.0", features = ["builder"] }
 [profile.release]
 codegen-units = 1
 lto = "thin"
