@@ -20,6 +20,8 @@ defineProps<{
   to: RouteLocationRaw
   editing: boolean
   handle: HandleBindings
+  /** Disables the edit controls, for while the layout saves. */
+  locked?: boolean
 }>()
 const width = defineModel<TileWidth>('width', { required: true })
 defineEmits<{ remove: [] }>()
@@ -36,6 +38,7 @@ const headingId = useId()
         type="button"
         class="btn btn-square cursor-grab touch-none btn-ghost btn-sm active:cursor-grabbing"
         v-bind="handle"
+        :disabled="locked"
       >
         <GripVertical class="size-4" aria-hidden="true" />
       </button>
@@ -45,11 +48,13 @@ const headingId = useId()
         :options="TILE_WIDTHS"
         :label="`Width of ${title}`"
         size="sm"
+        :disabled="locked"
       />
       <button
         type="button"
         class="btn btn-square btn-ghost btn-sm"
         :aria-label="`Remove ${title}`"
+        :disabled="locked"
         @click="$emit('remove')"
       >
         <X class="size-4" aria-hidden="true" />

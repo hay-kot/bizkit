@@ -460,6 +460,36 @@ mod insights {
     }
 
     #[tokio::test]
+    async fn patching_tiles_refuses_a_repeated_insight() {
+        let s = setup().await;
+        let insight: Value = s
+            .member
+            .post(
+                &s.path("insights"),
+                &json!({"project_id": s.project(), "name": "People", "query": {"kind": "people"}}),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        let tiles = json!([{"insight_id": insight["id"], "width": 8}]);
+        let body = json!({"project_id": s.project(), "name": "Once", "tiles": tiles});
+        let board: Value =
+            s.member.post(&s.path("dashboards"), &body).await.expect(StatusCode::CREATED).json();
+        let board_path = s.path(&format!("dashboards/{}", board["id"].as_str().unwrap()));
+        let repeated = json!({"tiles": [{"insight_id": insight["id"], "width": 6},
+                                        {"insight_id": insight["id"], "width": 12}]});
+        let refused: Value = s
+            .member
+            .patch(&board_path, &repeated)
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY)
+            .json();
+        assert!(refused.to_string().contains("must not repeat an insight"), "{refused}");
+        let kept: Value = s.member.get(&board_path).await.expect(StatusCode::OK).json();
+        assert_eq!(kept["tiles"], tiles, "a refused update changes nothing");
+    }
+
+    #[tokio::test]
     async fn dashboards_only_hold_their_projects_insights() {
         let s = setup().await;
         let app_project = s.team.projects["app"].id.to_string();

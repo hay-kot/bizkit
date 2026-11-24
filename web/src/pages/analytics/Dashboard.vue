@@ -2,9 +2,15 @@
 import { useEventListener } from '@vueuse/core'
 import { Check, LayoutDashboard, LayoutGrid, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
+import {
+  hiddenTiles,
+  MAX_TILES,
+  switchesDashboard,
+  tileRoom,
+} from '@/components/analytics/dashboardEdit'
 import { describeQuery } from '@/components/analytics/insightDraft'
 import InsightTile from '@/components/analytics/InsightTile.vue'
 import RangeToolbar from '@/components/analytics/RangeToolbar.vue'
@@ -27,9 +33,6 @@ import {
   useInsights,
   useUpdateDashboard,
 } from '@/queries/analytics'
-
-/** Matches the API's cap on tiles per dashboard. */
-const MAX_TILES = 20
 
 interface EditTile {
   insight: Insight
@@ -95,27 +98,36 @@ function cancelEditing() {
   editing.value = false
   draft.value = []
 }
+const update = useUpdateDashboard()
+// Done sends the draft as it is when clicked; an edit made while that save
+// runs would be lost when the page leaves edit mode, so the grid locks.
+const saving = computed(() => update.isLoading.value)
+
 function moveTile(from: number, to: number) {
+  if (saving.value) return
   draft.value = moveItem(draft.value, from, to)
 }
 function setWidth(index: number, width: TileWidth) {
   const tile = draft.value[index]
-  if (tile) tile.width = width
+  if (tile && !saving.value) tile.width = width
 }
 function removeTile(index: number) {
+  if (saving.value) return
   draft.value = draft.value.filter((_, at) => at !== index)
 }
 
-const update = useUpdateDashboard()
+// Tiles whose insight the list doesn't have yet keep their place at the end
+// of a save, so a stale insights list never drops them.
+const hidden = computed(() =>
+  hiddenTiles(dashboard.value?.tiles ?? [], new Set(insightsById.value.keys())),
+)
+
 async function finishEditing() {
   if (!dirty.value) {
     cancelEditing()
     return
   }
-  const shown = new Set(saved.value.map((tile) => tile.insight.id))
-  // Tiles whose insight the list doesn't have yet keep their place at the
-  // end, so a stale insights list never drops them.
-  const hidden = (dashboard.value?.tiles ?? []).filter((tile) => !shown.has(tile.insight_id))
+  const keep = hidden.value
   const done = await runAction({
     run: () =>
       update.mutateAsync({
@@ -123,7 +135,7 @@ async function finishEditing() {
         body: {
           tiles: [
             ...draft.value.map((tile) => ({ insight_id: tile.insight.id, width: tile.width })),
-            ...hidden,
+            ...keep,
           ],
         },
       }),
@@ -146,6 +158,14 @@ onBeforeRouteLeave(async () => {
   if (!dirty.value) return true
   return (await confirmDiscard()) === true
 })
+// Another dashboard reuses this page, so its edits would carry over or drop
+// silently. A range change keeps the page and the edits.
+onBeforeRouteUpdate(async (to, from) => {
+  if (!switchesDashboard(to, from)) return true
+  if (dirty.value && (await confirmDiscard()) !== true) return false
+  cancelEditing()
+  return true
+})
 useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
   if (dirty.value) event.preventDefault()
 })
@@ -156,12 +176,14 @@ const addable = computed(() => {
   const on = new Set(draft.value.map((tile) => tile.insight.id))
   return (insights.data.value?.items ?? []).filter((insight) => !on.has(insight.id))
 })
-const room = computed(() => MAX_TILES - draft.value.length)
+const room = computed(() => tileRoom(draft.value.length, hidden.value.length))
 function openAdd() {
+  if (saving.value) return
   picked.value = []
   adding.value = true
 }
 function onAdd() {
+  if (saving.value) return
   const added = picked.value.flatMap((id) => {
     const insight = insightsById.value.get(id)
     return insight ? [{ insight, width: 6 as const }] : []
@@ -173,13 +195,18 @@ function onAdd() {
 const headerActions = computed((): DetailAction[] =>
   editing.value
     ? [
-        { label: 'Add insight', icon: Plus, run: openAdd, disabled: room.value <= 0 },
-        { label: 'Cancel', icon: X, run: cancelEditing, disabled: update.isLoading.value },
+        {
+          label: 'Add insight',
+          icon: Plus,
+          run: openAdd,
+          disabled: room.value <= 0 || saving.value,
+        },
+        { label: 'Cancel', icon: X, run: cancelEditing, disabled: saving.value },
         {
           label: 'Done',
           icon: Check,
           run: () => void finishEditing(),
-          disabled: update.isLoading.value,
+          disabled: saving.value,
           primary: true,
         },
       ]
@@ -273,7 +300,7 @@ function onDelete() {
           <LayoutGrid class="size-4" aria-hidden="true" />Edit layout
         </button>
       </EmptyState>
-      <DashboardGrid v-else :items="gridItems" :editing="editing" @move="moveTile">
+      <DashboardGrid v-else :items="gridItems" :editing="editing" :locked="saving" @move="moveTile">
         <template #tile="{ index, handle }">
           <InsightTile
             v-if="tiles[index]"
@@ -283,6 +310,7 @@ function onDelete() {
             :range="range"
             :to="`${base}/insights/${tiles[index].insight.id}`"
             :editing="editing"
+            :locked="saving"
             :handle="handle"
             @update:width="setWidth(index, $event)"
             @remove="removeTile(index)"

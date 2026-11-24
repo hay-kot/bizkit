@@ -27,9 +27,15 @@ export interface HandleBindings {
  * Dashboard tiles on a 12-column grid, one column below `lg`. A row is as
  * tall as its tallest tile and each cell stretches to it, so no height is
  * stored. While `editing`, each tile's handle reorders it by pointer drag
- * or by the arrow keys, and every move is announced.
+ * or by the arrow keys, and every move is announced. `locked` stops every
+ * move, for while the layout saves.
  */
-const props = defineProps<{ items: GridItem[]; editing: boolean }>()
+const props = withDefaults(
+  defineProps<{ items: GridItem[]; editing: boolean; locked?: boolean }>(),
+  {
+    locked: false,
+  },
+)
 const emit = defineEmits<{ move: [from: number, to: number] }>()
 defineSlots<{
   tile: (props: { item: GridItem; index: number; handle: HandleBindings }) => unknown
@@ -90,7 +96,7 @@ function announce(from: number, to: number) {
 }
 
 function move(from: number, to: number) {
-  if (to < 0 || to >= props.items.length || to === from) return
+  if (props.locked || to < 0 || to >= props.items.length || to === from) return
   const id = props.items[from]?.id
   announce(from, to)
   emit('move', from, to)
@@ -98,6 +104,11 @@ function move(from: number, to: number) {
   void nextTick(() => {
     root.value?.querySelector<HTMLElement>(`[data-grid-handle="${id}"]`)?.focus()
   })
+}
+
+function insideGrid(x: number, y: number): boolean {
+  const box = root.value?.getBoundingClientRect()
+  return !!box && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
 }
 
 function targetAt(x: number, y: number): DropTarget | undefined {
@@ -123,7 +134,7 @@ function handle(item: GridItem, index: number): HandleBindings {
     'aria-label': `Move ${item.label}`,
     'aria-describedby': hintId,
     onPointerdown(event) {
-      if (event.button !== 0) return
+      if (event.button !== 0 || props.locked) return
       event.preventDefault()
       ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
       dragFrom.value = index
@@ -131,7 +142,10 @@ function handle(item: GridItem, index: number): HandleBindings {
     },
     onPointermove(event) {
       if (dragFrom.value === undefined) return
-      target.value = targetAt(event.clientX, event.clientY) ?? target.value
+      // In a gutter the last target holds; outside the grid a drop cancels.
+      target.value = insideGrid(event.clientX, event.clientY)
+        ? (targetAt(event.clientX, event.clientY) ?? target.value)
+        : undefined
     },
     onPointerup() {
       const from = dragFrom.value
@@ -145,6 +159,7 @@ function handle(item: GridItem, index: number): HandleBindings {
         if (event.key === 'Escape') endDrag()
         return
       }
+      if (props.locked) return
       const last = props.items.length - 1
       const to: Record<string, number> = {
         ArrowLeft: index - 1,

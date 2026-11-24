@@ -19,6 +19,7 @@ const props = defineProps<{
   to: string
   editing: boolean
   handle: HandleBindings
+  locked?: boolean
 }>()
 const width = defineModel<TileWidth>('width', { required: true })
 defineEmits<{ remove: [] }>()
@@ -38,6 +39,7 @@ const result = useInsightResult(
     :to="to"
     :editing="editing"
     :handle="handle"
+    :locked="locked"
     @remove="$emit('remove')"
   >
     <InsightResultView
