@@ -211,7 +211,8 @@ async function worker() {
       failed++
       console.error(`visit failed: ${error instanceof Error ? error.message : String(error)}`)
     }
-    if (stats.visitors % 25 === 0) console.error(`${stats.visitors}/${visitors} visitors`)
+    const done = stats.visitors + failed
+    if (done % 25 === 0) console.error(`${done}/${visitors} visits`)
   }
 }
 await Promise.all(Array.from({ length: Math.min(concurrency, visitors) }, worker))

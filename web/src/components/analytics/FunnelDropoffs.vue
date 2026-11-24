@@ -3,7 +3,7 @@ import type { RouteLocationRaw } from 'vue-router'
 
 import DataTable from '@/components/ui/DataTable.vue'
 import PageSection from '@/components/ui/PageSection.vue'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import { formatDateTime, formatNumber, formatTimeAfter } from '@/lib/format'
 import type { Dropoff, DropoffPage, EventItem } from '@/queries/analytics'
 
 /**
@@ -79,7 +79,7 @@ function eventLabel(event: EventItem): string {
         <ol class="flex flex-col gap-0.5 text-sm">
           <li v-for="event in row.events" :key="event.id" class="flex gap-2">
             <span class="shrink-0 text-base-content/70 tabular-nums">{{
-              formatTime(event.ts)
+              formatTimeAfter(event.ts, row.entered_at)
             }}</span>
             <span class="truncate">{{ eventLabel(event) }}</span>
           </li>

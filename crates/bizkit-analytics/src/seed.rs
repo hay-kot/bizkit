@@ -298,7 +298,7 @@ fn return_visit(
         (1, ("invoice_paid", "/app/billing", r#"{"amount":49,"plan":"pro"}"#)),
     ];
     let mut add = |r: &mut Rng, name: &str, path: &str, props: Option<&str>| {
-        let mut event = site.event(at, name, path);
+        let mut event = site.event(UnixMillis(at.0.min(now.0)), name, path);
         event.visitor = visitor;
         event.person = format!("p:{}", person.id);
         event.anon_id = Some(person.anon_id.clone());
@@ -350,7 +350,7 @@ fn docs_visit(rng: &mut Rng, site: &Site, day: Day, now: UnixMillis) -> Vec<Even
     let mut at = arrival(rng, day, now);
     let mut out = Vec::new();
     for i in 0..=rng.below(3) {
-        let mut event = site.event(at, "pageview", rng.pick(&DOCS_PAGES));
+        let mut event = site.event(UnixMillis(at.0.min(now.0)), "pageview", rng.pick(&DOCS_PAGES));
         event.visitor = visitor;
         event.person = format!("v:{day}:{visitor}");
         event.country = country.map(str::to_owned);
@@ -455,8 +455,10 @@ async fn ensure_demo_site(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> an
     let Some(mut site) = store::find_site(&mut *tx, seed.workspace_id, project_id).await? else {
         return Ok(());
     };
-    let mut hosts: Vec<String> = serde_json::from_str(&site.hostnames).unwrap_or_default();
-    if !hosts.iter().any(|host| host == DEMO_SITE_HOST) {
+    let mut hosts: Vec<String> =
+        serde_json::from_str(&site.hostnames).context("reading the website hostnames")?;
+    // An empty list accepts every host, the demo site's too.
+    if !hosts.is_empty() && !hosts.iter().any(|host| host == DEMO_SITE_HOST) {
         hosts.push(DEMO_SITE_HOST.to_owned());
         site.hostnames = json!(hosts).to_string();
         site.updated_at = seed.now;
@@ -652,7 +654,11 @@ async fn identify(
     rng: &mut Rng,
 ) -> anyhow::Result<Option<Person>> {
     let Some((user_id, traits)) = visit.signed_up.take() else { return Ok(None) };
-    let Some(at) = visit.events.last().map(|event| event.ts) else { return Ok(None) };
+    let Some(at) =
+        visit.events.iter().find(|event| event.name == "signup_completed").map(|event| event.ts)
+    else {
+        return Ok(None);
+    };
     let id = store::upsert_person(&mut *tx, seed.workspace_id, project_id, &user_id, at).await?;
     store::set_person_traits(&mut *tx, seed.workspace_id, id, &traits.to_string()).await?;
     let anon_id = format!("anon-{:x}", rng.next());
@@ -660,9 +666,9 @@ async fn identify(
     for event in &mut visit.events {
         event.person = format!("p:{id}");
     }
-    if let Some(last) = visit.events.last_mut() {
-        last.user_id = Some(user_id.clone());
-        last.anon_id = Some(anon_id.clone());
+    if let Some(signup) = visit.events.iter_mut().find(|event| event.name == "signup_completed") {
+        signup.user_id = Some(user_id.clone());
+        signup.anon_id = Some(anon_id.clone());
     }
     Ok(Some(Person {
         id,

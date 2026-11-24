@@ -11,6 +11,14 @@ window.bizkit = window.bizkit || {
   },
 };
 
+// A walk from the landing page is a new visitor, not the last signup. This
+// runs before the deferred snippet sends the landing pageview.
+if (location.pathname === "/") {
+  try {
+    localStorage.removeItem("bizkit_aid");
+  } catch (e) {}
+}
+
 (function () {
   function form(id, next, run) {
     var el = document.getElementById(id);
@@ -24,12 +32,6 @@ window.bizkit = window.bizkit || {
 
   document.addEventListener("DOMContentLoaded", function () {
     var page = document.body.dataset.page;
-    if (page === "landing") {
-      // A walk from the landing page is a new visitor, not the last signup.
-      try {
-        localStorage.removeItem("bizkit_aid");
-      } catch (e) {}
-    }
     if (page === "signup") {
       var params = new URLSearchParams(location.search);
       var signup = document.getElementById("signup");
@@ -37,12 +39,16 @@ window.bizkit = window.bizkit || {
       var id = Math.random().toString(36).slice(2, 8);
       signup.email.value = "sam." + id + "@example.com";
       var started = false;
-      signup.addEventListener("focusin", function () {
+      function start() {
         if (started) return;
         started = true;
         bizkit.track("signup_started", { plan: signup.plan.value });
-      });
+      }
+      // Safari doesn't focus a button on click, so a submit with the
+      // prefilled fields may come with no focusin.
+      signup.addEventListener("focusin", start);
       form("signup", "/onboarding/project", function (data) {
+        start();
         var plan = data.get("plan");
         bizkit.identify("user_" + id, { email: data.get("email"), name: data.get("name"), plan: plan });
         bizkit.track("signup_completed", { plan: plan });

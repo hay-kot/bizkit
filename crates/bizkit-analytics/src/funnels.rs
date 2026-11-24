@@ -659,10 +659,14 @@ async fn dropoff_events(
               AND e.person = json_extract(k.value, '$[0]')
               AND e.ts >= json_extract(k.value, '$[1]') AND e.ts <= json_extract(k.value, '$[2]')
            ) AS w
-           LEFT JOIN analytics_people p ON p.id = substr(w.person, 3) AND substr(w.person, 1, 2) = 'p:'
+           LEFT JOIN analytics_people p
+             ON p.id = substr(w.person, 3) AND substr(w.person, 1, 2) = 'p:'
+            AND p.workspace_id = ? AND p.project_id = ?
            WHERE w.seq <= ?
            ORDER BY w.rank, w.ts, w.id"#,
         keys,
+        scope.workspace_id,
+        scope.project_id,
         scope.workspace_id,
         scope.project_id,
         DROPOFF_EVENTS,

@@ -193,7 +193,6 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "analytics", feature = "test-hooks"))]
     #[cfg(feature = "analytics")]
     #[tokio::test]
     async fn demo_site_needs_the_demo_seed() {
@@ -211,8 +210,74 @@ mod tests {
         assert_eq!(out, b"", "nothing is printed");
     }
 
+    /// Hands each write to the test while `dev` keeps running.
+    #[cfg(feature = "analytics")]
+    struct Sender(tokio::sync::mpsc::UnboundedSender<Vec<u8>>);
+
+    #[cfg(feature = "analytics")]
+    impl Write for Sender {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.send(buf.to_vec()).map_err(std::io::Error::other)?;
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "analytics")]
+    #[tokio::test]
+    async fn demo_site_serves_pages_with_the_snippet() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let seed = Args { command: DevCommand::SeedDemo, data_dir: Some(data_dir.clone()) };
+        dev(&seed, &Context::default(), &mut Vec::new()).await.unwrap();
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let args = Args {
+            command: DevCommand::DemoSite {
+                listen: "127.0.0.1:0".parse().unwrap(),
+                snippet_base: Url::parse("http://localhost:5173").unwrap(),
+            },
+            data_dir: Some(data_dir),
+        };
+        let server = tokio::spawn(async move {
+            dev(&args, &Context::default(), &mut Sender(tx)).await.unwrap();
+        });
+        let mut line = Vec::new();
+        while !line.ends_with(b"\n") {
+            line.extend(rx.recv().await.unwrap());
+        }
+        let line = String::from_utf8(line).unwrap();
+        let addr = line
+            .strip_prefix("serving the demo site on http://")
+            .and_then(|rest| rest.strip_suffix('\n'))
+            .unwrap_or_else(|| panic!("output: {line:?}"))
+            .to_owned();
+        let page = tokio::task::spawn_blocking(move || {
+            use std::io::Read as _;
+            let mut stream = std::net::TcpStream::connect(addr).unwrap();
+            stream
+                .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            let mut page = String::new();
+            stream.read_to_string(&mut page).unwrap();
+            page
+        })
+        .await
+        .unwrap();
+        server.abort();
+        assert!(page.starts_with("HTTP/1.1 200"), "{page}");
+        assert!(
+            page.contains(r#"<script defer src="http://localhost:5173/m/analytics/public/s/"#),
+            "{page}"
+        );
+    }
+
     /// The website site takes the demo site's host and key, and its file
     /// has onboarding events, none in the future.
+    #[cfg(feature = "analytics")]
     async fn demo_site_is_ready(data_dir: &std::path::Path) {
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
         let (project, hostnames): (bizkit_core::ids::ProjectId, String) = sqlx::query_as(
@@ -238,6 +303,7 @@ mod tests {
         assert!(latest <= now, "no event after the seed ran: {latest} > {now}");
     }
 
+    #[cfg(feature = "analytics")]
     #[tokio::test]
     async fn seed_demo_fills_analytics_once() {
         let dir = tempfile::tempdir().unwrap();

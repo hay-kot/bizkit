@@ -65,9 +65,22 @@ export function formatDateTime(value: string | null | undefined, fallback = '—
   return value ? dateTimeFormat.format(new Date(value)) : fallback
 }
 
-/** `8:04 PM`, for times listed under a date shown nearby. */
-export function formatTime(value: string): string {
-  return timeFormat.format(new Date(value))
+const dayTimeFormat = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+/**
+ * `8:04 PM` when `value` is on the same local day as `start`, else
+ * `Nov 25, 8:04 PM`, for a list of times that follow `start`.
+ */
+export function formatTimeAfter(value: string, start: string): string {
+  const at = new Date(value)
+  return at.toDateString() === new Date(start).toDateString()
+    ? timeFormat.format(at)
+    : dayTimeFormat.format(at)
 }
 
 /**
