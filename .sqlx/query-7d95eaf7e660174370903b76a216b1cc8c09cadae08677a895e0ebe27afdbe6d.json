@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT length(bytes) AS \"len!: i64\" FROM signing_files\n           WHERE workspace_id = ? AND request_id = ? AND kind = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "len!: i64",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7d95eaf7e660174370903b76a216b1cc8c09cadae08677a895e0ebe27afdbe6d"
+}

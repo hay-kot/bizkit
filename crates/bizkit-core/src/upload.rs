@@ -23,16 +23,20 @@ pub async fn read_file(mut field: Field<'_>) -> Result<Bytes, ApiError> {
     let mut file = BytesMut::new();
     while let Some(chunk) = field.chunk().await.map_err(|err| multipart_error(&err))? {
         if file.len() + chunk.len() > MAX_UPLOAD_BYTES {
-            return Err(ApiError::PayloadTooLarge(MAX_UPLOAD_BYTES));
+            return Err(too_large());
         }
         file.extend_from_slice(&chunk);
     }
     Ok(file.freeze())
 }
 
+fn too_large() -> ApiError {
+    ApiError::PayloadTooLarge(format!("too large: at most {MAX_UPLOAD_BYTES} bytes"))
+}
+
 fn multipart_error(err: &MultipartError) -> ApiError {
     if err.status() == StatusCode::PAYLOAD_TOO_LARGE {
-        ApiError::PayloadTooLarge(MAX_UPLOAD_BYTES)
+        too_large()
     } else {
         ApiError::BadRequest(err.body_text())
     }

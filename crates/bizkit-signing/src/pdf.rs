@@ -13,32 +13,96 @@ use crate::signature::{PAD_HEIGHT, PAD_WIDTH, Signature};
 /// The time on an upload's dry-run seal; any time works.
 const DRY_RUN_AT: UnixMillis = UnixMillis(1_795_000_000_000);
 
-/// How long parsing an upload may take. Parsing runs off the async
-/// runtime; a hostile file that takes longer is refused.
-const PARSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// The most pages a request's PDF may have.
+pub(crate) const MAX_PAGES: usize = 500;
 
-/// Uploads parse one at a time: a small file can inflate a lot.
-static PARSING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+const TOO_SLOW: &str = "took too long to check; try a smaller file";
 
-/// Checks that `bytes` is a PDF bizkit can add pages to and seal. The error is a
-/// message for the `pdf_base64` field.
-pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
+/// Which queue a parse waits in and how long it may take, waiting included.
+/// Parses run one at a time per class, because a small file can inflate a
+/// lot; large uploads have their own class so a slow one never holds up
+/// `pdf_base64` creates or page counts.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ParseClass {
+    /// `pdf_base64` (at most 700 KiB) and page counts of stored files: 5 s.
+    Small,
+    /// Multipart uploads (at most 25 MiB): 20 s.
+    Large,
+}
+
+static SMALL_PARSES: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+static LARGE_PARSES: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+
+impl ParseClass {
+    const fn timeout(self) -> Duration {
+        match self {
+            Self::Small => Duration::from_secs(5),
+            Self::Large => Duration::from_secs(20),
+        }
+    }
+
+    const fn permits(self) -> &'static tokio::sync::Semaphore {
+        match self {
+            Self::Small => &SMALL_PARSES,
+            Self::Large => &LARGE_PARSES,
+        }
+    }
+}
+
+/// Runs `parse` off the async runtime in `class`'s queue. Waiting for the
+/// permit counts toward the timeout. The permit moves into the parse, so a
+/// parse that outlives the timeout still holds it until it ends, and the
+/// next file in that class waits rather than piling up threads.
+async fn parse_in<T: Send + 'static>(
+    class: ParseClass,
+    parse: impl FnOnce() -> Result<T, &'static str> + Send + 'static,
+) -> Result<T, &'static str> {
+    parse_within(class.permits(), class.timeout(), parse).await
+}
+
+async fn parse_within<T: Send + 'static>(
+    permits: &'static tokio::sync::Semaphore,
+    timeout: Duration,
+    parse: impl FnOnce() -> Result<T, &'static str> + Send + 'static,
+) -> Result<T, &'static str> {
+    let run = async {
+        let Ok(permit) = permits.acquire().await else {
+            return Err("must be a PDF that opens");
+        };
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            parse()
+        })
+        .await
+        .unwrap_or(Err("must be a PDF that opens"))
+    };
+    tokio::time::timeout(timeout, run).await.unwrap_or(Err(TOO_SLOW))
+}
+
+fn load(bytes: &[u8]) -> Result<Document, &'static str> {
+    let doc = Document::load_mem(bytes).map_err(|_| "must be a PDF that opens")?;
+    // lopdf decrypts files with an empty password as it loads them, and
+    // the copy it saves would drop the protection.
+    if doc.is_encrypted() || doc.encryption_state.is_some() {
+        return Err("must not be encrypted or password-protected");
+    }
+    Ok(doc)
+}
+
+/// Checks that `bytes` is a PDF bizkit can add pages to and seal, and
+/// returns its page count. The error is a message for the file's field.
+pub(crate) async fn check(bytes: Vec<u8>, class: ParseClass) -> Result<u32, &'static str> {
     if !bytes.starts_with(b"%PDF-") {
         return Err("must be a PDF");
     }
-    // The permit moves into the parse, so a parse that outlives the timeout
-    // still holds it until it ends.
-    let Ok(permit) = PARSING.acquire().await else { return Err("must be a PDF that opens") };
-    let parsed = tokio::task::spawn_blocking(move || {
-        let _permit = permit;
-        let doc = Document::load_mem(&bytes).map_err(|_| "must be a PDF that opens")?;
-        // lopdf decrypts files with an empty password as it loads them, and
-        // the copy it saves would drop the protection.
-        if doc.is_encrypted() || doc.encryption_state.is_some() {
-            return Err("must not be encrypted or password-protected");
-        }
-        if doc.get_pages().is_empty() {
+    parse_in(class, move || {
+        let doc = load(&bytes)?;
+        let pages = doc.get_pages().len();
+        if pages == 0 {
             return Err("must have at least one page");
+        }
+        if pages > MAX_PAGES {
+            return Err("must have at most 500 pages");
         }
         // Seal a copy with a throwaway key now, so a file that can't take the
         // added pages or the seal is refused here instead of after everyone signed.
@@ -48,12 +112,20 @@ pub(crate) async fn check(bytes: Vec<u8>) -> Result<(), &'static str> {
             tracing::info!(error = format!("{err:#}"), "an upload can't be sealed");
             return Err("must be a PDF bizkit can add pages to and seal");
         }
-        Ok(())
-    });
-    match tokio::time::timeout(PARSE_TIMEOUT, parsed).await {
-        Ok(Ok(result)) => result,
-        Ok(Err(_)) | Err(_) => Err("must be a PDF that opens"),
-    }
+        u32::try_from(pages).map_err(|_| "must have at most 500 pages")
+    })
+    .await
+}
+
+/// The page count of a stored PDF that passed [`check`] when it was
+/// uploaded, for requests from before page counts were stored. It only
+/// loads the file: no page cap and no dry-run seal.
+pub(crate) async fn page_count(bytes: Vec<u8>) -> Result<u32, &'static str> {
+    parse_in(ParseClass::Small, move || {
+        let pages = load(&bytes)?.get_pages().len();
+        u32::try_from(pages).map_err(|_| "has too many pages")
+    })
+    .await
 }
 
 /// The sealed PDF's file name: `contract.pdf` becomes `contract-signed.pdf`.
@@ -524,16 +596,47 @@ mod tests {
 
     #[tokio::test]
     async fn uploads_that_cant_be_sealed_are_refused() {
-        check(crate::testing::sample_pdf(&["One"])).await.unwrap();
+        assert_eq!(
+            check(crate::testing::sample_pdf(&["One", "Two"]), ParseClass::Small).await,
+            Ok(2)
+        );
         let direct_tree = edited(|doc, pages_id| {
             let tree = doc.get_dictionary(pages_id).unwrap().clone();
             doc.catalog_mut().unwrap().set("Pages", tree);
         });
-        assert_eq!(check(direct_tree).await, Err("must have at least one page"));
+        assert_eq!(check(direct_tree, ParseClass::Small).await, Err("must have at least one page"));
         let no_kids = edited(|doc, pages_id| {
             doc.get_dictionary_mut(pages_id).unwrap().set("Kids", 7);
         });
-        assert!(check(no_kids).await.is_err());
+        assert!(check(no_kids, ParseClass::Small).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn page_counts_skip_the_upload_checks() {
+        let pages = vec!["x"; MAX_PAGES + 1];
+        assert_eq!(page_count(crate::testing::sample_pdf(&pages)).await, Ok(501));
+        assert_eq!(page_count(b"%PDF-1.7 garbage".to_vec()).await, Err("must be a PDF that opens"));
+    }
+
+    #[tokio::test]
+    async fn a_parse_that_waits_past_its_budget_times_out() {
+        let held = ParseClass::Large.permits().acquire().await.unwrap();
+        let waited =
+            parse_within(ParseClass::Large.permits(), Duration::from_millis(50), || Ok(())).await;
+        assert_eq!(waited, Err(TOO_SLOW));
+        assert_eq!(
+            check(crate::testing::sample_pdf(&["x"]), ParseClass::Small).await,
+            Ok(1),
+            "small files have their own queue"
+        );
+        drop(held);
+    }
+
+    #[tokio::test]
+    async fn uploads_have_at_most_500_pages() {
+        let pages = vec!["x"; MAX_PAGES + 1];
+        let refused = check(crate::testing::sample_pdf(&pages), ParseClass::Small).await;
+        assert_eq!(refused, Err("must have at most 500 pages"));
     }
 
     #[test]

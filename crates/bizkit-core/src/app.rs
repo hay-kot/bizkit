@@ -40,8 +40,9 @@ use crate::time::UnixMillis;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// Long enough for a full-size file over a 1 Mbit/s uplink (about 210 s).
 const UPLOAD_TIMEOUT: Duration = Duration::from_secs(300);
-/// Room for the multipart framing around a file of `MAX_UPLOAD_BYTES`.
-const UPLOAD_BODY_BYTES: usize = MAX_UPLOAD_BYTES + 64 * 1024;
+/// Room for a file of `MAX_UPLOAD_BYTES`, the multipart framing and small
+/// parts beside it, such as a JSON part of up to 64 KiB.
+const UPLOAD_BODY_BYTES: usize = MAX_UPLOAD_BYTES + 128 * 1024;
 
 /// Shared platform state. Cheap to clone; modules capture clones.
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, name, email, status,\n                  signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers WHERE workspace_id = ? AND request_id = ? ORDER BY position",
+  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, signing_order, name,\n                  email, status, signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers\n           WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending' AND token_hash IS NULL\n             AND signing_order = (SELECT min(signing_order) FROM signing_signers\n                                  WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending')\n           ORDER BY position",
   "describe": {
     "columns": [
       {
@@ -48,8 +48,19 @@
         }
       },
       {
-        "name": "name",
+        "name": "signing_order",
         "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "signing_order"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -60,7 +71,7 @@
       },
       {
         "name": "email",
-        "ordinal": 5,
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +82,7 @@
       },
       {
         "name": "status",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "signature",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "signed_at: UnixMillis",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -114,9 +125,10 @@
       false,
       false,
       false,
+      false,
       true,
       true
     ]
   },
-  "hash": "83de10a9b273ea809f6fd055b11a36967694320153eab2bd9b46e06c29e8bef1"
+  "hash": "f4d4774b0434f42c35cdb13a17e95043c5aa089d1136e39689120ab7d8e4b097"
 }

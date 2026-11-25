@@ -5,6 +5,7 @@ use bizkit_core::time::UnixMillis;
 use sqlx::SqliteExecutor;
 
 use crate::api::{DocumentVersion, EventKind, RequestStatus, SignerId, SigningRequestId};
+use crate::fields::FieldId;
 
 /// A `signing_requests` row.
 #[derive(Debug, Clone)]
@@ -26,6 +27,7 @@ pub(crate) struct RequestRow {
     pub(crate) sent_at: Option<UnixMillis>,
     pub(crate) completed_at: Option<UnixMillis>,
     pub(crate) voided_at: Option<UnixMillis>,
+    pub(crate) page_count: Option<i64>,
 }
 
 /// A `signing_signers` row.
@@ -35,11 +37,32 @@ pub(crate) struct SignerRow {
     pub(crate) workspace_id: WorkspaceId,
     pub(crate) request_id: SigningRequestId,
     pub(crate) position: i64,
+    pub(crate) signing_order: i64,
     pub(crate) name: String,
     pub(crate) email: String,
     pub(crate) status: String,
     pub(crate) signature: Option<String>,
     pub(crate) signed_at: Option<UnixMillis>,
+}
+
+/// A `signing_fields` row.
+#[derive(Debug, Clone)]
+pub(crate) struct FieldRow {
+    pub(crate) id: FieldId,
+    pub(crate) workspace_id: WorkspaceId,
+    pub(crate) request_id: SigningRequestId,
+    pub(crate) signer_id: SignerId,
+    pub(crate) position: i64,
+    pub(crate) kind: String,
+    pub(crate) page: i64,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) required: bool,
+    pub(crate) label: String,
+    pub(crate) value: Option<String>,
+    pub(crate) filled_at: Option<UnixMillis>,
 }
 
 /// A `signing_events` row.
@@ -89,8 +112,8 @@ pub(crate) async fn insert_request(
     sqlx::query!(
         "INSERT INTO signing_requests (id, workspace_id, project_id, title, message, status, file_name,
              original_sha256, signed_sha256, created_by, sender, failure, created_at, updated_at, sent_at,
-             completed_at, voided_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             completed_at, voided_at, page_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.project_id,
@@ -108,6 +131,7 @@ pub(crate) async fn insert_request(
         row.sent_at,
         row.completed_at,
         row.voided_at,
+        row.page_count,
     )
     .execute(exec)
     .await?;
@@ -126,7 +150,7 @@ pub(crate) async fn find_request(
                   original_sha256, signed_sha256, created_by AS "created_by: UserId", sender, failure,
                   created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis",
                   sent_at AS "sent_at: UnixMillis", completed_at AS "completed_at: UnixMillis",
-                  voided_at AS "voided_at: UnixMillis"
+                  voided_at AS "voided_at: UnixMillis", page_count
            FROM signing_requests WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
         id,
@@ -147,7 +171,7 @@ pub(crate) async fn list_requests(
                   original_sha256, signed_sha256, created_by AS "created_by: UserId", sender, failure,
                   created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis",
                   sent_at AS "sent_at: UnixMillis", completed_at AS "completed_at: UnixMillis",
-                  voided_at AS "voided_at: UnixMillis"
+                  voided_at AS "voided_at: UnixMillis", page_count
            FROM signing_requests WHERE workspace_id = ? AND project_id = ?
            ORDER BY created_at DESC, id DESC LIMIT 200"#,
         workspace_id,
@@ -158,7 +182,9 @@ pub(crate) async fn list_requests(
 }
 
 /// Moves a request from one of `from` to `to`, stamping the matching time.
-/// False when it wasn't in one of `from`.
+/// False when it wasn't in one of `from`. `sent_at` keeps the first send,
+/// so a retry (failed to sent) doesn't count the request toward the hourly
+/// mail cap again.
 pub(crate) async fn set_status(
     exec: impl SqliteExecutor<'_>,
     row: &RequestRow,
@@ -176,7 +202,7 @@ pub(crate) async fn set_status(
     let voided = (to == RequestStatus::Voided).then_some(now);
     let result = sqlx::query!(
         "UPDATE signing_requests
-         SET status = ?, updated_at = ?, failure = NULL, sent_at = coalesce(?, sent_at),
+         SET status = ?, updated_at = ?, failure = NULL, sent_at = coalesce(sent_at, ?),
              completed_at = coalesce(?, completed_at), voided_at = coalesce(?, voided_at)
          WHERE workspace_id = ? AND id = ? AND status = ?",
         to_text,
@@ -223,6 +249,24 @@ pub(crate) async fn delete_request(
     Ok(())
 }
 
+/// Fills in the page count of a request from before fields existed.
+pub(crate) async fn set_page_count(
+    exec: impl SqliteExecutor<'_>,
+    row: &RequestRow,
+    page_count: i64,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE signing_requests SET page_count = coalesce(page_count, ?)
+         WHERE workspace_id = ? AND id = ?",
+        page_count,
+        row.workspace_id,
+        row.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
 pub(crate) async fn put_file(
     exec: impl SqliteExecutor<'_>,
     row: &RequestRow,
@@ -259,17 +303,37 @@ pub(crate) async fn get_file(
     .await
 }
 
+/// The length of a stored file in bytes, without reading it.
+pub(crate) async fn file_len(
+    exec: impl SqliteExecutor<'_>,
+    row: &RequestRow,
+    version: DocumentVersion,
+) -> sqlx::Result<Option<i64>> {
+    let kind = version.as_str();
+    sqlx::query_scalar!(
+        r#"SELECT length(bytes) AS "len!: i64" FROM signing_files
+           WHERE workspace_id = ? AND request_id = ? AND kind = ?"#,
+        row.workspace_id,
+        row.id,
+        kind,
+    )
+    .fetch_optional(exec)
+    .await
+}
+
 pub(crate) async fn insert_signer(
     exec: impl SqliteExecutor<'_>,
     row: &SignerRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "INSERT INTO signing_signers (id, workspace_id, request_id, position, name, email, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO signing_signers (id, workspace_id, request_id, position, signing_order, name, email,
+             status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         row.id,
         row.workspace_id,
         row.request_id,
         row.position,
+        row.signing_order,
         row.name,
         row.email,
         row.status,
@@ -287,11 +351,152 @@ pub(crate) async fn signers(
     sqlx::query_as!(
         SignerRow,
         r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
-                  request_id AS "request_id: SigningRequestId", position, name, email, status,
+                  request_id AS "request_id: SigningRequestId", position, signing_order, name,
+                  email, status,
                   signature, signed_at AS "signed_at: UnixMillis"
            FROM signing_signers WHERE workspace_id = ? AND request_id = ? ORDER BY position"#,
         workspace_id,
         request_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// Changes a draft signer's details and place. Their fields stay.
+pub(crate) async fn update_signer(
+    exec: impl SqliteExecutor<'_>,
+    row: &SignerRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE signing_signers SET position = ?, signing_order = ?, name = ?, email = ?
+         WHERE workspace_id = ? AND id = ?",
+        row.position,
+        row.signing_order,
+        row.name,
+        row.email,
+        row.workspace_id,
+        row.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Removes a signer; their fields go with them.
+pub(crate) async fn delete_signer(
+    exec: impl SqliteExecutor<'_>,
+    row: &SignerRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM signing_signers WHERE workspace_id = ? AND id = ?",
+        row.workspace_id,
+        row.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+/// Pending signers of the lowest pending `signing_order` that have no sign
+/// token yet: the group to mail next. Empty while that group still has
+/// someone to sign, or once nobody is pending.
+pub(crate) async fn next_group(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    request_id: SigningRequestId,
+) -> sqlx::Result<Vec<SignerRow>> {
+    sqlx::query_as!(
+        SignerRow,
+        r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
+                  request_id AS "request_id: SigningRequestId", position, signing_order, name,
+                  email, status, signature, signed_at AS "signed_at: UnixMillis"
+           FROM signing_signers
+           WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending' AND token_hash IS NULL
+             AND signing_order = (SELECT min(signing_order) FROM signing_signers
+                                  WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending')
+           ORDER BY position"#,
+        workspace_id,
+        request_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+pub(crate) async fn insert_field(
+    exec: impl SqliteExecutor<'_>,
+    row: &FieldRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO signing_fields (id, workspace_id, request_id, signer_id, position, kind, page, x, y,
+             width, height, required, label, value, filled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        row.id,
+        row.workspace_id,
+        row.request_id,
+        row.signer_id,
+        row.position,
+        row.kind,
+        row.page,
+        row.x,
+        row.y,
+        row.width,
+        row.height,
+        row.required,
+        row.label,
+        row.value,
+        row.filled_at,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn delete_fields(
+    exec: impl SqliteExecutor<'_>,
+    row: &RequestRow,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "DELETE FROM signing_fields WHERE workspace_id = ? AND request_id = ?",
+        row.workspace_id,
+        row.id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn fields(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    request_id: SigningRequestId,
+) -> sqlx::Result<Vec<FieldRow>> {
+    sqlx::query_as!(
+        FieldRow,
+        r#"SELECT id AS "id: FieldId", workspace_id AS "workspace_id: WorkspaceId",
+                  request_id AS "request_id: SigningRequestId", signer_id AS "signer_id: SignerId",
+                  position, kind, page, x, y, width, height, required AS "required: bool", label, value,
+                  filled_at AS "filled_at: UnixMillis"
+           FROM signing_fields WHERE workspace_id = ? AND request_id = ? ORDER BY position"#,
+        workspace_id,
+        request_id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// Signers of the request with no signature field, by name.
+pub(crate) async fn signers_without_signature_field(
+    exec: impl SqliteExecutor<'_>,
+    row: &RequestRow,
+) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar!(
+        r#"SELECT s.name FROM signing_signers s
+           WHERE s.workspace_id = ?1 AND s.request_id = ?2
+             AND NOT EXISTS (SELECT 1 FROM signing_fields f
+                             WHERE f.workspace_id = ?1 AND f.signer_id = s.id AND f.kind = 'signature')
+           ORDER BY s.position"#,
+        row.workspace_id,
+        row.id,
     )
     .fetch_all(exec)
     .await
@@ -395,7 +600,8 @@ pub(crate) async fn signer_by_token(
     sqlx::query_as!(
         SignerRow,
         r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
-                  request_id AS "request_id: SigningRequestId", position, name, email, status,
+                  request_id AS "request_id: SigningRequestId", position, signing_order, name,
+                  email, status,
                   signature, signed_at AS "signed_at: UnixMillis"
            FROM signing_signers WHERE token_hash = ?1 OR download_token_hash = ?1"#,
         token_hash,
@@ -452,15 +658,18 @@ pub(crate) async fn pending_signers(
     .await
 }
 
-/// Signer mails a workspace queued since `since`, for the hourly cap.
-pub(crate) async fn mails_since(
+/// Signers of the workspace's requests first sent since `since`, for the
+/// hourly cap. A request counts all its signers at its first send, whatever
+/// their group.
+pub(crate) async fn signers_sent_since(
     exec: impl SqliteExecutor<'_>,
     workspace_id: WorkspaceId,
     since: UnixMillis,
 ) -> sqlx::Result<i64> {
     sqlx::query_scalar!(
-        r#"SELECT COUNT(*) AS "n!: i64" FROM signing_events
-           WHERE workspace_id = ? AND kind = 'sent' AND signer_id IS NOT NULL AND at >= ?"#,
+        r#"SELECT COUNT(*) AS "n!: i64" FROM signing_signers s
+           JOIN signing_requests r ON r.id = s.request_id
+           WHERE r.workspace_id = ?1 AND s.workspace_id = ?1 AND r.sent_at >= ?2"#,
         workspace_id,
         since,
     )

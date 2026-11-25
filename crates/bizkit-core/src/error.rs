@@ -31,9 +31,10 @@ pub enum ApiError {
     /// The input failed deserialization or validation.
     #[error("invalid input")]
     Validation(FieldErrors),
-    /// The body or an uploaded file is over the limit, in bytes.
-    #[error("too large: at most {0} bytes")]
-    PayloadTooLarge(usize),
+    /// The body, an uploaded file or a requested file is over a limit; the
+    /// message says which and what to do instead.
+    #[error("{0}")]
+    PayloadTooLarge(String),
     /// Too many requests; retry later.
     #[error("rate limited")]
     RateLimited {

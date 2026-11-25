@@ -1,6 +1,7 @@
 //! Demo requests for the dev stack's website project: a draft, and a sent
-//! request one of two signers has signed. A seed can't run the seal job, so
-//! nothing is completed.
+//! request whose first signing-order group has signed. Each signer has a
+//! signature and a date field on the last page, in groups 1 and 2. A seed
+//! can't run the seal job, so nothing is completed.
 
 use anyhow::Context as _;
 use bizkit_core::DemoSeed;
@@ -8,15 +9,17 @@ use bizkit_core::auth::{hash_token, random_token};
 use bizkit_core::db::Db;
 
 use crate::api::{DocumentVersion, EventKind, RequestStatus, SignerId, SigningRequestId};
+use crate::fields::{FieldId, FieldKind, FieldValue};
 use crate::ops::sha256_hex;
 use crate::signature::Signature;
-use crate::store::{self, NewEvent, RequestRow, SignerRow};
+use crate::store::{self, FieldRow, NewEvent, RequestRow, SignerRow};
 use crate::testing::sample_pdf;
 
 struct Demo {
     title: &'static str,
     file_name: &'static str,
     status: RequestStatus,
+    /// Name, email and, for a signer who signed, their typed signature.
     signers: [(&'static str, &'static str, Option<&'static str>); 2],
 }
 
@@ -38,11 +41,54 @@ const DEMOS: [Demo; 2] = [
     },
 ];
 
+const PAGES: i64 = 2;
+
+/// A signature and a date field on the last page, side by side per signer,
+/// filled at `filled` (time and date) when the signer signed.
+async fn insert_fields(
+    tx: &mut bizkit_core::db::WriteTx,
+    signer: &SignerRow,
+    filled: Option<(bizkit_core::time::UnixMillis, &str)>,
+) -> anyhow::Result<()> {
+    let column = if signer.position == 0 { 0.08 } else { 0.54 };
+    let fields = [
+        (FieldKind::Signature, 0.7, 0.08, filled.map(|_| FieldValue::Signed)),
+        (
+            FieldKind::Date,
+            0.8,
+            0.04,
+            filled.map(|(_, date)| FieldValue::Date { date: date.to_owned() }),
+        ),
+    ];
+    for ((kind, y, height, value), at) in fields.into_iter().zip(0_i64..) {
+        let field = FieldRow {
+            id: FieldId::new(),
+            workspace_id: signer.workspace_id,
+            request_id: signer.request_id,
+            signer_id: signer.id,
+            position: signer.position * 2 + at,
+            kind: kind.as_str().to_owned(),
+            page: PAGES,
+            x: column,
+            y,
+            width: 0.38,
+            height,
+            required: true,
+            label: String::new(),
+            value: value.map(|value| serde_json::to_string(&value)).transpose()?,
+            filled_at: filled.map(|(time, _)| time),
+        };
+        store::insert_field(&mut **tx, &field).await.context("seeding a signing field")?;
+    }
+    Ok(())
+}
+
 pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     if !store::list_requests(db.read(), seed.workspace_id, project_id).await?.is_empty() {
         return Ok(());
     }
+    let today: String = seed.now.to_rfc3339()?.chars().take(10).collect();
     let mut tx = db.write().await?;
     for demo in DEMOS {
         let pdf = sample_pdf(&[demo.title, "Terms and conditions"]);
@@ -65,6 +111,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             sent_at: sent.then_some(seed.now),
             completed_at: None,
             voided_at: None,
+            page_count: Some(PAGES),
         };
         store::insert_request(&mut *tx, &row).await.context("seeding a signing request")?;
         store::put_file(&mut *tx, &row, DocumentVersion::Original, &pdf).await?;
@@ -75,6 +122,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
                 workspace_id: row.workspace_id,
                 request_id: row.id,
                 position,
+                signing_order: position + 1,
                 name: name.to_owned(),
                 email: email.to_owned(),
                 status: "pending".to_owned(),
@@ -82,7 +130,12 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
                 signed_at: None,
             };
             store::insert_signer(&mut *tx, &signer).await?;
-            if !sent {
+            let filled = signed.map(|_| (seed.now, today.as_str()));
+            insert_fields(&mut tx, &signer, filled).await?;
+            // The second group's link goes out once the first group signed,
+            // as record_signature does.
+            let mailed = position == 0 || demo.signers[0].2.is_some();
+            if !sent || !mailed {
                 continue;
             }
             store::set_token(&mut *tx, &signer, &hash_token(&random_token())).await?;

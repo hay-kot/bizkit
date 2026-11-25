@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO signing_fields (id, workspace_id, request_id, signer_id, position, kind, page, x, y,\n             width, height, required, label, value, filled_at)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 15
+    },
+    "nullable": []
+  },
+  "hash": "32a408e850890db8add3413e116b1b7bdbad3e6301445213901b0195d8f2a68b"
+}

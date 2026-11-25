@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE signing_requests\n         SET status = ?, updated_at = ?, failure = NULL, sent_at = coalesce(sent_at, ?),\n             completed_at = coalesce(?, completed_at), voided_at = coalesce(?, voided_at)\n         WHERE workspace_id = ? AND id = ? AND status = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "1d3f23cafcbbb484d1afd1db3b8c2affe30118f7f4a983b60ad46e39af4f38ef"
+}

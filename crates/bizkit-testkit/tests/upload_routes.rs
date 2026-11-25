@@ -150,7 +150,7 @@ mod upload_routes {
                 .await;
         assert_eq!(op, StatusCode::PAYLOAD_TOO_LARGE, "ops keep 1 MiB");
 
-        let too_big = MAX_UPLOAD_BYTES + 64 * 1024;
+        let too_big = MAX_UPLOAD_BYTES + 128 * 1024;
         let (streamed, _) = send(&session, &ws, too_big).await;
         assert_eq!(streamed, StatusCode::PAYLOAD_TOO_LARGE, "over the upload limit, streamed");
         let path = format!("/m/probe/upload/workspaces/{ws}/files");

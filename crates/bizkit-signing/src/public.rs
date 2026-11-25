@@ -379,8 +379,9 @@ struct Client {
     user_agent: Option<String>,
 }
 
-/// Stores the signature and its audit row, and queues the seal after the
-/// last one, in one transaction. False when the request or signer changed
+/// Stores the signature and its audit row, then mails the next
+/// signing-order group once this one is done, or queues the seal after the
+/// last signature, in one transaction. False when the request or signer changed
 /// since the page loaded (voided, or signed in another tab).
 async fn record_signature(
     platform: &Platform,
@@ -410,6 +411,8 @@ async fn record_signature(
         ..NewEvent::of(&link.request, EventKind::Signed, now)
     };
     store::insert_event(&mut *tx, event).await?;
+    let group = store::next_group(&mut *tx, link.request.workspace_id, link.request.id).await?;
+    crate::ops::mail_group(platform, &mut tx, &link.request, &group, now).await?;
     let pending = store::pending_signers(&mut *tx, &link.request).await?;
     if pending == 0 {
         let job = Complete { workspace_id: link.request.workspace_id, request_id: link.request.id };
@@ -419,7 +422,7 @@ async fn record_signature(
     Ok(true)
 }
 
-fn pdf_response(bytes: Vec<u8>, disposition: &str) -> Response {
+pub(crate) fn pdf_response(bytes: Vec<u8>, disposition: &str) -> Response {
     let mut response = (StatusCode::OK, bytes).into_response();
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/pdf"));
@@ -432,7 +435,7 @@ fn pdf_response(bytes: Vec<u8>, disposition: &str) -> Response {
 }
 
 /// An ASCII file name for `Content-Disposition`.
-fn disposition_name(name: &str) -> String {
+pub(crate) fn disposition_name(name: &str) -> String {
     let clean: String = name
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') { c } else { '_' })

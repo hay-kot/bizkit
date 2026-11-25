@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE signing_requests SET page_count = coalesce(page_count, ?)\n         WHERE workspace_id = ? AND id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b31e54a92718c361cee57f77c500e736ca81594c653cb346877d1413b304f226"
+}
