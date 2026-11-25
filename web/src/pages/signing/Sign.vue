@@ -19,7 +19,7 @@ import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { errorCode } from '@/lib/errors'
 import {
   documentUrl,
-  isSealing,
+  isSignerSealing,
   MAX_TEXT,
   signedPdfUrl,
   useRecordView,
@@ -258,13 +258,13 @@ const refreshing = computed(() => sign.data.value !== undefined && !signed.value
           >
         </template>
         <p
-          v-else-if="refreshing || (isSealing(session) && !pollGaveUp)"
+          v-else-if="refreshing || (isSignerSealing(session) && !pollGaveUp)"
           class="flex items-center gap-2 text-sm text-base-content/80"
         >
           <Spinner label="Waiting for the sealed PDF" />
           Sealing the document. The download appears here in a moment.
         </p>
-        <p v-else-if="isSealing(session)" class="text-sm text-base-content/80">
+        <p v-else-if="isSignerSealing(session)" class="text-sm text-base-content/80">
           Sealing is taking longer than usual. Reload this page later; the link keeps working.
         </p>
         <p
