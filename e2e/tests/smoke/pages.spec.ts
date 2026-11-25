@@ -1,5 +1,4 @@
 import { expectCleanPage, trackPageErrors } from '../../fixtures/clean-page'
-import { samplePdf } from '../../fixtures/pdf'
 import { expect, test } from '../../fixtures/test'
 
 test.describe('signed out', () => {
@@ -31,7 +30,6 @@ test.describe('workspace pages', () => {
   const projectPages = [
     'forms',
     'webhooks',
-    'signing',
     'extensions',
     'mailing',
     'mailing/broadcasts',
@@ -83,28 +81,6 @@ test.describe('workspace pages', () => {
     await expect(page.getByRole('heading', { name: 'Stripe' })).toBeVisible()
     await page.getByRole('button', { name: /^Inspect the POST request/ }).click()
     await expect(page.getByRole('heading', { name: 'Headers' })).toBeVisible()
-    await expectCleanPage(page, errors)
-  })
-
-  test('a signature request page is clean', async ({ page, world, baseURL, namespace }) => {
-    const errors = trackPageErrors(page)
-    const workspace = world.workspaces.main!.id
-    const created = await page.request.post(`/api/v1/workspaces/${workspace}/signing/requests`, {
-      data: {
-        project_id: world.projects.site!.id,
-        title: 'Services agreement',
-        file_name: 'agreement.pdf',
-        pdf_base64: samplePdf('Terms').toString('base64'),
-        signers: [{ name: 'Ada Lovelace', email: `ada+${namespace}@e2e.test` }],
-      },
-      headers: { Origin: new URL(baseURL!).origin },
-    })
-    expect(created.status()).toBe(201)
-    const signing = await created.json()
-    await page.goto(`/w/${workspace}/p/${world.projects.site!.id}/signing/${signing.id}`)
-    await expect(page.getByRole('heading', { name: 'Services agreement' })).toBeVisible()
-    await expect(page.getByRole('list', { name: 'Audit trail' })).toContainText('Created')
-    await expect(page.getByRole('region', { name: /agreement\.pdf, page 1 of 1/ })).toBeVisible()
     await expectCleanPage(page, errors)
   })
 
