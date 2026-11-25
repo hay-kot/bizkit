@@ -8,8 +8,25 @@ import mailing from './mailing'
 import type { NavItem, NavSection, WebModule } from './types'
 import webhooks from './webhooks'
 
+/**
+ * Tags a module's nav items and entity sections with its name, so the shell
+ * can hide what a workspace turned off.
+ */
+function tagged(module: WebModule): WebModule {
+  return {
+    ...module,
+    nav: module.nav.map((item) => ({ ...item, module: module.name })),
+    entitySections: module.entitySections?.map((section) => ({
+      ...section,
+      module: module.name,
+    })),
+  }
+}
+
 /** Every web module, in the order their routes register. */
-export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions]
+export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions].map(
+  tagged,
+)
 
 /**
  * Tags a module's route with the module's nav item it sits under (`forms`

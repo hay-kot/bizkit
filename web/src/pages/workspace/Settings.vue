@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import FeaturesCard from '@/components/workspace/FeaturesCard.vue'
 import Card from '@/components/ui/Card.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Field from '@/components/ui/Field.vue'
@@ -69,5 +70,6 @@ async function onSave() {
         </template>
       </Card>
     </form>
+    <FeaturesCard :workspace-id="workspaceId" />
   </TabPage>
 </template>

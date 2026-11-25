@@ -23,6 +23,11 @@ export interface NavItem {
   /** Only workspace admins see it. */
   adminOnly?: boolean
   /**
+   * The module that registered it, set by the registry. A workspace can turn
+   * a module off, which hides its entries.
+   */
+  module?: string
+  /**
    * Lower comes first within its section. Core uses 0-99; feature modules
    * start at 100. Settings keeps the highest workspace order so it sits last.
    */
@@ -41,6 +46,8 @@ export interface EntitySection {
   component: Component
   /** Only workspace admins see it. */
   adminOnly?: boolean
+  /** The module that registered it, set by the registry. */
+  module?: string
 }
 
 /**

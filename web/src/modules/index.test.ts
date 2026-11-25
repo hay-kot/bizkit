@@ -73,6 +73,17 @@ describe('web modules', () => {
     }
   })
 
+  it('tag nav items and entity sections with their module, so a workspace can turn it off', () => {
+    for (const m of modules) {
+      for (const item of m.nav) expect(item.module, item.path).toBe(m.name)
+      for (const section of m.entitySections ?? []) expect(section.module, section.key).toBe(m.name)
+    }
+    for (const route of projectRoutes) {
+      const nav = route.meta?.nav
+      if (nav) expect(nav.module, route.path).toBeTruthy()
+    }
+  })
+
   it('pin Settings to the bottom of the sidebar', () => {
     expect(workspaceNav.at(-1)?.path).toBe('settings')
   })
