@@ -32,12 +32,7 @@ async fn serve(uri: Uri) -> Response {
     if !path.is_empty()
         && let Some(file) = Assets::get(path)
     {
-        let cache = if path.starts_with("assets/") {
-            "public, max-age=31536000, immutable"
-        } else {
-            "no-cache"
-        };
-        return file_response(path, file.data, cache);
+        return file_response(path, file.data, asset_cache(path));
     }
     match Assets::get("index.html") {
         Some(index) => app_response(path, index.data),
@@ -46,6 +41,17 @@ async fn serve(uri: Uri) -> Response {
             "The web app was not built into this binary. Run `mise run web:build` and rebuild.",
         )
             .into_response(),
+    }
+}
+
+/// `assets/` names carry a content hash and `pdfjs/` paths the pdf.js
+/// version, so a changed file always gets a new URL and these can be cached
+/// for good.
+fn asset_cache(path: &str) -> &'static str {
+    if path.starts_with("assets/") || path.starts_with("pdfjs/") {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
     }
 }
 
@@ -88,6 +94,16 @@ mod tests {
         let has_index = Assets::get("index.html").is_some();
         let expected = if has_index { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
         assert_eq!(response.status(), expected, "SPA routes fall back to index.html");
+    }
+
+    #[test]
+    fn hashed_and_versioned_assets_are_cached_for_good() {
+        assert_eq!(asset_cache("assets/index-abc123.js"), "public, max-age=31536000, immutable");
+        assert_eq!(
+            asset_cache("pdfjs/6.5.438/cmaps/UniJIS-UTF16-H.bcmap"),
+            "public, max-age=31536000, immutable"
+        );
+        assert_eq!(asset_cache("favicon.svg"), "no-cache");
     }
 
     #[test]

@@ -177,6 +177,7 @@ mod signing {
         assert_eq!(session["request"]["page_count"], 2);
         assert_eq!(session["signer"]["name"], "Ada Lovelace");
         assert_eq!(session["signer"]["status"], "pending");
+        assert_eq!(session["all_signed"], false);
         assert!(session["consent"].as_str().unwrap().contains("electronically"));
         let fields = session["fields"].as_array().unwrap();
         assert_eq!(fields.len(), 1, "only Ada's own field");
@@ -392,6 +393,16 @@ mod signing {
     }
 
     #[tokio::test]
+    async fn a_drawing_of_dots_is_no_signature() {
+        let s = setup().await;
+        let (_, tokens) = s.sent().await;
+        let dots = json!({ "kind": "drawn", "strokes": [[[10, 10]], [[200, 150]], [[400, 40]]] });
+        let refused = s.sign(&tokens[0], &json!({ "consent": true, "signature": dots })).await;
+        refused.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(field_errors(&refused), ["signature"]);
+    }
+
+    #[tokio::test]
     async fn a_voided_request_takes_no_more_signatures() {
         let s = setup().await;
         let (id, tokens) = s.sent().await;
@@ -410,6 +421,9 @@ mod signing {
         let s = setup().await;
         let (id, tokens) = s.sent().await;
         s.sign_as(&tokens[0], "Ada Lovelace").await.expect(StatusCode::OK);
+        let waiting = s.session(&tokens[0]).await;
+        assert_eq!(waiting["signer"]["status"], "signed");
+        assert_eq!(waiting["all_signed"], false, "Grace has yet to sign");
         let strokes = json!([[[10, 10], [200, 150], [400, 40]], [[500, 200], [900, 250]]]);
         s.sign(
             &tokens[1],
@@ -417,6 +431,9 @@ mod signing {
         )
         .await
         .expect(StatusCode::OK);
+        let sealing = s.session(&tokens[0]).await;
+        assert_eq!(sealing["all_signed"], true);
+        assert_eq!(sealing["request"]["status"], "sent", "the seal job hasn't run yet");
         s.admin
             .post(&s.path(&format!("requests/{id}/void")), &json!({}))
             .await

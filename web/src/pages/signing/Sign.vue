@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CheckCircle2, FileSignature, LinkIcon, PenLine } from 'lucide-vue-next'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -33,7 +34,7 @@ type Mark = 'signature' | 'initials'
 
 const route = useRoute()
 const token = computed(() => (typeof route.query.t === 'string' ? route.query.t : ''))
-const { data: session, error: loadError, isPending } = useSignerSession(token)
+const { data: session, error: loadError, isPending, pollGaveUp } = useSignerSession(token)
 const recordView = useRecordView()
 const sign = useSign()
 
@@ -68,8 +69,15 @@ const checks = reactive<Record<string, boolean>>({})
 const consent = ref(false)
 
 const needsInitials = computed(() => fields.value.some((f) => f.kind === 'initials'))
-// The date fields get the server's UTC date at Sign; this is what it will be.
-const today = new Date().toISOString().slice(0, 10)
+// The date fields get the server's UTC date at Sign; this is what it will
+// be, kept fresh across midnight UTC and a tab left in the background.
+const utcToday = () => new Date().toISOString().slice(0, 10)
+const today = ref(utcToday())
+useIntervalFn(() => (today.value = utcToday()), 60_000)
+const visibility = useDocumentVisibility()
+watch(visibility, (state) => {
+  if (state === 'visible') today.value = utcToday()
+})
 
 const adopting = ref<Mark | null>(null)
 const draft = ref<SigningSignature>()
@@ -195,6 +203,8 @@ async function submit() {
 }
 
 const done = computed(() => signed.value || sign.data.value !== undefined)
+/** Signed here, and the session that says so hasn't come back yet. */
+const refreshing = computed(() => sign.data.value !== undefined && !signed.value)
 </script>
 
 <template>
@@ -222,10 +232,17 @@ const done = computed(() => signed.value || sign.data.value !== undefined)
       ></div>
     </template>
 
-    <ErrorAlert v-else-if="loadError" :error="loadError" />
+    <ErrorAlert v-else-if="loadError && !session" :error="loadError" />
 
     <template v-else-if="session && done">
       <PageHeader :title="title" :icon="FileSignature" :crumbs="[]" />
+      <p
+        v-if="loadError"
+        role="status"
+        class="rounded-box border border-warning/50 bg-warning/10 px-3 py-2 text-sm"
+      >
+        Couldn't check for updates just now. This page tries again on its own.
+      </p>
       <div
         class="flex flex-col items-start gap-3 rounded-box border border-base-300 bg-base-100 p-8"
         role="status"
@@ -234,19 +251,29 @@ const done = computed(() => signed.value || sign.data.value !== undefined)
         <h2 class="text-xl font-semibold">Thank you, you signed</h2>
         <template v-if="session.request.status === 'completed'">
           <p class="text-sm text-base-content/80">
-            Everyone signed. The sealed PDF carries every signature and an audit page.
+            Everyone signed. The sealed PDF carries every signature and a certificate page.
           </p>
           <a class="btn btn-primary btn-sm" :href="signedPdfUrl(token)" download
             >Download the signed PDF</a
           >
         </template>
         <p
-          v-else-if="isSealing(session)"
+          v-else-if="refreshing || (isSealing(session) && !pollGaveUp)"
           class="flex items-center gap-2 text-sm text-base-content/80"
         >
           <Spinner label="Waiting for the sealed PDF" />
-          The sealed PDF appears here once everyone has signed. You can close this page; the link
-          keeps working.
+          Sealing the document. The download appears here in a moment.
+        </p>
+        <p v-else-if="isSealing(session)" class="text-sm text-base-content/80">
+          Sealing is taking longer than usual. Reload this page later; the link keeps working.
+        </p>
+        <p
+          v-else-if="session.request.status === 'sent'"
+          class="text-sm text-base-content/80"
+          data-testid="waiting-for-others"
+        >
+          Waiting for the others to sign. Once everyone has, we email you a link to the sealed PDF,
+          and this page offers it too.
         </p>
         <p v-else class="text-sm text-base-content/80">
           The sealed copy is delayed. The sender can see it and try again.
@@ -261,6 +288,13 @@ const done = computed(() => signed.value || sign.data.value !== undefined)
         :crumbs="[]"
         :description="`For ${session.signer.name} (${session.signer.email}).`"
       />
+      <p
+        v-if="loadError"
+        role="status"
+        class="rounded-box border border-warning/50 bg-warning/10 px-3 py-2 text-sm"
+      >
+        Couldn't check for updates just now. Your fields are kept.
+      </p>
       <p
         v-if="session.request.message"
         class="rounded-box border border-base-300 bg-base-100 p-4 text-sm whitespace-pre-line"

@@ -23425,9 +23425,14 @@
           "request",
           "signer",
           "fields",
-          "consent"
+          "consent",
+          "all_signed"
         ],
         "properties": {
+          "all_signed": {
+            "type": "boolean",
+            "description": "True once every signer of the request signed, in every signing-order\ngroup. While it is true and the request is still `sent`, the seal job\nis running; while it is false, others have yet to sign."
+          },
           "consent": {
             "type": "string",
             "description": "The text the signer agrees to by signing."

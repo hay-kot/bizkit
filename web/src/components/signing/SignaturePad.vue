@@ -11,6 +11,7 @@ import {
   PAD_WIDTH,
   type SigningSignature,
 } from '@/queries/signing'
+import { isWinAnsi } from '@/lib/winAnsi'
 
 /**
  * Draw or type a signature or initials. Drawn strokes are points on a
@@ -27,7 +28,17 @@ const modes = [
   { value: 'drawn' as const, label: 'Draw' },
   { value: 'typed' as const, label: 'Type' },
 ]
-const typed = ref(model.value?.kind === 'typed' ? model.value.name : (props.typedDefault ?? ''))
+// A default the PDF fonts can't print would only be refused, so it's left out.
+const typedStart =
+  model.value?.kind === 'typed'
+    ? model.value.name
+    : isWinAnsi(props.typedDefault ?? '')
+      ? (props.typedDefault ?? '')
+      : ''
+const typed = ref(typedStart)
+const typedProblem = computed(() =>
+  isWinAnsi(typed.value) ? undefined : 'Use Latin letters, or draw it instead.',
+)
 // Strokes change on every pointer move, so they stay out of Vue's
 // reactivity; `points` and `strokeCount` are what the template reads.
 let strokes: [number, number][][] =
@@ -48,10 +59,12 @@ const full = computed(() => strokeCount.value >= MAX_STROKES || points.value >= 
 function emitModel() {
   if (mode.value === 'typed') {
     const name = typed.value.trim()
-    model.value = name ? { kind: 'typed', name } : undefined
+    model.value = name && !typedProblem.value ? { kind: 'typed', name } : undefined
   } else {
-    const drawn = strokes.filter((stroke) => stroke.length > 0).map((stroke) => [...stroke])
-    model.value = points.value >= 2 ? { kind: 'drawn', strokes: drawn } : undefined
+    // A one-point stroke is a dot that draws no line, and the server
+    // refuses a drawing of nothing but dots.
+    const drawn = strokes.filter((stroke) => stroke.length >= 2).map((stroke) => [...stroke])
+    model.value = drawn.length > 0 ? { kind: 'drawn', strokes: drawn } : undefined
   }
 }
 
@@ -161,7 +174,7 @@ function clear() {
         <template v-else>Draw with your mouse, finger or pen.</template>
       </span>
     </div>
-    <Field v-if="mode === 'typed'" :label="`Type your ${label}`">
+    <Field v-if="mode === 'typed'" :label="`Type your ${label}`" :error="typedProblem">
       <input
         v-model="typed"
         type="text"

@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import SignaturePad from './SignaturePad.vue'
 
-function mountPad(modelValue?: unknown) {
+function mountPad(modelValue?: unknown, typedDefault = 'Ada Lovelace') {
   return mount(SignaturePad, {
-    props: { label: 'signature', typedDefault: 'Ada Lovelace', modelValue: modelValue as never },
+    props: { label: 'signature', typedDefault, modelValue: modelValue as never },
     attachTo: document.body,
   })
 }
@@ -56,6 +56,49 @@ describe('SignaturePad', () => {
     await canvas.trigger('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
     await canvas.trigger('pointerup', { pointerId: 1 })
     expect(last(wrapper)).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('drops dots and needs a line', async () => {
+    const wrapper = mountPad()
+    const canvas = wrapper.get('canvas')
+    vi.spyOn(canvas.element, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1000,
+      height: 300,
+    } as DOMRect)
+    ;(canvas.element as HTMLCanvasElement).setPointerCapture = () => {}
+    for (const x of [10, 100]) {
+      await canvas.trigger('pointerdown', { clientX: x, clientY: 10, pointerId: 1 })
+      await canvas.trigger('pointerup', { pointerId: 1 })
+    }
+    expect(last(wrapper), 'two dots are no drawing').toBeUndefined()
+    await canvas.trigger('pointerdown', { clientX: 200, clientY: 50, pointerId: 1 })
+    await canvas.trigger('pointermove', { clientX: 300, clientY: 80, pointerId: 1 })
+    await canvas.trigger('pointerup', { pointerId: 1 })
+    expect(last(wrapper)).toEqual({
+      kind: 'drawn',
+      strokes: [
+        [
+          [200, 50],
+          [300, 80],
+        ],
+      ],
+    })
+    wrapper.unmount()
+  })
+
+  it('leaves out a default the PDF fonts cannot print, and refuses such text', async () => {
+    const wrapper = mountPad(undefined, 'Пётр')
+    await wrapper.get('[role="radio"]:nth-child(2)').trigger('click')
+    const input = wrapper.get('input[type="text"]')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    await input.setValue('山田')
+    expect(last(wrapper)).toBeUndefined()
+    expect(wrapper.text()).toContain('Use Latin letters')
+    await input.setValue('Yamada')
+    expect(last(wrapper)).toEqual({ kind: 'typed', name: 'Yamada' })
     wrapper.unmount()
   })
 

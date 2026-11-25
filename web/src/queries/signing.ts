@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from '@pinia/colada'
-import { useIntervalFn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
-import { toValue, watch } from 'vue'
+import { onScopeDispose, ref, toValue, watch } from 'vue'
 
 import {
   signingPublicSessionQueryKey,
@@ -41,8 +40,16 @@ export const MAX_POINTS = 2000
 export const MAX_TYPED = 100
 export const MAX_TEXT = 200
 
-/** How often the done view checks on the seal. */
-const SEALING_POLL_MS = 2_000
+/** The done view's checks on the seal: 2 s, then slower, for at most 2 minutes. */
+const SEAL_POLL_FIRST_MS = 2_000
+const SEAL_POLL_MAX_MS = 15_000
+const SEAL_POLL_FOR_MS = 120_000
+
+/** The wait before the next check on the seal, or `undefined` once it's time to stop. */
+export function nextSealPoll(attempt: number, waited: number): number | undefined {
+  if (waited >= SEAL_POLL_FOR_MS) return undefined
+  return Math.min(SEAL_POLL_FIRST_MS * 1.5 ** attempt, SEAL_POLL_MAX_MS)
+}
 
 const NOT_FOUND = { error: { code: 'not_found', message: 'This link no longer works.' } }
 
@@ -57,8 +64,9 @@ export function documentUrl(token: string): string {
 }
 
 /**
- * What a signer's link shows. Polls while the signer has signed and the
- * seal hasn't finished, so the download appears on its own.
+ * What a signer's link shows. Polls while everyone has signed and the seal
+ * runs, so the download appears on its own; `pollGaveUp` turns true when
+ * the seal took longer than the polling lasts.
  */
 export function useSignerSession(token: MaybeRefOrGetter<string>) {
   const query = useQuery<SigningSignerSession>(() => ({
@@ -76,25 +84,47 @@ export function useSignerSession(token: MaybeRefOrGetter<string>) {
       return data
     },
   }))
-  // A refetch cancels one in flight, so the poll skips a tick while loading.
-  const poll = useIntervalFn(
-    () => {
-      if (query.asyncStatus.value !== 'loading') void query.refetch()
-    },
-    SEALING_POLL_MS,
-    { immediate: false },
-  )
+  // Polls only while the seal job is what's pending: waiting on other
+  // signers can take days, and their signing doesn't need this page open.
+  const pollGaveUp = ref(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const stop = () => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = undefined
+  }
   watch(
     () => isSealing(query.data.value),
-    (sealing) => (sealing ? poll.resume() : poll.pause()),
+    (sealing) => {
+      stop()
+      pollGaveUp.value = false
+      if (!sealing) return
+      let attempt = 0
+      let waited = 0
+      const schedule = () => {
+        const wait = nextSealPoll(attempt, waited)
+        if (wait === undefined) {
+          pollGaveUp.value = true
+          return
+        }
+        timer = setTimeout(() => {
+          attempt++
+          waited += wait
+          // A refetch cancels one in flight, so a tick skips while loading.
+          if (query.asyncStatus.value !== 'loading') void query.refetch()
+          schedule()
+        }, wait)
+      }
+      schedule()
+    },
     { immediate: true },
   )
-  return query
+  onScopeDispose(stop)
+  return { ...query, pollGaveUp }
 }
 
-/** True once the signer signed and the sealed PDF isn't ready yet. */
+/** True once everyone signed and the seal job hasn't finished. */
 export function isSealing(session: SigningSignerSession | undefined): boolean {
-  return session?.signer.status === 'signed' && session.request.status === 'sent'
+  return session?.all_signed === true && session.request.status === 'sent'
 }
 
 export function useRecordView() {

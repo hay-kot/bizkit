@@ -9,6 +9,7 @@ import {
   scaleToWidth,
   type PDFDocumentLoadingTask,
   type PDFPageProxy,
+  type RenderTask,
 } from '@/lib/pdf'
 
 /**
@@ -30,10 +31,25 @@ const pages = ref<Shown[]>([])
 const failed = ref<unknown>()
 const loading = ref(true)
 const canvases = new Map<number, HTMLCanvasElement>()
-let task: PDFDocumentLoadingTask | undefined
 const proxies = shallowRef<PDFPageProxy[]>([])
+let task: PDFDocumentLoadingTask | undefined
 let width = 0
-let generation = 0
+/** Bumped by every layout, so an older one stops between pages. */
+let layoutRun = 0
+/** Bumped by every load and on unmount, so a late load is thrown away. */
+let loadRun = 0
+let unmounted = false
+
+/**
+ * The render in flight on each canvas. pdf.js refuses a second render on a
+ * canvas while one runs, so a relayout cancels the old one first.
+ */
+const rendering = new Map<HTMLCanvasElement, RenderTask>()
+
+function cancelRenders() {
+  for (const render of rendering.values()) render.cancel()
+  rendering.clear()
+}
 
 function canvasRef(number: number) {
   return (el: unknown) => {
@@ -42,13 +58,17 @@ function canvasRef(number: number) {
   }
 }
 
+const isCancel = (error: unknown) =>
+  (error as { name?: string } | null)?.name === 'RenderingCancelledException'
+
 /**
  * Lays every page out at `width`, then draws them one after another, so a
  * long document doesn't hold every page's bitmap in flight at once. A newer
- * layout (a resize) stops an older one between pages.
+ * layout (a resize) cancels the renders of an older one.
  */
 async function layout() {
-  const run = ++generation
+  const run = ++layoutRun
+  cancelRenders()
   if (!width || proxies.value.length === 0) return
   pages.value = proxies.value.map((page) => {
     const viewport = page.getViewport({ scale: scaleToWidth(page, width) })
@@ -56,17 +76,25 @@ async function layout() {
   })
   // The canvases mount with the new sizes on the next render.
   await new Promise((resolve) => requestAnimationFrame(resolve))
+  let ok = true
   for (const page of proxies.value) {
-    if (run !== generation) return
+    if (run !== layoutRun) return
     const canvas = canvases.get(page.pageNumber)
     if (!canvas) continue
     const viewport = page.getViewport({ scale: scaleToWidth(page, width) })
+    const render = renderPage(page, canvas, viewport)
+    rendering.set(canvas, render)
     try {
-      await renderPage(page, canvas, viewport).promise
+      await render.promise
     } catch (error) {
-      if ((error as { name?: string })?.name !== 'RenderingCancelledException') failed.value = error
+      if (isCancel(error)) return
+      ok = false
+      failed.value = error
+    } finally {
+      if (rendering.get(canvas) === render) rendering.delete(canvas)
     }
   }
+  if (ok && run === layoutRun) failed.value = undefined
 }
 
 const relayout = useDebounceFn(layout, 150)
@@ -83,28 +111,45 @@ useResizeObserver(root, (entries) => {
 watch(
   () => props.url,
   async (url) => {
+    const run = ++loadRun
+    layoutRun++
+    cancelRenders()
     loading.value = true
     failed.value = undefined
     pages.value = []
     proxies.value = []
-    await task?.destroy()
+    const previous = task
+    task = undefined
+    await previous?.destroy()
+    let mine: PDFDocumentLoadingTask | undefined
     try {
-      task = await loadPdf(url)
-      const loaded = await task.promise
+      mine = await loadPdf(url)
+      // A newer load, or leaving the page, makes this one moot.
+      if (run !== loadRun || unmounted) {
+        await mine.destroy()
+        return
+      }
+      task = mine
+      const loaded = await mine.promise
       const numbers = Array.from({ length: loaded.numPages }, (_, i) => i + 1)
-      proxies.value = await Promise.all(numbers.map((n) => loaded.getPage(n)))
+      const loadedPages = await Promise.all(numbers.map((n) => loaded.getPage(n)))
+      if (run !== loadRun || unmounted) return
+      proxies.value = loadedPages
       await layout()
     } catch (error) {
-      failed.value = error
+      if (run === loadRun && !unmounted) failed.value = error
     } finally {
-      loading.value = false
+      if (run === loadRun) loading.value = false
     }
   },
   { immediate: true },
 )
 
 onBeforeUnmount(() => {
-  generation++
+  unmounted = true
+  loadRun++
+  layoutRun++
+  cancelRenders()
   void task?.destroy()
 })
 </script>

@@ -3166,6 +3166,12 @@ export type SigningSignature = {
  */
 export type SigningSignerSession = {
     /**
+     * True once every signer of the request signed, in every signing-order
+     * group. While it is true and the request is still `sent`, the seal job
+     * is running; while it is false, others have yet to sign.
+     */
+    all_signed: boolean;
+    /**
      * The text the signer agrees to by signing.
      */
     consent: string;

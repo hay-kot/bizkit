@@ -52,7 +52,9 @@ impl Signature {
         let strokes: Vec<Vec<[u16; 2]>> =
             strokes.into_iter().filter(|stroke| !stroke.is_empty()).collect();
         let points: usize = strokes.iter().map(Vec::len).sum();
-        if points < 2 {
+        // A drawing of single-point strokes draws nothing: each stroke is a
+        // path, and one point is no line.
+        if !strokes.iter().any(|stroke| stroke.len() >= 2) {
             return Err("must have a drawing, or be typed instead");
         }
         if strokes.len() > MAX_STROKES || points > MAX_POINTS {
@@ -103,6 +105,8 @@ mod tests {
         );
         assert!(drawn("[]").is_err());
         assert!(drawn("[[[1,2]]]").is_err(), "one point is a dot");
+        assert!(drawn("[[[1,2]],[[30,40]]]").is_err(), "dots alone draw no line");
+        assert!(drawn("[[[1,2]],[[30,40],[50,60]]]").is_ok(), "one line is enough");
         assert!(drawn("[[[1,2],[1001,4]]]").is_err());
         let many = format!("[{}]", vec!["[[1,1],[2,2]]"; 51].join(","));
         assert!(drawn(&many).is_err(), "too many strokes");

@@ -16,7 +16,7 @@ import type {
   RenderTask,
 } from 'pdfjs-dist'
 
-export type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, PageViewport }
+export type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask }
 
 /** A rect in page fractions: 0..1 from the top-left corner. */
 export interface Rect {
@@ -49,17 +49,38 @@ function pdfjs() {
   return library
 }
 
+/** Where the build serves pdf.js's data files (see `pdfjsAssets` in vite.config.ts). */
+export function assetBase(version: string): string {
+  return `/pdfjs/${version}/`
+}
+
 /**
- * Opens the PDF at `url` (same origin); `destroy()` on the task frees it. The PDF comes from a stranger, so it
- * only ever draws: no XFA forms, no annotation, text or scripting layers,
- * and `pdf.sandbox` is never loaded. pdf.js 6 removed `isEvalSupported`
- * and the document-level `enableScripting` option along with the code paths
- * they guarded (fonts no longer compile to functions), so there is nothing
- * left to switch off there; 6.2.108 or later is needed for CVE-2026-16633.
+ * Opens the PDF at `url` (same origin); `destroy()` on the task frees it.
+ *
+ * The PDF comes from a stranger, so it only ever draws: no XFA forms, no
+ * annotation, text or scripting layers, and `pdf.sandbox` is never loaded.
+ * pdf.js 6 removed `isEvalSupported` and the document-level
+ * `enableScripting` option along with the code paths they guarded (fonts no
+ * longer compile to functions), so there is nothing left to switch off
+ * there; 6.2.108 or later is needed for CVE-2026-16633.
+ *
+ * The CMaps let CJK text draw, and the wasm decoders JPX and JBIG2 images
+ * (scans) and ICC colors. `standardFontDataUrl` stays unset: pdf.js's
+ * `standard_fonts/` holds Liberation fonts under SIL OFL 1.1, a license
+ * bizkit doesn't ship, so PDFs that don't embed the 14 standard fonts draw
+ * them with the browser's own fonts instead.
  */
 export async function loadPdf(url: string): Promise<PDFDocumentLoadingTask> {
   const lib = await pdfjs()
-  return lib.getDocument({ url, withCredentials: false, enableXfa: false })
+  const base = assetBase(lib.version)
+  return lib.getDocument({
+    url,
+    withCredentials: false,
+    enableXfa: false,
+    cMapUrl: `${base}cmaps/`,
+    cMapPacked: true,
+    wasmUrl: `${base}wasm/`,
+  })
 }
 
 /** The scale that makes `page` `width` CSS pixels wide, as displayed. */

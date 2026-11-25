@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '' }))
+vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/assets/worker.mjs' }))
+
+const getDocument = vi.fn((params: unknown) => ({ params }))
+vi.mock('pdfjs-dist', () => ({
+  version: '9.9.9',
+  GlobalWorkerOptions: { workerSrc: '' },
+  getDocument: (params: unknown) => getDocument(params),
+}))
 
 import {
   fractionToPdfPoint,
+  loadPdf,
   pdfPointToFraction,
   toFractions,
   toPixels,
@@ -60,6 +68,24 @@ const roundRect = (rect: { x: number; y: number; width: number; height: number }
   const [x, y, width, height] = round([rect.x, rect.y, rect.width, rect.height])
   return { x, y, width, height }
 }
+
+describe('loadPdf', () => {
+  it('points pdf.js at the versioned CMaps and decoders, and never at standard fonts', async () => {
+    await loadPdf('/m/signing/public/document?t=abc')
+    expect(getDocument).toHaveBeenCalledTimes(1)
+    const params = getDocument.mock.calls[0]![0] as Record<string, unknown>
+    expect(params).toMatchObject({
+      url: '/m/signing/public/document?t=abc',
+      cMapUrl: '/pdfjs/9.9.9/cmaps/',
+      cMapPacked: true,
+      wasmUrl: '/pdfjs/9.9.9/wasm/',
+      enableXfa: false,
+    })
+    expect(params).not.toHaveProperty('standardFontDataUrl')
+    const { GlobalWorkerOptions } = await import('pdfjs-dist')
+    expect(GlobalWorkerOptions.workerSrc).toBe('/assets/worker.mjs')
+  })
+})
 
 describe('toFractions and toPixels', () => {
   const size = { width: 800, height: 1000 }
