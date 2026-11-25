@@ -95,6 +95,7 @@ describe('web modules', () => {
     const shell = [
       '/src/components/PaletteRows.vue',
       '/src/components/ProjectSwitcher.vue',
+      '/src/pages/workspace/ProjectHome.vue',
       '/src/pages/workspace/WorkspaceHome.vue',
     ]
     const sources = import.meta.glob<string>('/src/{pages,components}/**/*.vue', {

@@ -17,12 +17,17 @@ const enabled = ref<string[]>([])
 const saved = computed(() =>
   (data.value?.items ?? []).filter((feature) => feature.enabled).map((feature) => feature.name),
 )
-watch(saved, (value) => (enabled.value = [...value]), { immediate: true })
-const changed = computed(
-  () =>
-    enabled.value.length !== saved.value.length ||
-    enabled.value.some((name) => !saved.value.includes(name)),
+const sameSet = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((name) => b.includes(name))
+// A refetch only replaces the ticks while the admin hasn't changed them.
+watch(
+  saved,
+  (value, before) => {
+    if (!before || sameSet(enabled.value, before)) enabled.value = [...value]
+  },
+  { immediate: true },
 )
+const changed = computed(() => !sameSet(enabled.value, saved.value))
 
 /** Module names are lowercase words, and their sidebar labels the same word capitalized. */
 const label = (name: string) => name.charAt(0).toUpperCase() + name.slice(1)

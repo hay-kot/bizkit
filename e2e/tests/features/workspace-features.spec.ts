@@ -16,6 +16,10 @@ test('an admin turns a feature off and on again from Settings', async ({ page, w
   await expect(page.getByText('Features saved')).toBeVisible()
   await expect(sidebar.getByRole('link', { name: 'Forms' })).toBeHidden()
 
+  // Opening the project lands on its first page that is on.
+  await page.goto(`/w/${workspace}/p/${project}`)
+  await expect(page).toHaveURL(new RegExp(`/p/${project}/analytics`))
+
   await page.goto(`/w/${workspace}/p/${project}/forms`)
   await expect(page.getByText('Forms is off', { exact: true })).toBeVisible()
   const refused = await page.request.get(`/api/v1/workspaces/${workspace}/forms?project_id=${project}`, {

@@ -39,8 +39,8 @@ pub(crate) struct Sites {
 
 impl Sites {
     /// The site with public key `key`, if there is one and its workspace
-    /// has analytics on. Turning analytics off takes up to [`SITE_TTL`] to
-    /// reach ingest.
+    /// has analytics on. The cache holds the answer either way, so turning
+    /// analytics off or on again takes up to [`SITE_TTL`] to reach ingest.
     pub(crate) async fn get(
         &self,
         platform: &Platform,
