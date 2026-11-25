@@ -10,3 +10,9 @@ DROP TABLE IF EXISTS signing_requests;
 DROP TABLE IF EXISTS signing_seal;
 
 DELETE FROM jobs WHERE kind LIKE 'signing.%';
+
+-- Signing sent its mails through core's mail.send job. Queued ones would link
+-- signers to /sign?t= and senders to a request's /signing/ page, both gone.
+DELETE FROM jobs
+WHERE kind = 'mail.send' AND status = 'queued'
+  AND (payload LIKE '%/sign?t=%' OR payload LIKE '%/signing/%');
