@@ -10,8 +10,7 @@ use bizkit_core::Module;
         feature = "webhooks",
         feature = "extensions",
         feature = "analytics",
-        feature = "mailing",
-        feature = "signing"
+        feature = "mailing"
     ),
     expect(clippy::vec_init_then_push, reason = "each push sits behind its module's feature")
 )]
@@ -28,8 +27,6 @@ pub(crate) fn modules() -> Vec<Box<dyn Module>> {
     // After forms: its demo seed links a list to the seeded Contact form.
     #[cfg(feature = "mailing")]
     modules.push(Box::new(bizkit_mailing::Mailing));
-    #[cfg(feature = "signing")]
-    modules.push(Box::new(bizkit_signing::Signing));
     #[cfg(feature = "extensions")]
     modules.push(Box::new(bizkit_extensions::Extensions::default()));
     modules

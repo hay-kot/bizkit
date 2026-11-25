@@ -27,13 +27,12 @@ bizkit-forms = { path = "crates/bizkit-forms" }
 bizkit-analytics = { path = "crates/bizkit-analytics" }
 bizkit-webhooks = { path = "crates/bizkit-webhooks" }
 bizkit-mailing = { path = "crates/bizkit-mailing" }
-bizkit-signing = { path = "crates/bizkit-signing" }
 bizkit-testkit = { path = "crates/bizkit-testkit" }
 bizkit-web = { path = "crates/bizkit-web" }
 
 anyhow = "1.0.104"
 async-trait = "0.1.92"
-axum = { version = "0.8.9", features = ["macros", "multipart"] }
+axum = { version = "0.8.9", features = ["macros"] }
 axum-test = "21.1.0"
 base64 = "0.23.1"
 bolero = "0.13.7"
@@ -78,14 +77,6 @@ tracing-subscriber = "0.3"
 url = { version = "=2.5.9", features = ["serde"] }
 utoipa = { version = "6.0.0", features = ["uuid", "openapi_extensions", "preserve_order"] }
 uuid = { version = "=1.29.2", features = ["v7", "serde"] }
-
-# Doc signing. The p256 0.14 line has crypto-bigint 0.7 (RUSTSEC-2026-0387
-# fixed); CMS is hand-encoded with der, since cms 0.3 is only a release
-# candidate and cms 0.2 needs the old line and rsa (RUSTSEC-2023-0071).
-der = { version = "=0.8.3", features = ["alloc", "derive", "oid"] }
-lopdf = { version = "=0.42.0", default-features = false }
-p256 = { version = "=0.14.0", features = ["ecdsa"] }
-x509-cert = { version = "=0.3.0", features = ["builder"] }
 [profile.release]
 codegen-units = 1
 lto = "thin"

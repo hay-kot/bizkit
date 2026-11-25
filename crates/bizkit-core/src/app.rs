@@ -5,7 +5,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context as _, bail};
-use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::{any, get};
@@ -30,7 +29,7 @@ use crate::hooks::Hooks;
 use crate::jobs::{Bus, Worker};
 use crate::mail::MailRouter;
 use crate::module::{
-    Lifecycle, MAX_UPLOAD_BYTES, Module, ModuleRoutes, Registration, RouteKind, register_all,
+    Lifecycle, Module, ModuleRoutes, Registration, RouteKind, register_all,
 };
 use crate::ops::{Registry, ScopeAreas};
 use crate::secrets::{SecretKey, Secrets};
@@ -38,11 +37,6 @@ use crate::tenancy::workspaces;
 use crate::time::UnixMillis;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-/// Long enough for a full-size file over a 1 Mbit/s uplink (about 210 s).
-const UPLOAD_TIMEOUT: Duration = Duration::from_secs(300);
-/// Room for a file of `MAX_UPLOAD_BYTES`, the multipart framing and small
-/// parts beside it, such as a JSON part of up to 64 KiB.
-const UPLOAD_BODY_BYTES: usize = MAX_UPLOAD_BYTES + 128 * 1024;
 
 /// Shared platform state. Cheap to clone; modules capture clones.
 #[derive(Debug, Clone)]
@@ -345,23 +339,13 @@ impl App {
         for routes in self.routes_of(RouteKind::Authenticated) {
             router = router.nest(&routes.nest(), routes.router.clone());
         }
-        // Each stage carries its own body limit and timeout, because an inner
-        // layer can't raise the limit an outer one already enforces. The
-        // authenticate layer goes inside each stage, so its session and key
-        // lookups run under that stage's timeout.
-        let authn = || middleware::from_fn_with_state(platform.clone(), authenticate);
-        router =
-            with_limits(router.layer(authn()), crate::ops::http::MAX_BODY_BYTES, REQUEST_TIMEOUT);
-        for routes in self.routes_of(RouteKind::Upload) {
-            let nested = Router::new().nest(&routes.nest(), routes.router.clone()).layer(authn());
-            // The tower-http limit alone bounds these bodies. A second limit
-            // from axum's extractors would wrap its error, and `Multipart`
-            // would then answer an oversized chunked body with 500, not 413.
-            router = router.merge(
-                with_limits(nested, UPLOAD_BODY_BYTES, UPLOAD_TIMEOUT)
-                    .layer(DefaultBodyLimit::disable()),
-            );
-        }
+        // The authenticate layer goes inside the limits, so its session and
+        // key lookups run under the timeout.
+        router = with_limits(
+            router.layer(middleware::from_fn_with_state(platform.clone(), authenticate)),
+            crate::ops::http::MAX_BODY_BYTES,
+            REQUEST_TIMEOUT,
+        );
         // Public routes never get the authenticate layer.
         for routes in self.routes_of(RouteKind::Public) {
             let nested = Router::new().nest(&routes.nest(), routes.router.clone());

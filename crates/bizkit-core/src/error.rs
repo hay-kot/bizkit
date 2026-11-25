@@ -31,10 +31,6 @@ pub enum ApiError {
     /// The input failed deserialization or validation.
     #[error("invalid input")]
     Validation(FieldErrors),
-    /// The body, an uploaded file or a requested file is over a limit; the
-    /// message says which and what to do instead.
-    #[error("{0}")]
-    PayloadTooLarge(String),
     /// Too many requests; retry later.
     #[error("rate limited")]
     RateLimited {
@@ -72,8 +68,6 @@ pub enum ErrorCode {
     NotFound,
     /// 409
     Conflict,
-    /// 413
-    PayloadTooLarge,
     /// 422
     Validation,
     /// 429
@@ -92,7 +86,6 @@ impl ErrorCode {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Conflict => StatusCode::CONFLICT,
-            Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::Validation => StatusCode::UNPROCESSABLE_ENTITY,
             Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
@@ -129,7 +122,6 @@ impl ApiError {
             Self::Forbidden(_) => ErrorCode::Forbidden,
             Self::NotFound => ErrorCode::NotFound,
             Self::Conflict(_) => ErrorCode::Conflict,
-            Self::PayloadTooLarge(_) => ErrorCode::PayloadTooLarge,
             Self::Validation(_) => ErrorCode::Validation,
             Self::RateLimited { .. } => ErrorCode::RateLimited,
             Self::Internal(_) => ErrorCode::Internal,
