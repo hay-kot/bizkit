@@ -10,8 +10,7 @@ use bizkit_core::Module;
         feature = "webhooks",
         feature = "extensions",
         feature = "analytics",
-        feature = "mailing",
-        feature = "signing"
+        feature = "mailing"
     ),
     expect(clippy::vec_init_then_push, reason = "each push sits behind its module's feature")
 )]
@@ -28,8 +27,6 @@ pub(crate) fn modules() -> Vec<Box<dyn Module>> {
     // After forms: its demo seed links a list to the seeded Contact form.
     #[cfg(feature = "mailing")]
     modules.push(Box::new(bizkit_mailing::Mailing));
-    #[cfg(feature = "signing")]
-    modules.push(Box::new(bizkit_signing::Signing));
     #[cfg(feature = "extensions")]
     modules.push(Box::new(bizkit_extensions::Extensions::default()));
     modules
@@ -142,9 +139,17 @@ mod tests {
         insta::assert_json_snapshot!(tools);
     }
 
+    /// Versions of migrations whose module left bizkit. Databases that ran
+    /// them keep the rows in `_sqlx_migrations`, so a new migration with one
+    /// of these versions would never run there.
+    const RETIRED_MIGRATIONS: [i64; 2] = [
+        20_261_205_000_000, // signing
+        20_261_209_100_000, // signing fields
+    ];
+
     #[test]
     fn migration_versions_are_unique() {
-        let mut seen = BTreeSet::new();
+        let mut seen = BTreeSet::from(RETIRED_MIGRATIONS);
         // Analytics' per-project files have their own set; the sqlx prepare
         // database applies it into the same table as the app's.
         #[cfg_attr(not(feature = "analytics"), expect(unused_mut, reason = "no extra sets"))]
@@ -155,7 +160,7 @@ mod tests {
             for migration in migrator.iter() {
                 assert!(
                     seen.insert(migration.version),
-                    "migration version {} appears twice",
+                    "migration version {} appears twice or was retired",
                     migration.version
                 );
             }

@@ -1,8 +1,7 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 
 import AuthLayout from './layouts/AuthLayout.vue'
 import HomeLayout from './layouts/HomeLayout.vue'
-import PublicLayout from './layouts/PublicLayout.vue'
 import WorkspaceLayout from './layouts/WorkspaceLayout.vue'
 import Home from './pages/Home.vue'
 import Invite from './pages/Invite.vue'
@@ -10,7 +9,7 @@ import NotFound from './pages/NotFound.vue'
 import SignIn from './pages/SignIn.vue'
 import SignInVerify from './pages/SignInVerify.vue'
 import WorkspaceHome from './pages/workspace/WorkspaceHome.vue'
-import { projectPath, projectRoutes, publicRoutes, workspaceRoutes } from './modules'
+import { projectPath, projectRoutes, workspaceRoutes } from './modules'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -33,12 +32,6 @@ export const router = createRouter({
         { path: 'verify', component: SignInVerify, meta: { public: true } },
       ],
     },
-    ...publicRoutes.map((route) => ({
-      path: `/${route.path}`,
-      component: PublicLayout,
-      meta: { public: true },
-      children: [{ ...route, path: '' } as RouteRecordRaw],
-    })),
     {
       path: '/',
       component: HomeLayout,
