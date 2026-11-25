@@ -153,6 +153,7 @@ export default tseslint.config(
         { element: ['table'], message: 'Use components/ui/DataTable.vue.' },
         { element: ['select'], message: 'Use components/ui/Select.vue.' },
         { element: ['dialog'], message: 'Use components/ui/FormPanel.vue or Overlay.vue.' },
+        { element: ['pre'], message: 'Use components/ui/CodeBlock.vue.' },
       ],
       'vue/no-restricted-static-attribute': [
         'error',

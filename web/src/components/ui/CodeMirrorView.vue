@@ -2,11 +2,12 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { syntaxHighlighting } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { tags } from '@lezer/highlight'
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue'
+
+import { codeHighlighter } from './codeHighlight'
 
 const props = defineProps<{
   label: string
@@ -18,24 +19,6 @@ const props = defineProps<{
 const model = defineModel<string>({ required: true })
 const host = useTemplateRef<HTMLDivElement>('host')
 let view: EditorView | undefined
-
-// DaisyUI exposes its theme as CSS variables, so the editor follows the
-// light and dark themes without colors of its own.
-const highlight = HighlightStyle.define([
-  { tag: [tags.keyword, tags.operatorKeyword, tags.modifier], color: 'var(--color-primary)' },
-  { tag: [tags.string, tags.special(tags.string), tags.regexp], color: 'var(--color-secondary)' },
-  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: 'var(--color-code-number)' },
-  {
-    tag: [tags.propertyName, tags.definition(tags.variableName)],
-    color: 'var(--color-code-property)',
-  },
-  {
-    tag: [tags.comment, tags.lineComment, tags.blockComment],
-    color: 'var(--color-code-comment)',
-    fontStyle: 'italic',
-  },
-  { tag: tags.invalid, color: 'var(--color-error)' },
-])
 
 const LINE_HEIGHT_EM = 1.5
 
@@ -64,11 +47,11 @@ function theme() {
     '.cm-content': { caretColor: 'var(--color-base-content)', padding: '4px 0' },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--color-base-content)' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-      backgroundColor: 'var(--color-code-selection)',
+      backgroundColor: 'var(--bk-code-selection)',
     },
     '.cm-gutters': {
       backgroundColor: 'var(--color-base-200)',
-      color: 'var(--color-code-gutter)',
+      color: 'var(--bk-code-gutter)',
       borderRight: 'var(--border) solid var(--color-base-300)',
     },
     '.cm-activeLine': { backgroundColor: 'inherit' },
@@ -86,7 +69,7 @@ onMounted(() => {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         props.language === 'json' ? json() : javascript(),
-        syntaxHighlighting(highlight),
+        syntaxHighlighting(codeHighlighter),
         theme(),
         EditorState.readOnly.of(props.readonly),
         EditorView.editable.of(!props.readonly),

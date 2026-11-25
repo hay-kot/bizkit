@@ -8,6 +8,7 @@ import DeliveryBadge from '@/components/webhooks/DeliveryBadge.vue'
 import RequestInspector from '@/components/webhooks/RequestInspector.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DetailActions from '@/components/ui/DetailActions.vue'
@@ -170,12 +171,7 @@ async function onSaveSettings() {
       </p>
       <details>
         <summary class="cursor-pointer text-sm font-medium">Send a test request</summary>
-        <div class="mt-2 flex items-start gap-2">
-          <pre tabindex="0" class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-xs">{{
-            curl
-          }}</pre>
-          <CopyButton :text="curl" label="Copy curl command" />
-        </div>
+        <CodeBlock class="mt-2" :code="curl" language="shell" copy="Copy curl command" />
       </details>
     </Card>
 

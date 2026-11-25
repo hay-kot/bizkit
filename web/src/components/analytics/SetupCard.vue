@@ -3,7 +3,7 @@ import { ChartLine } from 'lucide-vue-next'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import Card from '@/components/ui/Card.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import SubmitButton from '@/components/ui/SubmitButton.vue'
 import { useIsAdmin } from '@/composables/useIsAdmin'
@@ -57,13 +57,13 @@ function turnOn() {
     :title="`Set up analytics for ${projectName}`"
     description="Add this to the <head> of every page on your site."
   >
-    <div class="flex items-start gap-2">
-      <pre
-        tabindex="0"
-        class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
-      ><code data-testid="analytics-snippet">{{ site.snippet }}</code></pre>
-      <CopyButton :text="site.snippet" label="Copy snippet" />
-    </div>
+    <CodeBlock
+      :code="site.snippet"
+      language="html"
+      size="sm"
+      copy="Copy snippet"
+      data-testid="analytics-snippet"
+    />
     <p class="text-sm text-base-content/70">
       {{
         site.hostnames.length

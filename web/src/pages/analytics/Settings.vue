@@ -7,7 +7,7 @@ import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import GoalPanel from '@/components/analytics/GoalPanel.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import Card from '@/components/ui/Card.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
 import FormPanel from '@/components/ui/FormPanel.vue'
@@ -181,20 +181,11 @@ function viewGoal(goal: Goal | undefined) {
   >
     <template #default="{ site: current }">
       <Card title="Snippet" description="Add this to the <head> of every page on your site.">
-        <div class="flex items-start gap-2">
-          <pre
-            tabindex="0"
-            class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
-          ><code>{{ current.snippet }}</code></pre>
-          <CopyButton :text="current.snippet" label="Copy snippet" />
-        </div>
+        <CodeBlock :code="current.snippet" language="html" size="sm" copy="Copy snippet" />
         <p class="text-sm text-base-content/70">
           Send custom events and name your users from the page:
         </p>
-        <pre
-          tabindex="0"
-          class="overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
-        ><code>{{ TRACKING_EXAMPLE }}</code></pre>
+        <CodeBlock :code="TRACKING_EXAMPLE" language="javascript" size="sm" />
       </Card>
 
       <form @submit.prevent="onSave">
@@ -281,13 +272,7 @@ function viewGoal(goal: Goal | undefined) {
         title="Server-side events"
         description="Send events from your backend with a workspace API key that has the analytics:write scope."
       >
-        <div class="flex items-start gap-2">
-          <pre
-            tabindex="0"
-            class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
-          ><code>{{ curl }}</code></pre>
-          <CopyButton :text="curl" label="Copy curl example" />
-        </div>
+        <CodeBlock :code="curl" language="shell" size="sm" copy="Copy curl example" />
       </Card>
 
       <FormPanel
