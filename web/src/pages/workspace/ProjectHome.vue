@@ -14,12 +14,15 @@ const isAdmin = useIsAdmin(() => props.workspaceId)
 
 // The project's first page this user can see, in a feature that is on.
 // One-shot, like WorkspaceHome: a re-run during the leave transition would
-// undo the user's next navigation.
-const stop = watch(
+// undo the user's next navigation. A flag rather than the watch's stop
+// handle, because with the list cached the first call runs before the
+// handle exists.
+let done = false
+watch(
   features.loaded,
   (loaded) => {
-    if (!loaded) return
-    stop()
+    if (!loaded || done) return
+    done = true
     const first = projectNav.find(
       (item) => (!item.adminOnly || isAdmin.value) && features.isOn(item.module),
     )

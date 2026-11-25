@@ -360,7 +360,7 @@ mod mailing {
 
         let features = format!("/api/v1/workspaces/{ws}/features");
         s.admin
-            .send(http::Method::PUT, &features, Some(&json!({"disabled": []})))
+            .send(Method::PUT, &features, Some(&json!({"disabled": []})))
             .await
             .expect(StatusCode::OK);
         let contacts: Value = s.admin.get(&s.contacts(&list)).await.expect(StatusCode::OK).json();
