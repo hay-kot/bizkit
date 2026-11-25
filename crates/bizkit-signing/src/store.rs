@@ -182,7 +182,9 @@ pub(crate) async fn list_requests(
 }
 
 /// Moves a request from one of `from` to `to`, stamping the matching time.
-/// False when it wasn't in one of `from`.
+/// False when it wasn't in one of `from`. `sent_at` keeps the first send,
+/// so a retry (failed to sent) doesn't count the request toward the hourly
+/// mail cap again.
 pub(crate) async fn set_status(
     exec: impl SqliteExecutor<'_>,
     row: &RequestRow,
@@ -200,7 +202,7 @@ pub(crate) async fn set_status(
     let voided = (to == RequestStatus::Voided).then_some(now);
     let result = sqlx::query!(
         "UPDATE signing_requests
-         SET status = ?, updated_at = ?, failure = NULL, sent_at = coalesce(?, sent_at),
+         SET status = ?, updated_at = ?, failure = NULL, sent_at = coalesce(sent_at, ?),
              completed_at = coalesce(?, completed_at), voided_at = coalesce(?, voided_at)
          WHERE workspace_id = ? AND id = ? AND status = ?",
         to_text,

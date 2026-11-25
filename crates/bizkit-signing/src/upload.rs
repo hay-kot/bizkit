@@ -2,7 +2,7 @@
 //! route, nested at `/m/signing/upload`, and the PDF downloads, nested at
 //! `/m/signing`. Both check access like a workspace operation.
 
-use axum::extract::multipart::MultipartRejection;
+use axum::extract::multipart::{Field, MultipartError, MultipartRejection};
 use axum::extract::{Multipart, Path};
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::{get, post};
@@ -147,29 +147,29 @@ async fn create_inner(
         multipart.map_err(|rejection| ApiError::BadRequest(rejection.body_text()))?;
     let mut meta = None;
     let mut file = None;
+    let mut seen = Vec::new();
     let mut errors = FieldErrors::default();
-    while let Some(field) =
-        multipart.next_field().await.map_err(|err| ApiError::BadRequest(err.body_text()))?
-    {
-        match field.name() {
-            Some("meta") => {
-                let bytes = read_file(field).await?;
-                if bytes.len() > MAX_META_BYTES {
-                    errors.add("meta", "must be at most 64 KiB");
-                    continue;
-                }
-                match serde_json::from_slice::<DraftMeta>(&bytes) {
+    while let Some(field) = multipart.next_field().await.map_err(|err| multipart_error(&err))? {
+        let name = field.name().unwrap_or_default().to_owned();
+        if matches!(name.as_str(), "meta" | "file") && seen.contains(&name) {
+            errors.add(name, "must be given once");
+            continue;
+        }
+        seen.push(name.clone());
+        match name.as_str() {
+            "meta" => match read_meta(field).await? {
+                Some(bytes) => match serde_json::from_slice::<DraftMeta>(&bytes) {
                     Ok(parsed) => meta = Some(parsed),
                     Err(err) => errors.add("meta", format!("must be the draft as JSON: {err}")),
-                }
+                },
+                None => errors.add("meta", "must be at most 64 KiB"),
+            },
+            "file" => {
+                let file_name = field.file_name().unwrap_or_default().to_owned();
+                file = Some((file_name, read_file(field).await?));
             }
-            Some("file") => {
-                let name = field.file_name().unwrap_or_default().to_owned();
-                file = Some((name, read_file(field).await?));
-            }
-            other => {
-                errors.add(other.unwrap_or_default(), "is not a part of this upload");
-            }
+            "" => errors.add("parts", "a part has no name; send only `meta` and `file`"),
+            other => errors.add("parts", format!("`{other}` is not a part of this upload")),
         }
     }
     if meta.is_none() && !errors.as_map().contains_key("meta") {
@@ -184,6 +184,27 @@ async fn create_inner(
     };
     let draft_file = DraftFile { name, bytes: bytes.to_vec(), source: PdfSource::Upload };
     ops::create_draft(platform, workspace_id, authn.principal.as_ref(), meta, draft_file).await
+}
+
+/// The `meta` part, or `None` once it passes [`MAX_META_BYTES`]. It stops
+/// reading there, so a large part never sits in memory.
+async fn read_meta(mut field: Field<'_>) -> Result<Option<Vec<u8>>, ApiError> {
+    let mut meta = Vec::new();
+    while let Some(chunk) = field.chunk().await.map_err(|err| multipart_error(&err))? {
+        if meta.len() + chunk.len() > MAX_META_BYTES {
+            return Ok(None);
+        }
+        meta.extend_from_slice(&chunk);
+    }
+    Ok(Some(meta))
+}
+
+fn multipart_error(err: &MultipartError) -> ApiError {
+    if err.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        ApiError::PayloadTooLarge(err.body_text())
+    } else {
+        ApiError::BadRequest(err.body_text())
+    }
 }
 
 async fn file(

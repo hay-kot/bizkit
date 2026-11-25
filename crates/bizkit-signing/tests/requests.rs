@@ -460,6 +460,74 @@ mod requests {
     }
 
     #[tokio::test]
+    async fn uploads_take_one_meta_and_one_file() {
+        let s = setup().await;
+        let path =
+            format!("/m/signing/upload/workspaces/{}/requests", s.team.workspaces["main"].id);
+        let part = |head: &str, body: &str| {
+            format!("--{BOUNDARY}\r\nContent-Disposition: form-data; {head}\r\n\r\n{body}\r\n")
+        };
+        let meta = json!({
+            "project_id": s.team.projects["site"].id,
+            "title": "Lease",
+            "signers": [{ "name": "Ada Lovelace", "email": "ada@example.test" }],
+        })
+        .to_string();
+        let body = [
+            part("name=\"meta\"", &meta),
+            part("name=\"meta\"", &meta),
+            part("name=\"extra\"", "x"),
+            part("filename=\"a.txt\"", "x"),
+            part("name=\"meta2\"", &"x".repeat(10)),
+            format!("--{BOUNDARY}--\r\n"),
+        ]
+        .concat();
+        let raw = RawBody::new("multipart/form-data; boundary=signing-boundary", body);
+        let refused = s.member.send_body(Method::POST, &path, raw).await;
+        refused.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        let errors = &refused["error"]["fields"];
+        assert_eq!(errors["meta"][0], "must be given once", "{errors}");
+        assert_eq!(errors["file"][0], "is required", "{errors}");
+        assert_eq!(errors["parts"].as_array().unwrap().len(), 3, "{errors}");
+
+        let big = part("name=\"meta\"", &" ".repeat(64 * 1024 + 1));
+        let oversized = RawBody::new(
+            "multipart/form-data; boundary=signing-boundary",
+            format!("{big}--{BOUNDARY}--\r\n"),
+        );
+        let too_big = s.member.send_body(Method::POST, &path, oversized).await;
+        too_big.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(too_big["error"]["fields"]["meta"][0], "must be at most 64 KiB");
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_older_file_gives_a_conflict() {
+        let s = setup().await;
+        let created = s.create().await;
+        let id = created["id"].as_str().unwrap().to_owned();
+        let mut tx = s.app.app().platform().db().write().await.unwrap();
+        sqlx::query("UPDATE signing_requests SET page_count = NULL")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE signing_files SET bytes = x'00'").execute(&mut *tx).await.unwrap();
+        tx.commit().await.unwrap();
+        let refused = s
+            .put(
+                &id,
+                "fields",
+                &json!({ "fields": [signature_field(&created["signers"][0]["id"], 1)] }),
+            )
+            .await;
+        refused.expect(StatusCode::CONFLICT);
+        assert!(
+            refused["error"]["message"].as_str().unwrap().contains("count its pages"),
+            "{}",
+            refused.text
+        );
+    }
+
+    #[tokio::test]
     async fn files_over_8_mib_come_from_the_file_route_only() {
         let s = setup().await;
         let meta = json!({

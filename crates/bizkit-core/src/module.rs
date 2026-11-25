@@ -119,8 +119,11 @@ pub(crate) struct Registration {
     lifecycle_modules: Vec<&'static str>,
 }
 
-/// The largest file an upload route accepts. The body limit is this plus
-/// 64 KiB for multipart framing; handlers check the file part itself.
+/// The largest file an upload route accepts.
+///
+/// The body limit is this plus 128 KiB for multipart framing and small
+/// parts beside the file (such as a JSON part of up to 64 KiB); handlers
+/// check the file part itself.
 pub const MAX_UPLOAD_BYTES: usize = 25 * 1024 * 1024;
 
 /// Where a module's raw routes sit in the router.
@@ -295,7 +298,7 @@ impl<'a> ModuleContext<'a> {
     /// uploads, nested at `/m/<module>/upload`. They sit inside the
     /// authenticate layer like [`Self::routes`] (`Extension<Authn>`, the
     /// cookie CSRF check), with a body limit of [`MAX_UPLOAD_BYTES`] plus
-    /// 64 KiB and a 300 s timeout, instead of 1 MiB and 30 s. The limit
+    /// 128 KiB and a 300 s timeout, instead of 1 MiB and 30 s. The limit
     /// covers every extractor (axum's `DefaultBodyLimit` is off there), and
     /// a body over it gets 413. Read each file part with
     /// [`crate::upload::read_file`], which holds the file itself to

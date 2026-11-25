@@ -330,10 +330,10 @@ impl PdfSource {
         }
     }
 
-    const fn timeout(self) -> std::time::Duration {
+    const fn parse_class(self) -> pdf::ParseClass {
         match self {
-            Self::Base64 => pdf::BASE64_PARSE_TIMEOUT,
-            Self::Upload => pdf::UPLOAD_PARSE_TIMEOUT,
+            Self::Base64 => pdf::ParseClass::Small,
+            Self::Upload => pdf::ParseClass::Large,
         }
     }
 }
@@ -363,7 +363,7 @@ pub(crate) async fn create_draft(
     };
     check_file_name(&mut errors, name_field, &file.name);
     errors.into_result()?;
-    let page_count = match pdf::check(file.bytes.clone(), file.source.timeout()).await {
+    let page_count = match pdf::check(file.bytes.clone(), file.source.parse_class()).await {
         Ok(pages) => pages,
         Err(problem) => return Err(invalid(file.source.field(), problem)),
     };
@@ -733,8 +733,10 @@ async fn missing_page_count(
     let bytes = store::get_file(platform.db().read(), row, DocumentVersion::Original)
         .await?
         .ok_or_else(|| internal(anyhow::anyhow!("request {} has no original file", row.id)))?;
-    let pages = pdf::check(bytes, pdf::UPLOAD_PARSE_TIMEOUT).await.map_err(|problem| {
-        internal(anyhow::anyhow!("reading the page count of request {}: {problem}", row.id))
+    let pages = pdf::page_count(bytes).await.map_err(|problem| {
+        ApiError::Conflict(format!(
+            "the request's PDF can't be read to count its pages ({problem}); create a new request"
+        ))
     })?;
     Ok(Some(i64::from(pages)))
 }

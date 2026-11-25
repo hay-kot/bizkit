@@ -339,6 +339,35 @@ mod signing {
     }
 
     #[tokio::test]
+    async fn retries_keep_the_first_send_time_for_the_cap() {
+        let s = setup().await;
+        let signers: Vec<Value> = (0..10)
+            .map(
+                |n| json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test") }),
+            )
+            .collect();
+        let signers = Value::Array(signers);
+        let mut ids = Vec::new();
+        for _ in 0..10 {
+            ids.push(s.send(&signers).await);
+        }
+        s.app.clock.advance(Duration::from_mins(61));
+        let mut tx = s.app.app().platform().db().write().await.unwrap();
+        sqlx::query("UPDATE signing_requests SET status = 'failed', failure = 'test'")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        for id in &ids {
+            s.admin
+                .post(&s.path(&format!("requests/{id}/retry")), &json!({}))
+                .await
+                .expect(StatusCode::OK);
+        }
+        s.send(&signers).await;
+    }
+
+    #[tokio::test]
     async fn later_groups_count_toward_the_cap_at_the_first_send() {
         let s = setup().await;
         // 10 requests of 10 signers in two groups mail only 50 at first, but
