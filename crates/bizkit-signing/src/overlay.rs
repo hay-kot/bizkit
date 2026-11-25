@@ -265,20 +265,20 @@ fn content_streams(doc: &Document, page_id: ObjectId) -> anyhow::Result<Vec<Obje
 }
 
 /// How many `q` the original content leaves open after its lowest point,
-/// and how many `Q` it pops past its start. Content that can't be decoded
-/// counts as balanced, which is what most files are.
-fn unbalanced(doc: &Document, streams: &[Object]) -> (usize, usize) {
+/// and how many `Q` it pops past its start. Content that can't be read or
+/// decoded is an error rather than a guess, since a wrong count would let
+/// the original's state reach the overlay.
+fn unbalanced(doc: &Document, streams: &[Object]) -> anyhow::Result<(usize, usize)> {
     let mut bytes = Vec::new();
     for item in streams {
-        let Ok(stream) = resolve(doc, item).and_then(|o| o.as_stream().context("a content stream"))
-        else {
-            continue;
-        };
-        let Ok(content) = stream.get_plain_content() else { return (0, 0) };
+        let stream = resolve(doc, item)?.as_stream().context("a content item isn't a stream")?;
+        let content = stream.get_plain_content().context("decompressing a content stream")?;
         bytes.extend_from_slice(&content);
         bytes.push(b'\n');
     }
-    let Ok(content) = Content::decode(&bytes) else { return (0, 0) };
+    // Strict, because the lenient parser stops quietly at the first thing
+    // it can't read, and the count would cover only part of the page.
+    let content = Content::decode_strict(&bytes).context("the page's content can't be decoded")?;
     let (mut depth, mut lowest) = (0_i64, 0_i64);
     for op in &content.operations {
         match op.operator.as_str() {
@@ -290,9 +290,9 @@ fn unbalanced(doc: &Document, streams: &[Object]) -> (usize, usize) {
             _ => {}
         }
     }
-    let extra_close = usize::try_from(-lowest).unwrap_or(0);
-    let open = usize::try_from(depth - lowest).unwrap_or(0);
-    (open, extra_close)
+    let extra_close = usize::try_from(-lowest).context("counting Q")?;
+    let open = usize::try_from(depth - lowest).context("counting q")?;
+    Ok((open, extra_close))
 }
 
 fn operators(name: &str, count: usize) -> Vec<u8> {
@@ -314,7 +314,7 @@ fn wrapped_contents(
     name: &str,
 ) -> anyhow::Result<Vec<Object>> {
     let original = content_streams(doc, page_id)?;
-    let (open, extra_close) = unbalanced(doc, &original);
+    let (open, extra_close) = unbalanced(doc, &original)?;
     let pushes = 1 + extra_close;
     let open_stream = doc.add_object(Stream::new(dictionary! {}, operators("q", pushes)));
     let close_stream = doc.add_object(Stream::new(dictionary! {}, operators("Q", 1 + open)));
@@ -330,25 +330,31 @@ fn wrapped_contents(
     Ok(contents)
 }
 
-/// A copy of the page's resources, its own or inherited, with a copy of
-/// its `/XObject` dict holding `form` under a name the page doesn't use.
-fn own_resources(
-    doc: &Document,
-    page_id: ObjectId,
-    form: ObjectId,
-) -> anyhow::Result<(Dictionary, String)> {
-    let mut resources = match inherited(doc, page_id, b"Resources")? {
+/// Copies of the page's resources, its own or inherited, and of their
+/// `/XObject` dict.
+fn page_resources(doc: &Document, page_id: ObjectId) -> anyhow::Result<(Dictionary, Dictionary)> {
+    let resources = match inherited(doc, page_id, b"Resources")? {
         Some(Object::Dictionary(dict)) => dict.clone(),
         Some(_) => bail!("the page's Resources isn't a dictionary"),
         None => Dictionary::new(),
     };
-    let mut xobjects = match resources.get(b"XObject") {
+    let xobjects = match resources.get(b"XObject") {
         Ok(object) => resolve(doc, object)?
             .as_dict()
             .context("the page's XObject resources aren't a dictionary")?
             .clone(),
         Err(_) => Dictionary::new(),
     };
+    Ok((resources, xobjects))
+}
+
+/// The page's resources with `form` added under a name the page doesn't use.
+fn own_resources(
+    doc: &Document,
+    page_id: ObjectId,
+    form: ObjectId,
+) -> anyhow::Result<(Dictionary, String)> {
+    let (mut resources, mut xobjects) = page_resources(doc, page_id)?;
     let name = (0..1000)
         .map(|n| if n == 0 { XOBJECT_NAME.to_owned() } else { format!("{XOBJECT_NAME}{n}") })
         .find(|name| !xobjects.has(name.as_bytes()))
@@ -356,6 +362,16 @@ fn own_resources(
     xobjects.set(name.as_bytes().to_vec(), Object::Reference(form));
     resources.set("XObject", xobjects);
     Ok((resources, name))
+}
+
+/// Checks that [`apply`] can draw on the page: its box and rotation, its
+/// resources, and its content streams, which must resolve and decode.
+pub(crate) fn check_page(doc: &Document, page_id: ObjectId) -> anyhow::Result<()> {
+    page_box(doc, page_id)?;
+    page_resources(doc, page_id)?;
+    let streams = content_streams(doc, page_id)?;
+    unbalanced(doc, &streams)?;
+    Ok(())
 }
 
 /// Draws every filled field onto its page.
@@ -681,10 +697,58 @@ mod tests {
             Object::Stream(Stream::new(dictionary! {}, b"Q Q q 1 0 0 1 5 5 cm".to_vec())),
         );
         assert_eq!(
-            unbalanced(&doc, &streams),
+            unbalanced(&doc, &streams).unwrap(),
             (1, 2),
             "two pops past the start, then one push left open"
         );
+    }
+
+    /// `sample_pdf` with page `number`'s dict changed by `edit`.
+    fn with_page(number: u32, edit: impl FnOnce(&mut Document, ObjectId)) -> Document {
+        let mut doc = load(&SampleOptions::default(), &["One", "Two", "Three"]);
+        let id = page_id(&doc, number);
+        edit(&mut doc, id);
+        doc
+    }
+
+    #[test]
+    fn pages_that_cant_take_fields_are_found() {
+        let fine = with_page(3, |_, _| {});
+        assert!(fine.get_pages().values().all(|id| check_page(&fine, *id).is_ok()));
+        let bad_resources = with_page(3, |doc, id| {
+            doc.get_dictionary_mut(id).unwrap().set("Resources", 7);
+        });
+        assert!(check_page(&bad_resources, page_id(&bad_resources, 2)).is_ok());
+        assert!(check_page(&bad_resources, page_id(&bad_resources, 3)).is_err());
+        let not_a_stream = with_page(3, |doc, id| {
+            let target = doc.add_object(Object::Integer(1));
+            doc.get_dictionary_mut(id).unwrap().set("Contents", target);
+        });
+        assert!(check_page(&not_a_stream, page_id(&not_a_stream, 3)).is_err());
+        let array_of_numbers = with_page(3, |doc, id| {
+            let number = doc.add_object(Object::Integer(1));
+            doc.get_dictionary_mut(id).unwrap().set("Contents", vec![Object::Reference(number)]);
+        });
+        assert!(check_page(&array_of_numbers, page_id(&array_of_numbers, 3)).is_err());
+    }
+
+    #[test]
+    fn undecodable_content_is_an_error_not_a_guess() {
+        let unknown_filter = with_page(1, |doc, id| {
+            let odd = Stream::new(dictionary! { "Filter" => "JBIG2Decode" }, b"x".to_vec());
+            let stream = doc.add_object(odd);
+            doc.get_dictionary_mut(id).unwrap().set("Contents", stream);
+        });
+        assert!(check_page(&unknown_filter, page_id(&unknown_filter, 1)).is_err());
+        let mut doc = with_page(1, |doc, id| {
+            let cut = Stream::new(dictionary! {}, b"q 1 0 0 1 0 0 cm BT (cut off".to_vec());
+            let stream = doc.add_object(cut);
+            doc.get_dictionary_mut(id).unwrap().set("Contents", stream);
+        });
+        let id = page_id(&doc, 1);
+        assert!(check_page(&doc, id).is_err());
+        let field = Filled { page: 1, rect: RECT, mark: Mark::Check };
+        assert!(apply(&mut doc, &[field]).is_err(), "apply refuses rather than guessing");
     }
 
     #[test]

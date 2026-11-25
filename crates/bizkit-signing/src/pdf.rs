@@ -1,5 +1,6 @@
 //! Reading uploaded PDFs, and the final PDF's signatures and audit pages.
 
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use anyhow::Context as _;
@@ -19,6 +20,7 @@ const DRY_RUN_AT: UnixMillis = UnixMillis(1_795_000_000_000);
 pub(crate) const MAX_PAGES: usize = 500;
 
 const TOO_SLOW: &str = "took too long to check; try a smaller file";
+const UNDRAWABLE: &str = "must have pages bizkit can draw fields on: readable sizes, resources and content, turned by multiples of 90 degrees";
 
 /// Which queue a parse waits in and how long it may take, waiting included.
 /// Parses run one at a time per class, because a small file can inflate a
@@ -106,10 +108,10 @@ pub(crate) async fn check(bytes: Vec<u8>, class: ParseClass) -> Result<u32, &'st
         if pages > MAX_PAGES {
             return Err("must have at most 500 pages");
         }
-        // The editor places fields on every page, so each page's box must read.
-        let unreadable = doc.get_pages().values().any(|id| overlay::page_box(&doc, *id).is_err());
+        // The editor places fields on any page, so every page must take them.
+        let unreadable = doc.get_pages().values().any(|id| overlay::check_page(&doc, *id).is_err());
         if unreadable {
-            return Err("must have pages with readable sizes, turned by multiples of 90 degrees");
+            return Err(UNDRAWABLE);
         }
         // Fill sample fields and seal a copy with a throwaway key now, so a
         // file that can't take them, the added page or the seal is refused
@@ -121,6 +123,23 @@ pub(crate) async fn check(bytes: Vec<u8>, class: ParseClass) -> Result<u32, &'st
             return Err("must be a PDF bizkit can add pages to and seal");
         }
         u32::try_from(pages).map_err(|_| "must have at most 500 pages")
+    })
+    .await
+}
+
+/// The first of `pages` (from 1) that fields can't be drawn on, for drafts
+/// uploaded before [`check`] read every page. Files can be 25 MiB, so it
+/// waits in the large-upload queue.
+pub(crate) async fn first_undrawable_page(
+    bytes: Vec<u8>,
+    pages: BTreeSet<u32>,
+) -> Result<Option<u32>, &'static str> {
+    parse_in(ParseClass::Large, move || {
+        let doc = load(&bytes)?;
+        let ids = doc.get_pages();
+        Ok(pages
+            .into_iter()
+            .find(|page| ids.get(page).is_none_or(|id| overlay::check_page(&doc, *id).is_err())))
     })
     .await
 }
@@ -590,8 +609,17 @@ impl Pages {
             ),
             Operation::new("S", vec![]),
             Operation::new("Q", vec![]),
+            // A clip, so a signature that overflows can't print over the text.
+            Operation::new("q", vec![]),
+            Operation::new(
+                "re",
+                vec![x.into(), bottom.into(), width.into(), SIG_BOX_HEIGHT.into()],
+            ),
+            Operation::new("W", vec![]),
+            Operation::new("n", vec![]),
         ]);
         self.ops.extend(adopted(signature, (x, bottom, width, SIG_BOX_HEIGHT)));
+        self.ops.push(Operation::new("Q", vec![]));
         self.ops.extend(text_op((x, bottom - 10.0), Font::Regular, 7.0, caption));
     }
 
@@ -921,15 +949,47 @@ mod tests {
         let turned = edited(|doc, pages_id| {
             doc.get_dictionary_mut(pages_id).unwrap().set("Rotate", 45);
         });
-        assert_eq!(
-            check(turned, ParseClass::Small).await,
-            Err("must have pages with readable sizes, turned by multiples of 90 degrees")
-        );
+        assert_eq!(check(turned, ParseClass::Small).await, Err(UNDRAWABLE));
         let flat = edited(|doc, pages_id| {
             let flat = vec![0.into(), 0.into(), 612.into(), 0.into()];
             doc.get_dictionary_mut(pages_id).unwrap().set("MediaBox", flat);
         });
         assert!(check(flat, ParseClass::Small).await.is_err(), "a MediaBox with no area");
+    }
+
+    /// A three-page sample with page 3's dict changed by `edit`.
+    fn third_page(edit: impl FnOnce(&mut Document, ObjectId)) -> Vec<u8> {
+        let mut doc =
+            Document::load_mem(&crate::testing::sample_pdf(&["One", "Two", "Three"])).unwrap();
+        let id = doc.get_pages()[&3];
+        edit(&mut doc, id);
+        let mut out = Vec::new();
+        doc.save_to(&mut out).unwrap();
+        out
+    }
+
+    #[tokio::test]
+    async fn every_page_must_take_fields_not_just_the_first() {
+        let bad_resources = third_page(|doc, id| {
+            doc.get_dictionary_mut(id).unwrap().set("Resources", 7);
+        });
+        assert_eq!(check(bad_resources.clone(), ParseClass::Small).await, Err(UNDRAWABLE));
+        let not_a_stream = third_page(|doc, id| {
+            let target = doc.add_object(Object::Integer(1));
+            doc.get_dictionary_mut(id).unwrap().set("Contents", target);
+        });
+        assert_eq!(check(not_a_stream, ParseClass::Small).await, Err(UNDRAWABLE));
+        let undecodable = third_page(|doc, id| {
+            let cut = doc.add_object(Stream::new(dictionary! {}, b"BT (cut off".to_vec()));
+            doc.get_dictionary_mut(id).unwrap().set("Contents", cut);
+        });
+        assert_eq!(check(undecodable, ParseClass::Small).await, Err(UNDRAWABLE));
+
+        let pages = |list: &[u32]| list.iter().copied().collect::<BTreeSet<u32>>();
+        let fine = first_undrawable_page(bad_resources.clone(), pages(&[1, 2])).await;
+        assert_eq!(fine, Ok(None), "pages 1 and 2 are fine");
+        let found = first_undrawable_page(bad_resources, pages(&[1, 3])).await;
+        assert_eq!(found, Ok(Some(3)));
     }
 
     #[tokio::test]

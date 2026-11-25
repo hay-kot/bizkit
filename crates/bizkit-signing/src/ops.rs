@@ -850,6 +850,39 @@ pub(crate) async fn mail_group(
     Ok(())
 }
 
+fn field_pages(fields: &[FieldRow]) -> BTreeSet<u32> {
+    fields.iter().filter_map(|field| u32::try_from(field.page).ok()).collect()
+}
+
+/// The pages a draft has fields on, after checking that each can take
+/// them. Uploads check every page now, but drafts uploaded before that
+/// only had page 1 drawn on in the dry run. Returns no pages for anything
+/// but a draft; `send` refuses those itself.
+async fn check_field_pages(
+    platform: &Platform,
+    workspace_id: WorkspaceId,
+    request_id: SigningRequestId,
+) -> Result<BTreeSet<u32>, ApiError> {
+    let db = platform.db().read();
+    let row = store::find_request(db, workspace_id, request_id).await?.ok_or(ApiError::NotFound)?;
+    let pages = field_pages(&store::fields(db, workspace_id, request_id).await?);
+    if row.status != RequestStatus::Draft.as_str() || pages.is_empty() {
+        return Ok(pages);
+    }
+    let bytes = store::get_file(db, &row, DocumentVersion::Original)
+        .await?
+        .ok_or_else(|| internal(anyhow::anyhow!("request {} has no original file", row.id)))?;
+    match pdf::first_undrawable_page(bytes, pages.clone()).await {
+        Ok(None) => Ok(pages),
+        Ok(Some(page)) => Err(ApiError::Conflict(format!(
+            "page {page} of the PDF can't take fields; move its fields to other pages or create a new request"
+        ))),
+        Err(problem) => Err(ApiError::Conflict(format!(
+            "the request's PDF can't be checked ({problem}); create a new request"
+        ))),
+    }
+}
+
 struct RequestsSend;
 impl Operation for RequestsSend {
     type Input = InRequest;
@@ -860,13 +893,17 @@ impl Operation for RequestsSend {
     const ACCESS: Access = WRITE;
     const SUMMARY: &'static str = "Mail the first signing-order group their links";
     const TAGS: &'static [&'static str] = TAGS;
-    /// 409 when the request isn't a draft or a signer has no signature
-    /// field; 429 past 100 signer mails per workspace per hour.
+    /// 409 when the request isn't a draft, a signer has no signature
+    /// field, or a page with fields can't take them; 429 past 100 signer
+    /// mails per workspace per hour.
     const ERRORS: &'static [StatusCode] = &[StatusCode::CONFLICT, StatusCode::TOO_MANY_REQUESTS];
 
     async fn call(&self, cx: OpCtx, input: InRequest) -> Result<SigningRequest, ApiError> {
         let platform = cx.platform();
         let now = cx.now();
+        // Outside the write transaction: a 25 MiB parse must not hold the
+        // writer.
+        let checked = check_field_pages(platform, input.workspace_id, input.request_id).await?;
         let mut tx = cx.write().await?;
         let row = store::find_request(&mut *tx, input.workspace_id, input.request_id)
             .await?
@@ -880,6 +917,11 @@ impl Operation for RequestsSend {
                 "every signer needs a signature field; add one for {}",
                 unplaced.join(", ")
             )));
+        }
+        if field_pages(&store::fields(&mut *tx, row.workspace_id, row.id).await?) != checked {
+            return Err(ApiError::Conflict(
+                "the fields changed while sending; send again".to_owned(),
+            ));
         }
         // Later groups mail without a second check, so the cap counts every
         // signer of a request at its first send, and a request that passed

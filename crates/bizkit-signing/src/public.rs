@@ -50,6 +50,21 @@ pub(crate) fn router() -> Router {
         .route("/document", get(document))
         .route("/signed.pdf", get(signed_pdf))
         .layer(DefaultBodyLimit::max(MAX_BODY))
+        .layer(axum::middleware::map_response(private))
+}
+
+/// Every response, errors and rejections included: the token is in the
+/// request, so nothing is cached or sent on as a referrer. Responses
+/// without a CSP of their own get the JSON one.
+async fn private(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    if !headers.contains_key(header::CONTENT_SECURITY_POLICY) {
+        headers.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(JSON_CSP));
+    }
+    headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    response
 }
 
 #[derive(OpenApi)]
@@ -281,12 +296,10 @@ fn secure(response: &mut Response, csp: &str) {
 }
 
 fn json_response<T: Serialize>(result: Result<T, ApiError>) -> Response {
-    let mut response = match result {
+    match result {
         Ok(body) => (StatusCode::OK, Json(body)).into_response(),
         Err(err) => err.into_response(),
-    };
-    secure(&mut response, JSON_CSP);
-    response
+    }
 }
 
 fn parse<T: serde::de::DeserializeOwned>(body: &Bytes) -> Result<T, ApiError> {
@@ -351,15 +364,13 @@ async fn sign_redirect(
     Extension(platform): Extension<Platform>,
     Query(query): Query<TokenQuery>,
 ) -> Response {
-    let mut response = match crate::ops::sign_link(&platform, &query.t) {
+    match crate::ops::sign_link(&platform, &query.t) {
         Ok(url) => match HeaderValue::from_str(url.as_str()) {
             Ok(location) => (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response(),
             Err(err) => ApiError::Internal(err.into()).into_response(),
         },
         Err(err) => ApiError::Internal(err).into_response(),
-    };
-    secure(&mut response, JSON_CSP);
-    response
+    }
 }
 
 async fn viewed(
@@ -396,9 +407,7 @@ async fn viewed(
     if let Err(err) = recorded {
         tracing::warn!(error = format!("{err:#}"), "recording a view failed");
     }
-    let mut response = StatusCode::NO_CONTENT.into_response();
-    secure(&mut response, JSON_CSP);
-    response
+    StatusCode::NO_CONTENT.into_response()
 }
 
 /// What a sign POST stores.
@@ -624,9 +633,7 @@ async fn record_signature(
 
 fn failed(err: &anyhow::Error) -> Response {
     tracing::error!(error = format!("{err:#}"), "a signer file failed");
-    let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    secure(&mut response, JSON_CSP);
-    response
+    StatusCode::INTERNAL_SERVER_ERROR.into_response()
 }
 
 pub(crate) fn pdf_response(bytes: Vec<u8>, disposition: &str) -> Response {

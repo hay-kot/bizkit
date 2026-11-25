@@ -196,7 +196,14 @@ mod signing {
         let doc = s.app.client().get(&format!("/m/signing/public/document?t={}", tokens[0])).await;
         doc.expect(StatusCode::OK);
         assert_eq!(doc.headers[header::CONTENT_TYPE], "application/pdf");
-        s.session("nope").await.expect(StatusCode::NOT_FOUND);
+        let missing = s.session("nope").await;
+        missing.expect(StatusCode::NOT_FOUND);
+        let no_document = s.app.client().get("/m/signing/public/document?t=nope").await;
+        no_document.expect(StatusCode::NOT_FOUND);
+        for gone in [&missing, &no_document] {
+            assert_eq!(gone.headers[header::CACHE_CONTROL], "no-store");
+            assert_eq!(gone.headers[header::REFERRER_POLICY], "no-referrer");
+        }
     }
 
     #[tokio::test]
@@ -476,6 +483,60 @@ mod signing {
             .get(&format!("/m/signing/public/signed.pdf?t={}", tokens[0]))
             .await
             .expect(StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn send_refuses_a_draft_whose_field_page_cant_take_fields() {
+        let s = setup().await;
+        let body = json!({
+            "project_id": s.team.projects["site"].id,
+            "title": "Old upload",
+            "file_name": "old.pdf",
+            "pdf_base64": STANDARD.encode(sample_pdf(&["One", "Two", "Three"])),
+            "signers": [{ "name": "Ada Lovelace", "email": "ada@example.test" }],
+        });
+        let created = s.admin.post(&s.path("requests"), &body).await;
+        created.expect(StatusCode::CREATED);
+        let id = created["id"].as_str().unwrap().to_owned();
+        let signer = created["signers"][0].clone();
+        let place = |pages: &[u32]| {
+            let fields: Vec<Value> = pages
+                .iter()
+                .map(|page| {
+                    let mut field = signature_field(&signer);
+                    field["page"] = json!(page);
+                    field
+                })
+                .collect();
+            json!({ "fields": fields })
+        };
+        let fields_path = s.path(&format!("requests/{id}/fields"));
+        s.admin.send(Method::PUT, &fields_path, Some(&place(&[1, 3]))).await.expect(StatusCode::OK);
+
+        // A file that an older upload check let through: page 3's
+        // resources aren't a dictionary.
+        let mut doc = Document::load_mem(&sample_pdf(&["One", "Two", "Three"])).unwrap();
+        let third = doc.get_pages()[&3];
+        doc.get_dictionary_mut(third).unwrap().set("Resources", 7);
+        let mut bad = Vec::new();
+        doc.save_to(&mut bad).unwrap();
+        let mut tx = s.app.app().platform().db().write().await.unwrap();
+        sqlx::query("UPDATE signing_files SET bytes = ? WHERE kind = 'original'")
+            .bind(bad)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let send = s.path(&format!("requests/{id}/send"));
+        let refused = s.admin.post(&send, &json!({})).await;
+        refused.expect(StatusCode::CONFLICT);
+        let message = refused.body["error"]["message"].as_str().unwrap();
+        assert!(message.contains("page 3"), "{message}");
+        assert_eq!(s.app.mail.sent().len(), 0, "nothing mailed");
+
+        s.admin.send(Method::PUT, &fields_path, Some(&place(&[1, 2]))).await.expect(StatusCode::OK);
+        s.admin.post(&send, &json!({})).await.expect(StatusCode::OK);
     }
 
     #[tokio::test]

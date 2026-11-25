@@ -216,7 +216,8 @@ async fn record(
             Ok(SignedBy {
                 name: signer.name.clone(),
                 email: signer.email.clone(),
-                signing_order: u8::try_from(signer.signing_order).unwrap_or(1),
+                signing_order: u8::try_from(signer.signing_order)
+                    .with_context(|| format!("reading {}'s signing order", signer.email))?,
                 signed_at: signer.signed_at.unwrap_or(row.created_at),
                 ip,
                 user_agent,
