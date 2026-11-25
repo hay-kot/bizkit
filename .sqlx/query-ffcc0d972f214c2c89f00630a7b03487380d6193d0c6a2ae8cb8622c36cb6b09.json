@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM workspace_disabled_features WHERE workspace_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ffcc0d972f214c2c89f00630a7b03487380d6193d0c6a2ae8cb8622c36cb6b09"
+}

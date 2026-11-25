@@ -275,7 +275,8 @@ pub struct WorkspaceAccess {
 /// - [`ApiError::Unauthenticated`] without a `principal`.
 /// - [`ApiError::NotFound`] when `workspace_id` isn't a workspace ID, the
 ///   user isn't a member, or the API key belongs to another workspace.
-/// - [`ApiError::Forbidden`] when the role or key doesn't allow `scope`.
+/// - [`ApiError::Forbidden`] when the role or key doesn't allow `scope`, or
+///   an admin turned off the feature that declared its area.
 /// - [`ApiError::Internal`] when the membership lookup fails.
 pub async fn authorize_workspace(
     platform: &Platform,
@@ -297,6 +298,11 @@ pub async fn authorize_workspace(
     };
     if !grant.allows(scope) {
         return Err(ApiError::Forbidden(format!("missing scope {scope}")));
+    }
+    if let Some(feature) = platform.feature_of_area(scope.area())
+        && !platform.feature_enabled(workspace_id, feature).await.map_err(ApiError::Internal)?
+    {
+        return Err(ApiError::Forbidden(format!("the {feature} feature is off in this workspace")));
     }
     Ok(WorkspaceAccess { workspace_id, grant })
 }
