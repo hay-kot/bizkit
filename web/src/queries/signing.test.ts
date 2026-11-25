@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isSealing, nextSealPoll, type SigningSignerSession } from './signing'
+import { isSignerSealing, nextSealPoll, type SigningSignerSession } from './signing'
 
 const session = (allSigned: boolean, status: 'sent' | 'completed') =>
   ({
@@ -11,10 +11,10 @@ const session = (allSigned: boolean, status: 'sent' | 'completed') =>
 
 describe('the seal poll', () => {
   it('runs only while everyone signed and the request is still sent', () => {
-    expect(isSealing(session(true, 'sent'))).toBe(true)
-    expect(isSealing(session(false, 'sent')), 'others have yet to sign').toBe(false)
-    expect(isSealing(session(true, 'completed'))).toBe(false)
-    expect(isSealing(undefined)).toBe(false)
+    expect(isSignerSealing(session(true, 'sent'))).toBe(true)
+    expect(isSignerSealing(session(false, 'sent')), 'others have yet to sign').toBe(false)
+    expect(isSignerSealing(session(true, 'completed'))).toBe(false)
+    expect(isSignerSealing(undefined)).toBe(false)
   })
 
   it('backs off from 2 s to 15 s and stops after 2 minutes', () => {

@@ -49,8 +49,8 @@ wait_for() {
 log "building the web app"
 (cd "$root" && mise run web:build)
 
-log "building bizkit with test hooks and signing"
-(cd "$root" && cargo build --locked -p bizkit --features test-hooks,signing)
+log "building bizkit with test hooks"
+(cd "$root" && cargo build --locked -p bizkit --features test-hooks)
 bin="$root/target/debug/bizkit"
 
 workdir="$(mktemp -d)"
