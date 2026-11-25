@@ -37,19 +37,21 @@ interface Parser {
 }
 type Loader = () => Promise<Parser>
 
+// The Lezer grammars load without CodeMirror's editor packages, so a page
+// with static code alone stays light. Shell has no Lezer grammar; its legacy
+// mode needs @codemirror/language, which only pages with shell code load.
 const loaders: Record<Exclude<CodeLanguage, 'text'>, Loader> = {
-  javascript: async () => (await import('@codemirror/lang-javascript')).javascriptLanguage.parser,
+  javascript: async () => (await import('@lezer/javascript')).parser,
   'typescript-type': async () =>
-    (await import('@codemirror/lang-javascript')).typescriptLanguage.parser,
-  json: async () => (await import('@codemirror/lang-json')).jsonLanguage.parser,
-  html: async () => (await import('@codemirror/lang-html')).htmlLanguage.parser,
-  shell: async () => {
-    const [{ StreamLanguage }, { shell }] = await Promise.all([
-      import('@codemirror/language'),
-      import('@codemirror/legacy-modes/mode/shell'),
-    ])
-    return StreamLanguage.define(shell).parser
+    (await import('@lezer/javascript')).parser.configure({ dialect: 'ts' }),
+  json: async () => (await import('@lezer/json')).parser,
+  html: async () => {
+    const [html, js] = await Promise.all([import('@lezer/html'), import('@lezer/javascript')])
+    return html.parser.configure({
+      wrap: html.configureNesting([{ tag: 'script', parser: js.parser }]),
+    })
   },
+  shell: async () => (await import('./shellParser')).shellParser,
 }
 
 const parsers = new Map<CodeLanguage, Promise<Parser>>()

@@ -7,6 +7,7 @@ import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import { linkFromExplorer } from '@/components/analytics/insightDraft'
 import RangeToolbar from '@/components/analytics/RangeToolbar.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import Combobox from '@/components/ui/Combobox.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
@@ -270,11 +271,7 @@ const viewingFacts = computed(() => {
 
     <DetailPanel :open="viewing !== null" title="Event" @close="viewing = null">
       <DescriptionList :items="viewingFacts" />
-      <pre
-        v-if="viewing"
-        tabindex="0"
-        class="overflow-x-auto rounded-field bg-base-200 p-3 text-sm"
-      ><code>{{ JSON.stringify(viewing.props, null, 2) }}</code></pre>
+      <CodeBlock v-if="viewing" :code="JSON.stringify(viewing.props, null, 2)" language="json" />
     </DetailPanel>
   </AnalyticsShell>
 </template>

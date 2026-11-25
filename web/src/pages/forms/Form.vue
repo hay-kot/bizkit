@@ -10,6 +10,7 @@ import { fieldText, preview, sender } from '@/components/forms/submission'
 import Avatar from '@/components/ui/Avatar.vue'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailActions from '@/components/ui/DetailActions.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
@@ -240,12 +241,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       </div>
       <details>
         <summary class="cursor-pointer text-sm font-medium">HTML form</summary>
-        <div class="mt-2 flex items-start gap-2">
-          <pre tabindex="0" class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-xs">{{
-            html
-          }}</pre>
-          <CopyButton :text="html" label="Copy HTML" />
-        </div>
+        <CodeBlock class="mt-2" :code="html" language="html" copy="Copy HTML" />
         <p v-if="form.bot_check === 'challenge'" class="mt-2 text-xs text-base-content/80">
           The widget loads its challenge on page load (<code>auto="onload"</code>); timing counts
           from then.
@@ -253,12 +249,7 @@ const script = computed(() => (form.value ? fetchSnippet(form.value) : ''))
       </details>
       <details>
         <summary class="cursor-pointer text-sm font-medium">Post from script</summary>
-        <div class="mt-2 flex items-start gap-2">
-          <pre tabindex="0" class="flex-1 overflow-x-auto rounded-field bg-base-200 p-3 text-xs">{{
-            script
-          }}</pre>
-          <CopyButton :text="script" label="Copy script" />
-        </div>
+        <CodeBlock class="mt-2" :code="script" language="javascript" copy="Copy script" />
       </details>
     </Card>
 

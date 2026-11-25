@@ -38,7 +38,7 @@ watch(
       v-bind="$attrs"
       tabindex="0"
       class="min-w-0 flex-1 overflow-x-auto rounded-field bg-base-200 p-3 font-mono text-xs"
-      :class="{ 'break-all whitespace-pre-wrap': wrap }"
+      :class="{ 'wrap-break-word whitespace-pre-wrap': wrap }"
     ><code v-if="runs"><span v-for="(run, i) in runs" :key="i" :class="run.class || undefined">{{ run.text }}</span></code><code v-else>{{ code }}</code></pre>
     <CopyButton v-if="copy" :text="code" :label="copy" />
   </div>

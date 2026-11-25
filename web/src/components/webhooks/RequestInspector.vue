@@ -2,6 +2,7 @@
 import { Send } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailPanel from '@/components/ui/DetailPanel.vue'
@@ -142,11 +143,7 @@ function onReplay() {
           readonly
           :max-lines="40"
         />
-        <pre
-          v-else
-          tabindex="0"
-          class="overflow-x-auto rounded-field bg-base-200 p-3 text-xs break-all whitespace-pre-wrap"
-          >{{ body.text }}</pre>
+        <CodeBlock v-else :code="body.text" language="text" wrap />
       </section>
 
       <form class="flex flex-col gap-3" @submit.prevent="onReplay">

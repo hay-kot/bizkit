@@ -130,6 +130,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | Entities read one per row (Team, Projects, an inbox) | `List` with `ListItem`: `to` or `@select` makes the row the target, `#trailing` actions stay clickable; it handles loading, error and empty | `link-hover` is an error outside `components/ui` |
   | A few big things to pick from | `CardGrid` with `LinkCard`s | `grid-cols-*` is an error in `src/pages` |
   | Ordered steps with gaps between them | `Timeline` with `TimelineItem` (numbered marker, `#chip` for the gap) | |
+  | Code to read or copy (snippets, curl, JSON) | `CodeBlock` with a `language` (`javascript`, `typescript-type`, `json`, `html`, `shell`, `text`), `copy` for a copy button, `wrap` for long lines. It colors tokens with the editors' theme (`codeHighlight.ts`) and loads each parser on first use. Editable code uses `CodeEditor` or `JsonEditor` | `<pre>` is an error outside `components/ui` |
   | A choice | `Select` | `<select>`, `input[type=radio]` and DaisyUI `select*` classes are errors |
   | A choice from a long or open list, by typing | `Combobox` (grouped options with counts, `allowCustom` for free text) | |
   | A tick box | `Checkbox` | `input[type=checkbox]` and DaisyUI `checkbox`/`toggle` classes are errors |

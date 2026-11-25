@@ -10,6 +10,7 @@ import type { CasesResult } from '@/components/extensions/testCases'
 import { lineDiff, parseCases } from '@/components/extensions/testCases'
 import Card from '@/components/ui/Card.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
+import CodeBlock from '@/components/ui/CodeBlock.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import DescriptionList from '@/components/ui/DescriptionList.vue'
@@ -380,9 +381,7 @@ function summaryOf(run: Run): string {
             repeated runs must be harmless.
           </p>
           <p class="mt-3 mb-1 text-xs font-medium">Sample input</p>
-          <pre tabindex="0" class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
-            sampleInput
-          }}</pre>
+          <CodeBlock :code="sampleInput" language="json" />
         </details>
         <details v-if="hook" class="rounded-field border border-base-300 px-3 py-2">
           <summary class="cursor-pointer text-sm font-medium">What the script can call</summary>
@@ -548,13 +547,18 @@ function summaryOf(run: Run): string {
           </p>
           <p v-if="viewing.error" class="mb-3 text-sm text-error">{{ viewing.error }}</p>
           <h3 class="mb-1 text-xs font-semibold">Logs</h3>
-          <pre class="mb-3 overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
-            viewing.logs.length ? viewing.logs.join('\n') : '(none)'
-          }}</pre>
+          <CodeBlock
+            class="mb-3"
+            :code="viewing.logs.length ? viewing.logs.join('\n') : '(none)'"
+            language="text"
+          />
           <h3 class="mb-1 text-xs font-semibold">Output</h3>
-          <pre class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
-            viewing.output === null ? '(none)' : JSON.stringify(viewing.output, null, 2)
-          }}</pre>
+          <CodeBlock
+            v-if="viewing.output !== null"
+            :code="JSON.stringify(viewing.output, null, 2)"
+            language="json"
+          />
+          <CodeBlock v-else code="(none)" language="text" />
         </template>
       </DetailPanel>
 
@@ -575,8 +579,9 @@ function summaryOf(run: Run): string {
           </p>
           <template v-if="viewingDiff.length">
             <h3 class="mb-1 text-xs font-semibold">Expected (-) and returned (+)</h3>
+            <!-- eslint-disable-next-line vue/no-restricted-html-elements -- the diff colors whole lines, not tokens -->
             <pre
-              class="mb-3 overflow-x-auto rounded-field bg-base-200 p-2 text-xs"
+              class="mb-3 overflow-x-auto rounded-field bg-base-200 p-3 font-mono text-xs"
               data-testid="case-diff"
             ><span
               v-for="(line, i) in viewingDiff"
@@ -586,13 +591,18 @@ function summaryOf(run: Run): string {
             >{{ line.kind === 'removed' ? '-' : line.kind === 'added' ? '+' : ' ' }} {{ line.text }}</span></pre>
           </template>
           <h3 class="mb-1 text-xs font-semibold">Logs</h3>
-          <pre class="mb-3 overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
-            viewingCase.run.logs.length ? viewingCase.run.logs.join('\n') : '(none)'
-          }}</pre>
+          <CodeBlock
+            class="mb-3"
+            :code="viewingCase.run.logs.length ? viewingCase.run.logs.join('\n') : '(none)'"
+            language="text"
+          />
           <h3 class="mb-1 text-xs font-semibold">Returned</h3>
-          <pre class="overflow-x-auto rounded-field bg-base-200 p-2 text-xs">{{
-            viewingCase.run.output === null ? 'undefined' : pretty(viewingCase.run.output)
-          }}</pre>
+          <CodeBlock
+            v-if="viewingCase.run.output !== null"
+            :code="pretty(viewingCase.run.output)"
+            language="json"
+          />
+          <CodeBlock v-else code="undefined" language="text" />
         </template>
       </DetailPanel>
     </template>
