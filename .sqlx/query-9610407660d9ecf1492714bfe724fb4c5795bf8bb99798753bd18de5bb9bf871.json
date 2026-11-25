@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, signing_order, name,\n                  email, status,\n                  signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers WHERE token_hash = ?1 OR download_token_hash = ?1",
+  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, signing_order, name,\n                  email, status,\n                  signature, initials, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers WHERE token_hash = ?1 OR download_token_hash = ?1",
   "describe": {
     "columns": [
       {
@@ -103,8 +103,19 @@
         }
       },
       {
-        "name": "signed_at: UnixMillis",
+        "name": "initials",
         "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "initials"
+          }
+        }
+      },
+      {
+        "name": "signed_at: UnixMillis",
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -127,8 +138,9 @@
       false,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "2fecf3bad5d2879dd649690db6455dcaf3bb3fd932c270c540a3b118a540eeb6"
+  "hash": "9610407660d9ecf1492714bfe724fb4c5795bf8bb99798753bd18de5bb9bf871"
 }

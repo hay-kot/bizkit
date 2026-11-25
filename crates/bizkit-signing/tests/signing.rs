@@ -1,5 +1,5 @@
-//! The signer's side: the signing page, signatures, the seal and the
-//! completion mails.
+//! The signer's side: the session, signatures and field fills, the seal
+//! and the completion mails.
 
 #[cfg(test)]
 mod signing {
@@ -7,10 +7,13 @@ mod signing {
 
     use base64::Engine as _;
     use base64::engine::general_purpose::STANDARD;
+    use bizkit_core::time::UnixMillis;
     use bizkit_signing::Signing;
     use bizkit_signing::testing::sample_pdf;
-    use bizkit_testkit::{ApiResponse, Manifest, Persona, RawBody, SpecClient, TestApp};
+    use bizkit_testkit::{ApiResponse, BASE_URL, Manifest, Persona, SpecClient, TestApp};
     use http::{Method, StatusCode, header};
+    use lopdf::content::Content;
+    use lopdf::{Document, Object};
     use serde_json::{Value, json};
 
     struct Setup {
@@ -26,6 +29,14 @@ mod signing {
         Setup { app, team, admin }
     }
 
+    /// The token of the first sign link in `text`.
+    fn token(text: &str) -> String {
+        let prefix = format!("{BASE_URL}/sign?t=");
+        let word = text.split_whitespace().find(|word| word.starts_with(&prefix)).unwrap();
+        let url = url::Url::parse(word).unwrap();
+        url.query_pairs().find(|(k, _)| k == "t").unwrap().1.into_owned()
+    }
+
     /// The `/m/signing/public/...` path and query of the first link to `page` in `text`.
     fn link(text: &str, page: &str) -> String {
         let marker = format!("/m/signing/public/{page}?t=");
@@ -34,33 +45,57 @@ mod signing {
         format!("{marker}{rest}")
     }
 
+    fn signature_field(signer: &Value) -> Value {
+        json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
+                "x": 0.1, "y": 0.7, "width": 0.3, "height": 0.08 })
+    }
+
+    fn typed(name: &str) -> Value {
+        json!({ "kind": "typed", "name": name })
+    }
+
+    fn field_errors(response: &ApiResponse) -> Vec<String> {
+        let mut keys: Vec<String> =
+            response.body["error"]["fields"].as_object().unwrap().keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    /// The pages of a PDF, and the overlay `XObject`'s decoded operators on
+    /// `page`, if it has one.
+    fn overlay_ops(doc: &Document, page: u32) -> Option<Vec<lopdf::content::Operation>> {
+        let page = doc.get_dictionary(doc.get_pages()[&page]).unwrap();
+        let resources = page.get(b"Resources").ok()?.as_dict().ok()?;
+        let xobjects = resources.get(b"XObject").ok()?.as_dict().ok()?;
+        let form =
+            doc.get_object(xobjects.get(b"BizkitFields").ok()?.as_reference().unwrap()).unwrap();
+        let content = form.as_stream().unwrap().get_plain_content().unwrap();
+        Some(Content::decode(&content).unwrap().operations)
+    }
+
     impl Setup {
         fn path(&self, rest: &str) -> String {
             format!("/api/v1/workspaces/{}/signing/{rest}", self.team.workspaces["main"].id)
         }
 
-        /// Creates a request to `signers`, gives each a signature field and
-        /// sends it. Returns its ID.
-        async fn send(&self, signers: &Value) -> String {
+        /// Creates a request to `signers`, places the fields `fields` makes
+        /// from the created signers, and sends it. Returns the request.
+        async fn send_with(
+            &self,
+            signers: &Value,
+            fields: impl Fn(&[Value]) -> Vec<Value>,
+        ) -> Value {
             let body = json!({
                 "project_id": self.team.projects["site"].id,
                 "title": "Services agreement",
                 "file_name": "agreement.pdf",
-                "pdf_base64": STANDARD.encode(sample_pdf(&["Terms"])),
+                "pdf_base64": STANDARD.encode(sample_pdf(&["Terms", "Schedule"])),
                 "signers": signers,
             });
             let created = self.admin.post(&self.path("requests"), &body).await;
             created.expect(StatusCode::CREATED);
             let id = created["id"].as_str().unwrap().to_owned();
-            let fields: Vec<Value> = created["signers"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|signer| {
-                    json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
-                            "x": 0.1, "y": 0.7, "width": 0.3, "height": 0.08 })
-                })
-                .collect();
+            let fields = fields(created["signers"].as_array().unwrap());
             self.admin
                 .send(
                     Method::PUT,
@@ -74,10 +109,16 @@ mod signing {
                 .await
                 .expect(StatusCode::OK);
             self.app.drain_jobs().await;
-            id
+            self.detail(&id).await
         }
 
-        /// A sent request to Ada and Grace; their sign links, in that order.
+        /// [`send_with`] a signature field for each signer. Returns its ID.
+        async fn send(&self, signers: &Value) -> String {
+            let detail = self.send_with(signers, |s| s.iter().map(signature_field).collect()).await;
+            detail["request"]["id"].as_str().unwrap().to_owned()
+        }
+
+        /// A sent request to Ada and Grace; their link tokens, in that order.
         async fn sent(&self) -> (String, Vec<String>) {
             let id = self
                 .send(&json!([
@@ -85,24 +126,26 @@ mod signing {
                     { "name": "Grace Hopper", "email": "grace@example.test" },
                 ]))
                 .await;
-            let mails = self.app.mail.sent();
-            let link_for =
-                |to: &str| link(&mails.iter().find(|m| m.to == to).unwrap().text, "sign");
-            (id, vec![link_for("ada@example.test"), link_for("grace@example.test")])
+            (id, vec![self.token_for("ada@example.test"), self.token_for("grace@example.test")])
         }
 
-        async fn post_form(&self, path: &str, form: &[(&str, &str)]) -> ApiResponse {
-            let body =
-                url::form_urlencoded::Serializer::new(String::new()).extend_pairs(form).finish();
-            let raw = RawBody::new("application/x-www-form-urlencoded", body);
-            self.app.client().send_body(Method::POST, path, raw).await
+        fn token_for(&self, to: &str) -> String {
+            token(&self.app.mail.sent().iter().rev().find(|m| m.to == to).unwrap().text)
         }
 
-        async fn sign(&self, sign_link: &str, form: &[(&str, &str)]) -> ApiResponse {
-            let token = sign_link.split("t=").nth(1).unwrap();
-            let mut fields = vec![("t", token)];
-            fields.extend_from_slice(form);
-            self.post_form("/m/signing/public/sign", &fields).await
+        async fn session(&self, token: &str) -> ApiResponse {
+            self.app.client().get(&format!("/m/signing/public/session?t={token}")).await
+        }
+
+        async fn sign(&self, token: &str, body: &Value) -> ApiResponse {
+            let mut body = body.clone();
+            body["t"] = json!(token);
+            self.app.client().post("/m/signing/public/sign", &body).await
+        }
+
+        /// Signs with consent and a typed signature, and nothing else.
+        async fn sign_as(&self, token: &str, name: &str) -> ApiResponse {
+            self.sign(token, &json!({ "consent": true, "signature": typed(name) })).await
         }
 
         async fn detail(&self, id: &str) -> Value {
@@ -112,20 +155,36 @@ mod signing {
                 .expect(StatusCode::OK)
                 .json()
         }
+
+        async fn signed_pdf(&self, id: &str) -> Document {
+            let doc =
+                self.admin.get(&self.path(&format!("requests/{id}/document?version=signed"))).await;
+            doc.expect(StatusCode::OK);
+            let pdf = STANDARD.decode(doc["pdf_base64"].as_str().unwrap()).unwrap();
+            assert!(pdf.windows(19).any(|w| w == b"ETSI.CAdES.detached"), "a PAdES signature");
+            Document::load_mem(&pdf).unwrap()
+        }
     }
 
     #[tokio::test]
-    async fn the_page_shows_the_document_and_changes_nothing() {
+    async fn the_session_shows_the_signers_fields_and_changes_nothing() {
         let s = setup().await;
-        let (id, links) = s.sent().await;
-        let page = s.app.client().get(&links[0]).await;
-        page.expect(StatusCode::OK);
-        assert!(page.text.contains("Services agreement"), "{}", page.text);
-        assert!(page.text.contains("Hi Ada Lovelace"), "{}", page.text);
-        assert!(page.text.contains("<iframe src=\"document?t="), "{}", page.text);
-        let csp = page.headers[header::CONTENT_SECURITY_POLICY].to_str().unwrap();
-        assert!(csp.contains("script-src 'nonce-"), "{csp}");
-        assert!(csp.contains("frame-src 'self'"), "{csp}");
+        let (id, tokens) = s.sent().await;
+        let session = s.session(&tokens[0]).await;
+        session.expect(StatusCode::OK);
+        assert_eq!(session["request"]["title"], "Services agreement");
+        assert_eq!(session["request"]["status"], "sent");
+        assert_eq!(session["request"]["page_count"], 2);
+        assert_eq!(session["signer"]["name"], "Ada Lovelace");
+        assert_eq!(session["signer"]["status"], "pending");
+        assert!(session["consent"].as_str().unwrap().contains("electronically"));
+        let fields = session["fields"].as_array().unwrap();
+        assert_eq!(fields.len(), 1, "only Ada's own field");
+        let ada = s.detail(&id).await["request"]["signers"][0]["id"].clone();
+        assert_eq!(fields[0]["signer_id"], ada);
+        assert_eq!(session.headers[header::CACHE_CONTROL], "no-store");
+        assert_eq!(session.headers[header::REFERRER_POLICY], "no-referrer");
+
         let kinds: Vec<Value> = s.detail(&id).await["events"]
             .as_array()
             .unwrap()
@@ -134,19 +193,29 @@ mod signing {
             .collect();
         assert!(!kinds.contains(&json!("viewed")), "a GET records nothing: {kinds:?}");
 
-        let doc = s.app.client().get(&links[0].replace("/sign?", "/document?")).await;
+        let doc = s.app.client().get(&format!("/m/signing/public/document?t={}", tokens[0])).await;
         doc.expect(StatusCode::OK);
         assert_eq!(doc.headers[header::CONTENT_TYPE], "application/pdf");
-        s.app.client().get("/m/signing/public/sign?t=nope").await.expect(StatusCode::NOT_FOUND);
+        s.session("nope").await.expect(StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn old_sign_links_go_to_the_web_app() {
+        let s = setup().await;
+        let old = s.app.client().get("/m/signing/public/sign?t=abc%2Bdef").await;
+        old.expect(StatusCode::SEE_OTHER);
+        assert_eq!(old.headers[header::LOCATION], format!("{BASE_URL}/sign?t=abc%2Bdef"));
+        assert_eq!(old.headers[header::REFERRER_POLICY], "no-referrer");
     }
 
     #[tokio::test]
     async fn a_view_is_recorded_once() {
         let s = setup().await;
-        let (id, links) = s.sent().await;
-        let token = links[0].split("t=").nth(1).unwrap();
+        let (id, tokens) = s.sent().await;
         for _ in 0..3 {
-            s.post_form("/m/signing/public/viewed", &[("t", token)])
+            s.app
+                .client()
+                .post("/m/signing/public/viewed", &json!({ "t": tokens[0] }))
                 .await
                 .expect(StatusCode::NO_CONTENT);
         }
@@ -157,56 +226,190 @@ mod signing {
             .filter(|e| e["kind"] == "viewed")
             .count();
         assert_eq!(views, 1);
+        s.app
+            .client()
+            .post("/m/signing/public/viewed", &json!({}))
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    /// A sent request where Ada has one field of each kind plus an optional
+    /// text, and Grace a signature: its ID, the field IDs in order, and
+    /// Ada's token.
+    async fn request_with_every_kind(s: &Setup) -> (String, Vec<String>, String) {
+        let detail = s
+            .send_with(
+                &json!([
+                    { "name": "Ada Lovelace", "email": "ada@example.test" },
+                    { "name": "Grace Hopper", "email": "grace@example.test" },
+                ]),
+                |signers| {
+                    let field = |signer: &Value, kind: &str, page: u32, y: f64, extra: Value| {
+                        let mut field = json!({ "signer_id": signer["id"], "kind": kind, "page": page,
+                                                "x": 0.1, "y": y, "width": 0.3, "height": 0.05 });
+                        field.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+                        field
+                    };
+                    let (ada, grace) = (&signers[0], &signers[1]);
+                    vec![
+                        field(ada, "signature", 1, 0.1, json!({})),
+                        field(ada, "initials", 2, 0.1, json!({})),
+                        field(ada, "date", 1, 0.2, json!({})),
+                        field(ada, "text", 2, 0.3, json!({ "label": "Company" })),
+                        field(ada, "checkbox", 2, 0.4, json!({})),
+                        field(ada, "text", 2, 0.5, json!({ "required": false, "label": "Notes" })),
+                        field(grace, "signature", 1, 0.6, json!({})),
+                    ]
+                },
+            )
+            .await;
+        let id = detail["request"]["id"].as_str().unwrap().to_owned();
+        let ids: Vec<String> = detail["fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["id"].as_str().unwrap().to_owned())
+            .collect();
+        let ada = s.token_for("ada@example.test");
+        (id, ids, ada)
     }
 
     #[tokio::test]
-    async fn signing_needs_consent_and_a_signature() {
+    async fn signing_needs_consent_and_every_required_field() {
         let s = setup().await;
-        let (_, links) = s.sent().await;
-        let no_consent = s.sign(&links[0], &[("kind", "typed"), ("typed_name", "Ada")]).await;
-        no_consent.expect(StatusCode::UNPROCESSABLE_ENTITY);
-        assert!(no_consent.text.contains("Tick the box"), "{}", no_consent.text);
-        let empty =
-            s.sign(&links[0], &[("consent", "yes"), ("kind", "drawn"), ("strokes", "")]).await;
+        let (_, ids, ada) = request_with_every_kind(&s).await;
+
+        let empty = s.sign(&ada, &json!({ "consent": false })).await;
         empty.expect(StatusCode::UNPROCESSABLE_ENTITY);
-        assert!(empty.text.contains("Draw your signature"), "{}", empty.text);
+        let mut expected = vec![
+            "consent".to_owned(),
+            format!("fields.{}", ids[3]),
+            format!("fields.{}", ids[4]),
+            "initials".to_owned(),
+            "signature".to_owned(),
+        ];
+        expected.sort();
+        assert_eq!(field_errors(&empty), expected, "the optional text may stay empty");
+
+        let wrong = s
+            .sign(
+                &ada,
+                &json!({
+                    "consent": true,
+                    "signature": typed("Ada Lovelace"),
+                    "initials": typed("AL"),
+                    "values": [
+                        { "field_id": ids[6], "text": "Grace's" },
+                        { "field_id": ids[3], "text": "Line\nbreak" },
+                        { "field_id": ids[4], "checked": false },
+                    ],
+                }),
+            )
+            .await;
+        wrong.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            field_errors(&wrong),
+            [
+                format!("fields.{}", ids[4]),
+                "values[0].field_id".to_owned(),
+                "values[1].text".to_owned()
+            ],
+            "another signer's field, two lines, and a required box left clear"
+        );
+    }
+
+    #[tokio::test]
+    async fn fills_are_stored_drawn_and_listed_on_the_certificate() {
+        let s = setup().await;
+        let (id, ids, ada) = request_with_every_kind(&s).await;
+        // 23:30 UTC on 2026-01-01, the fake clock's first day: the date
+        // field takes the server's UTC day.
+        s.app.clock.set(UnixMillis(1_767_310_200_000));
+        let drawn =
+            json!({ "kind": "drawn", "strokes": [[[10, 10], [200, 150]], [[300, 20], [500, 40]]] });
+        let signed = s
+            .sign(
+                &ada,
+                &json!({
+                    "consent": true,
+                    "signature": typed("Ada Lovelace"),
+                    "initials": drawn,
+                    "values": [
+                        { "field_id": ids[3], "text": "  Acme Ltd " },
+                        { "field_id": ids[4], "checked": true },
+                    ],
+                }),
+            )
+            .await;
+        signed.expect(StatusCode::OK);
+        assert_eq!(signed["status"], "sent", "Grace is still to sign");
+
+        let fields = s.detail(&id).await["fields"].clone();
+        assert_eq!(fields[0]["value"], json!({ "kind": "signed" }));
+        assert_eq!(fields[1]["value"], json!({ "kind": "initialed" }));
+        assert_eq!(fields[2]["value"], json!({ "kind": "date", "date": "2026-01-01" }));
+        assert_eq!(fields[3]["value"], json!({ "kind": "text", "text": "Acme Ltd" }));
+        assert_eq!(fields[4]["value"], json!({ "kind": "checkbox", "checked": true }));
+        assert_eq!(fields[5]["value"], Value::Null, "the optional text stays empty");
+        assert_eq!(fields[5]["filled_at"], Value::Null);
+        assert_eq!(fields[2]["filled_at"], "2026-01-01T23:30:00Z");
+        assert_eq!(fields[6]["value"], Value::Null, "Grace's field waits for her");
+
+        let session = s.session(&ada).await;
+        assert_eq!(session["signer"]["status"], "signed");
+        assert_eq!(session["fields"][2]["value"]["date"], "2026-01-01");
+        s.sign_as(&ada, "Ada Lovelace").await.expect(StatusCode::NOT_FOUND);
+
+        s.sign_as(&s.token_for("grace@example.test"), "Grace Hopper").await.expect(StatusCode::OK);
+        s.app.drain_jobs().await;
+        let doc = s.signed_pdf(&id).await;
+        let pages = u32::try_from(doc.get_pages().len()).unwrap();
+        assert!(pages >= 3, "two pages and the certificate");
+        let schedule = overlay_ops(&doc, 2).unwrap();
+        let strings: Vec<&[u8]> = schedule
+            .iter()
+            .filter(|op| op.operator == "Tj")
+            .map(|op| op.operands[0].as_str().unwrap())
+            .collect();
+        assert_eq!(strings, [&b"Acme Ltd"[..]], "drawn initials and the tick are paths");
+        assert!(
+            schedule.iter().filter(|op| op.operator == "S").count() >= 3,
+            "two strokes and a tick"
+        );
+        let certificate: Vec<u32> = (3..=pages).collect();
+        let text = doc.extract_text(&certificate).unwrap();
+        assert!(text.contains("Page 2, Text 'Company': Acme Ltd"), "{text}");
+        assert!(text.contains("Page 2, Checkbox: ticked"), "{text}");
+        assert!(text.contains("Page 1, Date: 2026-01-01"), "{text}");
+        assert!(!text.contains("Notes"), "only filled fields are listed: {text}");
     }
 
     #[tokio::test]
     async fn a_voided_request_takes_no_more_signatures() {
         let s = setup().await;
-        let (id, links) = s.sent().await;
-        let ada = s
-            .sign(
-                &links[0],
-                &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Ada Lovelace")],
-            )
-            .await;
-        ada.expect(StatusCode::OK);
-        assert!(ada.text.contains("Thank you"), "{}", ada.text);
+        let (id, tokens) = s.sent().await;
+        s.sign_as(&tokens[0], "Ada Lovelace").await.expect(StatusCode::OK);
         s.admin
             .post(&s.path(&format!("requests/{id}/void")), &json!({}))
             .await
             .expect(StatusCode::OK);
-        // A voided request takes no more signatures.
-        s.sign(&links[1], &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Grace")])
-            .await
-            .expect(StatusCode::NOT_FOUND);
+        s.sign_as(&tokens[1], "Grace").await.expect(StatusCode::NOT_FOUND);
         // Nor does it promise Ada a signed copy.
-        s.app.client().get(&links[0]).await.expect(StatusCode::NOT_FOUND);
+        s.session(&tokens[0]).await.expect(StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
     async fn everyone_signs_and_gets_the_sealed_pdf() {
         let s = setup().await;
-        let (id, links) = s.sent().await;
-        s.sign(&links[0], &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Ada Lovelace")])
-            .await
-            .expect(StatusCode::OK);
-        let strokes = "[[[10,10],[200,150],[400,40]],[[500,200],[900,250]]]";
-        s.sign(&links[1], &[("consent", "yes"), ("kind", "drawn"), ("strokes", strokes)])
-            .await
-            .expect(StatusCode::OK);
+        let (id, tokens) = s.sent().await;
+        s.sign_as(&tokens[0], "Ada Lovelace").await.expect(StatusCode::OK);
+        let strokes = json!([[[10, 10], [200, 150], [400, 40]], [[500, 200], [900, 250]]]);
+        s.sign(
+            &tokens[1],
+            &json!({ "consent": true, "signature": { "kind": "drawn", "strokes": strokes } }),
+        )
+        .await
+        .expect(StatusCode::OK);
         s.admin
             .post(&s.path(&format!("requests/{id}/void")), &json!({}))
             .await
@@ -226,12 +429,28 @@ mod signing {
         let signed = detail["events"][3]["detail"].as_str().unwrap();
         assert!(signed.contains("I agree to sign this document electronically"), "{signed}");
 
-        let doc = s.admin.get(&s.path(&format!("requests/{id}/document?version=signed"))).await;
-        doc.expect(StatusCode::OK);
-        assert_eq!(doc["file_name"], "agreement-signed.pdf");
-        assert_eq!(doc["sha256"], detail["request"]["signed_sha256"]);
-        let pdf = STANDARD.decode(doc["pdf_base64"].as_str().unwrap()).unwrap();
-        assert!(pdf.windows(19).any(|w| w == b"ETSI.CAdES.detached"), "a PAdES signature");
+        let doc = s.signed_pdf(&id).await;
+        assert_eq!(doc.get_pages().len(), 3, "the two pages and one certificate page");
+        let page1 = overlay_ops(&doc, 1).expect("the fields' overlay on page 1");
+        let typed: Vec<(&[u8], &[u8])> = page1
+            .iter()
+            .filter(|op| op.operator == "Tf" || op.operator == "Tj")
+            .collect::<Vec<_>>()
+            .chunks(2)
+            .map(|pair| {
+                (pair[0].operands[0].as_name().unwrap(), pair[1].operands[0].as_str().unwrap())
+            })
+            .collect();
+        assert_eq!(typed, [(&b"F3"[..], &b"Ada Lovelace"[..])], "Ada's typed signature, oblique");
+        assert!(page1.iter().any(|op| op.operator == "l"), "Grace's strokes");
+        assert!(overlay_ops(&doc, 2).is_none(), "no fields on page 2");
+        let contents = doc.get_dictionary(doc.get_pages()[&1]).unwrap().get(b"Contents").unwrap();
+        assert_eq!(contents.as_array().unwrap().len(), 4, "q, the original, Q, the overlay");
+        let text = doc.extract_text(&[3]).unwrap();
+        assert!(text.contains("Certificate of completion"), "{text}");
+        assert!(text.contains("Ada Lovelace <ada@example.test>"), "{text}");
+        assert!(text.contains("Page 1, Signature: signed"), "{text}");
+        assert!(!text.contains("Audit trail"), "the certificate replaces the old pages: {text}");
 
         let mails = s.app.mail.sent();
         let to: Vec<&str> = mails.iter().map(|m| m.to.as_str()).collect();
@@ -248,31 +467,77 @@ mod signing {
             file.headers[header::CONTENT_DISPOSITION],
             "attachment; filename=\"agreement-signed.pdf\""
         );
-        // The sign link still works and leads to the download.
-        let page = s.app.client().get(&links[0]).await;
-        page.expect(StatusCode::OK);
-        assert!(page.text.contains("Download the signed PDF"), "{}", page.text);
+        // The sign link still opens the session and leads to the download.
+        let session = s.session(&tokens[0]).await;
+        session.expect(StatusCode::OK);
+        assert_eq!(session["request"]["status"], "completed");
         s.app
             .client()
-            .get(&links[0].replace("/sign?", "/signed.pdf?"))
+            .get(&format!("/m/signing/public/signed.pdf?t={}", tokens[0]))
             .await
             .expect(StatusCode::OK);
     }
 
     #[tokio::test]
+    async fn a_request_from_before_fields_completes_with_its_signatures() {
+        let s = setup().await;
+        let (id, tokens) = s.sent().await;
+        let mut tx = s.app.app().platform().db().write().await.unwrap();
+        sqlx::query("DELETE FROM signing_fields").execute(&mut *tx).await.unwrap();
+        sqlx::query("UPDATE signing_requests SET page_count = NULL")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let session = s.session(&tokens[0]).await;
+        assert_eq!(session["fields"], json!([]));
+        assert_eq!(session["request"]["page_count"], Value::Null);
+        let refused = s
+            .sign(
+                &tokens[0],
+                &json!({ "consent": true, "signature": typed("Ada"), "initials": typed("A") }),
+            )
+            .await;
+        refused.expect(StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(field_errors(&refused), ["initials"]);
+        for (token, name) in tokens.iter().zip(["Ada Lovelace", "Grace Hopper"]) {
+            s.sign_as(token, name).await.expect(StatusCode::OK);
+        }
+        s.app.drain_jobs().await;
+        assert_eq!(s.detail(&id).await["request"]["status"], "completed");
+        let doc = s.signed_pdf(&id).await;
+        assert_eq!(doc.get_pages().len(), 3);
+        assert!(overlay_ops(&doc, 1).is_none(), "nothing drawn on the pages");
+        let certificate = doc.get_dictionary(doc.get_pages()[&3]).unwrap();
+        let content = doc.get_page_content(doc.get_pages()[&3]).unwrap();
+        let ops = Content::decode(&content).unwrap().operations;
+        let names: Vec<&[u8]> = ops
+            .iter()
+            .filter(|op| op.operator == "Tj")
+            .filter_map(|op| op.operands[0].as_str().ok())
+            .filter(|text| *text == b"Ada Lovelace" || *text == b"Grace Hopper")
+            .collect();
+        assert_eq!(
+            names,
+            [&b"Ada Lovelace"[..], b"Grace Hopper"],
+            "the signatures print on the certificate"
+        );
+        assert!(matches!(certificate.get(b"Rotate"), Ok(Object::Integer(0))));
+    }
+
+    #[tokio::test]
     async fn a_broken_original_fails_after_three_tries_and_can_be_retried() {
         let s = setup().await;
-        let (id, links) = s.sent().await;
+        let (id, tokens) = s.sent().await;
         let mut tx = s.app.app().platform().db().write().await.unwrap();
         sqlx::query("UPDATE signing_files SET bytes = x'00' WHERE kind = 'original'")
             .execute(&mut *tx)
             .await
             .unwrap();
         tx.commit().await.unwrap();
-        for link in &links {
-            s.sign(link, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Someone")])
-                .await
-                .expect(StatusCode::OK);
+        for token in &tokens {
+            s.sign_as(token, "Someone").await.expect(StatusCode::OK);
         }
         for _ in 0..4 {
             s.app.drain_jobs().await;
@@ -293,37 +558,26 @@ mod signing {
             .expect(StatusCode::CONFLICT);
     }
 
-    #[tokio::test]
-    async fn a_workspace_mails_at_most_100_signers_an_hour() {
-        let s = setup().await;
-        let signers: Vec<Value> = (0..10)
-            .map(
-                |n| json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test") }),
+    /// Creates a request to `signers` with a signature field each, and
+    /// tries to send it.
+    async fn create_and_send(s: &Setup, signers: &Value) -> ApiResponse {
+        let created = s
+            .admin
+            .post(
+                &s.path("requests"),
+                &json!({
+                    "project_id": s.team.projects["site"].id,
+                    "title": "One too many",
+                    "file_name": "x.pdf",
+                    "pdf_base64": STANDARD.encode(sample_pdf(&["x"])),
+                    "signers": signers,
+                }),
             )
-            .collect();
-        let signers = Value::Array(signers);
-        for _ in 0..10 {
-            s.send(&signers).await;
-        }
-        let body = json!({
-            "project_id": s.team.projects["site"].id,
-            "title": "Bulk",
-            "file_name": "bulk.pdf",
-            "pdf_base64": STANDARD.encode(sample_pdf(&["x"])),
-            "signers": signers,
-        });
-        let created = s.admin.post(&s.path("requests"), &body).await;
+            .await;
         created.expect(StatusCode::CREATED);
         let id = created["id"].as_str().unwrap();
-        let fields: Vec<Value> = created["signers"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|signer| {
-                json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
-                        "x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1 })
-            })
-            .collect();
+        let fields: Vec<Value> =
+            created["signers"].as_array().unwrap().iter().map(signature_field).collect();
         s.admin
             .send(
                 Method::PUT,
@@ -332,21 +586,34 @@ mod signing {
             )
             .await
             .expect(StatusCode::OK);
-        s.admin
-            .post(&s.path(&format!("requests/{id}/send")), &json!({}))
-            .await
-            .expect(StatusCode::TOO_MANY_REQUESTS);
+        s.admin.post(&s.path(&format!("requests/{id}/send")), &json!({})).await
+    }
+
+    fn ten_signers(group: impl Fn(u8) -> u8) -> Value {
+        Value::Array(
+            (0..10)
+                .map(|n| {
+                    json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test"),
+                            "signing_order": group(n) })
+                })
+                .collect(),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_workspace_mails_at_most_100_signers_an_hour() {
+        let s = setup().await;
+        let signers = ten_signers(|_| 1);
+        for _ in 0..10 {
+            s.send(&signers).await;
+        }
+        create_and_send(&s, &signers).await.expect(StatusCode::TOO_MANY_REQUESTS);
     }
 
     #[tokio::test]
     async fn retries_keep_the_first_send_time_for_the_cap() {
         let s = setup().await;
-        let signers: Vec<Value> = (0..10)
-            .map(
-                |n| json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test") }),
-            )
-            .collect();
-        let signers = Value::Array(signers);
+        let signers = ten_signers(|_| 1);
         let mut ids = Vec::new();
         for _ in 0..10 {
             ids.push(s.send(&signers).await);
@@ -372,52 +639,12 @@ mod signing {
         let s = setup().await;
         // 10 requests of 10 signers in two groups mail only 50 at first, but
         // count 100.
-        let signers: Vec<Value> = (0..10)
-            .map(|n| {
-                json!({ "name": format!("Signer {n}"), "email": format!("s{n}@example.test"),
-                        "signing_order": 1 + n / 5 })
-            })
-            .collect();
-        let signers = Value::Array(signers);
+        let signers = ten_signers(|n| 1 + n / 5);
         for _ in 0..10 {
             s.send(&signers).await;
         }
         assert_eq!(s.app.mail.sent().len(), 50, "only the first groups");
-        let created = s
-            .admin
-            .post(
-                &s.path("requests"),
-                &json!({
-                    "project_id": s.team.projects["site"].id,
-                    "title": "One too many",
-                    "file_name": "x.pdf",
-                    "pdf_base64": STANDARD.encode(sample_pdf(&["x"])),
-                    "signers": signers,
-                }),
-            )
-            .await;
-        let id = created["id"].as_str().unwrap();
-        let fields: Vec<Value> = created["signers"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|signer| {
-                json!({ "signer_id": signer["id"], "kind": "signature", "page": 1,
-                        "x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1 })
-            })
-            .collect();
-        s.admin
-            .send(
-                Method::PUT,
-                &s.path(&format!("requests/{id}/fields")),
-                Some(&json!({ "fields": fields })),
-            )
-            .await
-            .expect(StatusCode::OK);
-        s.admin
-            .post(&s.path(&format!("requests/{id}/send")), &json!({}))
-            .await
-            .expect(StatusCode::TOO_MANY_REQUESTS);
+        create_and_send(&s, &signers).await.expect(StatusCode::TOO_MANY_REQUESTS);
     }
 
     #[tokio::test]
@@ -434,10 +661,7 @@ mod signing {
         let to: Vec<&str> = first.iter().map(|m| m.to.as_str()).collect();
         assert_eq!(to, ["ada@example.test"], "only the lowest group");
 
-        let ada = link(&first[0].text, "sign");
-        s.sign(&ada, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Ada Lovelace")])
-            .await
-            .expect(StatusCode::OK);
+        s.sign_as(&token(&first[0].text), "Ada Lovelace").await.expect(StatusCode::OK);
         s.app.drain_jobs().await;
         let second = s.app.mail.take();
         let mut together: Vec<&str> = second.iter().map(|m| m.to.as_str()).collect();
@@ -453,18 +677,16 @@ mod signing {
             .collect();
         assert_eq!(kinds, ["created", "sent", "signed", "sent", "sent"]);
 
-        let grace =
-            link(&second.iter().find(|m| m.to == "grace@example.test").unwrap().text, "sign");
-        s.sign(&grace, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Grace Hopper")])
-            .await
-            .expect(StatusCode::OK);
+        let token_to =
+            |address: &str| token(&second.iter().find(|m| m.to == address).unwrap().text);
+        s.sign_as(&token_to("grace@example.test"), "Grace Hopper").await.expect(StatusCode::OK);
         s.app.drain_jobs().await;
         assert!(s.app.mail.take().is_empty(), "Alan's group is still signing");
-        let alan = link(&second.iter().find(|m| m.to == "alan@example.test").unwrap().text, "sign");
-        s.sign(&alan, &[("consent", "yes"), ("kind", "typed"), ("typed_name", "Alan Turing")])
-            .await
-            .expect(StatusCode::OK);
+        s.sign_as(&token_to("alan@example.test"), "Alan Turing").await.expect(StatusCode::OK);
         s.app.drain_jobs().await;
         assert_eq!(s.detail(&id).await["request"]["status"], "completed");
+        let doc = s.signed_pdf(&id).await;
+        let text = doc.extract_text(&[3]).unwrap();
+        assert!(text.contains("Signing order 5"), "{text}");
     }
 }

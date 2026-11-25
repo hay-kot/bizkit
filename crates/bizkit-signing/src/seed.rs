@@ -127,6 +127,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
                 email: email.to_owned(),
                 status: "pending".to_owned(),
                 signature: None,
+                initials: None,
                 signed_at: None,
             };
             store::insert_signer(&mut *tx, &signer).await?;
@@ -150,7 +151,7 @@ pub(crate) async fn seed(db: &Db, seed: &DemoSeed) -> anyhow::Result<()> {
             if let Some(typed) = signed {
                 let signature =
                     serde_json::to_string(&Signature::Typed { name: typed.to_owned() })?;
-                store::mark_signed(&mut *tx, &signer, &signature, seed.now).await?;
+                store::mark_signed(&mut *tx, &signer, &signature, None, seed.now).await?;
                 store::insert_event(
                     &mut *tx,
                     NewEvent {

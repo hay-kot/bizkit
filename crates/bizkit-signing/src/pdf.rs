@@ -5,8 +5,10 @@ use std::time::Duration;
 use anyhow::Context as _;
 use bizkit_core::time::UnixMillis;
 use lopdf::content::{Content, Operation};
-use lopdf::{Document, Object, ObjectId, Stream, StringFormat, dictionary};
+use lopdf::{Dictionary, Document, Object, ObjectId, Stream, StringFormat, dictionary};
 
+use crate::fields::{FieldKind, FieldValue};
+use crate::overlay::{self, Filled, Mark, Rect};
 use crate::seal::{self, SealKey};
 use crate::signature::{PAD_HEIGHT, PAD_WIDTH, Signature};
 
@@ -104,10 +106,16 @@ pub(crate) async fn check(bytes: Vec<u8>, class: ParseClass) -> Result<u32, &'st
         if pages > MAX_PAGES {
             return Err("must have at most 500 pages");
         }
-        // Seal a copy with a throwaway key now, so a file that can't take the
-        // added pages or the seal is refused here instead of after everyone signed.
+        // The editor places fields on every page, so each page's box must read.
+        let unreadable = doc.get_pages().values().any(|id| overlay::page_box(&doc, *id).is_err());
+        if unreadable {
+            return Err("must have pages with readable sizes, turned by multiples of 90 degrees");
+        }
+        // Fill sample fields and seal a copy with a throwaway key now, so a
+        // file that can't take them, the added page or the seal is refused
+        // here instead of after everyone signed.
         let sealed = SealKey::generate("bizkit", DRY_RUN_AT)
-            .and_then(|key| seal::seal(append(doc, &Record::dry_run())?, &key, DRY_RUN_AT));
+            .and_then(|key| seal::seal(finish(doc, &Record::dry_run())?, &key, DRY_RUN_AT));
         if let Err(err) = sealed {
             tracing::info!(error = format!("{err:#}"), "an upload can't be sealed");
             return Err("must be a PDF bizkit can add pages to and seal");
@@ -174,7 +182,7 @@ pub(crate) fn win_ansi(c: char) -> Option<u8> {
 }
 
 /// `text` in `WinAnsi`; characters the standard fonts lack print as `?`.
-fn encode(text: &str) -> Vec<u8> {
+pub(crate) fn encode(text: &str) -> Vec<u8> {
     text.chars().map(|c| if c.is_control() { b' ' } else { win_ansi(c).unwrap_or(b'?') }).collect()
 }
 
@@ -217,13 +225,54 @@ pub(crate) fn utc(at: UnixMillis) -> String {
     )
 }
 
-/// One signer, as the signatures page prints them.
+/// A filled field, as the certificate lists it and the overlay draws it.
+#[derive(Debug, Clone)]
+pub(crate) struct FieldRecord {
+    pub(crate) page: u32,
+    pub(crate) rect: Rect,
+    pub(crate) kind: FieldKind,
+    pub(crate) label: String,
+    pub(crate) value: FieldValue,
+}
+
+impl FieldRecord {
+    /// `Page 2, Text 'Company': Acme`.
+    fn line(&self) -> String {
+        let kind = match self.kind {
+            FieldKind::Signature => "Signature",
+            FieldKind::Initials => "Initials",
+            FieldKind::Date => "Date",
+            FieldKind::Text => "Text",
+            FieldKind::Checkbox => "Checkbox",
+        };
+        let label =
+            if self.label.is_empty() { String::new() } else { format!(" '{}'", self.label) };
+        let value = match &self.value {
+            FieldValue::Signed => "signed",
+            FieldValue::Initialed => "initialed",
+            FieldValue::Date { date } => date,
+            FieldValue::Text { text } => text,
+            FieldValue::Checkbox { checked: true } => "ticked",
+            FieldValue::Checkbox { checked: false } => "not ticked",
+        };
+        format!("Page {}, {kind}{label}: {value}", self.page)
+    }
+}
+
+/// One signer, as the certificate prints them.
 #[derive(Debug, Clone)]
 pub(crate) struct SignedBy {
     pub(crate) name: String,
     pub(crate) email: String,
+    pub(crate) signing_order: u8,
     pub(crate) signed_at: UnixMillis,
+    /// From the signer's `signed` event.
+    pub(crate) ip: Option<String>,
+    pub(crate) user_agent: Option<String>,
     pub(crate) signature: Signature,
+    pub(crate) initials: Option<Signature>,
+    /// Their filled fields. Empty for requests made before fields.
+    pub(crate) fields: Vec<FieldRecord>,
 }
 
 /// One audit line.
@@ -234,7 +283,8 @@ pub(crate) struct AuditLine {
     pub(crate) client: Option<String>,
 }
 
-/// What the appended pages say.
+/// What the final PDF shows: the fields on their pages, and the
+/// certificate page.
 #[derive(Debug, Clone)]
 pub(crate) struct Record {
     pub(crate) title: String,
@@ -247,9 +297,18 @@ pub(crate) struct Record {
 }
 
 impl Record {
-    /// A record as long as a typical one, for the upload's dry run.
+    /// A record as long as a typical one, with one field of each kind on
+    /// page 1, for the upload's dry run.
     fn dry_run() -> Self {
         let at = DRY_RUN_AT;
+        let drawn = Signature::Drawn { strokes: vec![vec![[0, 0], [PAD_WIDTH, PAD_HEIGHT]]] };
+        let field = |y: f64, kind, value| FieldRecord {
+            page: 1,
+            rect: Rect { x: 0.1, y, width: 0.3, height: 0.05 },
+            kind,
+            label: String::new(),
+            value,
+        };
         Self {
             title: "Dry run".to_owned(),
             file_name: "upload.pdf".to_owned(),
@@ -259,25 +318,114 @@ impl Record {
             signers: vec![SignedBy {
                 name: "Signer".to_owned(),
                 email: "signer@example.test".to_owned(),
+                signing_order: 1,
                 signed_at: at,
-                signature: Signature::Drawn {
-                    strokes: vec![vec![[0, 0], [PAD_WIDTH, PAD_HEIGHT]]],
-                },
+                ip: None,
+                user_agent: None,
+                signature: drawn,
+                initials: Some(Signature::Typed { name: "SG".to_owned() }),
+                fields: vec![
+                    field(0.1, FieldKind::Signature, FieldValue::Signed),
+                    field(0.2, FieldKind::Initials, FieldValue::Initialed),
+                    field(0.3, FieldKind::Date, FieldValue::Date { date: "2026-11-24".to_owned() }),
+                    field(0.4, FieldKind::Text, FieldValue::Text { text: "Acme".to_owned() }),
+                    field(0.5, FieldKind::Checkbox, FieldValue::Checkbox { checked: true }),
+                ],
             }],
             audit: vec![AuditLine { at, what: "Signed".to_owned(), client: None }],
         }
     }
+
+    /// The fields to draw, with each signer's adopted signature and
+    /// initials in theirs.
+    fn filled(&self) -> Vec<Filled<'_>> {
+        let mut filled = Vec::new();
+        for signer in &self.signers {
+            for field in &signer.fields {
+                let mark = match &field.value {
+                    FieldValue::Signed => signer.signature.mark(),
+                    FieldValue::Initialed => match &signer.initials {
+                        Some(initials) => initials.mark(),
+                        None => continue,
+                    },
+                    FieldValue::Date { date } => Mark::Date(date),
+                    FieldValue::Text { text } => Mark::Text(text),
+                    FieldValue::Checkbox { checked: true } => Mark::Check,
+                    FieldValue::Checkbox { checked: false } => continue,
+                };
+                filled.push(Filled { page: field.page, rect: field.rect, mark });
+            }
+        }
+        filled
+    }
 }
 
-const PAGE_WIDTH: f32 = 612.0;
-const PAGE_HEIGHT: f32 = 792.0;
-const MARGIN: f32 = 56.0;
-const BOTTOM: f32 = 56.0;
-const SIG_BOX_WIDTH: f32 = 280.0;
-const SIG_BOX_HEIGHT: f32 = 84.0;
+const PAGE_WIDTH: f64 = 612.0;
+const PAGE_HEIGHT: f64 = 792.0;
+const MARGIN: f64 = 56.0;
+const BOTTOM: f64 = 56.0;
+const SIG_BOX_WIDTH: f64 = 200.0;
+const INITIALS_BOX_WIDTH: f64 = 80.0;
+const SIG_BOX_HEIGHT: f64 = 60.0;
+/// The smallest text a field shrinks to; longer text is clipped.
+const MIN_TEXT_SIZE: f64 = 6.0;
+/// Helvetica's cap height, in thousandths of the font size.
+const CAP_HEIGHT: f64 = 718.0;
 
+/// Helvetica's glyph widths in thousandths of the font size, by `WinAnsi`
+/// byte, from the standard 14 font AFM metrics. Helvetica-Oblique has the
+/// same widths. Bytes `WinAnsi` leaves undefined are 0; [`encode`] never
+/// produces them.
+#[rustfmt::skip]
+const HELVETICA_WIDTHS: [u16; 256] = [
+    // 0x00 - 0x1f: control codes
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    // 0x20: space ! " # $ % & ' ( ) * + , - . /
+    278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
+    // 0x30: 0-9 : ; < = > ?
+    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
+    // 0x40: @ A-O
+    1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,
+    // 0x50: P-Z [ \ ] ^ _
+    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,
+    // 0x60: ` a-o
+    333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556,
+    // 0x70: p-z { | } ~ (0x7f undefined)
+    556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584, 0,
+    // 0x80: Euro, -, quotesinglbase, florin, quotedblbase, ellipsis, dagger,
+    // daggerdbl, circumflex, perthousand, Scaron, guilsinglleft, OE, -, Zcaron, -
+    556, 0, 222, 556, 333, 1000, 556, 556, 333, 1000, 667, 333, 1000, 0, 611, 0,
+    // 0x90: -, quoteleft, quoteright, quotedblleft, quotedblright, bullet,
+    // endash, emdash, tilde, trademark, scaron, guilsinglright, oe, -, zcaron, Ydieresis
+    0, 222, 222, 333, 333, 350, 556, 1000, 333, 1000, 500, 333, 944, 0, 500, 667,
+    // 0xa0: nbsp, exclamdown, cent, sterling, currency, yen, brokenbar, section,
+    // dieresis, copyright, ordfeminine, guillemotleft, logicalnot, hyphen, registered, macron
+    278, 333, 556, 556, 556, 556, 260, 556, 333, 737, 370, 556, 584, 333, 737, 333,
+    // 0xb0: degree, plusminus, twosuperior, threesuperior, acute, mu, paragraph,
+    // periodcentered, cedilla, onesuperior, ordmasculine, guillemotright,
+    // onequarter, onehalf, threequarters, questiondown
+    400, 584, 333, 333, 333, 556, 537, 278, 333, 333, 365, 556, 834, 834, 834, 611,
+    // 0xc0: Agrave-Aring, AE, Ccedilla, Egrave-Edieresis, Igrave-Idieresis
+    667, 667, 667, 667, 667, 667, 1000, 722, 667, 667, 667, 667, 278, 278, 278, 278,
+    // 0xd0: Eth, Ntilde, Ograve-Odieresis, multiply, Oslash, Ugrave-Udieresis, Yacute, Thorn, germandbls
+    722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611,
+    // 0xe0: agrave-aring, ae, ccedilla, egrave-edieresis, igrave-idieresis
+    556, 556, 556, 556, 556, 556, 889, 500, 556, 556, 556, 556, 278, 278, 278, 278,
+    // 0xf0: eth, ntilde, ograve-odieresis, divide, oslash, ugrave-udieresis, yacute, thorn, ydieresis
+    556, 556, 556, 556, 556, 556, 556, 584, 611, 556, 556, 556, 556, 500, 556, 500,
+];
+
+/// The width of `text` in Helvetica at size 1, in points.
+fn text_width(text: &str) -> f64 {
+    let width = |byte: &u8| HELVETICA_WIDTHS.get(usize::from(*byte)).copied().unwrap_or(0);
+    let thousandths: u32 = encode(text).iter().map(|byte| u32::from(width(byte))).sum();
+    f64::from(thousandths) / 1000.0
+}
+
+/// The standard 14 fonts the added content uses, by resource name.
 #[derive(Debug, Clone, Copy)]
-enum Font {
+pub(crate) enum Font {
     Regular,
     Bold,
     Italic,
@@ -293,12 +441,107 @@ impl Font {
     }
 }
 
+/// A `/Resources` object with the three [`Font`]s.
+pub(crate) fn font_resources(doc: &mut Document) -> ObjectId {
+    let mut font = |base: &str| {
+        doc.add_object(dictionary! {
+            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => base, "Encoding" => "WinAnsiEncoding",
+        })
+    };
+    let (regular, bold, italic) =
+        (font("Helvetica"), font("Helvetica-Bold"), font("Helvetica-Oblique"));
+    let fonts: Dictionary = dictionary! { "F1" => regular, "F2" => bold, "F3" => italic };
+    doc.add_object(dictionary! { "Font" => fonts })
+}
+
+/// Text with its baseline at `(x, y)`. Strings go in hex, so no text can
+/// close the string and inject operators.
+fn text_op((x, y): (f64, f64), font: Font, size: f64, text: &str) -> Vec<Operation> {
+    vec![
+        Operation::new("BT", vec![]),
+        Operation::new("Tf", vec![Object::Name(font.name().as_bytes().to_vec()), size.into()]),
+        Operation::new("Td", vec![x.into(), y.into()]),
+        Operation::new("Tj", vec![Object::String(encode(text), StringFormat::Hexadecimal)]),
+        Operation::new("ET", vec![]),
+    ]
+}
+
+/// One line of `text` in the box `(x, y, width, height)`: sized to the
+/// height, shrunk to fit the width down to 6 pt, and centred vertically.
+/// Regular or italic only; their widths are the ones measured.
+pub(crate) fn fitted_text(
+    font: Font,
+    text: &str,
+    (x, y, width, height): (f64, f64, f64, f64),
+) -> Vec<Operation> {
+    let pad = (height * 0.1).min(width * 0.05);
+    let room = pad.mul_add(-2.0, width);
+    let em = text_width(text);
+    let mut size = height * 0.7;
+    if em * size > room && em > 0.0 {
+        size = (room / em).max(MIN_TEXT_SIZE);
+    }
+    let baseline = y + size.mul_add(-CAP_HEIGHT / 1000.0, height) / 2.0;
+    text_op((x + pad, baseline), font, size, text)
+}
+
+/// Pad strokes scaled into the box `(x, y, width, height)`: the drawing's
+/// own extent fills 90% of the box with its aspect ratio kept, centred,
+/// and the pad's y-down points flipped.
+pub(crate) fn strokes(
+    strokes: &[Vec<[u16; 2]>],
+    (x, y, width, height): (f64, f64, f64, f64),
+) -> Vec<Operation> {
+    let all = || strokes.iter().flatten();
+    let (Some(min_x), Some(max_x), Some(min_y), Some(max_y)) = (
+        all().map(|p| p[0]).min(),
+        all().map(|p| p[0]).max(),
+        all().map(|p| p[1]).min(),
+        all().map(|p| p[1]).max(),
+    ) else {
+        return Vec::new();
+    };
+    let extent_x = f64::from(max_x - min_x).max(1.0);
+    let extent_y = f64::from(max_y - min_y).max(1.0);
+    let scale = (width * 0.9 / extent_x).min(height * 0.9 / extent_y);
+    let left = extent_x.mul_add(-scale, width) / 2.0 + x;
+    let bottom = extent_y.mul_add(-scale, height) / 2.0 + y;
+    let point = |[px, py]: [u16; 2]| -> (f64, f64) {
+        (f64::from(px - min_x).mul_add(scale, left), f64::from(max_y - py).mul_add(scale, bottom))
+    };
+    let mut ops = vec![
+        Operation::new("q", vec![]),
+        Operation::new("w", vec![(scale * 5.0).clamp(0.6, 2.5).into()]),
+        Operation::new("J", vec![1.into()]),
+        Operation::new("j", vec![1.into()]),
+    ];
+    for stroke in strokes {
+        let mut path = stroke.iter().map(|p| point(*p));
+        let Some((start_x, start_y)) = path.next() else { continue };
+        ops.push(Operation::new("m", vec![start_x.into(), start_y.into()]));
+        for (to_x, to_y) in path {
+            ops.push(Operation::new("l", vec![to_x.into(), to_y.into()]));
+        }
+        ops.push(Operation::new("S", vec![]));
+    }
+    ops.push(Operation::new("Q", vec![]));
+    ops
+}
+
+/// A signature or initials in the box `(x, y, width, height)`.
+fn adopted(signature: &Signature, area: (f64, f64, f64, f64)) -> Vec<Operation> {
+    match signature {
+        Signature::Drawn { strokes: drawn } => strokes(drawn, area),
+        Signature::Typed { name } => fitted_text(Font::Italic, name, area),
+    }
+}
+
 /// Lays out pages top to bottom, starting a new page when one fills.
 #[derive(Default)]
 struct Pages {
     done: Vec<Vec<Operation>>,
     ops: Vec<Operation>,
-    y: f32,
+    y: f64,
 }
 
 impl Pages {
@@ -306,94 +549,80 @@ impl Pages {
         Self { done: Vec::new(), ops: Vec::new(), y: PAGE_HEIGHT - MARGIN }
     }
 
-    fn need(&mut self, height: f32) {
+    fn need(&mut self, height: f64) {
         if self.y - height < BOTTOM {
             self.done.push(std::mem::take(&mut self.ops));
             self.y = PAGE_HEIGHT - MARGIN;
         }
     }
 
-    /// Text at `x` on the current line; strings go in hex, so no text
-    /// can close the string and inject operators.
-    fn text_at(&mut self, (x, y): (f32, f32), font: Font, size: f32, text: &str) {
-        self.ops.extend([
-            Operation::new("BT", vec![]),
-            Operation::new("Tf", vec![Object::Name(font.name().as_bytes().to_vec()), size.into()]),
-            Operation::new("Td", vec![x.into(), y.into()]),
-            Operation::new("Tj", vec![Object::String(encode(text), StringFormat::Hexadecimal)]),
-            Operation::new("ET", vec![]),
-        ]);
-    }
-
-    fn line(&mut self, font: Font, size: f32, text: &str) {
+    fn line(&mut self, font: Font, size: f64, text: &str) {
         let height = size * 1.4;
         self.need(height);
         self.y -= height;
-        self.text_at((MARGIN, self.y), font, size, text);
+        self.ops.extend(text_op((MARGIN, self.y), font, size, text));
     }
 
-    fn paragraph(&mut self, size: f32, width: usize, text: &str) {
+    fn paragraph(&mut self, size: f64, width: usize, text: &str) {
         for line in wrap(text, width) {
             self.line(Font::Regular, size, &line);
         }
     }
 
-    fn gap(&mut self, height: f32) {
+    fn gap(&mut self, height: f64) {
         self.y -= height;
     }
 
-    fn signature(&mut self, signer: &SignedBy) {
-        self.need(SIG_BOX_HEIGHT + 48.0);
-        let top = self.y - 8.0;
-        let bottom = top - SIG_BOX_HEIGHT;
+    /// An outlined box at `(x, bottom)` holding `signature`, captioned.
+    fn adopted_box(
+        &mut self,
+        (x, bottom, width): (f64, f64, f64),
+        caption: &str,
+        signature: &Signature,
+    ) {
         self.ops.extend([
             Operation::new("q", vec![]),
             Operation::new("G", vec![0.7.into()]),
             Operation::new("w", vec![0.5.into()]),
             Operation::new(
                 "re",
-                vec![MARGIN.into(), bottom.into(), SIG_BOX_WIDTH.into(), SIG_BOX_HEIGHT.into()],
+                vec![x.into(), bottom.into(), width.into(), SIG_BOX_HEIGHT.into()],
             ),
             Operation::new("S", vec![]),
             Operation::new("Q", vec![]),
         ]);
-        match &signer.signature {
-            Signature::Drawn { strokes } => self.strokes(strokes, bottom),
-            Signature::Typed { name } => {
-                self.text_at((MARGIN + 12.0, bottom + 30.0), Font::Italic, 26.0, name);
-            }
-        }
-        self.y = bottom;
-        self.line(Font::Bold, 10.0, &format!("{} <{}>", signer.name, signer.email));
-        self.line(Font::Regular, 9.0, &format!("Signed {}", utc(signer.signed_at)));
-        self.gap(14.0);
+        self.ops.extend(adopted(signature, (x, bottom, width, SIG_BOX_HEIGHT)));
+        self.ops.extend(text_op((x, bottom - 10.0), Font::Regular, 7.0, caption));
     }
 
-    fn strokes(&mut self, strokes: &[Vec<[u16; 2]>], bottom: f32) {
-        let scale_x = SIG_BOX_WIDTH / f32::from(PAD_WIDTH);
-        let scale_y = SIG_BOX_HEIGHT / f32::from(PAD_HEIGHT);
-        let point = |[x, y]: [u16; 2]| -> (f32, f32) {
-            (
-                f32::mul_add(f32::from(x), scale_x, MARGIN),
-                f32::mul_add(f32::from(PAD_HEIGHT.saturating_sub(y)), scale_y, bottom),
-            )
-        };
-        self.ops.extend([
-            Operation::new("q", vec![]),
-            Operation::new("w", vec![1.4.into()]),
-            Operation::new("J", vec![1.into()]),
-            Operation::new("j", vec![1.into()]),
-        ]);
-        for stroke in strokes {
-            let mut points = stroke.iter().map(|p| point(*p));
-            let Some((start_x, start_y)) = points.next() else { continue };
-            self.ops.push(Operation::new("m", vec![start_x.into(), start_y.into()]));
-            for (x, y) in points {
-                self.ops.push(Operation::new("l", vec![x.into(), y.into()]));
-            }
-            self.ops.push(Operation::new("S", vec![]));
+    fn signer(&mut self, signer: &SignedBy) {
+        self.need(60.0);
+        self.line(Font::Bold, 10.0, &format!("{} <{}>", signer.name, signer.email));
+        self.line(
+            Font::Regular,
+            9.0,
+            &format!("Signing order {} - signed {}", signer.signing_order, utc(signer.signed_at)),
+        );
+        if signer.ip.is_some() || signer.user_agent.is_some() {
+            let client = format!(
+                "IP {} - {}",
+                signer.ip.as_deref().unwrap_or("unknown"),
+                signer.user_agent.as_deref().unwrap_or("unknown browser")
+            );
+            self.paragraph(7.5, 125, &client);
         }
-        self.ops.push(Operation::new("Q", vec![]));
+        self.need(SIG_BOX_HEIGHT + 24.0);
+        let bottom = self.y - 6.0 - SIG_BOX_HEIGHT;
+        self.adopted_box((MARGIN, bottom, SIG_BOX_WIDTH), "Signature", &signer.signature);
+        if let Some(initials) = &signer.initials {
+            let x = MARGIN + SIG_BOX_WIDTH + 12.0;
+            self.adopted_box((x, bottom, INITIALS_BOX_WIDTH), "Initials", initials);
+        }
+        self.y = bottom - 14.0;
+        for field in &signer.fields {
+            self.paragraph(8.5, 110, &field.line());
+        }
+        self.gap(14.0);
     }
 
     fn finish(mut self) -> Vec<Vec<Operation>> {
@@ -404,62 +633,70 @@ impl Pages {
     }
 }
 
-fn layout(record: &Record) -> Vec<Vec<Operation>> {
-    let mut pages = Pages::new();
-    pages.line(Font::Bold, 18.0, "Signatures");
-    pages.paragraph(10.0, 90, &record.title);
-    pages.paragraph(
+/// The certificate: a summary, each signer with their adopted signature
+/// and fields, then the events.
+fn layout(record: &Record, pages: usize) -> Vec<Vec<Operation>> {
+    let mut out = Pages::new();
+    out.line(Font::Bold, 18.0, "Certificate of completion");
+    out.paragraph(10.0, 90, &record.title);
+    out.paragraph(9.0, 100, &format!("Request {} - sent by {}", record.request_id, record.sender));
+    let pages = if pages == 1 { "1 page".to_owned() } else { format!("{pages} pages") };
+    out.paragraph(
         8.0,
         110,
-        &format!("{} - SHA-256 of the original: {}", record.file_name, record.original_sha256),
-    );
-    pages.gap(10.0);
-    for signer in &record.signers {
-        pages.signature(signer);
-    }
-    pages.done.push(std::mem::take(&mut pages.ops));
-    pages.y = PAGE_HEIGHT - MARGIN;
-
-    pages.line(Font::Bold, 18.0, "Audit trail");
-    pages.paragraph(
-        9.0,
-        100,
         &format!(
-            "Request {} - \"{}\" - sent by {}",
-            record.request_id, record.title, record.sender
-        ),
-    );
-    pages.paragraph(
-        9.0,
-        100,
-        &format!(
-            "The original file ({}) has SHA-256 {}; bizkit keeps it with this request. Each signer received a \
-             private link by email, so their identity rests on control of that address. Each signer agreed to sign \
-             electronically before signing. bizkit sealed this file with its platform certificate after the last \
-             signature; any change to the file breaks the seal.",
+            "{} - {pages} - SHA-256 of the original: {}",
             record.file_name, record.original_sha256
         ),
     );
-    pages.gap(8.0);
-    for entry in &record.audit {
-        pages.line(Font::Bold, 8.5, &utc(entry.at));
-        pages.paragraph(8.5, 110, &entry.what);
-        if let Some(client) = &entry.client {
-            pages.paragraph(7.5, 125, client);
-        }
-        pages.gap(4.0);
+    out.gap(4.0);
+    out.paragraph(
+        9.0,
+        100,
+        "bizkit keeps the original file with this request. Each signer received a private link by email, so \
+         their identity rests on control of that address. Each signer agreed to sign electronically before \
+         signing, and their fields were drawn onto the pages above. bizkit sealed this file with its \
+         platform certificate after the last signature; any change to the file breaks the seal.",
+    );
+    out.gap(10.0);
+    out.line(Font::Bold, 13.0, "Signers");
+    out.gap(4.0);
+    for signer in &record.signers {
+        out.signer(signer);
     }
-    pages.finish()
+    out.gap(6.0);
+    out.line(Font::Bold, 13.0, "Events");
+    out.gap(4.0);
+    for entry in &record.audit {
+        out.line(Font::Bold, 8.5, &utc(entry.at));
+        out.paragraph(8.5, 110, &entry.what);
+        if let Some(client) = &entry.client {
+            out.paragraph(7.5, 125, client);
+        }
+        out.gap(4.0);
+    }
+    out.finish()
 }
 
-/// Loads the original and appends the signatures and audit pages.
+/// Loads the original, draws the fields on its pages and appends the
+/// certificate.
 pub(crate) fn assemble(original: &[u8], record: &Record) -> anyhow::Result<Document> {
     let doc = Document::load_mem(original).context("reading the original PDF")?;
-    append(doc, record)
+    finish(doc, record)
 }
 
-/// Appends the signatures and audit pages to `doc`.
-fn append(mut doc: Document, record: &Record) -> anyhow::Result<Document> {
+fn finish(mut doc: Document, record: &Record) -> anyhow::Result<Document> {
+    let pages = doc.get_pages().len();
+    overlay::apply(&mut doc, &record.filled()).context("drawing the fields")?;
+    append_certificate(doc, record, pages)
+}
+
+/// Appends the certificate pages to `doc`.
+fn append_certificate(
+    mut doc: Document,
+    record: &Record,
+    original_pages: usize,
+) -> anyhow::Result<Document> {
     let pages_id = match doc.catalog().context("the PDF has no catalog")?.get(b"Pages") {
         Ok(Object::Reference(id)) => *id,
         _ => anyhow::bail!("the PDF's page tree isn't a reference"),
@@ -474,21 +711,9 @@ fn append(mut doc: Document, record: &Record) -> anyhow::Result<Document> {
             .clone(),
         _ => anyhow::bail!("the page tree has no Kids array"),
     };
-    let font = |target: &mut Document, base: &str| {
-        target.add_object(dictionary! {
-            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => base, "Encoding" => "WinAnsiEncoding",
-        })
-    };
-    let (regular, bold, italic) = (
-        font(&mut doc, "Helvetica"),
-        font(&mut doc, "Helvetica-Bold"),
-        font(&mut doc, "Helvetica-Oblique"),
-    );
-    let resources = doc.add_object(dictionary! {
-        "Font" => dictionary! { "F1" => regular, "F2" => bold, "F3" => italic },
-    });
+    let resources = font_resources(&mut doc);
     let mut added: Vec<ObjectId> = Vec::new();
-    for ops in layout(record) {
+    for ops in layout(record, original_pages) {
         let content = Content { operations: ops }.encode().context("encoding a page")?;
         let stream = doc.add_object(Stream::new(dictionary! {}, content));
         let media_box = || vec![0.into(), 0.into(), PAGE_WIDTH.into(), PAGE_HEIGHT.into()];
@@ -517,7 +742,43 @@ fn append(mut doc: Document, record: &Record) -> anyhow::Result<Document> {
 mod tests {
     use super::*;
 
+    fn signer(name: &str, email: &str, signature: Signature) -> SignedBy {
+        SignedBy {
+            name: name.to_owned(),
+            email: email.to_owned(),
+            signing_order: 1,
+            signed_at: UnixMillis(1_795_000_000_000),
+            ip: Some("192.0.2.1".to_owned()),
+            user_agent: Some("Mozilla/5.0".to_owned()),
+            signature,
+            initials: None,
+            fields: Vec::new(),
+        }
+    }
+
     fn record(audit: usize) -> Record {
+        let mut ada = signer(
+            "Ada",
+            "ada@example.test",
+            Signature::Drawn { strokes: vec![vec![[0, 0], [500, 150], [1000, 300]]] },
+        );
+        ada.initials = Some(Signature::Typed { name: "AL".to_owned() });
+        ada.fields = vec![
+            FieldRecord {
+                page: 1,
+                rect: Rect { x: 0.1, y: 0.8, width: 0.3, height: 0.06 },
+                kind: FieldKind::Signature,
+                label: String::new(),
+                value: FieldValue::Signed,
+            },
+            FieldRecord {
+                page: 2,
+                rect: Rect { x: 0.1, y: 0.1, width: 0.3, height: 0.04 },
+                kind: FieldKind::Text,
+                label: "Company".to_owned(),
+                value: FieldValue::Text { text: "Acme".to_owned() },
+            },
+        ];
         Record {
             title: "Services (agreement) <x>".to_owned(),
             file_name: "agreement.pdf".to_owned(),
@@ -525,20 +786,8 @@ mod tests {
             sender: "ops@example.test".to_owned(),
             original_sha256: "ab".repeat(32),
             signers: vec![
-                SignedBy {
-                    name: "Ada".to_owned(),
-                    email: "ada@example.test".to_owned(),
-                    signed_at: UnixMillis(1_795_000_000_000),
-                    signature: Signature::Drawn {
-                        strokes: vec![vec![[0, 0], [500, 150], [1000, 300]]],
-                    },
-                },
-                SignedBy {
-                    name: "Пётр".to_owned(),
-                    email: "p@example.test".to_owned(),
-                    signed_at: UnixMillis(1_795_000_000_000),
-                    signature: Signature::Typed { name: "Peter".to_owned() },
-                },
+                ada,
+                signer("Пётр", "p@example.test", Signature::Typed { name: "Peter".to_owned() }),
             ],
             audit: (0..audit)
                 .map(|n| AuditLine {
@@ -551,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    fn the_pages_follow_the_original() {
+    fn one_certificate_page_follows_the_original() {
         let original = crate::testing::sample_pdf(&["One", "Two"]);
         let doc = assemble(&original, &record(3)).unwrap();
         let mut out = Vec::new();
@@ -559,16 +808,76 @@ mod tests {
         doc.save_to(&mut out).unwrap();
         let back = Document::load_mem(&out).unwrap();
         let pages = back.get_pages();
-        assert_eq!(pages.len(), 4, "two original pages, signatures, audit");
-        let text = back.extract_text(&[3, 4]).unwrap();
-        assert!(text.contains("Signatures"), "{text}");
-        assert!(text.contains("Audit trail"), "{text}");
+        assert_eq!(pages.len(), 3, "two original pages and the certificate");
+        let text = back.extract_text(&[3]).unwrap();
+        assert!(text.contains("Certificate of completion"), "{text}");
+        assert!(text.contains("2 pages"), "{text}");
+        assert!(text.contains("Signing order 1"), "{text}");
+        assert!(text.contains("IP 192.0.2.1 - Mozilla/5.0"), "{text}");
+        assert!(text.contains("Page 2, Text 'Company': Acme"), "{text}");
+        assert!(text.contains("Page 1, Signature: signed"), "{text}");
+        assert!(text.contains("Events"), "{text}");
         assert!(text.contains("???? <p@example.test>"), "Cyrillic prints as ?: {text}");
+        assert!(!text.contains("Audit trail"), "{text}");
+        for page in [1, 2] {
+            let xobjects = back
+                .get_dictionary(pages[&page])
+                .unwrap()
+                .get(b"Resources")
+                .and_then(Object::as_dict)
+                .and_then(|r| r.get(b"XObject"))
+                .and_then(Object::as_dict)
+                .unwrap();
+            assert!(xobjects.has(b"BizkitFields"), "page {page} has its overlay");
+        }
+    }
+
+    #[test]
+    fn helvetica_widths_match_the_afm() {
+        assert!((text_width("Hello") - 2.278).abs() < 1e-4, "{}", text_width("Hello"));
+        assert_eq!(HELVETICA_WIDTHS[usize::from(b' ')], 278);
+        assert_eq!(HELVETICA_WIDTHS[0x80], 556, "Euro");
+        assert_eq!(HELVETICA_WIDTHS[0xff], 500, "ydieresis");
+    }
+
+    #[test]
+    fn text_shrinks_to_the_width_but_not_below_6_points() {
+        let size = |ops: &[Operation]| {
+            f64::from(
+                ops.iter().find(|op| op.operator == "Tf").unwrap().operands[1].as_float().unwrap(),
+            )
+        };
+        let short = fitted_text(Font::Regular, "Hi", (0.0, 0.0, 200.0, 20.0));
+        assert!((size(&short) - 14.0).abs() < 1e-4, "the height sets the size");
+        // 24 wide less a 1.2 pad each side leaves 21.6 for 2.278 em.
+        let long = fitted_text(Font::Regular, "Hello", (0.0, 0.0, 24.0, 20.0));
+        assert!(size(&long).mul_add(2.278, -21.6).abs() < 1e-3, "{}", size(&long));
+        let huge = fitted_text(Font::Regular, &"W".repeat(200), (0.0, 0.0, 50.0, 20.0));
+        assert!((size(&huge) - MIN_TEXT_SIZE).abs() < 1e-4);
+    }
+
+    #[test]
+    fn strokes_fill_the_box_with_their_aspect_kept() {
+        let ops = strokes(&[vec![[100, 100], [300, 200]]], (10.0, 20.0, 100.0, 100.0));
+        let points: Vec<Vec<f64>> = ops
+            .iter()
+            .filter(|op| op.operator == "m" || op.operator == "l")
+            .map(|op| op.operands.iter().map(|n| f64::from(n.as_float().unwrap())).collect())
+            .collect();
+        // 200 x 100 of pad scaled by 0.45 to 90 x 45, centred. The pad's y
+        // runs down, so its first point is the higher one.
+        let expected = [[15.0, 92.5], [105.0, 47.5]];
+        for (point, want) in points.iter().zip(expected) {
+            assert!(
+                (point[0] - want[0]).abs() < 1e-3 && (point[1] - want[1]).abs() < 1e-3,
+                "{points:?}"
+            );
+        }
     }
 
     /// `sample_pdf` with its page tree changed by `edit`.
     fn edited(edit: impl FnOnce(&mut Document, ObjectId)) -> Vec<u8> {
-        let mut doc = Document::load_mem(&crate::testing::sample_pdf(&["One"])).unwrap();
+        let mut doc = Document::load_mem(&crate::testing::sample_pdf(&["One", "Two"])).unwrap();
         let pages_id = doc.catalog().unwrap().get(b"Pages").unwrap().as_reference().unwrap();
         edit(&mut doc, pages_id);
         let mut out = Vec::new();
@@ -609,6 +918,18 @@ mod tests {
             doc.get_dictionary_mut(pages_id).unwrap().set("Kids", 7);
         });
         assert!(check(no_kids, ParseClass::Small).await.is_err());
+        let turned = edited(|doc, pages_id| {
+            doc.get_dictionary_mut(pages_id).unwrap().set("Rotate", 45);
+        });
+        assert_eq!(
+            check(turned, ParseClass::Small).await,
+            Err("must have pages with readable sizes, turned by multiples of 90 degrees")
+        );
+        let flat = edited(|doc, pages_id| {
+            let flat = vec![0.into(), 0.into(), 612.into(), 0.into()];
+            doc.get_dictionary_mut(pages_id).unwrap().set("MediaBox", flat);
+        });
+        assert!(check(flat, ParseClass::Small).await.is_err(), "a MediaBox with no area");
     }
 
     #[tokio::test]
@@ -641,7 +962,7 @@ mod tests {
 
     #[test]
     fn a_long_trail_spills_onto_more_pages() {
-        let original = crate::testing::sample_pdf(&["One"]);
+        let original = crate::testing::sample_pdf(&["One", "Two"]);
         let doc = assemble(&original, &record(80)).unwrap();
         assert!(doc.get_pages().len() > 3, "{}", doc.get_pages().len());
     }

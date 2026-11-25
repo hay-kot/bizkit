@@ -1,6 +1,6 @@
 //! The `signing.complete` job: after the last signature, build the final
-//! PDF (the original, a signatures page and the audit trail), seal it, and
-//! mail everyone the result.
+//! PDF (the original with the fields drawn on its pages, and a certificate
+//! page), seal it, and mail everyone the result.
 
 use std::collections::BTreeMap;
 use std::panic::AssertUnwindSafe;
@@ -15,11 +15,13 @@ use futures::FutureExt as _;
 use serde::{Deserialize, Serialize};
 
 use crate::api::{DocumentVersion, EventKind, RequestStatus, SignerId, SigningRequestId};
+use crate::fields::{FieldKind, FieldValue};
 use crate::ops::sha256_hex;
-use crate::pdf::{self, AuditLine, Record, SignedBy};
+use crate::overlay::Rect;
+use crate::pdf::{self, AuditLine, FieldRecord, Record, SignedBy};
 use crate::seal::{self, SealKey};
 use crate::signature::Signature;
-use crate::store::{self, NewEvent, RequestRow, SignerRow};
+use crate::store::{self, EventRow, FieldRow, NewEvent, RequestRow, SignerRow};
 
 /// Seals run one at a time in their own lane, so they never hold up mail.
 const SIGNING: Lane = Lane { name: "signing", concurrency: 1 };
@@ -141,53 +143,86 @@ fn event_label(kind: &str) -> &str {
     }
 }
 
+fn audit_line(event: EventRow, names: &BTreeMap<SignerId, String>) -> AuditLine {
+    let who = event.signer_id.and_then(|id| names.get(&id)).map(|name| format!(" - {name}"));
+    let detail = event.detail.map(|detail| format!(". {detail}"));
+    let client = match (event.ip, event.user_agent) {
+        (None, None) => None,
+        (ip, agent) => Some(format!(
+            "IP {} - {}",
+            ip.unwrap_or_else(|| "unknown".to_owned()),
+            agent.unwrap_or_else(|| "unknown browser".to_owned())
+        )),
+    };
+    AuditLine {
+        at: event.at,
+        what: format!(
+            "{}{}{}",
+            event_label(&event.kind),
+            who.unwrap_or_default(),
+            detail.unwrap_or_default()
+        ),
+        client,
+    }
+}
+
+/// A filled field, for the overlay and the certificate. None while empty.
+fn field_record(row: FieldRow) -> anyhow::Result<Option<FieldRecord>> {
+    let Some(value) = row.value else { return Ok(None) };
+    let value: FieldValue = serde_json::from_str(&value).context("reading a field value")?;
+    Ok(Some(FieldRecord {
+        page: u32::try_from(row.page).context("reading a field's page")?,
+        rect: Rect { x: row.x, y: row.y, width: row.width, height: row.height },
+        kind: FieldKind::parse(&row.kind)?,
+        label: row.label,
+        value,
+    }))
+}
+
+fn adopted(json: Option<&str>, what: &str, email: &str) -> anyhow::Result<Option<Signature>> {
+    json.map(serde_json::from_str).transpose().with_context(|| format!("reading {email}'s {what}"))
+}
+
 async fn record(
     platform: &Platform,
     row: &RequestRow,
     signers: &[SignerRow],
 ) -> anyhow::Result<Record> {
+    let db = platform.db().read();
     let names: BTreeMap<SignerId, String> =
         signers.iter().map(|s| (s.id, format!("{} <{}>", s.name, s.email))).collect();
-    let events = store::events(platform.db().read(), row.workspace_id, row.id)
-        .await
-        .context("reading the audit trail")?;
-    let audit = events
-        .into_iter()
-        .map(|event| {
-            let who =
-                event.signer_id.and_then(|id| names.get(&id)).map(|name| format!(" - {name}"));
-            let detail = event.detail.map(|detail| format!(". {detail}"));
-            let client = match (event.ip, event.user_agent) {
-                (None, None) => None,
-                (ip, agent) => Some(format!(
-                    "IP {} - {}",
-                    ip.unwrap_or_else(|| "unknown".to_owned()),
-                    agent.unwrap_or_else(|| "unknown browser".to_owned())
-                )),
-            };
-            AuditLine {
-                at: event.at,
-                what: format!(
-                    "{}{}{}",
-                    event_label(&event.kind),
-                    who.unwrap_or_default(),
-                    detail.unwrap_or_default()
-                ),
-                client,
-            }
-        })
+    let events =
+        store::events(db, row.workspace_id, row.id).await.context("reading the audit trail")?;
+    // The client a signer signed from is on their `signed` event.
+    let clients: BTreeMap<SignerId, (Option<String>, Option<String>)> = events
+        .iter()
+        .filter(|event| event.kind == EventKind::Signed.as_str())
+        .filter_map(|event| Some((event.signer_id?, (event.ip.clone(), event.user_agent.clone()))))
         .collect();
+    let mut fields: BTreeMap<SignerId, Vec<FieldRecord>> = BTreeMap::new();
+    for field in store::fields(db, row.workspace_id, row.id).await.context("reading the fields")? {
+        let signer_id = field.signer_id;
+        if let Some(record) = field_record(field)? {
+            fields.entry(signer_id).or_default().push(record);
+        }
+    }
+    let audit = events.into_iter().map(|event| audit_line(event, &names)).collect();
     let signed = signers
         .iter()
         .map(|signer| {
-            let signature: Signature =
-                serde_json::from_str(signer.signature.as_deref().unwrap_or("null"))
-                    .with_context(|| format!("reading {}'s signature", signer.email))?;
+            let signature = adopted(signer.signature.as_deref(), "signature", &signer.email)?
+                .with_context(|| format!("{} has no signature", signer.email))?;
+            let (ip, user_agent) = clients.get(&signer.id).cloned().unwrap_or_default();
             Ok(SignedBy {
                 name: signer.name.clone(),
                 email: signer.email.clone(),
+                signing_order: u8::try_from(signer.signing_order).unwrap_or(1),
                 signed_at: signer.signed_at.unwrap_or(row.created_at),
+                ip,
+                user_agent,
                 signature,
+                initials: adopted(signer.initials.as_deref(), "initials", &signer.email)?,
+                fields: fields.remove(&signer.id).unwrap_or_default(),
             })
         })
         .collect::<anyhow::Result<_>>()?;

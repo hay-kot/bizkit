@@ -119,7 +119,7 @@ pub(crate) fn to_api(row: RequestRow, signers: Vec<SignerRow>) -> Result<Signing
     })
 }
 
-fn to_field(row: FieldRow) -> anyhow::Result<Field> {
+pub(crate) fn to_field(row: FieldRow) -> anyhow::Result<Field> {
     let value = row
         .value
         .as_deref()
@@ -410,6 +410,7 @@ pub(crate) async fn create_draft(
             email: normalize_email(&signer.email),
             status: "pending".to_owned(),
             signature: None,
+            initials: None,
             signed_at: None,
         })
         .collect();
@@ -696,6 +697,7 @@ impl Operation for SignersPut {
                     email,
                     status: "pending".to_owned(),
                     signature: None,
+                    initials: None,
                     signed_at: None,
                 }),
             }
@@ -815,10 +817,9 @@ impl Operation for FieldsPut {
     }
 }
 
-/// The link a signer opens.
+/// The link a signer opens: the web app's signer view.
 pub(crate) fn sign_link(platform: &Platform, token: &str) -> anyhow::Result<url::Url> {
-    let mut url =
-        platform.base_url().join("/m/signing/public/sign").context("building the sign link")?;
+    let mut url = platform.base_url().join("/sign").context("building the sign link")?;
     url.query_pairs_mut().append_pair("t", token);
     Ok(url)
 }

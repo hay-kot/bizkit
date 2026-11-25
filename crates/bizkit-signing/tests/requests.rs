@@ -175,9 +175,12 @@ mod requests {
         let link = ada
             .text
             .split_whitespace()
-            .find(|word| word.contains("/m/signing/public/sign?t="))
+            .find(|word| word.starts_with("http://localhost:8484/sign?t="))
             .unwrap();
-        assert!(link.len() > "/m/signing/public/sign?t=".len() + 40, "a link with a token: {link}");
+        assert!(
+            link.len() > "http://localhost:8484/sign?t=".len() + 40,
+            "a link with a token: {link}"
+        );
 
         s.member
             .post(&s.path(&format!("requests/{id}/send")), &json!({}))

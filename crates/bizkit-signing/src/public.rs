@@ -1,24 +1,33 @@
-//! The pages signers use, nested at `/m/signing/public`. They sit outside
-//! authentication: the link's token is the credential, and the database
-//! keeps only its hash. GETs change nothing, so mail scanners that follow a
-//! link leave no trace; the page's script reports a view, and the form
-//! posts the signature. Everything echoed is escaped.
+//! The signer API, nested at `/m/signing/public`, which the web app's
+//! signer view (`/sign?t=`) calls. It sits outside authentication: the
+//! link's token is the credential, and the database keeps only its hash.
+//! GETs change nothing, so mail scanners that follow a link leave no trace;
+//! the view reports a view, and a sign POST fills every field at once.
+//! Every response is `no-store` and `no-referrer`, because the token is in
+//! the request.
+
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Context as _;
-use axum::extract::{DefaultBodyLimit, Form, Query};
+use axum::body::Bytes;
+use axum::extract::{DefaultBodyLimit, Query};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::{get, post};
-use axum::{Extension, Router};
-use bizkit_core::Platform;
-use bizkit_core::auth::{hash_token, random_token};
+use axum::{Extension, Json, Router};
+use bizkit_core::auth::hash_token;
+use bizkit_core::error::ErrorBody;
 use bizkit_core::jobs::Enqueue;
 use bizkit_core::net::ClientIp;
-use serde::Deserialize;
-use utoipa::OpenApi;
+use bizkit_core::time::UnixMillis;
+use bizkit_core::validate::{FieldErrors, from_json};
+use bizkit_core::{ApiError, Platform};
+use serde::{Deserialize, Serialize};
+use utoipa::{OpenApi, ToSchema};
 
 use crate::api::{DocumentVersion, EventKind, RequestStatus};
 use crate::complete::Complete;
+use crate::fields::{Field, FieldId, FieldKind, FieldValue};
 use crate::pdf;
 use crate::signature::Signature;
 use crate::store::{self, NewEvent, RequestRow, SignerRow};
@@ -26,14 +35,17 @@ use crate::store::{self, NewEvent, RequestRow, SignerRow};
 /// What a signer agrees to; recorded with each signature.
 pub(crate) const CONSENT: &str = "I agree to sign this document electronically, and that my electronic \
                                   signature has the same effect as a handwritten one.";
-/// Form posts are small: a typed name, or the strokes of one signature.
+/// Sign posts are small: two signatures' strokes and a few lines of text.
 const MAX_BODY: usize = 256 * 1024;
 const MAX_USER_AGENT: usize = 300;
+const MAX_TEXT: usize = 200;
+const JSON_CSP: &str = "default-src 'none'; frame-ancestors 'none'";
 
 /// The public router.
 pub(crate) fn router() -> Router {
     Router::new()
-        .route("/sign", get(sign_page).post(sign_post))
+        .route("/session", get(session))
+        .route("/sign", get(sign_redirect).post(sign))
         .route("/viewed", post(viewed))
         .route("/document", get(document))
         .route("/signed.pdf", get(signed_pdf))
@@ -41,31 +53,59 @@ pub(crate) fn router() -> Router {
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(sign_page_docs, sign_post_docs, viewed_docs, document_docs, signed_pdf_docs))]
+#[openapi(
+    paths(
+        session_docs,
+        sign_redirect_docs,
+        sign_docs,
+        viewed_docs,
+        document_docs,
+        signed_pdf_docs
+    ),
+    components(schemas(SignerSession, SignInput, SignResult, TokenBody, ErrorBody))
+)]
 pub(crate) struct PublicDocs;
 
-#[utoipa::path(get, path = "/sign", operation_id = "signing.public.sign_page", tag = "signing",
-    summary = "The signing page for a signer's link",
+#[utoipa::path(get, path = "/session", operation_id = "signing.public.session", tag = "signing",
+    summary = "What a signer's link shows: the request, the signer and their fields",
+    description = "Changes nothing. A signer who signed still gets their session, with their \
+        fields' values; once the request completes, `signed.pdf` with the same token downloads it.",
     params(("t" = String, Query, description = "The signer's link token")),
-    responses((status = 200, description = "The page", content_type = "text/html"),
-              (status = 404, description = "The link no longer works", content_type = "text/html")))]
+    responses((status = 200, description = "The session", body = SignerSession),
+              (status = 404, description = "The link no longer works: unknown, voided, or not out for \
+                signature", body = ErrorBody)))]
 #[expect(dead_code, reason = "exists for its utoipa docs")]
-const fn sign_page_docs() {}
+const fn session_docs() {}
+
+#[utoipa::path(get, path = "/sign", operation_id = "signing.public.sign_redirect", tag = "signing",
+    summary = "Old sign links: go to the web app's signer view",
+    description = "Links mailed before the signer view moved to the web app point here.",
+    params(("t" = String, Query, description = "The signer's link token")),
+    responses((status = 303, description = "To `/sign?t=` in the web app")))]
+#[expect(dead_code, reason = "exists for its utoipa docs")]
+const fn sign_redirect_docs() {}
 
 #[utoipa::path(post, path = "/sign", operation_id = "signing.public.sign", tag = "signing",
-    summary = "Sign with a drawn or typed signature",
-    request_body(content_type = "application/x-www-form-urlencoded", content = String,
-        description = "`t`, `consent=yes`, `kind` (`drawn` or `typed`), and `strokes` (JSON) or `typed_name`"),
-    responses((status = 200, description = "Signed", content_type = "text/html"),
-              (status = 404, description = "The link no longer works", content_type = "text/html"),
-              (status = 422, description = "The form needs fixing", content_type = "text/html")))]
+    summary = "Adopt a signature, fill the signer's fields and sign",
+    description = "Fills every field of the signer at once. Signature and initials fields take the \
+        adopted `signature` and `initials`; date fields take today's UTC date; `values` fill text and \
+        checkbox fields. Every required field must be filled, and a required checkbox ticked.",
+    request_body(content = SignInput, content_type = "application/json"),
+    responses((status = 200, description = "Signed", body = SignResult),
+              (status = 400, description = "The body isn't JSON", body = ErrorBody),
+              (status = 404, description = "The link no longer works, or the signer signed already",
+                body = ErrorBody),
+              (status = 413, description = "The body is over 256 KiB"),
+              (status = 422, description = "Fields need fixing; `fields` names them", body = ErrorBody)))]
 #[expect(dead_code, reason = "exists for its utoipa docs")]
-const fn sign_post_docs() {}
+const fn sign_docs() {}
 
 #[utoipa::path(post, path = "/viewed", operation_id = "signing.public.viewed", tag = "signing",
-    summary = "Record that a signer opened the signing page",
-    request_body(content_type = "application/x-www-form-urlencoded", content = String, description = "`t`"),
-    responses((status = 204, description = "Recorded, or the link no longer works")))]
+    summary = "Record that a signer opened the signer view",
+    request_body(content = TokenBody, content_type = "application/json"),
+    responses((status = 204, description = "Recorded, or the link no longer works"),
+              (status = 400, description = "The body isn't JSON", body = ErrorBody),
+              (status = 422, description = "The body has no token", body = ErrorBody)))]
 #[expect(dead_code, reason = "exists for its utoipa docs")]
 const fn viewed_docs() {}
 
@@ -101,6 +141,115 @@ struct TokenQuery {
     t: String,
 }
 
+/// A body that carries only the link token.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = SigningToken)]
+struct TokenBody {
+    /// The signer's link token.
+    t: String,
+}
+
+/// The request, as its signer sees it.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = SigningSessionRequest)]
+struct SessionRequest {
+    /// What signers see as the subject.
+    title: String,
+    /// The sender's note.
+    message: String,
+    /// The PDF's file name.
+    file_name: String,
+    /// Where the request is.
+    status: RequestStatus,
+    /// Pages in the PDF. Empty only on requests made before fields existed.
+    page_count: Option<u32>,
+}
+
+/// Whether a signer signed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = SigningSignerStatus)]
+enum SignerStatus {
+    /// Yet to sign.
+    Pending,
+    /// Signed.
+    Signed,
+}
+
+/// The signer the link belongs to.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = SigningSessionSigner)]
+struct SessionSigner {
+    /// Their name, as the sender gave it.
+    name: String,
+    /// Their address.
+    email: String,
+    /// Whether they signed.
+    status: SignerStatus,
+}
+
+/// What a signer's link shows.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = SigningSignerSession)]
+struct SignerSession {
+    /// The request.
+    request: SessionRequest,
+    /// The signer.
+    signer: SessionSigner,
+    /// This signer's fields only, in request order, with values once signed.
+    /// Empty for requests made before fields: the signer then adopts a
+    /// signature only.
+    fields: Vec<Field>,
+    /// The text the signer agrees to by signing.
+    consent: String,
+}
+
+/// A signer's fill of one text or checkbox field.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = SigningFieldFill)]
+struct FieldFill {
+    /// The field.
+    field_id: FieldId,
+    /// For a text field: one line of at most 200 Latin characters. Empty
+    /// text leaves an optional field empty.
+    #[serde(default)]
+    text: Option<String>,
+    /// For a checkbox field: whether it's ticked.
+    #[serde(default)]
+    checked: Option<bool>,
+}
+
+/// A signer's signature, initials and fills.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = SigningSignInput)]
+struct SignInput {
+    /// The signer's link token.
+    t: String,
+    /// Must be true: the signer agrees to `consent` from the session.
+    consent: bool,
+    /// The adopted signature, for every signature field.
+    signature: Option<Signature>,
+    /// The adopted initials, for every initials field. Required when the
+    /// signer has one, and refused when they have none.
+    #[serde(default)]
+    initials: Option<Signature>,
+    /// Fills of text and checkbox fields; each field at most once.
+    #[serde(default)]
+    values: Vec<FieldFill>,
+}
+
+/// The request after a signature.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = SigningSignResult)]
+struct SignResult {
+    /// Where the request is. It stays `sent` until the seal job completes
+    /// it after the last signature.
+    status: RequestStatus,
+}
+
 /// A signer's link, resolved: their row and their request.
 struct Link {
     signer: SignerRow,
@@ -121,21 +270,6 @@ async fn resolve(platform: &Platform, token: &str) -> anyhow::Result<Option<Link
     Ok(request.map(|request| Link { signer, request }))
 }
 
-pub(crate) fn escape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            c => out.push(c),
-        }
-    }
-    out
-}
-
 fn secure(response: &mut Response, csp: &str) {
     let headers = response.headers_mut();
     if let Ok(csp) = HeaderValue::from_str(csp) {
@@ -146,137 +280,19 @@ fn secure(response: &mut Response, csp: &str) {
     headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
 }
 
-const STYLE: &str = "body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem;line-height:1.5}\
-    iframe{width:100%;height:70vh;border:1px solid #ccc;border-radius:.375rem}\
-    canvas{width:100%;max-width:40rem;aspect-ratio:10/3;border:1px dashed #888;border-radius:.375rem;touch-action:none;background:#fff}\
-    button{font:inherit;padding:.5rem 1rem;border-radius:.375rem;border:1px solid #888;cursor:pointer}\
-    fieldset{border:1px solid #ccc;border-radius:.375rem;margin:1rem 0}.error{color:#b91c1c}input[type=text]{font:inherit;padding:.4rem}";
-
-fn page(status: StatusCode, title: &str, body: &str, script: Option<(&str, &str)>) -> Response {
-    let (script_tag, script_src) = match script {
-        Some((nonce, code)) => {
-            (format!("<script nonce=\"{nonce}\">{code}</script>"), format!("'nonce-{nonce}'"))
-        }
-        None => (String::new(), "'none'".to_owned()),
+fn json_response<T: Serialize>(result: Result<T, ApiError>) -> Response {
+    let mut response = match result {
+        Ok(body) => (StatusCode::OK, Json(body)).into_response(),
+        Err(err) => err.into_response(),
     };
-    let html = format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <title>{title}</title><style>{STYLE}</style></head><body><h1>{title}</h1>{body}{script_tag}</body></html>",
-        title = escape(title),
-    );
-    let mut response = (status, html).into_response();
-    response
-        .headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
-    let csp = format!(
-        "default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'; \
-         form-action 'self'; base-uri 'none'; frame-ancestors 'none'; script-src {script_src}",
-    );
-    secure(&mut response, &csp);
+    secure(&mut response, JSON_CSP);
     response
 }
 
-fn gone() -> Response {
-    page(
-        StatusCode::NOT_FOUND,
-        "This link no longer works",
-        "<p>It may have been mistyped, or the request was cancelled. Ask the sender for a new link.</p>",
-        None,
-    )
-}
-
-fn failed(err: &anyhow::Error) -> Response {
-    tracing::error!(error = format!("{err:#}"), "signing page failed");
-    page(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "Something went wrong",
-        "<p>Try again in a minute.</p>",
-        None,
-    )
-}
-
-/// The page a signer who signed already sees.
-fn done_page(link: &Link, token: &str) -> Response {
-    let signed = format!("<p>You signed <strong>{}</strong>.</p>", escape(&link.request.title));
-    let next = if link.request.status == RequestStatus::Completed.as_str() {
-        format!(
-            "<p>Everyone has signed. <a href=\"signed.pdf?t={}\">Download the signed PDF</a>.</p>",
-            escape(token)
-        )
-    } else {
-        "<p>You'll get a mail with the signed PDF once everyone has signed.</p>".to_owned()
-    };
-    page(StatusCode::OK, "Thank you", &format!("{signed}{next}"), None)
-}
-
-const PAD_SCRIPT: &str = include_str!("pad.js");
-
-/// The signer's name for the typed-signature field, when it would pass as one.
-fn typed_default(name: &str) -> String {
-    match Signature::from_form("typed", "", name) {
-        Ok(Signature::Typed { name }) => name,
-        _ => String::new(),
-    }
-}
-
-fn sign_form(link: &Link, token: &str, error: Option<&str>) -> Response {
-    let request = &link.request;
-    let mut body = vec![format!(
-        "<p>Hi {name}. You're asked to sign <strong>{file}</strong>.</p>",
-        name = escape(&link.signer.name),
-        file = escape(&request.file_name)
-    )];
-    if !request.message.is_empty() {
-        body.push(format!("<blockquote>{}</blockquote>", escape(&request.message)));
-    }
-    let token = escape(token);
-    body.push(format!("<iframe src=\"document?t={token}\" title=\"The document\"></iframe>\
-         <p><a href=\"document?t={token}\" target=\"_blank\" rel=\"noopener\">Open the PDF in a new tab</a></p>"
-    ));
-    if let Some(error) = error {
-        body.push(format!("<p class=\"error\" role=\"alert\">{}</p>", escape(error)));
-    }
-    body.push(format!("<form method=\"post\" action=\"sign\" id=\"sign\">\
-         <input type=\"hidden\" name=\"t\" value=\"{token}\">\
-         <input type=\"hidden\" name=\"strokes\" id=\"strokes\">\
-         <fieldset><legend>Your signature</legend>\
-         <p><label><input type=\"radio\" name=\"kind\" value=\"typed\" checked> Type your name</label> \
-         <label id=\"draw-choice\" hidden><input type=\"radio\" name=\"kind\" value=\"drawn\"> Draw it</label></p>\
-         <p id=\"typed\"><label>Full name <input type=\"text\" name=\"typed_name\" maxlength=\"100\" \
-         autocomplete=\"name\" value=\"{name}\"></label></p>\
-         <div id=\"drawn\" hidden><canvas id=\"pad\" width=\"1000\" height=\"300\" \
-         aria-label=\"Draw your signature\"></canvas><p><button type=\"button\" id=\"clear\">Clear</button></p></div>\
-         </fieldset>\
-         <p><label><input type=\"checkbox\" name=\"consent\" value=\"yes\" required> {consent}</label></p>\
-         <p><button type=\"submit\">Sign</button></p></form>",
-        name = escape(&typed_default(&link.signer.name)),
-        consent = escape(CONSENT),
-    ));
-    let nonce = random_token();
-    let status = if error.is_some() { StatusCode::UNPROCESSABLE_ENTITY } else { StatusCode::OK };
-    page(status, &request.title, &body.concat(), Some((&nonce, PAD_SCRIPT)))
-}
-
-async fn sign_page(
-    Extension(platform): Extension<Platform>,
-    Query(query): Query<TokenQuery>,
-) -> Response {
-    let link = match resolve(&platform, &query.t).await {
-        Ok(Some(link)) => link,
-        Ok(None) => return gone(),
-        Err(err) => return failed(&err),
-    };
-    if link.request.status == RequestStatus::Voided.as_str() {
-        return gone();
-    }
-    if link.signer.status == "signed" {
-        return done_page(&link, &query.t);
-    }
-    if link.request.status != RequestStatus::Sent.as_str() {
-        return gone();
-    }
-    sign_form(&link, &query.t, None)
+fn parse<T: serde::de::DeserializeOwned>(body: &Bytes) -> Result<T, ApiError> {
+    let value: serde_json::Value = serde_json::from_slice(body)
+        .map_err(|_| ApiError::BadRequest("the body must be JSON".to_owned()))?;
+    Ok(from_json(value)?)
 }
 
 fn user_agent(headers: &HeaderMap) -> Option<String> {
@@ -286,14 +302,78 @@ fn user_agent(headers: &HeaderMap) -> Option<String> {
         .map(|agent| agent.chars().take(MAX_USER_AGENT).collect())
 }
 
+/// The signer's fields, read from the API's own conversion.
+async fn signer_fields(platform: &Platform, signer: &SignerRow) -> anyhow::Result<Vec<Field>> {
+    store::signer_fields(platform.db().read(), signer)
+        .await?
+        .into_iter()
+        .map(crate::ops::to_field)
+        .collect()
+}
+
+async fn session(
+    Extension(platform): Extension<Platform>,
+    Query(query): Query<TokenQuery>,
+) -> Response {
+    let result = async {
+        let link = resolve(&platform, &query.t).await?.ok_or(ApiError::NotFound)?;
+        let request = &link.request;
+        let signed = link.signer.status == "signed";
+        if request.status == RequestStatus::Voided.as_str()
+            || (!signed && request.status != RequestStatus::Sent.as_str())
+        {
+            return Err(ApiError::NotFound);
+        }
+        let fields = signer_fields(&platform, &link.signer).await?;
+        Ok(SignerSession {
+            request: SessionRequest {
+                title: request.title.clone(),
+                message: request.message.clone(),
+                file_name: request.file_name.clone(),
+                status: RequestStatus::parse(&request.status)?,
+                page_count: request.page_count.and_then(|count| u32::try_from(count).ok()),
+            },
+            signer: SessionSigner {
+                name: link.signer.name,
+                email: link.signer.email,
+                status: if signed { SignerStatus::Signed } else { SignerStatus::Pending },
+            },
+            fields,
+            consent: CONSENT.to_owned(),
+        })
+    }
+    .await;
+    json_response(result)
+}
+
+/// Links mailed before the signer view moved into the web app.
+async fn sign_redirect(
+    Extension(platform): Extension<Platform>,
+    Query(query): Query<TokenQuery>,
+) -> Response {
+    let mut response = match crate::ops::sign_link(&platform, &query.t) {
+        Ok(url) => match HeaderValue::from_str(url.as_str()) {
+            Ok(location) => (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response(),
+            Err(err) => ApiError::Internal(err.into()).into_response(),
+        },
+        Err(err) => ApiError::Internal(err).into_response(),
+    };
+    secure(&mut response, JSON_CSP);
+    response
+}
+
 async fn viewed(
     Extension(platform): Extension<Platform>,
     ClientIp(ip): ClientIp,
     headers: HeaderMap,
-    Form(form): Form<TokenQuery>,
-) -> StatusCode {
+    body: Bytes,
+) -> Response {
+    let input: TokenBody = match parse(&body) {
+        Ok(input) => input,
+        Err(err) => return json_response::<()>(Err(err)),
+    };
     let recorded = async {
-        let Some(link) = resolve(&platform, &form.t).await? else { return Ok(()) };
+        let Some(link) = resolve(&platform, &input.t).await? else { return Ok(()) };
         if link.request.status != RequestStatus::Sent.as_str() || link.signer.status == "signed" {
             return Ok(());
         }
@@ -316,62 +396,171 @@ async fn viewed(
     if let Err(err) = recorded {
         tracing::warn!(error = format!("{err:#}"), "recording a view failed");
     }
-    StatusCode::NO_CONTENT
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    secure(&mut response, JSON_CSP);
+    response
 }
 
-#[derive(Debug, Deserialize)]
-struct SignForm {
-    #[serde(default)]
-    t: String,
-    #[serde(default)]
-    consent: Option<String>,
-    #[serde(default)]
-    kind: String,
-    #[serde(default)]
-    strokes: String,
-    #[serde(default)]
-    typed_name: String,
+/// What a sign POST stores.
+#[derive(Debug, PartialEq)]
+struct Fill {
+    signature: Signature,
+    initials: Option<Signature>,
+    values: Vec<(FieldId, FieldValue)>,
 }
 
-async fn sign_post(
+/// One line of 1 to 200 characters the standard font prints.
+fn check_text(text: &str) -> Result<(), &'static str> {
+    if text.chars().count() > MAX_TEXT {
+        return Err("must be at most 200 characters");
+    }
+    if text.chars().any(char::is_control) {
+        return Err("must be one line");
+    }
+    if !text.chars().all(|c| pdf::win_ansi(c).is_some()) {
+        return Err("must use Latin letters");
+    }
+    Ok(())
+}
+
+/// The text and checkbox fills a signer gave, checked against their
+/// `fields`.
+#[derive(Default)]
+struct Given {
+    values: BTreeMap<FieldId, FieldValue>,
+    /// Fields whose fill has an error already, so a missing value isn't
+    /// reported on top of it.
+    bad: BTreeSet<FieldId>,
+}
+
+fn given_values(fills: Vec<FieldFill>, fields: &[Field], errors: &mut FieldErrors) -> Given {
+    let by_id: BTreeMap<FieldId, &Field> = fields.iter().map(|field| (field.id, field)).collect();
+    let mut seen = BTreeSet::new();
+    let mut given = Given::default();
+    for (at, fill) in fills.into_iter().enumerate() {
+        let path = |name: &str| format!("values[{at}].{name}");
+        let field = by_id
+            .get(&fill.field_id)
+            .filter(|field| matches!(field.kind, FieldKind::Text | FieldKind::Checkbox));
+        let Some(field) = field else {
+            errors.add(path("field_id"), "must be one of your text or checkbox fields");
+            continue;
+        };
+        if !seen.insert(fill.field_id) {
+            errors.add(path("field_id"), "must be listed once");
+            continue;
+        }
+        let mut problem = |name: &str, message: &str| {
+            errors.add(path(name), message);
+            given.bad.insert(field.id);
+        };
+        if field.kind == FieldKind::Checkbox {
+            if fill.text.is_some() {
+                problem("text", "must be left out for a checkbox");
+            }
+            match fill.checked {
+                Some(checked) => {
+                    given.values.insert(field.id, FieldValue::Checkbox { checked });
+                }
+                None => problem("checked", "must be given"),
+            }
+        } else {
+            if fill.checked.is_some() {
+                problem("checked", "must be left out for a text field");
+            }
+            let text = fill.text.as_deref().map_or("", str::trim);
+            if let Err(message) = check_text(text) {
+                problem("text", message);
+            } else if !text.is_empty() {
+                given.values.insert(field.id, FieldValue::Text { text: text.to_owned() });
+            }
+        }
+    }
+    given
+}
+
+/// Checks a sign POST against the signer's `fields` and works out every
+/// value to store; date fields get `today`.
+fn fill(input: SignInput, fields: &[Field], today: &str) -> Result<Fill, FieldErrors> {
+    let mut errors = FieldErrors::default();
+    if !input.consent {
+        errors.add("consent", "must be true to sign electronically");
+    }
+    let mut adopt = |name: &str, given: Option<Signature>, needed: bool| match given {
+        None if needed => {
+            errors.add(name, "must be given");
+            None
+        }
+        None => None,
+        Some(_) if !needed => {
+            errors.add(name, "must be left out: you have no fields for it");
+            None
+        }
+        Some(signature) => signature.checked().map_err(|problem| errors.add(name, problem)).ok(),
+    };
+    // Every signer has a signature field once a request is sent; a signer
+    // from before fields has none and still signs.
+    let signature = adopt("signature", input.signature, true);
+    let needs_initials = fields.iter().any(|field| field.kind == FieldKind::Initials);
+    let initials = adopt("initials", input.initials, needs_initials);
+    let mut given = given_values(input.values, fields, &mut errors);
+
+    let mut values = Vec::new();
+    for field in fields {
+        let value = match field.kind {
+            FieldKind::Signature => Some(FieldValue::Signed),
+            FieldKind::Initials => Some(FieldValue::Initialed),
+            FieldKind::Date => Some(FieldValue::Date { date: today.to_owned() }),
+            FieldKind::Text | FieldKind::Checkbox => given.values.remove(&field.id),
+        };
+        let filled = match &value {
+            Some(FieldValue::Checkbox { checked }) => *checked,
+            other => other.is_some(),
+        };
+        if field.required && !filled && !given.bad.contains(&field.id) {
+            let problem =
+                if field.kind == FieldKind::Checkbox { "must be ticked" } else { "must be filled" };
+            errors.add(format!("fields.{}", field.id), problem);
+        }
+        if let Some(value) = value {
+            values.push((field.id, value));
+        }
+    }
+    match signature {
+        Some(signature) if errors.is_empty() => Ok(Fill { signature, initials, values }),
+        _ => Err(errors),
+    }
+}
+
+/// The UTC date of `at`, `YYYY-MM-DD`.
+fn utc_date(at: UnixMillis) -> anyhow::Result<String> {
+    let date = at.to_datetime().context("the clock is out of range")?.date();
+    Ok(format!("{:04}-{:02}-{:02}", date.year(), u8::from(date.month()), date.day()))
+}
+
+async fn sign(
     Extension(platform): Extension<Platform>,
     ClientIp(ip): ClientIp,
     headers: HeaderMap,
-    Form(form): Form<SignForm>,
+    body: Bytes,
 ) -> Response {
-    let link = match resolve(&platform, &form.t).await {
-        Ok(Some(link)) => link,
-        Ok(None) => return gone(),
-        Err(err) => return failed(&err),
-    };
-    if link.request.status == RequestStatus::Voided.as_str() {
-        return gone();
-    }
-    if link.signer.status == "signed" {
-        return done_page(&link, &form.t);
-    }
-    if link.request.status != RequestStatus::Sent.as_str() {
-        return gone();
-    }
-    if form.consent.as_deref() != Some("yes") {
-        return sign_form(&link, &form.t, Some("Tick the box to agree to sign electronically."));
-    }
-    let signature = match Signature::from_form(&form.kind, &form.strokes, &form.typed_name) {
-        Ok(signature) => signature,
-        Err(problem) => return sign_form(&link, &form.t, Some(problem)),
-    };
-    let client = Client { ip: ip.map(|ip| ip.to_string()), user_agent: user_agent(&headers) };
-    match record_signature(&platform, &link, &signature, &client).await {
-        Ok(true) => {
-            let signed = Link {
-                signer: SignerRow { status: "signed".to_owned(), ..link.signer },
-                request: link.request,
-            };
-            done_page(&signed, &form.t)
+    let result = async {
+        let input: SignInput = parse(&body)?;
+        let link = resolve(&platform, &input.t).await?.ok_or(ApiError::NotFound)?;
+        if link.request.status != RequestStatus::Sent.as_str() || link.signer.status == "signed" {
+            return Err(ApiError::NotFound);
         }
-        Ok(false) => gone(),
-        Err(err) => failed(&err),
+        let now = platform.now();
+        let fields = signer_fields(&platform, &link.signer).await?;
+        let fill = fill(input, &fields, &utc_date(now)?)?;
+        let client = Client { ip: ip.map(|ip| ip.to_string()), user_agent: user_agent(&headers) };
+        if !record_signature(&platform, &link, &fill, &client, now).await? {
+            return Err(ApiError::NotFound);
+        }
+        Ok(SignResult { status: RequestStatus::Sent })
     }
+    .await;
+    json_response(result)
 }
 
 struct Client {
@@ -379,25 +568,36 @@ struct Client {
     user_agent: Option<String>,
 }
 
-/// Stores the signature and its audit row, then mails the next
-/// signing-order group once this one is done, or queues the seal after the
-/// last signature, in one transaction. False when the request or signer changed
-/// since the page loaded (voided, or signed in another tab).
+/// Stores the signature, the field values and the audit row, then mails
+/// the next signing-order group once this one is done, or queues the seal
+/// after the last signature, in one transaction. False when the request
+/// or signer changed since the session loaded (voided, or signed in
+/// another tab).
 async fn record_signature(
     platform: &Platform,
     link: &Link,
-    signature: &Signature,
+    fill: &Fill,
     client: &Client,
+    now: UnixMillis,
 ) -> anyhow::Result<bool> {
-    let now = platform.now();
-    let json = serde_json::to_string(signature).context("encoding a signature")?;
+    let signature = serde_json::to_string(&fill.signature).context("encoding a signature")?;
+    let initials = fill
+        .initials
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .context("encoding initials")?;
     let mut tx = platform.db().write().await?;
     let current = store::find_request(&mut *tx, link.request.workspace_id, link.request.id).await?;
     if current.is_none_or(|row| row.status != RequestStatus::Sent.as_str()) {
         return Ok(false);
     }
-    if !store::mark_signed(&mut *tx, &link.signer, &json, now).await? {
+    if !store::mark_signed(&mut *tx, &link.signer, &signature, initials.as_deref(), now).await? {
         return Ok(false);
+    }
+    for (field_id, value) in &fill.values {
+        let value = serde_json::to_string(value).context("encoding a field value")?;
+        store::fill_field(&mut *tx, &link.signer, *field_id, &value, now).await?;
     }
     let detail = format!(
         "Agreed: \"{CONSENT}\" Document SHA-256 {}. Signed by {} <{}>.",
@@ -422,6 +622,13 @@ async fn record_signature(
     Ok(true)
 }
 
+fn failed(err: &anyhow::Error) -> Response {
+    tracing::error!(error = format!("{err:#}"), "a signer file failed");
+    let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    secure(&mut response, JSON_CSP);
+    response
+}
+
 pub(crate) fn pdf_response(bytes: Vec<u8>, disposition: &str) -> Response {
     let mut response = (StatusCode::OK, bytes).into_response();
     let headers = response.headers_mut();
@@ -429,7 +636,7 @@ pub(crate) fn pdf_response(bytes: Vec<u8>, disposition: &str) -> Response {
     if let Ok(value) = HeaderValue::from_str(disposition) {
         headers.insert(header::CONTENT_DISPOSITION, value);
     }
-    // Only the signing page, on this origin, may frame the PDF.
+    // Only pages on this origin may frame the PDF.
     secure(&mut response, "default-src 'none'; frame-ancestors 'self'");
     response
 }

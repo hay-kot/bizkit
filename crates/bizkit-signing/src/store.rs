@@ -42,6 +42,7 @@ pub(crate) struct SignerRow {
     pub(crate) email: String,
     pub(crate) status: String,
     pub(crate) signature: Option<String>,
+    pub(crate) initials: Option<String>,
     pub(crate) signed_at: Option<UnixMillis>,
 }
 
@@ -353,7 +354,7 @@ pub(crate) async fn signers(
         r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
                   request_id AS "request_id: SigningRequestId", position, signing_order, name,
                   email, status,
-                  signature, signed_at AS "signed_at: UnixMillis"
+                  signature, initials, signed_at AS "signed_at: UnixMillis"
            FROM signing_signers WHERE workspace_id = ? AND request_id = ? ORDER BY position"#,
         workspace_id,
         request_id,
@@ -409,7 +410,7 @@ pub(crate) async fn next_group(
         SignerRow,
         r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
                   request_id AS "request_id: SigningRequestId", position, signing_order, name,
-                  email, status, signature, signed_at AS "signed_at: UnixMillis"
+                  email, status, signature, initials, signed_at AS "signed_at: UnixMillis"
            FROM signing_signers
            WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending' AND token_hash IS NULL
              AND signing_order = (SELECT min(signing_order) FROM signing_signers
@@ -482,6 +483,47 @@ pub(crate) async fn fields(
     )
     .fetch_all(exec)
     .await
+}
+
+/// One signer's fields, in request order.
+pub(crate) async fn signer_fields(
+    exec: impl SqliteExecutor<'_>,
+    signer: &SignerRow,
+) -> sqlx::Result<Vec<FieldRow>> {
+    sqlx::query_as!(
+        FieldRow,
+        r#"SELECT id AS "id: FieldId", workspace_id AS "workspace_id: WorkspaceId",
+                  request_id AS "request_id: SigningRequestId", signer_id AS "signer_id: SignerId",
+                  position, kind, page, x, y, width, height, required AS "required: bool", label, value,
+                  filled_at AS "filled_at: UnixMillis"
+           FROM signing_fields WHERE workspace_id = ? AND signer_id = ? ORDER BY position"#,
+        signer.workspace_id,
+        signer.id,
+    )
+    .fetch_all(exec)
+    .await
+}
+
+/// Stores a signer's fill of one of their fields.
+pub(crate) async fn fill_field(
+    exec: impl SqliteExecutor<'_>,
+    signer: &SignerRow,
+    field_id: FieldId,
+    value: &str,
+    now: UnixMillis,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE signing_fields SET value = ?, filled_at = ?
+         WHERE workspace_id = ? AND signer_id = ? AND id = ?",
+        value,
+        now,
+        signer.workspace_id,
+        signer.id,
+        field_id,
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
 }
 
 /// Signers of the request with no signature field, by name.
@@ -602,7 +644,7 @@ pub(crate) async fn signer_by_token(
         r#"SELECT id AS "id: SignerId", workspace_id AS "workspace_id: WorkspaceId",
                   request_id AS "request_id: SigningRequestId", position, signing_order, name,
                   email, status,
-                  signature, signed_at AS "signed_at: UnixMillis"
+                  signature, initials, signed_at AS "signed_at: UnixMillis"
            FROM signing_signers WHERE token_hash = ?1 OR download_token_hash = ?1"#,
         token_hash,
     )
@@ -624,17 +666,20 @@ pub(crate) async fn has_viewed(
     .await
 }
 
-/// Marks a pending signer signed. False when they already were.
+/// Marks a pending signer signed with their adopted signature and
+/// initials. False when they already were.
 pub(crate) async fn mark_signed(
     exec: impl SqliteExecutor<'_>,
     signer: &SignerRow,
     signature: &str,
+    initials: Option<&str>,
     now: UnixMillis,
 ) -> sqlx::Result<bool> {
     let result = sqlx::query!(
-        "UPDATE signing_signers SET status = 'signed', signature = ?, signed_at = ?
+        "UPDATE signing_signers SET status = 'signed', signature = ?, initials = ?, signed_at = ?
          WHERE workspace_id = ? AND id = ? AND status = 'pending'",
         signature,
+        initials,
         now,
         signer.workspace_id,
         signer.id,

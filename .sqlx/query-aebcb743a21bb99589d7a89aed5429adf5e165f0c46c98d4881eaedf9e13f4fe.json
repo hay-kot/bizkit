@@ -1,0 +1,194 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id: FieldId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", signer_id AS \"signer_id: SignerId\",\n                  position, kind, page, x, y, width, height, required AS \"required: bool\", label, value,\n                  filled_at AS \"filled_at: UnixMillis\"\n           FROM signing_fields WHERE workspace_id = ? AND signer_id = ? ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: FieldId",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "workspace_id: WorkspaceId",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "name": "request_id: SigningRequestId",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "request_id"
+          }
+        }
+      },
+      {
+        "name": "signer_id: SignerId",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "signer_id"
+          }
+        }
+      },
+      {
+        "name": "position",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "page",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "page"
+          }
+        }
+      },
+      {
+        "name": "x",
+        "ordinal": 7,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "x"
+          }
+        }
+      },
+      {
+        "name": "y",
+        "ordinal": 8,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "y"
+          }
+        }
+      },
+      {
+        "name": "width",
+        "ordinal": 9,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "name": "height",
+        "ordinal": 10,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "name": "required: bool",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "required"
+          }
+        }
+      },
+      {
+        "name": "label",
+        "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "name": "value",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "name": "filled_at: UnixMillis",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "signing_fields",
+            "name": "filled_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "aebcb743a21bb99589d7a89aed5429adf5e165f0c46c98d4881eaedf9e13f4fe"
+}
