@@ -28,9 +28,7 @@ use crate::error::ApiError;
 use crate::hooks::Hooks;
 use crate::jobs::{Bus, Worker};
 use crate::mail::MailRouter;
-use crate::module::{
-    Lifecycle, Module, ModuleRoutes, Registration, RouteKind, register_all,
-};
+use crate::module::{Lifecycle, Module, ModuleRoutes, Registration, RouteKind, register_all};
 use crate::ops::{Registry, ScopeAreas};
 use crate::secrets::{SecretKey, Secrets};
 use crate::tenancy::workspaces;
