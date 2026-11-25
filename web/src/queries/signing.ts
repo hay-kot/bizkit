@@ -1,6 +1,5 @@
 import { useMutation, useQuery } from '@pinia/colada'
-import { useIntervalFn } from '@vueuse/core'
-import type { MaybeRefOrGetter } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import { onScopeDispose, ref, toValue, watch } from 'vue'
 
 import {
@@ -95,6 +94,51 @@ export function documentUrl(token: string): string {
 }
 
 /**
+ * Refetches `query` while `sealing()` holds, backing off per `nextSealPoll`.
+ * Gives a flag that turns true once the polling gave up.
+ */
+function useSealPoll(
+  query: { asyncStatus: Ref<string>; refetch: () => Promise<unknown> },
+  sealing: () => boolean,
+): Ref<boolean> {
+  const gaveUp = ref(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const stop = () => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = undefined
+  }
+  watch(
+    sealing,
+    (now) => {
+      stop()
+      gaveUp.value = false
+      if (!now) return
+      let attempt = 0
+      let waited = 0
+      const schedule = () => {
+        const wait = nextSealPoll(attempt, waited)
+        if (wait === undefined) {
+          gaveUp.value = true
+          return
+        }
+        timer = setTimeout(() => {
+          attempt++
+          waited += wait
+          // A refetch cancels one in flight, and a mutation that awaits its
+          // invalidation would then fail, so a tick skips while loading.
+          if (query.asyncStatus.value !== 'loading') void query.refetch()
+          schedule()
+        }, wait)
+      }
+      schedule()
+    },
+    { immediate: true },
+  )
+  onScopeDispose(stop)
+  return gaveUp
+}
+
+/**
  * What a signer's link shows. Polls while everyone has signed and the seal
  * runs, so the download appears on its own; `pollGaveUp` turns true when
  * the seal took longer than the polling lasts.
@@ -117,39 +161,7 @@ export function useSignerSession(token: MaybeRefOrGetter<string>) {
   }))
   // Polls only while the seal job is what's pending: waiting on other
   // signers can take days, and their signing doesn't need this page open.
-  const pollGaveUp = ref(false)
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const stop = () => {
-    if (timer !== undefined) clearTimeout(timer)
-    timer = undefined
-  }
-  watch(
-    () => isSignerSealing(query.data.value),
-    (sealing) => {
-      stop()
-      pollGaveUp.value = false
-      if (!sealing) return
-      let attempt = 0
-      let waited = 0
-      const schedule = () => {
-        const wait = nextSealPoll(attempt, waited)
-        if (wait === undefined) {
-          pollGaveUp.value = true
-          return
-        }
-        timer = setTimeout(() => {
-          attempt++
-          waited += wait
-          // A refetch cancels one in flight, so a tick skips while loading.
-          if (query.asyncStatus.value !== 'loading') void query.refetch()
-          schedule()
-        }, wait)
-      }
-      schedule()
-    },
-    { immediate: true },
-  )
-  onScopeDispose(stop)
+  const pollGaveUp = useSealPoll(query, () => isSignerSealing(query.data.value))
   return { ...query, pollGaveUp }
 }
 
@@ -201,15 +213,15 @@ export function useSigningRequests(
   )
 }
 
-/** How often a request's page checks on a seal in progress. */
-const SEALING_POLL_MS = 2_000
-
 /** True while every signer signed and the seal hasn't finished. */
 export function isSealing(request: SigningRequest | undefined): boolean {
   return request?.status === 'sent' && request.signers.every((s) => s.signed)
 }
 
-/** One request with its fields and audit trail; polls while its seal runs. */
+/**
+ * One request with its fields and audit trail. Polls while its seal runs,
+ * like the signer view; `pollGaveUp` turns true when the seal took longer.
+ */
 export function useSigningRequest(
   workspaceId: MaybeRefOrGetter<string>,
   requestId: MaybeRefOrGetter<string>,
@@ -219,21 +231,8 @@ export function useSigningRequest(
       path: { workspace_id: toValue(workspaceId), request_id: toValue(requestId) },
     }),
   )
-  // A refetch cancels one in flight, and a mutation that awaits its
-  // invalidation would then fail, so the poll skips a tick while loading.
-  const poll = useIntervalFn(
-    () => {
-      if (query.asyncStatus.value !== 'loading') void query.refetch()
-    },
-    SEALING_POLL_MS,
-    { immediate: false },
-  )
-  watch(
-    () => isSealing(query.data.value?.request),
-    (sealing) => (sealing ? poll.resume() : poll.pause()),
-    { immediate: true },
-  )
-  return query
+  const pollGaveUp = useSealPoll(query, () => isSealing(query.data.value?.request))
+  return { ...query, pollGaveUp }
 }
 
 const TOO_LARGE = { error: { code: 'too_large', message: 'The PDF must be at most 25 MiB.' } }
@@ -269,46 +268,39 @@ export function useUploadSigningRequest() {
   })
 }
 
-/** A draft's whole signer list, its whole field list, or both, to save. */
-export interface DraftSave {
-  workspaceId: string
-  requestId: string
-  /** Only when the signers changed. */
-  signers?: SignerSlot[]
-  /**
-   * The fields, built once the signers have IDs: `signerIds` holds the
-   * saved signers' IDs in the order of `signers`.
-   */
-  fields: (signerIds: string[]) => SigningFieldInput[]
-  /** Called once the signers saved, before the fields go. */
-  onSigners?: (detail: SigningRequestDetail) => void
+/** The calls a draft save makes, bound to one request. */
+export interface DraftApi {
+  /** `signers.put`: the detail lists the signers in the order sent. */
+  putSigners(signers: SignerSlot[]): Promise<SigningRequestDetail>
+  /** `fields.put`: the detail lists the fields in the order sent. */
+  putFields(fields: SigningFieldInput[]): Promise<SigningRequestDetail>
+}
+
+/** A saved draft and the server ID of every local signer and field key. */
+export interface SavedDraft {
+  detail: SigningRequestDetail
+  ids: Map<string, string>
 }
 
 /**
- * Saves a draft: `signers.put`, then `fields.put`, since new signers need
- * their IDs before fields can name them. Gives the final detail.
+ * Saves a draft through `save`, which gets the request's `DraftApi` and
+ * makes the calls; `components/signing/draft.ts` has the save itself.
  */
 export function useSaveSigningDraft() {
   const invalidate = useInvalidate()
   return useMutation({
-    mutation: async (save: DraftSave) => {
-      const path = { workspace_id: save.workspaceId, request_id: save.requestId }
-      let ids: string[] = []
-      if (save.signers) {
-        const { data } = await signingRequestsSignersPut({
-          path,
-          body: { signers: save.signers },
-          throwOnError: true,
-        })
-        save.onSigners?.(data)
-        ids = data.request.signers.map((signer) => signer.id)
-      }
-      const { data } = await signingRequestsFieldsPut({
-        path,
-        body: { fields: save.fields(ids) },
-        throwOnError: true,
+    mutation: (vars: {
+      workspaceId: string
+      requestId: string
+      save: (api: DraftApi) => Promise<SavedDraft>
+    }) => {
+      const path = { workspace_id: vars.workspaceId, request_id: vars.requestId }
+      return vars.save({
+        putSigners: async (signers) =>
+          (await signingRequestsSignersPut({ path, body: { signers }, throwOnError: true })).data,
+        putFields: async (fields) =>
+          (await signingRequestsFieldsPut({ path, body: { fields }, throwOnError: true })).data,
       })
-      return data
     },
     onSettled: () => invalidate(...REQUEST_QUERIES),
   })

@@ -3,6 +3,7 @@ import { FileSignature, Plus, Trash2, UserPlus } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { orderOf } from '@/components/signing/draft'
 import StatusBadge from '@/components/signing/StatusBadge.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import Field from '@/components/ui/Field.vue'
@@ -37,12 +38,12 @@ const upload = useUploadSigningRequest()
 const panelOpen = ref(false)
 useCreateIntent(openPanel)
 
-type SignerDraft = Required<NewSigner>
+type NewSignerDraft = Required<NewSigner>
 
 const title = ref('')
 const message = ref('')
 const file = ref<File | null>(null)
-const signers = ref<SignerDraft[]>([])
+const signers = ref<NewSignerDraft[]>([])
 const fileError = ref<Error | null>(null)
 const formError = computed(() => fileError.value ?? upload.error.value)
 
@@ -53,7 +54,7 @@ const columns = [
   { key: 'created', label: 'Created' },
 ]
 
-const newSigner = (): SignerDraft => ({ name: '', email: '', signing_order: 1 })
+const newSigner = (): NewSignerDraft => ({ name: '', email: '', signing_order: 1 })
 
 function openPanel() {
   title.value = ''
@@ -79,11 +80,6 @@ function addSigner() {
 
 function removeSigner(index: number) {
   signers.value.splice(index, 1)
-}
-
-/** An emptied number input gives '' under v-model.number. */
-function orderOf(value: number | string): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 1
 }
 
 async function onCreate() {
@@ -224,6 +220,7 @@ async function onCreate() {
             type="number"
             min="1"
             :max="MAX_ORDER"
+            step="1"
             required
             aria-label="Signing order"
             title="Signing order"

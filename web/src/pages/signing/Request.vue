@@ -16,14 +16,13 @@ import { useRouter } from 'vue-router'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import {
   fieldDrafts,
-  fieldInputs,
   KIND_LABELS,
   localKey,
   orderOf,
+  saveDraft as saveSigningDraft,
   sameFields,
   sameSigners,
   signerDrafts,
-  signerSlots,
   signersWithoutSignature,
   type FieldDraft,
   type SignerDraft,
@@ -74,6 +73,7 @@ const {
   data: detail,
   error: detailError,
   isPending,
+  pollGaveUp,
 } = useSigningRequest(
   () => props.workspaceId,
   () => props.requestId,
@@ -125,6 +125,9 @@ const fieldsDirty = computed(
 )
 const dirty = computed(() => isDraft.value && (signersDirty.value || fieldsDirty.value))
 const unplaced = computed(() => signersWithoutSignature(signers.value, fields.value))
+const unplacedNames = computed(() =>
+  unplaced.value.map((s) => s.name.trim() || `signer ${signers.value.indexOf(s) + 1}`).join(', '),
+)
 
 function addSigner() {
   signers.value.push({ key: localKey('signer'), name: '', email: '', signing_order: 1 })
@@ -151,35 +154,25 @@ function removeSigner(signer: SignerDraft) {
   })
 }
 
-/** Saves the draft; gives true when it saved. */
+const editor = ref<InstanceType<typeof FieldEditor>>()
+const saving = computed(() => saveDraft.asyncStatus.value === 'loading')
+
+/** Saves the draft; gives true when it saved. The editor stays locked meanwhile. */
 async function save(): Promise<boolean> {
-  const saved = await runAction({
+  const result = await runAction({
     run: () =>
       saveDraft.mutateAsync({
         workspaceId: props.workspaceId,
         requestId: props.requestId,
-        signers: signersDirty.value ? signerSlots(signers.value) : undefined,
-        // Fields name signers by key; once the signers saved, the keys are IDs.
-        onSigners: (afterSigners) => {
-          const ids = new Map(
-            signers.value.map((s, i) => [s.key, afterSigners.request.signers[i]?.id ?? s.key]),
-          )
-          signers.value = signerDrafts(afterSigners)
-          fields.value = fields.value.map((f) => ({
-            ...f,
-            signerKey: ids.get(f.signerKey) ?? f.signerKey,
-          }))
-          synced = afterSigners
-        },
-        fields: () =>
-          fieldInputs(fields.value, new Map(signers.value.map((s) => [s.key, s.id ?? '']))),
+        save: (api) => saveSigningDraft(api, signers.value, fields.value, signersDirty.value),
       }),
     success: 'Draft saved',
   })
-  if (!saved) return false
-  synced = saved
-  signers.value = signerDrafts(saved)
-  fields.value = fieldDrafts(saved.fields)
+  if (!result) return false
+  synced = result.detail
+  signers.value = signerDrafts(result.detail)
+  fields.value = fieldDrafts(result.detail.fields)
+  editor.value?.remap(result.ids)
   return true
 }
 
@@ -233,9 +226,13 @@ function groupCount() {
   return new Set(signers.value.map((s) => orderOf(s.signing_order))).size
 }
 
+const draftForm = ref<HTMLFormElement>()
+
 function onSend() {
   const r = request.value
-  if (!r) return
+  // Save checks the form when it submits; Send saves without submitting,
+  // so it checks first.
+  if (!r || (draftForm.value && !draftForm.value.reportValidity())) return
   const count = signers.value.length
   const groups = groupCount()
   const first =
@@ -305,7 +302,7 @@ const actions = computed<DetailAction[]>(() => {
       label: 'Send',
       icon: Send,
       run: onSend,
-      disabled: send.asyncStatus.value === 'loading' || saveDraft.asyncStatus.value === 'loading',
+      disabled: send.asyncStatus.value === 'loading' || saving.value,
     })
   }
   if (r.status === 'failed') {
@@ -378,7 +375,7 @@ function fieldLabel(field: SigningField): string {
             ? {
                 form: 'signing-draft',
                 dirty,
-                pending: saveDraft.asyncStatus.value === 'loading',
+                pending: saving,
               }
             : undefined
         "
@@ -401,75 +398,92 @@ function fieldLabel(field: SigningField): string {
         <template #status><StatusBadge :status="request.status" /></template>
       </DescriptionList>
 
+      <p
+        v-if="pollGaveUp"
+        role="status"
+        class="rounded-box border border-base-300 bg-base-100 px-3 py-2 text-sm text-base-content/80"
+      >
+        Sealing is taking longer than usual. Reload this page later to see the result.
+      </p>
+
       <div v-if="request.status === 'failed'" role="alert" class="alert alert-error">
         <span>Sealing failed: {{ request.failure }}. Retry the seal once the cause is fixed.</span>
       </div>
 
-      <form v-if="isDraft" id="signing-draft" class="flex flex-col gap-8" @submit.prevent="save">
+      <form
+        v-if="isDraft"
+        id="signing-draft"
+        ref="draftForm"
+        class="flex flex-col gap-8"
+        @submit.prevent="save"
+      >
         <Card
           title="Signers"
           description="Order 1 signs first. Equal numbers sign at the same time; the next group gets its links once everyone before it signed."
         >
-          <div
-            v-for="(signer, index) in signers"
-            :key="signer.key"
-            class="flex items-center gap-2"
-            data-testid="signer-row"
-          >
-            <span
-              class="size-3 shrink-0 rounded-full"
-              :class="signerColor(index).swatch"
-              aria-hidden="true"
-            ></span>
-            <input
-              v-model="signer.name"
-              :name="`signer-name-${index}`"
-              required
-              maxlength="120"
-              aria-label="Signer name"
-              class="input w-full input-sm"
-              placeholder="Name"
-            />
-            <input
-              v-model="signer.email"
-              :name="`signer-email-${index}`"
-              type="email"
-              required
-              aria-label="Signer email"
-              class="input w-full input-sm"
-              placeholder="Email"
-            />
-            <input
-              v-model.number="signer.signing_order"
-              :name="`signer-order-${index}`"
-              type="number"
-              min="1"
-              :max="MAX_ORDER"
-              required
-              aria-label="Signing order"
-              title="Signing order"
-              class="input w-16 shrink-0 input-sm"
-            />
-            <button
-              type="button"
-              class="btn btn-square btn-ghost btn-sm"
-              :disabled="signers.length === 1"
-              :aria-label="`Remove signer ${index + 1}`"
-              @click="removeSigner(signer)"
+          <fieldset class="flex flex-col gap-4" :disabled="saving">
+            <div
+              v-for="(signer, index) in signers"
+              :key="signer.key"
+              class="flex items-center gap-2"
+              data-testid="signer-row"
             >
-              <Trash2 class="size-4" aria-hidden="true" />
-            </button>
-          </div>
-          <div>
-            <button
-              type="button"
-              class="btn gap-1.5 btn-ghost btn-sm"
-              :disabled="signers.length >= MAX_SIGNERS"
-              @click="addSigner"
-            >
-              <UserPlus class="size-4" aria-hidden="true" />Add signer
-            </button>
-          </div>
+              <span
+                class="size-3 shrink-0 rounded-full"
+                :class="signerColor(index).swatch"
+                aria-hidden="true"
+              ></span>
+              <input
+                v-model="signer.name"
+                :name="`signer-name-${index}`"
+                required
+                maxlength="120"
+                aria-label="Signer name"
+                class="input w-full input-sm"
+                placeholder="Name"
+              />
+              <input
+                v-model="signer.email"
+                :name="`signer-email-${index}`"
+                type="email"
+                required
+                aria-label="Signer email"
+                class="input w-full input-sm"
+                placeholder="Email"
+              />
+              <input
+                v-model.number="signer.signing_order"
+                :name="`signer-order-${index}`"
+                type="number"
+                min="1"
+                :max="MAX_ORDER"
+                step="1"
+                required
+                aria-label="Signing order"
+                title="Signing order"
+                class="input w-16 shrink-0 input-sm"
+              />
+              <button
+                type="button"
+                class="btn btn-square btn-ghost btn-sm"
+                :disabled="signers.length === 1"
+                :aria-label="`Remove signer ${index + 1}`"
+                @click="removeSigner(signer)"
+              >
+                <Trash2 class="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div>
+              <button
+                type="button"
+                class="btn gap-1.5 btn-ghost btn-sm"
+                :disabled="signers.length >= MAX_SIGNERS"
+                @click="addSigner"
+              >
+                <UserPlus class="size-4" aria-hidden="true" />Add signer
+              </button>
+            </div>
+          </fieldset>
         </Card>
 
         <PageSection
@@ -482,10 +496,12 @@ function fieldLabel(field: SigningField): string {
             data-testid="unplaced"
           >
             No signature field yet for
-            {{ unplaced.map((s, i) => s.name.trim() || `signer ${i + 1}`).join(', ') }}.
+            {{ unplacedNames }}.
           </p>
           <FieldEditor
+            ref="editor"
             v-model="fields"
+            :locked="saving"
             :url="originalUrl"
             :title="request.file_name"
             :signers="signers"

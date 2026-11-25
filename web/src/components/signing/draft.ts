@@ -5,6 +5,8 @@
  * for new ones.
  */
 import type {
+  DraftApi,
+  SavedDraft,
   SignerSlot,
   SigningField,
   SigningFieldInput,
@@ -94,30 +96,28 @@ export function signerSlots(signers: SignerDraft[]): SignerSlot[] {
 }
 
 /**
- * The fields as `fields.put` takes them. `signerIds` maps signer keys to
- * IDs; a field whose signer has none is left out, which only happens if a
- * signer save failed halfway.
+ * The fields as `fields.put` takes them, in the same order. `signerIds`
+ * maps signer keys to IDs; a field whose signer has none throws, since
+ * sending the rest would delete it.
  */
 export function fieldInputs(
   fields: FieldDraft[],
   signerIds: Map<string, string>,
 ): SigningFieldInput[] {
-  return fields.flatMap((field) => {
+  return fields.map((field) => {
     const signerId = signerIds.get(field.signerKey)
-    if (!signerId) return []
-    return [
-      {
-        signer_id: signerId,
-        kind: field.kind,
-        page: field.page,
-        x: field.x,
-        y: field.y,
-        width: field.width,
-        height: field.height,
-        required: mayBeOptional(field.kind) ? field.required : true,
-        label: mayBeOptional(field.kind) ? field.label.trim() : '',
-      },
-    ]
+    if (!signerId) throw new Error('A field has no saved signer. Reload the page and try again.')
+    return {
+      signer_id: signerId,
+      kind: field.kind,
+      page: field.page,
+      x: field.x,
+      y: field.y,
+      width: field.width,
+      height: field.height,
+      required: mayBeOptional(field.kind) ? field.required : true,
+      label: mayBeOptional(field.kind) ? field.label.trim() : '',
+    }
   })
 }
 
@@ -154,4 +154,43 @@ export function signersWithoutSignature(
 ): SignerDraft[] {
   const signed = new Set(fields.filter((f) => f.kind === 'signature').map((f) => f.signerKey))
   return signers.filter((signer) => !signed.has(signer.key))
+}
+
+/**
+ * Saves `signers` and `fields` as they are now: `signers.put` when the
+ * signers changed, then `fields.put` with every field. New signers get
+ * their IDs from the first call, so fields go second. The lists are
+ * copied first and the IDs mapped from the copies by position, which is
+ * how the server answers, so the caller's lists can't skew the mapping.
+ * The result maps every local signer and field key to its server ID.
+ */
+export async function saveDraft(
+  api: DraftApi,
+  signers: readonly SignerDraft[],
+  fields: readonly FieldDraft[],
+  signersChanged: boolean,
+): Promise<SavedDraft> {
+  const sentSigners = signers.map((signer) => ({ ...signer }))
+  const sentFields = fields.map((field) => ({ ...field }))
+  const ids = new Map<string, string>()
+  if (signersChanged) {
+    const afterSigners = await api.putSigners(signerSlots(sentSigners))
+    sentSigners.forEach((signer, i) => {
+      const id = afterSigners.request.signers[i]?.id
+      if (id) ids.set(signer.key, id)
+    })
+  } else {
+    for (const signer of sentSigners) if (signer.id) ids.set(signer.key, signer.id)
+  }
+  const detail = await api.putFields(fieldInputs(sentFields, ids))
+  sentFields.forEach((field, i) => {
+    const id = detail.fields[i]?.id
+    if (id) ids.set(field.key, id)
+  })
+  return { detail, ids }
+}
+
+/** `key` after a save: its server ID when it was a local key, else itself. */
+export function remapKey(key: string, ids: Map<string, string>): string {
+  return ids.get(key) ?? key
 }

@@ -7,7 +7,14 @@ import Checkbox from '@/components/ui/Checkbox.vue'
 import Select from '@/components/ui/Select.vue'
 import { MAX_FIELDS, MAX_LABEL, type SigningFieldKind } from '@/queries/signing'
 
-import { KIND_LABELS, localKey, mayBeOptional, type FieldDraft, type SignerDraft } from './draft'
+import {
+  KIND_LABELS,
+  localKey,
+  mayBeOptional,
+  remapKey,
+  type FieldDraft,
+  type SignerDraft,
+} from './draft'
 import FieldBox from './FieldBox.vue'
 import { dragDelta, moveRect, nudgeRect, placeRect, resizeRect } from './fieldEditor'
 import PdfPages from './PdfPages.vue'
@@ -17,13 +24,17 @@ import { signerColor } from './signerColors'
  * Places a draft's fields on its pages. Pick a kind and click the page, or
  * drag the kind onto it. Drag a field to move it and its corner handle to
  * resize it. With a field focused, the arrow keys move it (Shift for big
- * steps, Alt to resize) and Delete removes it.
+ * steps, Alt to resize) and Delete removes it. After a save, the page
+ * calls `remap` with the save's key-to-ID map, so the signer picked for new
+ * fields and the selected field carry over to their saved IDs.
  */
 const props = defineProps<{
   url: string
   title?: string
   signers: SignerDraft[]
   pageCount: number
+  /** Read-only while a save runs, so nothing changes under it. */
+  locked?: boolean
 }>()
 const fields = defineModel<FieldDraft[]>({ required: true })
 
@@ -78,7 +89,7 @@ async function focusField(key: string) {
 }
 
 function place(kind: SigningFieldKind, page: number, cx: number, cy: number) {
-  if (!canPlace.value) return
+  if (!canPlace.value || props.locked) return
   const key = localKey('field')
   fields.value = [
     ...fields.value,
@@ -98,10 +109,12 @@ function place(kind: SigningFieldKind, page: number, cx: number, cy: number) {
 }
 
 function update(key: string, change: Partial<FieldDraft>) {
+  if (props.locked) return
   fields.value = fields.value.map((f) => (f.key === key ? { ...f, ...change } : f))
 }
 
 function remove(key: string) {
+  if (props.locked) return
   fields.value = fields.value.filter((f) => f.key !== key)
   if (selectedKey.value === key) selectedKey.value = null
 }
@@ -209,6 +222,18 @@ function onFieldKey(field: FieldDraft, event: KeyboardEvent) {
 onKeyStroke('Escape', () => {
   armed.value = null
 })
+
+/** Moves the picked signer and the selection from local keys to saved IDs. */
+function remap(ids: Map<string, string>) {
+  forSigner.value = remapKey(forSigner.value, ids)
+  if (selectedKey.value !== null) {
+    const focused = root.value?.contains(document.activeElement) ?? false
+    selectedKey.value = remapKey(selectedKey.value, ids)
+    if (focused) void focusField(selectedKey.value)
+  }
+}
+
+defineExpose({ remap, forSigner, selectedKey })
 </script>
 
 <template>
@@ -218,117 +243,120 @@ onKeyStroke('Escape', () => {
       role="toolbar"
       aria-label="Field tools"
     >
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-sm font-medium">Add a field for</span>
-        <div class="w-48">
-          <Select
-            v-model="forSigner"
-            :options="signerOptions"
-            label="Signer for new fields"
-            size="sm"
-          />
-        </div>
-        <span
-          v-if="forSigner"
-          class="size-3 shrink-0 rounded-full"
-          :class="colorOf(forSigner).swatch"
-          aria-hidden="true"
-        ></span>
-        <div class="flex flex-wrap gap-1" role="group" aria-label="Field kinds">
-          <button
-            v-for="item in KINDS"
-            :key="item.kind"
-            type="button"
-            draggable="true"
-            class="btn gap-1.5 btn-sm"
-            :class="armed === item.kind ? 'btn-primary' : 'btn-ghost'"
-            :aria-pressed="armed === item.kind"
-            :disabled="!canPlace"
-            :data-kind="item.kind"
-            @click="onKind(item.kind, $event)"
-            @dragstart="onKindDrag(item.kind, $event)"
-          >
-            <component :is="item.icon" class="size-4" aria-hidden="true" />{{
-              KIND_LABELS[item.kind]
-            }}
-          </button>
-        </div>
-      </div>
-      <p class="text-xs text-base-content/70" role="status">
-        <template v-if="full">A request takes at most {{ MAX_FIELDS }} fields.</template>
-        <template v-else-if="armed"
-          >Click the page where the {{ KIND_LABELS[armed].toLowerCase() }} field goes. Escape
-          cancels.</template
-        >
-        <template v-else
-          >Pick a kind and click the page, or drag it there. Drag a field to move it, its corner to
-          resize it. Arrow keys move a selected field, Shift for big steps, Alt to resize.</template
-        >
-      </p>
-
-      <div
-        v-if="selected"
-        class="flex flex-wrap items-end gap-3 border-t border-base-300 pt-3"
-        data-testid="field-settings"
-      >
-        <div class="flex flex-col gap-1">
-          <span class="text-xs font-medium">Signer</span>
+      <fieldset class="flex min-w-0 flex-col gap-3" :disabled="locked">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium">Add a field for</span>
           <div class="w-48">
             <Select
-              :model-value="selected.signerKey"
+              v-model="forSigner"
               :options="signerOptions"
-              label="Field signer"
+              label="Signer for new fields"
               size="sm"
-              @update:model-value="(key) => update(selected!.key, { signerKey: key })"
             />
+          </div>
+          <span
+            v-if="forSigner"
+            class="size-3 shrink-0 rounded-full"
+            :class="colorOf(forSigner).swatch"
+            aria-hidden="true"
+          ></span>
+          <div class="flex flex-wrap gap-1" role="group" aria-label="Field kinds">
+            <button
+              v-for="item in KINDS"
+              :key="item.kind"
+              type="button"
+              draggable="true"
+              class="btn gap-1.5 btn-sm"
+              :class="armed === item.kind ? 'btn-primary' : 'btn-ghost'"
+              :aria-pressed="armed === item.kind"
+              :disabled="!canPlace"
+              :data-kind="item.kind"
+              @click="onKind(item.kind, $event)"
+              @dragstart="onKindDrag(item.kind, $event)"
+            >
+              <component :is="item.icon" class="size-4" aria-hidden="true" />{{
+                KIND_LABELS[item.kind]
+              }}
+            </button>
           </div>
         </div>
-        <div class="flex flex-col gap-1">
-          <span class="text-xs font-medium">Page</span>
-          <div class="w-32">
-            <Select
-              :model-value="String(selected.page)"
-              :options="pageOptions"
-              label="Field page"
-              size="sm"
-              @update:model-value="(page) => update(selected!.key, { page: Number(page) })"
-            />
-          </div>
-        </div>
-        <template v-if="mayBeOptional(selected.kind)">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs font-medium">Label</span>
-            <input
-              :value="selected.label"
-              :maxlength="MAX_LABEL"
-              class="input w-48 input-sm"
-              placeholder="Company"
-              name="field-label"
-              @input="
-                (event) =>
-                  update(selected!.key, { label: (event.target as HTMLInputElement).value })
-              "
-            />
-          </label>
-          <div class="flex h-8 items-center">
-            <Checkbox
-              :model-value="selected.required"
-              label="Required"
-              @update:model-value="(value) => update(selected!.key, { required: value === true })"
-            />
-          </div>
-        </template>
-        <p v-else class="flex h-8 items-center text-xs text-base-content/70">
-          {{ KIND_LABELS[selected.kind] }} fields are always required.
+        <p class="text-xs text-base-content/70" role="status">
+          <template v-if="full">A request takes at most {{ MAX_FIELDS }} fields.</template>
+          <template v-else-if="armed"
+            >Click the page where the {{ KIND_LABELS[armed].toLowerCase() }} field goes. Escape
+            cancels.</template
+          >
+          <template v-else
+            >Pick a kind and click the page, or drag it there. Drag a field to move it, its corner
+            to resize it. Arrow keys move a selected field, Shift for big steps, Alt to
+            resize.</template
+          >
         </p>
-        <button
-          type="button"
-          class="btn ms-auto gap-1.5 btn-ghost btn-sm"
-          @click="remove(selected.key)"
+
+        <div
+          v-if="selected"
+          class="flex flex-wrap items-end gap-3 border-t border-base-300 pt-3"
+          data-testid="field-settings"
         >
-          <Trash2 class="size-4" aria-hidden="true" />Remove field
-        </button>
-      </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-medium">Signer</span>
+            <div class="w-48">
+              <Select
+                :model-value="selected.signerKey"
+                :options="signerOptions"
+                label="Field signer"
+                size="sm"
+                @update:model-value="(key) => update(selected!.key, { signerKey: key })"
+              />
+            </div>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-medium">Page</span>
+            <div class="w-32">
+              <Select
+                :model-value="String(selected.page)"
+                :options="pageOptions"
+                label="Field page"
+                size="sm"
+                @update:model-value="(page) => update(selected!.key, { page: Number(page) })"
+              />
+            </div>
+          </div>
+          <template v-if="mayBeOptional(selected.kind)">
+            <label class="flex flex-col gap-1">
+              <span class="text-xs font-medium">Label</span>
+              <input
+                :value="selected.label"
+                :maxlength="MAX_LABEL"
+                class="input w-48 input-sm"
+                placeholder="Company"
+                name="field-label"
+                @input="
+                  (event) =>
+                    update(selected!.key, { label: (event.target as HTMLInputElement).value })
+                "
+              />
+            </label>
+            <div class="flex h-8 items-center">
+              <Checkbox
+                :model-value="selected.required"
+                label="Required"
+                @update:model-value="(value) => update(selected!.key, { required: value === true })"
+              />
+            </div>
+          </template>
+          <p v-else class="flex h-8 items-center text-xs text-base-content/70">
+            {{ KIND_LABELS[selected.kind] }} fields are always required.
+          </p>
+          <button
+            type="button"
+            class="btn ms-auto gap-1.5 btn-ghost btn-sm"
+            @click="remove(selected.key)"
+          >
+            <Trash2 class="size-4" aria-hidden="true" />Remove field
+          </button>
+        </div>
+      </fieldset>
     </div>
 
     <PdfPages :url="url" :title="title">
@@ -356,6 +384,7 @@ onKeyStroke('Escape', () => {
               :data-field="field.key"
               :aria-label="describe(field)"
               :aria-pressed="selectedKey === field.key"
+              :aria-disabled="locked || undefined"
               @focus="selectedKey = field.key"
               @pointerdown="startGesture(field, 'move', { width, height }, $event)"
               @pointermove="onGestureMove"
