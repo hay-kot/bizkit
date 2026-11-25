@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteRecordRaw } from 'vue-router'
 
-import { modules, projectNav, projectRoutes, workspaceNav, workspaceRoutes } from './index'
+import {
+  modules,
+  projectNav,
+  projectRoutes,
+  publicRoutes,
+  workspaceNav,
+  workspaceRoutes,
+} from './index'
 
 /** A module's routes with children joined to their parent's path. */
 function flat(routes: RouteRecordRaw[] = []): RouteRecordRaw[] {
@@ -59,6 +66,7 @@ describe('web modules', () => {
     for (const route of modules.flatMap((m) => [
       ...all(m.workspaceRoutes),
       ...all(m.projectRoutes),
+      ...all(m.publicRoutes),
     ])) {
       expect(route.path.startsWith('/'), route.path).toBe(false)
     }
@@ -70,6 +78,16 @@ describe('web modules', () => {
       const nav = route.meta?.nav
       if (nav) expect(path === nav.path || path.startsWith(`${nav.path}/`), path).toBe(true)
       else expect(path, 'only Projects has no nav item').toBe('projects')
+    }
+  })
+
+  it('mark public routes public and keep them off the shell paths', () => {
+    const shell = ['sign-in', 'w', 'invite']
+    const paths = publicRoutes.map((route) => route.path)
+    expect(new Set(paths).size, 'public paths').toBe(paths.length)
+    for (const route of publicRoutes) {
+      expect(route.meta?.public, route.path).toBe(true)
+      expect(shell.includes(route.path.split('/')[0]!), route.path).toBe(false)
     }
   })
 

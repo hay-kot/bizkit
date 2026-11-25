@@ -57,6 +57,12 @@ export interface WebModule {
    * get `projectId` (and any other params) as props.
    */
   projectRoutes?: RouteRecordRaw[]
+  /**
+   * Routes for people without an account (a signer's link), with relative
+   * paths mounted at the top level, such as `sign` for `/sign`. They render
+   * in the public layout, outside the workspace shell, and need no session.
+   */
+  publicRoutes?: RouteRecordRaw[]
   nav: NavItem[]
   /** Blocks for other modules' entity pages. */
   entitySections?: EntitySection[]

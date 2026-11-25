@@ -5,11 +5,12 @@ import core from './core'
 import extensions from './extensions'
 import forms from './forms'
 import mailing from './mailing'
+import signing from './signing'
 import type { NavItem, NavSection, WebModule } from './types'
 import webhooks from './webhooks'
 
 /** Every web module, in the order their routes register. */
-export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions]
+export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions, signing]
 
 /**
  * Tags a module's route with the module's nav item it sits under (`forms`
@@ -25,6 +26,13 @@ function withNav(module: WebModule, route: RouteRecordRaw): RouteRecordRaw {
 /** Every module's workspace routes, relative to `/w/:workspaceId/`. */
 export const workspaceRoutes: RouteRecordRaw[] = modules.flatMap((m) =>
   (m.workspaceRoutes ?? []).map((route) => withNav(m, route)),
+)
+
+/** Every module's public routes, relative to `/`, marked public. */
+export const publicRoutes: RouteRecordRaw[] = modules.flatMap((m) =>
+  (m.publicRoutes ?? []).map(
+    (route) => ({ ...route, meta: { ...route.meta, public: true } }) as RouteRecordRaw,
+  ),
 )
 
 /** Params as props, on a route and its children. */

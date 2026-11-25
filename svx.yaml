@@ -22,7 +22,7 @@ services:
     # Origin passes the CSRF check. It says localhost, not 127.0.0.1: some
     # browser setups (proxies, HTTPS-only modes) break on the IP origin.
     run: >-
-      exec cargo run -p bizkit --features test-hooks -- --config dev/bizkit.yaml serve
+      exec cargo run -p bizkit --features test-hooks,signing -- --config dev/bizkit.yaml serve
       --listen 127.0.0.1:$PORT --base-url http://localhost:$SVX_PORT_UI
       --data-dir $SVX_STACK_DIR/data --smtp-url smtp://127.0.0.1:$SVX_PORT_MAILPIT_SMTP
     port: 8484

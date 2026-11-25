@@ -40,13 +40,25 @@ async fn serve(uri: Uri) -> Response {
         return file_response(path, file.data, cache);
     }
     match Assets::get("index.html") {
-        Some(index) => file_response("index.html", index.data, "no-cache"),
+        Some(index) => app_response(path, index.data),
         None => (
             StatusCode::SERVICE_UNAVAILABLE,
             "The web app was not built into this binary. Run `mise run web:build` and rebuild.",
         )
             .into_response(),
     }
+}
+
+/// `index.html` for the SPA route at `path`. The signer view's URL carries
+/// the signer's link token, so that page is never cached and never sends
+/// its URL on as a referrer.
+fn app_response(path: &str, index: Cow<'static, [u8]>) -> Response {
+    if path != "sign" && !path.starts_with("sign/") {
+        return file_response("index.html", index, "no-cache");
+    }
+    let mut response = file_response("index.html", index, "no-store");
+    response.headers_mut().insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    response
 }
 
 fn file_response(path: &str, data: Cow<'static, [u8]>, cache: &'static str) -> Response {
@@ -76,5 +88,18 @@ mod tests {
         let has_index = Assets::get("index.html").is_some();
         let expected = if has_index { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
         assert_eq!(response.status(), expected, "SPA routes fall back to index.html");
+    }
+
+    #[test]
+    fn the_signer_view_is_never_cached_or_sent_as_a_referrer() {
+        let index = || Cow::Borrowed(&b"<html></html>"[..]);
+        let sign = app_response("sign", index());
+        assert_eq!(sign.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(sign.headers()[header::REFERRER_POLICY], "no-referrer");
+        for path in ["signup", "w/acme/projects", ""] {
+            let other = app_response(path, index());
+            assert_eq!(other.headers()[header::CACHE_CONTROL], "no-cache", "{path}");
+            assert!(!other.headers().contains_key(header::REFERRER_POLICY), "{path}");
+        }
     }
 }
