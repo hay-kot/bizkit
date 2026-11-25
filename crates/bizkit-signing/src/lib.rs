@@ -8,6 +8,7 @@ mod complete;
 pub mod fields;
 mod mail;
 mod ops;
+mod overlay;
 mod pdf;
 mod public;
 mod seal;

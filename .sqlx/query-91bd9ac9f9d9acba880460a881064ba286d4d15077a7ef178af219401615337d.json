@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, signing_order, name,\n                  email, status, signature, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers\n           WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending' AND token_hash IS NULL\n             AND signing_order = (SELECT min(signing_order) FROM signing_signers\n                                  WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending')\n           ORDER BY position",
+  "query": "SELECT id AS \"id: SignerId\", workspace_id AS \"workspace_id: WorkspaceId\",\n                  request_id AS \"request_id: SigningRequestId\", position, signing_order, name,\n                  email, status, signature, initials, signed_at AS \"signed_at: UnixMillis\"\n           FROM signing_signers\n           WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending' AND token_hash IS NULL\n             AND signing_order = (SELECT min(signing_order) FROM signing_signers\n                                  WHERE workspace_id = ?1 AND request_id = ?2 AND status = 'pending')\n           ORDER BY position",
   "describe": {
     "columns": [
       {
@@ -103,8 +103,19 @@
         }
       },
       {
-        "name": "signed_at: UnixMillis",
+        "name": "initials",
         "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "signing_signers",
+            "name": "initials"
+          }
+        }
+      },
+      {
+        "name": "signed_at: UnixMillis",
+        "ordinal": 10,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -127,8 +138,9 @@
       false,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "f4d4774b0434f42c35cdb13a17e95043c5aa089d1136e39689120ab7d8e4b097"
+  "hash": "91bd9ac9f9d9acba880460a881064ba286d4d15077a7ef178af219401615337d"
 }
