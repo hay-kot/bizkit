@@ -99,6 +99,18 @@ mod archive {
     }
 
     #[tokio::test]
+    async fn the_archive_goes_away_while_mailing_is_off() {
+        let s = setup().await;
+        let list = s.list("Newsletter").await;
+        let list = s.set_archive(&list, true).await;
+        let archive = archive_path(&list);
+        s.get(&archive).await.expect(StatusCode::OK);
+        s.app.turn_off(s.team.workspaces["main"].id, "mailing").await;
+        s.get(&archive).await.expect(StatusCode::NOT_FOUND);
+        s.get(&format!("{archive}/feed.xml")).await.expect(StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
     async fn the_archive_shows_only_sent_broadcasts_marked_archived() {
         let s = setup().await;
         let list = s.list("Newsletter").await;

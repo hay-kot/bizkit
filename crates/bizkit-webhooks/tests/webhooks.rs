@@ -133,6 +133,18 @@ mod webhooks {
     }
 
     #[tokio::test]
+    async fn a_workspace_with_webhooks_off_captures_nothing() {
+        let s = setup().await;
+        let endpoint = s.endpoint(json!({})).await;
+        s.app.turn_off(s.team.workspaces["main"].id, "webhooks").await;
+        assert_eq!(
+            s.capture(&endpoint, json_body("{}")).await.status,
+            StatusCode::NOT_FOUND,
+            "as if the endpoint didn't exist"
+        );
+    }
+
+    #[tokio::test]
     async fn unknown_disabled_and_oversized_requests_are_refused() {
         let s = setup().await;
         let endpoint = s.endpoint(json!({})).await;

@@ -262,6 +262,25 @@ impl TestApp {
             .unwrap_or_else(|err| panic!("seeding {persona}: {err:#}"))
     }
 
+    /// Turns `feature` off in the workspace, as `workspaces.features.put`
+    /// would, without needing an admin session.
+    ///
+    /// # Panics
+    ///
+    /// When the insert fails.
+    pub async fn turn_off(&self, workspace_id: WorkspaceId, feature: &str) {
+        let mut tx = self.app.platform().db().write().await.unwrap_or_else(|err| panic!("{err:#}"));
+        sqlx::query(
+            "INSERT OR IGNORE INTO workspace_disabled_features (workspace_id, feature) VALUES (?, ?)",
+        )
+        .bind(workspace_id)
+        .bind(feature)
+        .execute(&mut *tx)
+        .await
+        .unwrap_or_else(|err| panic!("turning {feature} off: {err}"));
+        tx.commit().await.unwrap_or_else(|err| panic!("{err:#}"));
+    }
+
     /// Writes an API key with exactly `scopes` (even none, which the API
     /// refuses) straight into the database and returns its token.
     ///

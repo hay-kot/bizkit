@@ -157,6 +157,19 @@ mod ingest {
     }
 
     #[tokio::test]
+    async fn a_workspace_with_analytics_off_takes_no_events() {
+        let s = setup("cookieless").await;
+        let src = format!("/m/analytics/public/s/{}.js", s.key);
+        s.anon.get(&src).await.expect(StatusCode::OK);
+        s.app.turn_off(s.team.workspaces["main"].id, "analytics").await;
+        // The site cache holds the site for up to 30 s.
+        s.app.clock.advance(Duration::from_secs(31));
+        s.anon.get(&src).await.expect(StatusCode::NOT_FOUND);
+        s.send(json!({"n": "pageview"}), "203.0.113.9").await;
+        assert_eq!(s.count("SELECT count(*) FROM analytics_events").await, 0, "nothing stored");
+    }
+
+    #[tokio::test]
     async fn pageviews_are_enriched() {
         let s = setup("cookieless").await;
         s.send(

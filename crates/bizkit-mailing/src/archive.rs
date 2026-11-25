@@ -137,9 +137,19 @@ fn answer(result: anyhow::Result<Option<Response>>) -> Response {
     }
 }
 
+/// The list whose archive key is `key`, unless its workspace turned mailing
+/// off. Subscriber pages (confirm, unsubscribe, manage) keep working then;
+/// the archive is a page for readers, so it goes away with the feature.
+async fn archive_list(platform: &Platform, key: &str) -> anyhow::Result<Option<ListRow>> {
+    let Some(list) = store::find_archive_list(platform.db().read(), key).await? else {
+        return Ok(None);
+    };
+    Ok(platform.feature_enabled(list.workspace_id, "mailing").await?.then_some(list))
+}
+
 async fn index_page(platform: &Platform, key: &str) -> anyhow::Result<Option<Response>> {
     let db = platform.db().read();
-    let Some(list) = store::find_archive_list(db, key).await? else { return Ok(None) };
+    let Some(list) = archive_list(platform, key).await? else { return Ok(None) };
     let issues = store::archive_issues(db, list.workspace_id, list.id, None, PAGE_ISSUES).await?;
     let feed = feed_url(platform, key)?;
     let mut body = format!("<h1>{}</h1>", escape(&list.name));
@@ -171,7 +181,7 @@ async fn issue_page(
     id: BroadcastId,
 ) -> anyhow::Result<Option<Response>> {
     let db = platform.db().read();
-    let Some(list) = store::find_archive_list(db, key).await? else { return Ok(None) };
+    let Some(list) = archive_list(platform, key).await? else { return Ok(None) };
     let Some(issue) =
         store::archive_issues(db, list.workspace_id, list.id, Some(id), 1).await?.pop()
     else {
@@ -192,7 +202,7 @@ async fn issue_page(
 
 async fn feed_xml(platform: &Platform, key: &str) -> anyhow::Result<Option<Response>> {
     let db = platform.db().read();
-    let Some(list) = store::find_archive_list(db, key).await? else { return Ok(None) };
+    let Some(list) = archive_list(platform, key).await? else { return Ok(None) };
     let issues = store::archive_issues(db, list.workspace_id, list.id, None, FEED_ISSUES).await?;
     let mut xml =
         String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\"><channel>");

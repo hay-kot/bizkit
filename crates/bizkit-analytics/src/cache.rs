@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use anyhow::Context as _;
+use bizkit_core::Platform;
 use bizkit_core::db::Db;
 use bizkit_core::time::UnixMillis;
 use rand::RngExt as _;
@@ -37,10 +38,12 @@ pub(crate) struct Sites {
 }
 
 impl Sites {
-    /// The site with public key `key`, if there is one.
+    /// The site with public key `key`, if there is one and its workspace
+    /// has analytics on. Turning analytics off takes up to [`SITE_TTL`] to
+    /// reach ingest.
     pub(crate) async fn get(
         &self,
-        db: &Db,
+        platform: &Platform,
         key: &str,
         now: UnixMillis,
     ) -> anyhow::Result<Option<Arc<CachedSite>>> {
@@ -50,7 +53,7 @@ impl Sites {
         {
             return Ok(site);
         }
-        let site = load(db, key).await?.map(Arc::new);
+        let site = load(platform, key).await?.map(Arc::new);
         {
             let mut map = self.lock();
             if map.len() >= MAX_SITES {
@@ -71,10 +74,14 @@ impl Sites {
     }
 }
 
-async fn load(db: &Db, key: &str) -> anyhow::Result<Option<CachedSite>> {
+async fn load(platform: &Platform, key: &str) -> anyhow::Result<Option<CachedSite>> {
+    let db = platform.db();
     let Some(row) = store::find_site_by_key(db.read(), key).await.context("finding a site")? else {
         return Ok(None);
     };
+    if !platform.feature_enabled(row.workspace_id, "analytics").await? {
+        return Ok(None);
+    }
     let goals = store::list_goals(db.read(), row.workspace_id, row.project_id)
         .await
         .context("loading a site's goals")?;

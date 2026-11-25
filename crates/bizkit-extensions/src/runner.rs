@@ -300,6 +300,11 @@ impl HookRunner for ScriptRunner {
         target: HookTarget,
         input: &Value,
     ) -> SyncOutcome {
+        // A lookup failure counts as on: sync hooks fail open, and loading
+        // the script next fails the same way if the database is down.
+        if !platform.feature_enabled(target.workspace_id, "extensions").await.unwrap_or(true) {
+            return SyncOutcome::NoScript;
+        }
         let scripts = match store::enabled_scripts(
             platform.db().read(),
             target.workspace_id,
@@ -354,6 +359,13 @@ impl HookRunner for ScriptRunner {
         target: HookTarget,
         event: &Value,
     ) -> anyhow::Result<()> {
+        if !platform
+            .feature_enabled(target.workspace_id, "extensions")
+            .await
+            .context("checking the extensions feature")?
+        {
+            return Ok(());
+        }
         let scripts = store::enabled_scripts(
             platform.db().read(),
             target.workspace_id,

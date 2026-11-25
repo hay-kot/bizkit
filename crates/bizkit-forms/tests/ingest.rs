@@ -99,6 +99,17 @@ mod ingest {
     }
 
     #[tokio::test]
+    async fn a_workspace_with_forms_off_takes_no_submissions() {
+        let s = setup().await;
+        let form = s.form(json!({"name": "Contact"})).await;
+        s.app.turn_off(s.team.workspaces["main"].id, "forms").await;
+        let res = s.post(&form, RawBody::new("application/json", r#"{"name": "Ada"}"#)).await;
+        assert_eq!(res.status, StatusCode::NOT_FOUND, "as if the form didn't exist");
+        let list = s.admin.get(&s.forms()).await;
+        assert_eq!(list.status, StatusCode::FORBIDDEN, "the API refuses too");
+    }
+
+    #[tokio::test]
     async fn json_and_urlencoded_bodies() {
         let s = setup().await;
         let form = s.form(json!({"name": "Contact"})).await;
