@@ -167,6 +167,14 @@ async fn take(
     let Incoming { method, query, headers, body } = incoming;
     let Ok(id) = endpoint_id.parse::<EndpointId>() else { return Err(ApiError::NotFound.into()) };
     let endpoint = store::find_public(platform.db().read(), id).await?.ok_or(ApiError::NotFound)?;
+    // An endpoint whose workspace turned webhooks off captures nothing.
+    if !platform
+        .feature_enabled(endpoint.workspace_id, "webhooks")
+        .await
+        .map_err(ApiError::Internal)?
+    {
+        return Err(ApiError::NotFound.into());
+    }
     let body = axum::body::to_bytes(body, MAX_BODY_BYTES).await.map_err(|_| Refused::TooLarge)?;
     let row = RequestRow {
         id: RequestId::new(),

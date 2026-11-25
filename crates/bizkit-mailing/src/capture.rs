@@ -32,6 +32,11 @@ impl Subscriber<ContactCaptured> for CaptureSubscriber {
             return Ok(());
         }
         let platform = &cx.platform;
+        // A capture while mailing is off is new intake, like a public route,
+        // so it adds nobody and mails nobody.
+        if !platform.feature_enabled(event.workspace_id, "mailing").await? {
+            return Ok(());
+        }
         let mut tx = platform.db().write().await?;
         let lists =
             store::lists_for_form(&mut *tx, event.workspace_id, event.project_id, &event.source.id)

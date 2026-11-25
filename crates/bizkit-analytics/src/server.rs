@@ -181,8 +181,11 @@ pub(crate) async fn record(
     }
     errors.into_result()?;
     let db = platform.db();
-    let site =
-        ingest.sites.get(db, &row.site_key, platform.now()).await?.ok_or(ApiError::NotFound)?;
+    let site = ingest
+        .sites
+        .get(platform, &row.site_key, platform.now())
+        .await?
+        .ok_or(ApiError::NotFound)?;
     let salt = ingest.salts.get(db, Day::of(received)).await?;
     let events: Vec<Incoming> = events
         .into_iter()

@@ -9,7 +9,8 @@ import type { PaletteContext, PaletteRow } from '@/palette/types'
 /**
  * Registers the workspace's palette rows: every nav item the user can see,
  * then each module's `palette` source. Key it by workspace, project and admin
- * flag, so the sources run again with the new context.
+ * flag and the modules turned off, so the sources run again with the new
+ * context.
  */
 const props = defineProps<{
   workspaceId: string
@@ -17,9 +18,14 @@ const props = defineProps<{
   projectName: string
   workspaceName: string
   isAdmin: boolean
+  /** Modules the workspace turned off: their rows stay out. */
+  off: string[]
 }>()
 
-const visible = (items: NavItem[]) => items.filter((item) => !item.adminOnly || props.isAdmin)
+const visible = (items: NavItem[]) =>
+  items.filter(
+    (item) => (!item.adminOnly || props.isAdmin) && !props.off.includes(item.module ?? ''),
+  )
 
 usePaletteRows(
   computed((): PaletteRow[] => {
@@ -58,7 +64,7 @@ const cx: PaletteContext = {
   isAdmin: props.isAdmin,
 }
 for (const module of modules) {
-  if (module.palette) usePaletteRows(module.palette(cx))
+  if (module.palette && !props.off.includes(module.name)) usePaletteRows(module.palette(cx))
 }
 </script>
 

@@ -7,17 +7,34 @@ import {
   invitationsDeclineMutation,
   invitationsMineQuery,
   workspacesCreateMutation,
+  workspacesFeaturesGetQuery,
+  workspacesFeaturesPutMutation,
   workspacesGetQuery,
   workspacesUpdateMutation,
 } from '@/api/gen/@pinia/colada.gen'
-import type { Membership, MyInvitation, Workspace } from '@/api/gen/types.gen'
+import type { Feature, Membership, MyInvitation, Workspace } from '@/api/gen/types.gen'
 
 import { useInvalidate } from './keys'
 
-export type { Membership, MyInvitation, Workspace }
+export type { Feature, Membership, MyInvitation, Workspace }
 
 export function useWorkspace(workspaceId: MaybeRefOrGetter<string>) {
   return useQuery(() => workspacesGetQuery({ path: { workspace_id: toValue(workspaceId) } }))
+}
+
+/** The workspace's features (modules) and whether each is on. */
+export function useWorkspaceFeatures(workspaceId: MaybeRefOrGetter<string>) {
+  return useQuery(() =>
+    workspacesFeaturesGetQuery({ path: { workspace_id: toValue(workspaceId) } }),
+  )
+}
+
+export function useUpdateWorkspaceFeatures() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    ...workspacesFeaturesPutMutation(),
+    onSettled: () => invalidate('workspacesFeaturesGet'),
+  })
 }
 
 export function useCreateWorkspace() {

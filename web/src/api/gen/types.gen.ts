@@ -968,6 +968,34 @@ export type EventStats = {
 };
 
 /**
+ * A feature and whether it is on in the workspace.
+ */
+export type Feature = {
+    /**
+     * What the feature covers.
+     */
+    description: string;
+    /**
+     * False when an admin turned it off.
+     */
+    enabled: boolean;
+    /**
+     * The module name, such as `forms`.
+     */
+    name: string;
+};
+
+/**
+ * Every feature of this build, sorted by name.
+ */
+export type FeatureList = {
+    /**
+     * The features.
+     */
+    items: Array<Feature>;
+};
+
+/**
  * A field a form accepts.
  */
 export type FieldDef = {
@@ -6542,6 +6570,105 @@ export type ExtensionsTargetsListResponses = {
 };
 
 export type ExtensionsTargetsListResponse = ExtensionsTargetsListResponses[keyof ExtensionsTargetsListResponses];
+
+export type WorkspacesFeaturesGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/features';
+};
+
+export type WorkspacesFeaturesGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WorkspacesFeaturesGetError = WorkspacesFeaturesGetErrors[keyof WorkspacesFeaturesGetErrors];
+
+export type WorkspacesFeaturesGetResponses = {
+    /**
+     * OK
+     */
+    200: FeatureList;
+};
+
+export type WorkspacesFeaturesGetResponse = WorkspacesFeaturesGetResponses[keyof WorkspacesFeaturesGetResponses];
+
+export type WorkspacesFeaturesPutData = {
+    body: {
+        /**
+         * Names of the features to turn off, such as `["mailing"]`. Empty
+         * turns every feature on. Data of a feature that is off stays, and
+         * comes back when it is on again.
+         */
+        disabled: Array<string>;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/features';
+};
+
+export type WorkspacesFeaturesPutErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type WorkspacesFeaturesPutError = WorkspacesFeaturesPutErrors[keyof WorkspacesFeaturesPutErrors];
+
+export type WorkspacesFeaturesPutResponses = {
+    /**
+     * OK
+     */
+    200: FeatureList;
+};
+
+export type WorkspacesFeaturesPutResponse = WorkspacesFeaturesPutResponses[keyof WorkspacesFeaturesPutResponses];
 
 export type FormsListData = {
     body?: never;

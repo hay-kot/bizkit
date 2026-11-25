@@ -16,6 +16,7 @@ impl Module for CoreModule {
         crate::tenancy::ops::register(cx)?;
         crate::auth::ops::register(cx)?;
         crate::mail::ops::register(cx)?;
+        crate::features::register(cx)?;
         cx.job(SendMailHandler)?;
         Ok(())
     }

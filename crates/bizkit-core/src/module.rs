@@ -117,6 +117,8 @@ pub(crate) struct Registration {
     pub(crate) hooks: HookRegistry,
     pub(crate) lifecycles: Vec<Arc<dyn Lifecycle>>,
     lifecycle_modules: Vec<&'static str>,
+    /// The module that declared each scope area; core's areas aren't here.
+    pub(crate) area_features: BTreeMap<&'static str, &'static str>,
 }
 
 /// Where a module's raw routes sit in the router.
@@ -214,7 +216,11 @@ impl<'a> ModuleContext<'a> {
                 self.module
             );
         }
-        self.registration.registry.declare_area(area, description)
+        self.registration.registry.declare_area(area, description)?;
+        if !self.is_core {
+            self.registration.area_features.insert(area, self.module);
+        }
+        Ok(())
     }
 
     /// Registers an operation. Module paths start with

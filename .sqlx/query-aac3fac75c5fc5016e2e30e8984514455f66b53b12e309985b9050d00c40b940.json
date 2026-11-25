@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO workspace_disabled_features (workspace_id, feature)\n                 VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "aac3fac75c5fc5016e2e30e8984514455f66b53b12e309985b9050d00c40b940"
+}

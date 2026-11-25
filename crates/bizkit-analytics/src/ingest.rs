@@ -102,7 +102,7 @@ async fn script(
     Path(file): Path<String>,
 ) -> Response {
     let Some(key) = file.strip_suffix(".js") else { return StatusCode::NOT_FOUND.into_response() };
-    let site = match ingest.sites.get(platform.db(), key, platform.now()).await {
+    let site = match ingest.sites.get(&platform, key, platform.now()).await {
         Ok(Some(site)) => site,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(err) => {
@@ -199,7 +199,7 @@ async fn accept(
         return Ok(Err(Dropped::Bot));
     }
     let now = platform.now();
-    let Some(site) = ingest.sites.get(platform.db(), &beacon.site, now).await? else {
+    let Some(site) = ingest.sites.get(platform, &beacon.site, now).await? else {
         return Ok(Err(Dropped::UnknownSite));
     };
     let host = beacon.url.host_str().unwrap_or("").to_ascii_lowercase();

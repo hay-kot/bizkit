@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT feature FROM workspace_disabled_features WHERE workspace_id = ? ORDER BY feature",
+  "describe": {
+    "columns": [
+      {
+        "name": "feature",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspace_disabled_features",
+            "name": "feature"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a96fc0bb1af346909e30cd50c5959a169fd5add5d0297901bb6dd2b37c0cfd9d"
+}

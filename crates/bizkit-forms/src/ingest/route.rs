@@ -226,7 +226,12 @@ fn request_id(headers: &HeaderMap) -> String {
 
 async fn find_form(platform: &Platform, form_id: &str) -> Result<FormRow, ApiError> {
     let Ok(id) = form_id.parse::<FormId>() else { return Err(ApiError::NotFound) };
-    store::find_public(platform.db().read(), id).await?.ok_or(ApiError::NotFound)
+    let form = store::find_public(platform.db().read(), id).await?.ok_or(ApiError::NotFound)?;
+    // A form whose workspace turned forms off takes no submissions.
+    if !platform.feature_enabled(form.workspace_id, "forms").await.map_err(ApiError::Internal)? {
+        return Err(ApiError::NotFound);
+    }
+    Ok(form)
 }
 
 fn settings(form: &FormRow) -> ChallengeSettings<'_> {

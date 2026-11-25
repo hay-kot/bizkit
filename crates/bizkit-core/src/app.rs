@@ -1,5 +1,6 @@
 //! The application: platform state, router and background worker.
 
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -50,6 +51,7 @@ struct PlatformInner {
     policies: Policies,
     scope_areas: ScopeAreas,
     modules: Vec<&'static str>,
+    area_features: BTreeMap<&'static str, &'static str>,
     hooks: Hooks,
     lifecycles: Vec<Arc<dyn Lifecycle>>,
     secrets: Option<Secrets>,
@@ -123,6 +125,11 @@ impl Platform {
     #[must_use]
     pub fn modules(&self) -> &[&'static str] {
         &self.0.modules
+    }
+
+    /// The feature (module) that declared `area`; `None` for core's areas.
+    pub(crate) fn feature_of_area(&self, area: &str) -> Option<&'static str> {
+        self.0.area_features.get(area).copied()
     }
 
     pub(crate) fn hooks(&self) -> &Hooks {
@@ -280,7 +287,8 @@ impl App {
                 }
             }
         }
-        let Registration { registry, handlers, routes, hooks, lifecycles, .. } = registration;
+        let Registration { registry, handlers, routes, hooks, lifecycles, area_features, .. } =
+            registration;
         let handlers = Arc::new(handlers);
         let bus = Bus::new(Arc::clone(&handlers), Arc::clone(&deps.clock));
         let platform = Platform(Arc::new(PlatformInner {
@@ -291,6 +299,7 @@ impl App {
             policies,
             scope_areas: registry.areas().clone(),
             modules: names,
+            area_features,
             hooks: hooks.finish(),
             lifecycles,
             secrets,

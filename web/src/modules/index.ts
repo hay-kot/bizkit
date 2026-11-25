@@ -8,8 +8,25 @@ import mailing from './mailing'
 import type { NavItem, NavSection, WebModule } from './types'
 import webhooks from './webhooks'
 
+/**
+ * Tags a module's nav items and entity sections with its name, so the shell
+ * can hide what a workspace turned off.
+ */
+function tagged(module: WebModule): WebModule {
+  return {
+    ...module,
+    nav: module.nav.map((item) => ({ ...item, module: module.name })),
+    entitySections: module.entitySections?.map((section) => ({
+      ...section,
+      module: module.name,
+    })),
+  }
+}
+
 /** Every web module, in the order their routes register. */
-export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions]
+export const modules: WebModule[] = [core, forms, analytics, webhooks, mailing, extensions].map(
+  tagged,
+)
 
 /**
  * Tags a module's route with the module's nav item it sits under (`forms`
@@ -59,10 +76,10 @@ export const workspaceNav: NavItem[] = navFor('workspace')
 
 /**
  * The URL of a project's page, `section` being a project nav path such as
- * `forms`. Without one, the first project page anyone can see, or the
- * Projects page when no module has project pages.
+ * `forms`. Without one, the project's own path, whose page picks the first
+ * page the user can see in a feature the workspace has on.
  */
 export function projectPath(workspaceId: string, projectId: string, section?: string): string {
-  const target = section ?? projectNav.find((item) => !item.adminOnly)?.path
-  return target ? `/w/${workspaceId}/p/${projectId}/${target}` : `/w/${workspaceId}/projects`
+  const base = `/w/${workspaceId}/p/${projectId}`
+  return section ? `${base}/${section}` : base
 }

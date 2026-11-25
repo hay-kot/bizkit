@@ -348,6 +348,26 @@ mod mailing {
     }
 
     #[tokio::test]
+    async fn form_captures_add_nobody_while_mailing_is_off() {
+        let s = setup().await;
+        let form = s.form(json!([])).await;
+        let list = s.list(json!({"double_opt_in": false, "form_ids": [form]})).await;
+        let ws = s.team.workspaces["main"].id;
+        s.app.turn_off(ws, "mailing").await;
+        s.submit(&form, json!({"email": "gus@example.com"})).await;
+        s.app.drain_jobs().await;
+        assert!(s.app.mail.take().is_empty(), "no confirm mail");
+
+        let features = format!("/api/v1/workspaces/{ws}/features");
+        s.admin
+            .send(Method::PUT, &features, Some(&json!({"disabled": []})))
+            .await
+            .expect(StatusCode::OK);
+        let contacts: Value = s.admin.get(&s.contacts(&list)).await.expect(StatusCode::OK).json();
+        assert_eq!(contacts["items"], json!([]), "nobody added");
+    }
+
+    #[tokio::test]
     async fn form_captures_always_confirm_and_never_reach_unsubscribed_addresses() {
         let s = setup().await;
         let fields = json!([{"name": "your_email", "label": "Email", "kind": "email", "required": true}, {"name": "name", "label": "Name", "kind": "text"}]);

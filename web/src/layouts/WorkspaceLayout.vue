@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onKeyStroke } from '@vueuse/core'
-import { FolderX, Menu as MenuIcon, Search, X } from 'lucide-vue-next'
-import { inject, provide, ref, unref, watch } from 'vue'
+import { FolderX, Menu as MenuIcon, PowerOff, Search, X } from 'lucide-vue-next'
+import { computed, inject, provide, ref, unref, watch } from 'vue'
 import { useRoute, viewDepthKey } from 'vue-router'
 
 import EmptyState from '@/components/EmptyState.vue'
@@ -14,6 +14,7 @@ import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 import CommandPalette from '@/components/ui/CommandPalette.vue'
 import { PAGE_CONTEXT } from '@/components/ui/pageHeader'
 import { useCurrentProject } from '@/composables/useCurrentProject'
+import { useFeatures } from '@/composables/useFeatures'
 import { createPageContext } from '@/layouts/pageContext'
 import { projectNav, projectPath, workspaceNav } from '@/modules'
 import type { NavItem } from '@/modules/types'
@@ -33,7 +34,15 @@ const isAdmin = useIsAdmin(() => props.workspaceId)
 // admin flag flips would cancel their list requests mid-flight, and the
 // palette would miss those rows.
 const { data: me } = useMe()
-const visible = (items: NavItem[]) => items.filter((item) => !item.adminOnly || isAdmin.value)
+const features = useFeatures(() => props.workspaceId)
+const visible = (items: NavItem[]) =>
+  items.filter((item) => (!item.adminOnly || isAdmin.value) && features.isOn(item.module))
+// A page of a feature the workspace turned off shows why instead of the page,
+// whose requests the API would refuse.
+const offPage = computed(() => {
+  const nav = route.meta.nav
+  return nav && !features.isOn(nav.module) ? nav : undefined
+})
 const {
   projects,
   project,
@@ -180,6 +189,24 @@ watch(
             All projects
           </RouterLink>
         </EmptyState>
+        <EmptyState
+          v-else-if="offPage"
+          :icon="PowerOff"
+          :title="`${offPage.label} is off`"
+          :message="
+            isAdmin
+              ? `${offPage.label} is turned off in this workspace. Its data is kept; turn it on in Settings to use it again.`
+              : `An admin turned ${offPage.label} off in this workspace.`
+          "
+        >
+          <RouterLink
+            v-if="isAdmin"
+            :to="`/w/${workspaceId}/settings`"
+            class="btn btn-primary btn-sm"
+          >
+            Open settings
+          </RouterLink>
+        </EmptyState>
         <RouterView v-else v-slot="{ Component, route: child }">
           <Transition
             mode="out-in"
@@ -201,13 +228,14 @@ watch(
       </main>
     </div>
     <PaletteRows
-      v-if="me"
-      :key="`${workspaceId}:${project?.id}:${isAdmin}`"
+      v-if="me && features.loaded.value"
+      :key="`${workspaceId}:${project?.id}:${isAdmin}:${features.off.value.join(',')}`"
       :workspace-id="workspaceId"
       :project-id="project?.id"
       :project-name="project?.name ?? ''"
       :workspace-name="workspace?.name ?? 'Workspace'"
       :is-admin="isAdmin"
+      :off="features.off.value"
     />
     <CommandPalette />
   </div>

@@ -670,6 +670,25 @@ mod api {
     }
 
     #[tokio::test]
+    async fn no_scripts_run_while_extensions_is_off() {
+        let s = setup().await;
+        let contact = s.form().await;
+        let pre = s.script(PRE, SPAM_IF_CASINO).await;
+        let post = s.script(POST, "export default (input, ctx) => ctx.log('ran')").await;
+        s.app.turn_off(s.team.workspaces["main"].id, "extensions").await;
+
+        assert_eq!(s.submit(&contact, r#"{"message": "casino"}"#).await, StatusCode::CREATED);
+        s.app.drain_jobs().await;
+        assert_eq!(s.submissions(&contact, "inbox").await.len(), 1, "the sync script didn't run");
+        let runs = s
+            .admin
+            .get(&format!("{}/extensions/runs?script_id={}", s.ws(), pre["id"].as_str().unwrap()))
+            .await;
+        assert_eq!(runs.status, StatusCode::FORBIDDEN, "the API refuses while off");
+        assert!(post["id"].is_string(), "the async script exists");
+    }
+
+    #[tokio::test]
     async fn scripts_run_for_the_forms_they_name() {
         let s = setup().await;
         let contact = s.form().await;

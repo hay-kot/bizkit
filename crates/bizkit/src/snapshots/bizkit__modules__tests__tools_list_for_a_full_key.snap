@@ -6337,6 +6337,45 @@ expression: tools
         "destructiveHint": false,
         "readOnlyHint": true
       },
+      "description": "List the workspace's features and whether each is on",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "The workspace whose features to show.",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "workspaces_features_get"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Turn features off in the workspace; the rest are on",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "The features to turn off. Every other feature is on.",
+        "properties": {
+          "disabled": {
+            "description": "Names of the features to turn off, such as `[\"mailing\"]`. Empty\nturns every feature on. Data of a feature that is off stays, and\ncomes back when it is on again.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "disabled"
+        ],
+        "type": "object"
+      },
+      "name": "workspaces_features_put"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true
+      },
       "description": "Show a workspace",
       "inputSchema": {
         "additionalProperties": false,

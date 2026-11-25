@@ -154,17 +154,30 @@ impl McpHandler {
         }
     }
 
-    fn list_tools_now(
+    /// The tools the key's scopes allow, without those of features turned
+    /// off in its workspace.
+    async fn list_tools_now(
         &self,
         ctx: &RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         let (key, _) = Self::key(ctx)?;
+        let off = self
+            .platform
+            .disabled_features(key.workspace_id)
+            .await
+            .map_err(|err| ErrorData::internal_error(err.to_string(), None))?;
         let tools = self
             .tools
             .values()
             .filter(|tool| {
                 self.registry.get(tool.op_id).is_some_and(|op| match &op.meta.access {
-                    Access::Workspace(scope) => key.grants(scope),
+                    Access::Workspace(scope) => {
+                        key.grants(scope)
+                            && self
+                                .platform
+                                .feature_of_area(scope.area())
+                                .is_none_or(|feature| !off.iter().any(|name| name == feature))
+                    }
                     Access::Public | Access::User => false,
                 })
             })
@@ -199,12 +212,12 @@ impl ServerHandler for McpHandler {
             .with_instructions("Tools act on the workspace the API key belongs to.")
     }
 
-    fn list_tools(
+    async fn list_tools(
         &self,
         _request: Option<PaginatedRequestParams>,
         ctx: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
-        std::future::ready(self.list_tools_now(&ctx))
+    ) -> Result<ListToolsResult, ErrorData> {
+        self.list_tools_now(&ctx).await
     }
 
     async fn call_tool(
