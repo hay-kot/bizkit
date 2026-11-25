@@ -14442,6 +14442,1168 @@
         "x-bizkit-scope": "projects:write"
       }
     },
+    "/api/v1/workspaces/{workspace_id}/signing/requests": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "List a project's signature requests",
+        "operationId": "signing.requests.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId",
+              "description": "The project."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequestList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:read"
+      },
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Upload a PDF and name its signers, as a draft",
+        "operationId": "signing.requests.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "title",
+                  "file_name",
+                  "pdf_base64",
+                  "signers"
+                ],
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "The file's name, such as `contract.pdf`."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "A note for signers, at most 2,000 characters."
+                  },
+                  "pdf_base64": {
+                    "type": "string",
+                    "description": "The PDF, standard base64, at most 700 KiB decoded and 500 pages.\nEncrypted PDFs are refused. Larger files go through the upload\nroute, `POST /m/signing/upload/workspaces/{workspace_id}/requests`."
+                  },
+                  "project_id": {
+                    "$ref": "#/components/schemas/ProjectId",
+                    "description": "The project it belongs to."
+                  },
+                  "signers": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/NewSigner"
+                    },
+                    "description": "1 to 10 signers with different emails, in the order they print."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "What signers see as the subject; 1-120 characters."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Get a signature request with its fields and audit trail",
+        "operationId": "signing.requests.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequestDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:read"
+      },
+      "delete": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Delete a draft or voided request",
+        "operationId": "signing.requests.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:admin"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/document": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Download a request's original or sealed PDF",
+        "operationId": "signing.requests.document",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DocumentVersion",
+              "description": "`original` (default) or `signed`, once completed."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:read"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/fields": {
+      "put": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Replace the fields on a draft's pages",
+        "operationId": "signing.requests.fields.put",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "fields"
+                ],
+                "properties": {
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SigningFieldInput"
+                    },
+                    "description": "At most 200 fields, replacing the ones the draft has."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequestDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/retry": {
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Try sealing a failed request again",
+        "operationId": "signing.requests.retry",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/send": {
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Mail the first signing-order group their links",
+        "operationId": "signing.requests.send",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/signers": {
+      "put": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Replace a draft's signers; listed IDs keep their fields",
+        "operationId": "signing.requests.signers.put",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "signers"
+                ],
+                "properties": {
+                  "signers": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SignerSlot"
+                    },
+                    "description": "1 to 10 signers in the order they print. Signers of the request\nleft out are removed with their fields."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequestDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:write"
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/void": {
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Cancel a request; its links stop working",
+        "operationId": "signing.requests.void",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId",
+              "description": "The workspace."
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SigningRequestId",
+              "description": "The request."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "x-bizkit-scope": "signing:write"
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/webhooks": {
       "get": {
         "tags": [
@@ -16164,6 +17326,489 @@
         }
       }
     },
+    "/m/signing/public/document": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "The PDF to sign, for a signer's link",
+        "operationId": "signing.public.document",
+        "parameters": [
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The signer's link token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "404": {
+            "description": "The link no longer works"
+          }
+        }
+      }
+    },
+    "/m/signing/public/session": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "What a signer's link shows: the request, the signer and their fields",
+        "description": "Changes nothing. A signer who signed still gets their session, with their fields' values; once the request completes, `signed.pdf` with the same token downloads it.",
+        "operationId": "signing.public.session",
+        "parameters": [
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The signer's link token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningSignerSession"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The link no longer works: unknown, voided, or not out for signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/signing/public/sign": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Old sign links: go to the web app's signer view",
+        "description": "Links mailed before the signer view moved to the web app point here.",
+        "operationId": "signing.public.sign_redirect",
+        "parameters": [
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The signer's link token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "To `/sign?t=` in the web app"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Adopt a signature, fill the signer's fields and sign",
+        "description": "Fills every field of the signer at once. Signature and initials fields take the adopted `signature` and `initials`; date fields take today's UTC date; `values` fill text and checkbox fields. Every required field must be filled, and a required checkbox ticked.",
+        "operationId": "signing.public.sign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SigningSignInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningSignResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body isn't JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The link no longer works, or the signer signed already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 256 KiB"
+          },
+          "422": {
+            "description": "Fields need fixing; `fields` names them",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/signing/public/signed.pdf": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "The sealed PDF, once everyone signed",
+        "operationId": "signing.public.signed_pdf",
+        "parameters": [
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The signer's link token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "404": {
+            "description": "Not completed, or the link no longer works"
+          }
+        }
+      }
+    },
+    "/m/signing/public/viewed": {
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Record that a signer opened the signer view",
+        "operationId": "signing.public.viewed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SigningToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded, or the link no longer works"
+          },
+          "400": {
+            "description": "The body isn't JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body has no token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/signing/upload/workspaces/{workspace_id}/requests": {
+      "post": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "Upload a PDF of up to 25 MiB and name its signers, as a draft",
+        "operationId": "signing.upload.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Parts `meta` (JSON) and `file` (the PDF). Needs `signing:write`.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The multipart body is malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-site, or missing `signing:write`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The upload took too long"
+          },
+          "413": {
+            "description": "The body or the file is too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The meta or the file needs fixing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/signing/workspaces/{workspace_id}/requests/{request_id}/original.pdf": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "A request's PDF as uploaded. Needs `signing:read`.",
+        "operationId": "signing.files.original",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "description": "The request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing `signing:read`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/m/signing/workspaces/{workspace_id}/requests/{request_id}/signed.pdf": {
+      "get": {
+        "tags": [
+          "signing"
+        ],
+        "summary": "A request's sealed PDF, once completed. Needs `signing:read`.",
+        "operationId": "signing.files.signed",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "path",
+            "description": "The request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing `signing:read`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request, or not completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/m/webhooks/public/{endpoint_id}": {
       "get": {
         "tags": [
@@ -16780,6 +18425,56 @@
             "format": "int64",
             "description": "The matching subscribers.",
             "minimum": 0
+          }
+        }
+      },
+      "AuditEvent": {
+        "type": "object",
+        "description": "One audit trail entry.",
+        "required": [
+          "kind",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When."
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "More about it, such as the consent text a signer agreed to."
+          },
+          "ip": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client address, for signer actions."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind",
+            "description": "What happened."
+          },
+          "signer_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SignerId",
+                "description": "The signer it concerns, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The browser, for signer actions."
           }
         }
       },
@@ -17552,6 +19247,68 @@
           "goal"
         ]
       },
+      "Document": {
+        "type": "object",
+        "description": "A PDF, base64-encoded.",
+        "required": [
+          "file_name",
+          "sha256",
+          "pdf_base64"
+        ],
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "description": "A file name to save it as."
+          },
+          "pdf_base64": {
+            "type": "string",
+            "description": "The PDF, standard base64."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA-256 of the bytes, hex."
+          }
+        }
+      },
+      "DocumentVersion": {
+        "type": "string",
+        "description": "Which PDF of a request.",
+        "enum": [
+          "original",
+          "signed"
+        ]
+      },
+      "DraftMeta": {
+        "type": "object",
+        "description": "What a new draft says, apart from its file: the JSON `meta` part of an\nupload, and the same fields of `signing.requests.create`.",
+        "required": [
+          "project_id",
+          "title",
+          "signers"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A note for signers, at most 2,000 characters."
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewSigner"
+            },
+            "description": "1 to 10 signers with different emails, in the order they print."
+          },
+          "title": {
+            "type": "string",
+            "description": "What signers see as the subject; 1-120 characters."
+          }
+        },
+        "additionalProperties": false
+      },
       "Dropoff": {
         "type": "object",
         "description": "Someone who reached the step before and not the step.",
@@ -17999,6 +19756,19 @@
           }
         }
       },
+      "EventKind": {
+        "type": "string",
+        "description": "What happened to a request, for the audit trail.",
+        "enum": [
+          "created",
+          "sent",
+          "viewed",
+          "signed",
+          "completed",
+          "voided",
+          "failed"
+        ]
+      },
       "EventName": {
         "type": "object",
         "description": "One event name seen in the range.",
@@ -18151,6 +19921,10 @@
           }
         },
         "additionalProperties": false
+      },
+      "FieldId": {
+        "type": "string",
+        "format": "uuid"
       },
       "FieldKind": {
         "type": "string",
@@ -19802,6 +21576,31 @@
           }
         }
       },
+      "NewSigner": {
+        "type": "object",
+        "description": "A person to ask for a signature.",
+        "required": [
+          "name",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Where their link goes."
+          },
+          "name": {
+            "type": "string",
+            "description": "Their name, printed under their signature."
+          },
+          "signing_order": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Their group, 1 (default) to 10. Groups get their links in order,\neach once everyone in the groups before it signed; equal numbers\nsign in parallel, and numbers need not be consecutive.",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "PersonDetail": {
         "type": "object",
         "description": "A person, their traits and a page of their events, newest first.",
@@ -20034,6 +21833,17 @@
             ]
           }
         }
+      },
+      "RequestStatus": {
+        "type": "string",
+        "description": "Where a request is.",
+        "enum": [
+          "draft",
+          "sent",
+          "completed",
+          "voided",
+          "failed"
+        ]
       },
       "RequestSummary": {
         "type": "object",
@@ -20901,6 +22711,771 @@
         },
         "additionalProperties": false
       },
+      "Signer": {
+        "type": "object",
+        "description": "One person asked to sign.",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "signing_order",
+          "signed"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Where their link goes."
+          },
+          "id": {
+            "$ref": "#/components/schemas/SignerId",
+            "description": "The signer ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Their name, as the sender gave it."
+          },
+          "signed": {
+            "type": "boolean",
+            "description": "True once they signed."
+          },
+          "signed_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When they signed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signing_order": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Their group, 1 to 10. The lowest group with someone yet to sign\ngets its links; equal numbers sign in parallel.",
+            "minimum": 0
+          }
+        }
+      },
+      "SignerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "SignerSlot": {
+        "type": "object",
+        "description": "A signer of a draft: an existing one by `id`, or a new one without.",
+        "required": [
+          "name",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Where their link goes."
+          },
+          "id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SignerId",
+                "description": "An existing signer of the request, who keeps their fields. Leave it\nout for a new signer."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Their name, printed under their signature."
+          },
+          "signing_order": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Their group, 1 (default) to 10.",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "SigningField": {
+        "type": "object",
+        "description": "A field on a request's pages.",
+        "required": [
+          "id",
+          "signer_id",
+          "kind",
+          "page",
+          "x",
+          "y",
+          "width",
+          "height",
+          "required",
+          "label"
+        ],
+        "properties": {
+          "filled_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the signer filled it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "height": {
+            "type": "number",
+            "format": "double",
+            "description": "The height, as a fraction of the page height."
+          },
+          "id": {
+            "$ref": "#/components/schemas/FieldId",
+            "description": "The field ID."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SigningFieldKind",
+            "description": "What it asks for."
+          },
+          "label": {
+            "type": "string",
+            "description": "A hint for the signer."
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The page, from 1.",
+            "minimum": 0
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether the signer must fill it."
+          },
+          "signer_id": {
+            "$ref": "#/components/schemas/SignerId",
+            "description": "The signer who fills it."
+          },
+          "value": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SigningFieldValue",
+                "description": "What the signer filled in, once they signed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "description": "The width, as a fraction of the page width."
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "The left edge, as a fraction of the page width from the left."
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "description": "The top edge, as a fraction of the page height from the top."
+          }
+        }
+      },
+      "SigningFieldFill": {
+        "type": "object",
+        "description": "A signer's fill of one text or checkbox field.",
+        "required": [
+          "field_id"
+        ],
+        "properties": {
+          "checked": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "For a checkbox field: whether it's ticked."
+          },
+          "field_id": {
+            "$ref": "#/components/schemas/FieldId",
+            "description": "The field."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a text field: one line of at most 200 Latin characters. Empty\ntext leaves an optional field empty."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SigningFieldInput": {
+        "type": "object",
+        "description": "A field to place.",
+        "required": [
+          "signer_id",
+          "kind",
+          "page",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "height": {
+            "type": "number",
+            "format": "double",
+            "description": "The height, as a fraction of the page height; at least 0.01."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SigningFieldKind",
+            "description": "What it asks for."
+          },
+          "label": {
+            "type": "string",
+            "description": "A hint for the signer, such as `Company`; at most 100 characters."
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The page, from 1.",
+            "minimum": 0
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether the signer must fill it. Only text and checkbox fields may\nbe optional."
+          },
+          "signer_id": {
+            "$ref": "#/components/schemas/SignerId",
+            "description": "The signer who fills it; one of the request's."
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "description": "The width, as a fraction of the page width; at least 0.01."
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "The left edge, as a fraction of the page width from the left."
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "description": "The top edge, as a fraction of the page height from the top."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SigningFieldKind": {
+        "type": "string",
+        "description": "What a field asks for.",
+        "enum": [
+          "signature",
+          "initials",
+          "date",
+          "text",
+          "checkbox"
+        ]
+      },
+      "SigningFieldValue": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The adopted signature goes here.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "signed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The adopted initials go here.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "initialed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The UTC date of the signature.",
+            "required": [
+              "date",
+              "kind"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "`YYYY-MM-DD`."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "date"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Typed text.",
+            "required": [
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              },
+              "text": {
+                "type": "string",
+                "description": "One line."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A tick box.",
+            "required": [
+              "checked",
+              "kind"
+            ],
+            "properties": {
+              "checked": {
+                "type": "boolean",
+                "description": "True when ticked."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "checkbox"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "A filled field's value."
+      },
+      "SigningRequest": {
+        "type": "object",
+        "description": "A PDF sent for signature.",
+        "required": [
+          "id",
+          "project_id",
+          "title",
+          "message",
+          "status",
+          "sender",
+          "file_name",
+          "original_sha256",
+          "signers",
+          "created_at"
+        ],
+        "properties": {
+          "completed_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the last signer signed and the PDF was sealed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When it was created."
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why sealing failed, while `status` is `failed`."
+          },
+          "file_name": {
+            "type": "string",
+            "description": "The uploaded file's name."
+          },
+          "id": {
+            "$ref": "#/components/schemas/SigningRequestId",
+            "description": "The request ID."
+          },
+          "message": {
+            "type": "string",
+            "description": "A note for signers, shown on the signing page."
+          },
+          "original_sha256": {
+            "type": "string",
+            "description": "SHA-256 of the uploaded PDF, hex."
+          },
+          "page_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Pages in the uploaded PDF. Empty only on requests made before\nfields existed, until `signing.requests.fields.put` reads the file.",
+            "minimum": 0
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId",
+            "description": "The project it belongs to."
+          },
+          "sender": {
+            "type": "string",
+            "description": "Who sent it, as `Name <email>` or the API key that did."
+          },
+          "sent_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the links went out."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signed_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SHA-256 of the sealed PDF, hex, once completed."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Signer"
+            },
+            "description": "In the order given."
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus",
+            "description": "Where it is."
+          },
+          "title": {
+            "type": "string",
+            "description": "What signers see as the subject."
+          },
+          "voided_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When it was voided."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SigningRequestDetail": {
+        "type": "object",
+        "description": "A request with its fields and audit trail.",
+        "required": [
+          "request",
+          "fields",
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            },
+            "description": "Oldest first."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SigningField"
+            },
+            "description": "The fields on its pages, in the order given."
+          },
+          "request": {
+            "$ref": "#/components/schemas/SigningRequest",
+            "description": "The request."
+          }
+        }
+      },
+      "SigningRequestId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "SigningRequestList": {
+        "type": "object",
+        "description": "Requests of a project.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SigningRequest"
+            },
+            "description": "Newest first, at most 200."
+          }
+        }
+      },
+      "SigningSessionRequest": {
+        "type": "object",
+        "description": "The request, as its signer sees it.",
+        "required": [
+          "title",
+          "message",
+          "file_name",
+          "status"
+        ],
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "description": "The PDF's file name."
+          },
+          "message": {
+            "type": "string",
+            "description": "The sender's note."
+          },
+          "page_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Pages in the PDF. Empty only on requests made before fields existed.",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus",
+            "description": "Where the request is."
+          },
+          "title": {
+            "type": "string",
+            "description": "What signers see as the subject."
+          }
+        }
+      },
+      "SigningSessionSigner": {
+        "type": "object",
+        "description": "The signer the link belongs to.",
+        "required": [
+          "name",
+          "email",
+          "status"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Their address."
+          },
+          "name": {
+            "type": "string",
+            "description": "Their name, as the sender gave it."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SigningSignerStatus",
+            "description": "Whether they signed."
+          }
+        }
+      },
+      "SigningSignInput": {
+        "type": "object",
+        "description": "A signer's signature, initials and fills.",
+        "required": [
+          "t",
+          "consent"
+        ],
+        "properties": {
+          "consent": {
+            "type": "boolean",
+            "description": "Must be true: the signer agrees to `consent` from the session."
+          },
+          "initials": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SigningSignature",
+                "description": "The adopted initials, for every initials field. Required when the\nsigner has one, and refused when they have none."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signature": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SigningSignature",
+                "description": "The adopted signature, for every signature field."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "t": {
+            "type": "string",
+            "description": "The signer's link token."
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SigningFieldFill"
+            },
+            "description": "Fills of text and checkbox fields; each field at most once."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SigningSignResult": {
+        "type": "object",
+        "description": "The request after a signature.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus",
+            "description": "Where the request is. It stays `sent` until the seal job completes\nit after the last signature."
+          }
+        }
+      },
+      "SigningSignature": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Strokes drawn on a 1000 by 300 pad, each a list of `[x, y]` points\nwith the origin top left; at most 50 strokes and 2000 points.",
+            "required": [
+              "strokes",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "drawn"
+                ]
+              },
+              "strokes": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int32",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "description": "The strokes."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A typed name or initials: 1 to 100 characters the PDF's standard\nfont can print (Latin letters).",
+            "required": [
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "typed"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "description": "The text."
+              }
+            }
+          }
+        ],
+        "description": "How a signer signed or initialed."
+      },
+      "SigningSignerSession": {
+        "type": "object",
+        "description": "What a signer's link shows.",
+        "required": [
+          "request",
+          "signer",
+          "fields",
+          "consent",
+          "all_signed"
+        ],
+        "properties": {
+          "all_signed": {
+            "type": "boolean",
+            "description": "True once every signer of the request signed, in every signing-order\ngroup. While it is true and the request is still `sent`, the seal job\nis running; while it is false, others have yet to sign."
+          },
+          "consent": {
+            "type": "string",
+            "description": "The text the signer agrees to by signing."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SigningField"
+            },
+            "description": "This signer's fields only, in request order, with values once signed.\nEmpty for requests made before fields: the signer then adopts a\nsignature only."
+          },
+          "request": {
+            "$ref": "#/components/schemas/SigningSessionRequest",
+            "description": "The request."
+          },
+          "signer": {
+            "$ref": "#/components/schemas/SigningSessionSigner",
+            "description": "The signer."
+          }
+        }
+      },
+      "SigningSignerStatus": {
+        "type": "string",
+        "description": "Whether a signer signed.",
+        "enum": [
+          "pending",
+          "signed"
+        ]
+      },
+      "SigningToken": {
+        "type": "object",
+        "description": "A body that carries only the link token.",
+        "required": [
+          "t"
+        ],
+        "properties": {
+          "t": {
+            "type": "string",
+            "description": "The signer's link token."
+          }
+        },
+        "additionalProperties": false
+      },
       "Site": {
         "type": "object",
         "description": "A project's analytics settings and snippet.",
@@ -21576,6 +24151,25 @@
             "type": "integer",
             "format": "int64",
             "description": "Unique visitors, summed per day."
+          }
+        }
+      },
+      "UploadForm": {
+        "type": "object",
+        "description": "A multipart create: the draft's details and its PDF.",
+        "required": [
+          "meta",
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "The PDF, at most 25 MiB and 500 pages. Its part's file name becomes\nthe request's `file_name`."
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DraftMeta",
+            "description": "The draft as JSON: `project_id`, `title`, `message` and `signers`,\nas in `signing.requests.create`."
           }
         }
       },

@@ -218,6 +218,10 @@ struct SignerSession {
     fields: Vec<Field>,
     /// The text the signer agrees to by signing.
     consent: String,
+    /// True once every signer of the request signed, in every signing-order
+    /// group. While it is true and the request is still `sent`, the seal job
+    /// is running; while it is false, others have yet to sign.
+    all_signed: bool,
 }
 
 /// A signer's fill of one text or checkbox field.
@@ -338,6 +342,7 @@ async fn session(
             return Err(ApiError::NotFound);
         }
         let fields = signer_fields(&platform, &link.signer).await?;
+        let pending = store::pending_signers(platform.db().read(), request).await?;
         Ok(SignerSession {
             request: SessionRequest {
                 title: request.title.clone(),
@@ -353,6 +358,7 @@ async fn session(
             },
             fields,
             consent: CONSENT.to_owned(),
+            all_signed: pending == 0,
         })
     }
     .await;

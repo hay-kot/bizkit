@@ -119,11 +119,14 @@ run = "scripts/sqlx-db.sh check"
 description = "Install node modules for web and e2e"
 run = "pnpm install --frozen-lockfile"
 
+# Signing is off in default builds until the sender UI lands, but the web
+# signer view needs its types, so the spec is built with the feature on.
+# openapi.json then lists signing paths a default build does not serve.
 [tasks.gen]
 description = "Write openapi.json and regenerate the web API client"
 depends = ["web:install"]
 run = [
-    "CONFIG_FILE=/dev/null cargo run --locked -q -p bizkit -- openapi > openapi.json",
+    "CONFIG_FILE=/dev/null cargo run --locked -q -p bizkit --features signing -- openapi > openapi.json",
     "pnpm -C web gen",
 ]
 

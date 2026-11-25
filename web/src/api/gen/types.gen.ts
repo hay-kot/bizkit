@@ -177,6 +177,33 @@ export type Audience = {
 };
 
 /**
+ * One audit trail entry.
+ */
+export type AuditEvent = {
+    /**
+     * When.
+     */
+    at: Timestamp;
+    /**
+     * More about it, such as the consent text a signer agreed to.
+     */
+    detail?: string | null;
+    /**
+     * The client address, for signer actions.
+     */
+    ip?: string | null;
+    /**
+     * What happened.
+     */
+    kind: EventKind;
+    signer_id?: SignerId | null;
+    /**
+     * The browser, for signer actions.
+     */
+    user_agent?: string | null;
+};
+
+/**
  * How a request body is given.
  */
 export type BodyEncoding = 'utf8' | 'base64';
@@ -632,6 +659,52 @@ export type DeliveryStatus = 'queued' | 'sent' | 'failed' | 'skipped';
 export type Dimension = 'page' | 'referrer' | 'utm_source' | 'utm_medium' | 'utm_campaign' | 'country' | 'device' | 'browser' | 'os' | 'event' | 'goal';
 
 /**
+ * A PDF, base64-encoded.
+ */
+export type Document = {
+    /**
+     * A file name to save it as.
+     */
+    file_name: string;
+    /**
+     * The PDF, standard base64.
+     */
+    pdf_base64: string;
+    /**
+     * SHA-256 of the bytes, hex.
+     */
+    sha256: string;
+};
+
+/**
+ * Which PDF of a request.
+ */
+export type DocumentVersion = 'original' | 'signed';
+
+/**
+ * What a new draft says, apart from its file: the JSON `meta` part of an
+ * upload, and the same fields of `signing.requests.create`.
+ */
+export type DraftMeta = {
+    /**
+     * A note for signers, at most 2,000 characters.
+     */
+    message?: string;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * 1 to 10 signers with different emails, in the order they print.
+     */
+    signers: Array<NewSigner>;
+    /**
+     * What signers see as the subject; 1-120 characters.
+     */
+    title: string;
+};
+
+/**
  * Someone who reached the step before and not the step.
  */
 export type Dropoff = {
@@ -899,6 +972,11 @@ export type EventItem = {
 };
 
 /**
+ * What happened to a request, for the audit trail.
+ */
+export type EventKind = 'created' | 'sent' | 'viewed' | 'signed' | 'completed' | 'voided' | 'failed';
+
+/**
  * One event name seen in the range.
  */
 export type EventName = {
@@ -1001,6 +1079,8 @@ export type FieldDef = {
      */
     required?: boolean;
 };
+
+export type FieldId = string;
 
 /**
  * What a field holds, which decides how it is checked.
@@ -1949,6 +2029,26 @@ export type MyInvitationList = {
 };
 
 /**
+ * A person to ask for a signature.
+ */
+export type NewSigner = {
+    /**
+     * Where their link goes.
+     */
+    email: string;
+    /**
+     * Their name, printed under their signature.
+     */
+    name: string;
+    /**
+     * Their group, 1 (default) to 10. Groups get their links in order,
+     * each once everyone in the groups before it signed; equal numbers
+     * sign in parallel, and numbers need not be consecutive.
+     */
+    signing_order?: number;
+};
+
+/**
  * A person, their traits and a page of their events, newest first.
  */
 export type PersonDetail = {
@@ -2099,6 +2199,11 @@ export type RequestList = {
     items: Array<RequestSummary>;
     next_before?: RequestId | null;
 };
+
+/**
+ * Where a request is.
+ */
+export type RequestStatus = 'draft' | 'sent' | 'completed' | 'voided' | 'failed';
 
 /**
  * A captured request without its headers and body.
@@ -2682,6 +2787,426 @@ export type SignInBody = {
 };
 
 /**
+ * One person asked to sign.
+ */
+export type Signer = {
+    /**
+     * Where their link goes.
+     */
+    email: string;
+    /**
+     * The signer ID.
+     */
+    id: SignerId;
+    /**
+     * Their name, as the sender gave it.
+     */
+    name: string;
+    /**
+     * True once they signed.
+     */
+    signed: boolean;
+    signed_at?: Timestamp | null;
+    /**
+     * Their group, 1 to 10. The lowest group with someone yet to sign
+     * gets its links; equal numbers sign in parallel.
+     */
+    signing_order: number;
+};
+
+export type SignerId = string;
+
+/**
+ * A signer of a draft: an existing one by `id`, or a new one without.
+ */
+export type SignerSlot = {
+    /**
+     * Where their link goes.
+     */
+    email: string;
+    id?: SignerId | null;
+    /**
+     * Their name, printed under their signature.
+     */
+    name: string;
+    /**
+     * Their group, 1 (default) to 10.
+     */
+    signing_order?: number;
+};
+
+/**
+ * A field on a request's pages.
+ */
+export type SigningField = {
+    filled_at?: Timestamp | null;
+    /**
+     * The height, as a fraction of the page height.
+     */
+    height: number;
+    /**
+     * The field ID.
+     */
+    id: FieldId;
+    /**
+     * What it asks for.
+     */
+    kind: SigningFieldKind;
+    /**
+     * A hint for the signer.
+     */
+    label: string;
+    /**
+     * The page, from 1.
+     */
+    page: number;
+    /**
+     * Whether the signer must fill it.
+     */
+    required: boolean;
+    /**
+     * The signer who fills it.
+     */
+    signer_id: SignerId;
+    value?: SigningFieldValue | null;
+    /**
+     * The width, as a fraction of the page width.
+     */
+    width: number;
+    /**
+     * The left edge, as a fraction of the page width from the left.
+     */
+    x: number;
+    /**
+     * The top edge, as a fraction of the page height from the top.
+     */
+    y: number;
+};
+
+/**
+ * A signer's fill of one text or checkbox field.
+ */
+export type SigningFieldFill = {
+    /**
+     * For a checkbox field: whether it's ticked.
+     */
+    checked?: boolean | null;
+    /**
+     * The field.
+     */
+    field_id: FieldId;
+    /**
+     * For a text field: one line of at most 200 Latin characters. Empty
+     * text leaves an optional field empty.
+     */
+    text?: string | null;
+};
+
+/**
+ * A field to place.
+ */
+export type SigningFieldInput = {
+    /**
+     * The height, as a fraction of the page height; at least 0.01.
+     */
+    height: number;
+    /**
+     * What it asks for.
+     */
+    kind: SigningFieldKind;
+    /**
+     * A hint for the signer, such as `Company`; at most 100 characters.
+     */
+    label?: string;
+    /**
+     * The page, from 1.
+     */
+    page: number;
+    /**
+     * Whether the signer must fill it. Only text and checkbox fields may
+     * be optional.
+     */
+    required?: boolean;
+    /**
+     * The signer who fills it; one of the request's.
+     */
+    signer_id: SignerId;
+    /**
+     * The width, as a fraction of the page width; at least 0.01.
+     */
+    width: number;
+    /**
+     * The left edge, as a fraction of the page width from the left.
+     */
+    x: number;
+    /**
+     * The top edge, as a fraction of the page height from the top.
+     */
+    y: number;
+};
+
+/**
+ * What a field asks for.
+ */
+export type SigningFieldKind = 'signature' | 'initials' | 'date' | 'text' | 'checkbox';
+
+/**
+ * A filled field's value.
+ */
+export type SigningFieldValue = {
+    kind: 'signed';
+} | {
+    kind: 'initialed';
+} | {
+    /**
+     * `YYYY-MM-DD`.
+     */
+    date: string;
+    kind: 'date';
+} | {
+    kind: 'text';
+    /**
+     * One line.
+     */
+    text: string;
+} | {
+    /**
+     * True when ticked.
+     */
+    checked: boolean;
+    kind: 'checkbox';
+};
+
+/**
+ * A PDF sent for signature.
+ */
+export type SigningRequest = {
+    completed_at?: Timestamp | null;
+    /**
+     * When it was created.
+     */
+    created_at: Timestamp;
+    /**
+     * Why sealing failed, while `status` is `failed`.
+     */
+    failure?: string | null;
+    /**
+     * The uploaded file's name.
+     */
+    file_name: string;
+    /**
+     * The request ID.
+     */
+    id: SigningRequestId;
+    /**
+     * A note for signers, shown on the signing page.
+     */
+    message: string;
+    /**
+     * SHA-256 of the uploaded PDF, hex.
+     */
+    original_sha256: string;
+    /**
+     * Pages in the uploaded PDF. Empty only on requests made before
+     * fields existed, until `signing.requests.fields.put` reads the file.
+     */
+    page_count?: number | null;
+    /**
+     * The project it belongs to.
+     */
+    project_id: ProjectId;
+    /**
+     * Who sent it, as `Name <email>` or the API key that did.
+     */
+    sender: string;
+    sent_at?: Timestamp | null;
+    /**
+     * SHA-256 of the sealed PDF, hex, once completed.
+     */
+    signed_sha256?: string | null;
+    /**
+     * In the order given.
+     */
+    signers: Array<Signer>;
+    /**
+     * Where it is.
+     */
+    status: RequestStatus;
+    /**
+     * What signers see as the subject.
+     */
+    title: string;
+    voided_at?: Timestamp | null;
+};
+
+/**
+ * A request with its fields and audit trail.
+ */
+export type SigningRequestDetail = {
+    /**
+     * Oldest first.
+     */
+    events: Array<AuditEvent>;
+    /**
+     * The fields on its pages, in the order given.
+     */
+    fields: Array<SigningField>;
+    /**
+     * The request.
+     */
+    request: SigningRequest;
+};
+
+export type SigningRequestId = string;
+
+/**
+ * Requests of a project.
+ */
+export type SigningRequestList = {
+    /**
+     * Newest first, at most 200.
+     */
+    items: Array<SigningRequest>;
+};
+
+/**
+ * The request, as its signer sees it.
+ */
+export type SigningSessionRequest = {
+    /**
+     * The PDF's file name.
+     */
+    file_name: string;
+    /**
+     * The sender's note.
+     */
+    message: string;
+    /**
+     * Pages in the PDF. Empty only on requests made before fields existed.
+     */
+    page_count?: number | null;
+    /**
+     * Where the request is.
+     */
+    status: RequestStatus;
+    /**
+     * What signers see as the subject.
+     */
+    title: string;
+};
+
+/**
+ * The signer the link belongs to.
+ */
+export type SigningSessionSigner = {
+    /**
+     * Their address.
+     */
+    email: string;
+    /**
+     * Their name, as the sender gave it.
+     */
+    name: string;
+    /**
+     * Whether they signed.
+     */
+    status: SigningSignerStatus;
+};
+
+/**
+ * A signer's signature, initials and fills.
+ */
+export type SigningSignInput = {
+    /**
+     * Must be true: the signer agrees to `consent` from the session.
+     */
+    consent: boolean;
+    initials?: SigningSignature | null;
+    signature?: SigningSignature | null;
+    /**
+     * The signer's link token.
+     */
+    t: string;
+    /**
+     * Fills of text and checkbox fields; each field at most once.
+     */
+    values?: Array<SigningFieldFill>;
+};
+
+/**
+ * The request after a signature.
+ */
+export type SigningSignResult = {
+    /**
+     * Where the request is. It stays `sent` until the seal job completes
+     * it after the last signature.
+     */
+    status: RequestStatus;
+};
+
+/**
+ * How a signer signed or initialed.
+ */
+export type SigningSignature = {
+    kind: 'drawn';
+    /**
+     * The strokes.
+     */
+    strokes: Array<Array<Array<number>>>;
+} | {
+    kind: 'typed';
+    /**
+     * The text.
+     */
+    name: string;
+};
+
+/**
+ * What a signer's link shows.
+ */
+export type SigningSignerSession = {
+    /**
+     * True once every signer of the request signed, in every signing-order
+     * group. While it is true and the request is still `sent`, the seal job
+     * is running; while it is false, others have yet to sign.
+     */
+    all_signed: boolean;
+    /**
+     * The text the signer agrees to by signing.
+     */
+    consent: string;
+    /**
+     * This signer's fields only, in request order, with values once signed.
+     * Empty for requests made before fields: the signer then adopts a
+     * signature only.
+     */
+    fields: Array<SigningField>;
+    /**
+     * The request.
+     */
+    request: SigningSessionRequest;
+    /**
+     * The signer.
+     */
+    signer: SigningSessionSigner;
+};
+
+/**
+ * Whether a signer signed.
+ */
+export type SigningSignerStatus = 'pending' | 'signed';
+
+/**
+ * A body that carries only the link token.
+ */
+export type SigningToken = {
+    /**
+     * The signer's link token.
+     */
+    t: string;
+};
+
+/**
  * A project's analytics settings and snippet.
  */
 export type Site = {
@@ -3111,6 +3636,22 @@ export type Totals = {
      * Unique visitors, summed per day.
      */
     visitors: number;
+};
+
+/**
+ * A multipart create: the draft's details and its PDF.
+ */
+export type UploadForm = {
+    /**
+     * The PDF, at most 25 MiB and 500 pages. Its part's file name becomes
+     * the request's `file_name`.
+     */
+    file: Blob | File;
+    /**
+     * The draft as JSON: `project_id`, `title`, `message` and `signers`,
+     * as in `signing.requests.create`.
+     */
+    meta: DraftMeta;
 };
 
 export type UserId = string;
@@ -10095,6 +10636,578 @@ export type ProjectsUpdateResponses = {
 
 export type ProjectsUpdateResponse = ProjectsUpdateResponses[keyof ProjectsUpdateResponses];
 
+export type SigningRequestsListData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query: {
+        /**
+         * The project.
+         */
+        project_id: ProjectId;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests';
+};
+
+export type SigningRequestsListErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsListError = SigningRequestsListErrors[keyof SigningRequestsListErrors];
+
+export type SigningRequestsListResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequestList;
+};
+
+export type SigningRequestsListResponse = SigningRequestsListResponses[keyof SigningRequestsListResponses];
+
+export type SigningRequestsCreateData = {
+    body: {
+        /**
+         * The file's name, such as `contract.pdf`.
+         */
+        file_name: string;
+        /**
+         * A note for signers, at most 2,000 characters.
+         */
+        message?: string;
+        /**
+         * The PDF, standard base64, at most 700 KiB decoded and 500 pages.
+         * Encrypted PDFs are refused. Larger files go through the upload
+         * route, `POST /m/signing/upload/workspaces/{workspace_id}/requests`.
+         */
+        pdf_base64: string;
+        /**
+         * The project it belongs to.
+         */
+        project_id: ProjectId;
+        /**
+         * 1 to 10 signers with different emails, in the order they print.
+         */
+        signers: Array<NewSigner>;
+        /**
+         * What signers see as the subject; 1-120 characters.
+         */
+        title: string;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests';
+};
+
+export type SigningRequestsCreateErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsCreateError = SigningRequestsCreateErrors[keyof SigningRequestsCreateErrors];
+
+export type SigningRequestsCreateResponses = {
+    /**
+     * Created
+     */
+    201: SigningRequest;
+};
+
+export type SigningRequestsCreateResponse = SigningRequestsCreateResponses[keyof SigningRequestsCreateResponses];
+
+export type SigningRequestsDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}';
+};
+
+export type SigningRequestsDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsDeleteError = SigningRequestsDeleteErrors[keyof SigningRequestsDeleteErrors];
+
+export type SigningRequestsDeleteResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type SigningRequestsDeleteResponse = SigningRequestsDeleteResponses[keyof SigningRequestsDeleteResponses];
+
+export type SigningRequestsGetData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}';
+};
+
+export type SigningRequestsGetErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsGetError = SigningRequestsGetErrors[keyof SigningRequestsGetErrors];
+
+export type SigningRequestsGetResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequestDetail;
+};
+
+export type SigningRequestsGetResponse = SigningRequestsGetResponses[keyof SigningRequestsGetResponses];
+
+export type SigningRequestsDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: {
+        /**
+         * `original` (default) or `signed`, once completed.
+         */
+        version?: DocumentVersion;
+    };
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/document';
+};
+
+export type SigningRequestsDocumentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Payload Too Large
+     */
+    413: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsDocumentError = SigningRequestsDocumentErrors[keyof SigningRequestsDocumentErrors];
+
+export type SigningRequestsDocumentResponses = {
+    /**
+     * OK
+     */
+    200: Document;
+};
+
+export type SigningRequestsDocumentResponse = SigningRequestsDocumentResponses[keyof SigningRequestsDocumentResponses];
+
+export type SigningRequestsFieldsPutData = {
+    body: {
+        /**
+         * At most 200 fields, replacing the ones the draft has.
+         */
+        fields: Array<SigningFieldInput>;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/fields';
+};
+
+export type SigningRequestsFieldsPutErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsFieldsPutError = SigningRequestsFieldsPutErrors[keyof SigningRequestsFieldsPutErrors];
+
+export type SigningRequestsFieldsPutResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequestDetail;
+};
+
+export type SigningRequestsFieldsPutResponse = SigningRequestsFieldsPutResponses[keyof SigningRequestsFieldsPutResponses];
+
+export type SigningRequestsRetryData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/retry';
+};
+
+export type SigningRequestsRetryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsRetryError = SigningRequestsRetryErrors[keyof SigningRequestsRetryErrors];
+
+export type SigningRequestsRetryResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequest;
+};
+
+export type SigningRequestsRetryResponse = SigningRequestsRetryResponses[keyof SigningRequestsRetryResponses];
+
+export type SigningRequestsSendData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/send';
+};
+
+export type SigningRequestsSendErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsSendError = SigningRequestsSendErrors[keyof SigningRequestsSendErrors];
+
+export type SigningRequestsSendResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequest;
+};
+
+export type SigningRequestsSendResponse = SigningRequestsSendResponses[keyof SigningRequestsSendResponses];
+
+export type SigningRequestsSignersPutData = {
+    body: {
+        /**
+         * 1 to 10 signers in the order they print. Signers of the request
+         * left out are removed with their fields.
+         */
+        signers: Array<SignerSlot>;
+    };
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/signers';
+};
+
+export type SigningRequestsSignersPutErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsSignersPutError = SigningRequestsSignersPutErrors[keyof SigningRequestsSignersPutErrors];
+
+export type SigningRequestsSignersPutResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequestDetail;
+};
+
+export type SigningRequestsSignersPutResponse = SigningRequestsSignersPutResponses[keyof SigningRequestsSignersPutResponses];
+
+export type SigningRequestsVoidData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace.
+         */
+        workspace_id: WorkspaceId;
+        /**
+         * The request.
+         */
+        request_id: SigningRequestId;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/signing/requests/{request_id}/void';
+};
+
+export type SigningRequestsVoidErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorBody;
+    /**
+     * Forbidden
+     */
+    403: ErrorBody;
+    /**
+     * Not Found
+     */
+    404: ErrorBody;
+    /**
+     * Conflict
+     */
+    409: ErrorBody;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorBody;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorBody;
+};
+
+export type SigningRequestsVoidError = SigningRequestsVoidErrors[keyof SigningRequestsVoidErrors];
+
+export type SigningRequestsVoidResponses = {
+    /**
+     * OK
+     */
+    200: SigningRequest;
+};
+
+export type SigningRequestsVoidResponse = SigningRequestsVoidResponses[keyof SigningRequestsVoidResponses];
+
 export type WebhooksEndpointsListData = {
     body?: never;
     path: {
@@ -11026,6 +12139,311 @@ export type MailingPublicUnsubscribeResponses = {
 };
 
 export type MailingPublicUnsubscribeResponse = MailingPublicUnsubscribeResponses[keyof MailingPublicUnsubscribeResponses];
+
+export type SigningPublicDocumentData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The signer's link token
+         */
+        t: string;
+    };
+    url: '/m/signing/public/document';
+};
+
+export type SigningPublicDocumentErrors = {
+    /**
+     * The link no longer works
+     */
+    404: unknown;
+};
+
+export type SigningPublicDocumentResponses = {
+    /**
+     * The PDF
+     */
+    200: Blob | File;
+};
+
+export type SigningPublicDocumentResponse = SigningPublicDocumentResponses[keyof SigningPublicDocumentResponses];
+
+export type SigningPublicSessionData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The signer's link token
+         */
+        t: string;
+    };
+    url: '/m/signing/public/session';
+};
+
+export type SigningPublicSessionErrors = {
+    /**
+     * The link no longer works: unknown, voided, or not out for signature
+     */
+    404: ErrorBody;
+};
+
+export type SigningPublicSessionError = SigningPublicSessionErrors[keyof SigningPublicSessionErrors];
+
+export type SigningPublicSessionResponses = {
+    /**
+     * The session
+     */
+    200: SigningSignerSession;
+};
+
+export type SigningPublicSessionResponse = SigningPublicSessionResponses[keyof SigningPublicSessionResponses];
+
+export type SigningPublicSignRedirectData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The signer's link token
+         */
+        t: string;
+    };
+    url: '/m/signing/public/sign';
+};
+
+export type SigningPublicSignData = {
+    body: SigningSignInput;
+    path?: never;
+    query?: never;
+    url: '/m/signing/public/sign';
+};
+
+export type SigningPublicSignErrors = {
+    /**
+     * The body isn't JSON
+     */
+    400: ErrorBody;
+    /**
+     * The link no longer works, or the signer signed already
+     */
+    404: ErrorBody;
+    /**
+     * The body is over 256 KiB
+     */
+    413: unknown;
+    /**
+     * Fields need fixing; `fields` names them
+     */
+    422: ErrorBody;
+};
+
+export type SigningPublicSignError = SigningPublicSignErrors[keyof SigningPublicSignErrors];
+
+export type SigningPublicSignResponses = {
+    /**
+     * Signed
+     */
+    200: SigningSignResult;
+};
+
+export type SigningPublicSignResponse = SigningPublicSignResponses[keyof SigningPublicSignResponses];
+
+export type SigningPublicSignedPdfData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The signer's link token
+         */
+        t: string;
+    };
+    url: '/m/signing/public/signed.pdf';
+};
+
+export type SigningPublicSignedPdfErrors = {
+    /**
+     * Not completed, or the link no longer works
+     */
+    404: unknown;
+};
+
+export type SigningPublicSignedPdfResponses = {
+    /**
+     * The PDF
+     */
+    200: Blob | File;
+};
+
+export type SigningPublicSignedPdfResponse = SigningPublicSignedPdfResponses[keyof SigningPublicSignedPdfResponses];
+
+export type SigningPublicViewedData = {
+    body: SigningToken;
+    path?: never;
+    query?: never;
+    url: '/m/signing/public/viewed';
+};
+
+export type SigningPublicViewedErrors = {
+    /**
+     * The body isn't JSON
+     */
+    400: ErrorBody;
+    /**
+     * The body has no token
+     */
+    422: ErrorBody;
+};
+
+export type SigningPublicViewedError = SigningPublicViewedErrors[keyof SigningPublicViewedErrors];
+
+export type SigningPublicViewedResponses = {
+    /**
+     * Recorded, or the link no longer works
+     */
+    204: void;
+};
+
+export type SigningPublicViewedResponse = SigningPublicViewedResponses[keyof SigningPublicViewedResponses];
+
+export type SigningUploadCreateData = {
+    /**
+     * Parts `meta` (JSON) and `file` (the PDF). Needs `signing:write`.
+     */
+    body: UploadForm;
+    path: {
+        /**
+         * The workspace
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/m/signing/upload/workspaces/{workspace_id}/requests';
+};
+
+export type SigningUploadCreateErrors = {
+    /**
+     * The multipart body is malformed
+     */
+    400: ErrorBody;
+    /**
+     * Not signed in
+     */
+    401: ErrorBody;
+    /**
+     * Cross-site, or missing `signing:write`
+     */
+    403: ErrorBody;
+    /**
+     * No such workspace or project
+     */
+    404: ErrorBody;
+    /**
+     * The upload took too long
+     */
+    408: unknown;
+    /**
+     * The body or the file is too large
+     */
+    413: ErrorBody;
+    /**
+     * The meta or the file needs fixing
+     */
+    422: ErrorBody;
+};
+
+export type SigningUploadCreateError = SigningUploadCreateErrors[keyof SigningUploadCreateErrors];
+
+export type SigningUploadCreateResponses = {
+    /**
+     * The draft
+     */
+    201: SigningRequest;
+};
+
+export type SigningUploadCreateResponse = SigningUploadCreateResponses[keyof SigningUploadCreateResponses];
+
+export type SigningFilesOriginalData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace
+         */
+        workspace_id: string;
+        /**
+         * The request
+         */
+        request_id: string;
+    };
+    query?: never;
+    url: '/m/signing/workspaces/{workspace_id}/requests/{request_id}/original.pdf';
+};
+
+export type SigningFilesOriginalErrors = {
+    /**
+     * Not signed in
+     */
+    401: ErrorBody;
+    /**
+     * Missing `signing:read`
+     */
+    403: ErrorBody;
+    /**
+     * No such request
+     */
+    404: ErrorBody;
+};
+
+export type SigningFilesOriginalError = SigningFilesOriginalErrors[keyof SigningFilesOriginalErrors];
+
+export type SigningFilesOriginalResponses = {
+    /**
+     * The PDF
+     */
+    200: Blob | File;
+};
+
+export type SigningFilesOriginalResponse = SigningFilesOriginalResponses[keyof SigningFilesOriginalResponses];
+
+export type SigningFilesSignedData = {
+    body?: never;
+    path: {
+        /**
+         * The workspace
+         */
+        workspace_id: string;
+        /**
+         * The request
+         */
+        request_id: string;
+    };
+    query?: never;
+    url: '/m/signing/workspaces/{workspace_id}/requests/{request_id}/signed.pdf';
+};
+
+export type SigningFilesSignedErrors = {
+    /**
+     * Not signed in
+     */
+    401: ErrorBody;
+    /**
+     * Missing `signing:read`
+     */
+    403: ErrorBody;
+    /**
+     * No such request, or not completed
+     */
+    404: ErrorBody;
+};
+
+export type SigningFilesSignedError = SigningFilesSignedErrors[keyof SigningFilesSignedErrors];
+
+export type SigningFilesSignedResponses = {
+    /**
+     * The PDF
+     */
+    200: Blob | File;
+};
+
+export type SigningFilesSignedResponse = SigningFilesSignedResponses[keyof SigningFilesSignedResponses];
 
 export type WebhooksPublicCaptureDeleteData = {
     /**
