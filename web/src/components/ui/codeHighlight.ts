@@ -54,21 +54,38 @@ const loaders: Record<Exclude<CodeLanguage, 'text'>, Loader> = {
   shell: async () => (await import('./shellParser')).shellParser,
 }
 
-const parsers = new Map<CodeLanguage, Promise<Parser>>()
+const loaded = new Map<CodeLanguage, Parser>()
+const loading = new Map<CodeLanguage, Promise<Parser>>()
 
-function parserFor(language: Exclude<CodeLanguage, 'text'>): Promise<Parser> {
-  let parser = parsers.get(language)
+function load(language: Exclude<CodeLanguage, 'text'>): Promise<Parser> {
+  let parser = loading.get(language)
   if (!parser) {
-    parser = loaders[language]()
-    parsers.set(language, parser)
+    parser = loaders[language]().then(
+      (ready) => {
+        loaded.set(language, ready)
+        return ready
+      },
+      (err: unknown) => {
+        // A chunk that failed (a deploy replaced it, the network dropped)
+        // gets another try on the next call.
+        loading.delete(language)
+        throw err
+      },
+    )
+    loading.set(language, parser)
   }
   return parser
 }
 
-/** Splits `code` into colored runs. Each language's parser loads on first use. */
-export async function highlight(code: string, language: CodeLanguage): Promise<CodeRun[]> {
+/**
+ * Splits `code` into colored runs when the language's parser has already
+ * loaded, so a block whose code changes recolors without a plain frame.
+ * Gives null when the parser hasn't loaded yet.
+ */
+export function highlightLoaded(code: string, language: CodeLanguage): CodeRun[] | null {
   if (language === 'text') return [{ text: code, class: '' }]
-  const parser = await parserFor(language)
+  const parser = loaded.get(language)
+  if (!parser) return null
   // A bare type isn't a valid program, so it parses as the right side of an
   // alias and the alias stays out of the output.
   const prefix = language === 'typescript-type' ? 'type T = ' : ''
@@ -83,4 +100,10 @@ export async function highlight(code: string, language: CodeLanguage): Promise<C
     prefix.length,
   )
   return runs
+}
+
+/** Splits `code` into colored runs. Each language's parser loads on first use. */
+export async function highlight(code: string, language: CodeLanguage): Promise<CodeRun[]> {
+  if (language !== 'text') await load(language)
+  return highlightLoaded(code, language) ?? [{ text: code, class: '' }]
 }

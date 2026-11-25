@@ -33,12 +33,24 @@ describe('CodeBlock', () => {
     await vi.waitFor(() => expect(wrapper.find('span.text-code-number').text()).toBe('true'))
   })
 
-  it('adds a copy button and passes attributes to the block', () => {
+  it('adds a copy button, puts class on the row and other attributes on the block', async () => {
     const wrapper = mount(CodeBlock, {
       props: { code: 'x', language: 'text', copy: 'Copy snippet' },
-      attrs: { 'data-testid': 'snippet' },
+      attrs: { class: 'mt-2', 'data-testid': 'snippet' },
     })
+    await settle(wrapper)
     expect(wrapper.get('button').attributes('aria-label')).toBe('Copy snippet')
+    expect(wrapper.classes()).toContain('mt-2')
+    expect(wrapper.get('pre').classes()).not.toContain('mt-2')
     expect(wrapper.get('pre').attributes('data-testid')).toBe('snippet')
+    wrapper.unmount()
+  })
+
+  it('recolors a new value at once when the parser has loaded', async () => {
+    const wrapper = mount(CodeBlock, { props: { code: '1', language: 'json' } })
+    await settle(wrapper)
+    await wrapper.setProps({ code: 'false' })
+    expect(wrapper.get('span.text-code-number').text()).toBe('false')
+    wrapper.unmount()
   })
 })

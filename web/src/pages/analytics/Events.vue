@@ -271,7 +271,12 @@ const viewingFacts = computed(() => {
 
     <DetailPanel :open="viewing !== null" title="Event" @close="viewing = null">
       <DescriptionList :items="viewingFacts" />
-      <CodeBlock v-if="viewing" :code="JSON.stringify(viewing.props, null, 2)" language="json" />
+      <CodeBlock
+        v-if="viewing"
+        :code="JSON.stringify(viewing.props, null, 2)"
+        language="json"
+        size="sm"
+      />
     </DetailPanel>
   </AnalyticsShell>
 </template>

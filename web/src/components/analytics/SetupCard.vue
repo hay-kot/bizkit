@@ -60,6 +60,7 @@ function turnOn() {
     <CodeBlock
       :code="site.snippet"
       language="html"
+      size="sm"
       copy="Copy snippet"
       data-testid="analytics-snippet"
     />

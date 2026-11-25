@@ -181,11 +181,11 @@ function viewGoal(goal: Goal | undefined) {
   >
     <template #default="{ site: current }">
       <Card title="Snippet" description="Add this to the <head> of every page on your site.">
-        <CodeBlock :code="current.snippet" language="html" copy="Copy snippet" />
+        <CodeBlock :code="current.snippet" language="html" size="sm" copy="Copy snippet" />
         <p class="text-sm text-base-content/70">
           Send custom events and name your users from the page:
         </p>
-        <CodeBlock :code="TRACKING_EXAMPLE" language="javascript" />
+        <CodeBlock :code="TRACKING_EXAMPLE" language="javascript" size="sm" />
       </Card>
 
       <form @submit.prevent="onSave">
@@ -272,7 +272,7 @@ function viewGoal(goal: Goal | undefined) {
         title="Server-side events"
         description="Send events from your backend with a workspace API key that has the analytics:write scope."
       >
-        <CodeBlock :code="curl" language="shell" copy="Copy curl example" />
+        <CodeBlock :code="curl" language="shell" size="sm" copy="Copy curl example" />
       </Card>
 
       <FormPanel
