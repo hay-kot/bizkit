@@ -109,6 +109,23 @@ mod cli {
 
     #[cfg(feature = "test-hooks")]
     #[test]
+    fn dev_demo_key_keeps_its_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = dir.path().join("demo.env");
+        for said in ["minted a new demo API key", "kept the demo API key"] {
+            bin()
+                .args(["dev", "demo-key", "--endpoint", "http://127.0.0.1:8514", "--out"])
+                .arg(&env)
+                .arg("--data-dir")
+                .arg(dir.path().join("data"))
+                .assert()
+                .success()
+                .stdout(contains(said));
+        }
+    }
+
+    #[cfg(feature = "test-hooks")]
+    #[test]
     fn dev_seed_demo_runs_twice() {
         let dir = tempfile::tempdir().unwrap();
         for _ in 0..2 {

@@ -35,11 +35,10 @@ services:
 
   seed:
     # Demo data to look at: sign in as demo@bizkit.test. Safe to run again.
-    # Runs the binary the api's `cargo run` just built, instead of a second
-    # cargo invocation.
-    run: >-
-      exec ./target/debug/bizkit --config dev/bizkit.yaml dev seed-demo
-      --data-dir $SVX_STACK_DIR/data
+    # The demo workspace's configuration goes through OpenTofu (dev/tofu)
+    # and the provider, then seed-demo adds sample data. Runs the binary the
+    # api's `cargo run` just built, instead of a second cargo invocation.
+    run: exec scripts/seed-dev.sh
     oneshot: true
     depends: [api]
 
