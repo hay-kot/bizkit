@@ -12,3 +12,4 @@ node_modules
 *.tsbuildinfo
 /.claude/scheduled_tasks.lock
 /.claude/worktrees/
+/terraform-provider-bizkit/terraform-provider-bizkit
