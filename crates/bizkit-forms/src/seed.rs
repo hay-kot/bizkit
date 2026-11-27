@@ -69,7 +69,7 @@ fn demo_forms() -> [DemoForm; 2] {
 /// Seeds "Contact" and "Newsletter" in the `website` project and records
 /// them in `seed.entities`. A form that already exists by name keeps its
 /// settings; it gets the sample submissions only while its inbox is empty,
-/// which is how forms the dev stack's OpenTofu config made get them.
+/// which is how forms the dev stack's `tofu` config made get them.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let existing = store::list_forms(db.read(), seed.workspace_id, Some(project_id)).await?;

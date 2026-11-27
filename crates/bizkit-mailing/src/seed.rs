@@ -173,23 +173,23 @@ async fn seed_privacy(
         store::list_lists(&mut **tx, newsletter.workspace_id, Some(newsletter.project_id))
             .await
             .context("loading the project's lists")?;
-    let list = match existing.into_iter().find(|list| list.name == UPDATES) {
-        Some(list) => list,
-        None => {
-            let list = ListRow {
-                id: ListId::new(),
-                name: UPDATES.to_owned(),
-                description: Some("Release notes, when a version ships.".to_owned()),
-                double_opt_in: false,
-                created_at: days_ago(now, 20),
-                updated_at: days_ago(now, 20),
-                archive: false,
-                archive_key: random_token(),
-                ..newsletter.clone()
-            };
-            store::insert_list(&mut **tx, &list).await.context("inserting the updates list")?;
-            list
-        }
+    let found = existing.into_iter().find(|list| list.name == UPDATES);
+    let list = if let Some(list) = found {
+        list
+    } else {
+        let list = ListRow {
+            id: ListId::new(),
+            name: UPDATES.to_owned(),
+            description: Some("Release notes, when a version ships.".to_owned()),
+            double_opt_in: false,
+            created_at: days_ago(now, 20),
+            updated_at: days_ago(now, 20),
+            archive: false,
+            archive_key: random_token(),
+            ..newsletter.clone()
+        };
+        store::insert_list(&mut **tx, &list).await.context("inserting the updates list")?;
+        list
     };
     if is_empty(tx, &list).await? {
         for (email, name) in UPDATES_CONTACTS {

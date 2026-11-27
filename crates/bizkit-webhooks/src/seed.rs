@@ -103,7 +103,7 @@ fn demo_endpoints() -> [(&'static str, Vec<DemoRequest>); 2] {
 /// Seeds "Stripe" and "GitHub" in the `website` project, with sample
 /// requests, and records them in `seed.entities`. An endpoint that already
 /// exists by name keeps its settings; it gets the sample requests only
-/// while it has none, which is how the dev stack's OpenTofu endpoints get
+/// while it has none, which is how the dev stack's `tofu` endpoints get
 /// them. No endpoint forwards,
 /// so the dev stack sends nothing out.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {

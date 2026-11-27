@@ -39,14 +39,14 @@ enum DevCommand {
     },
     /// Seed the demo workspace and each module's sample data. Safe to run again
     SeedDemo,
-    /// Make the demo account and keep a full-scope API key for OpenTofu in
+    /// Make the demo account and keep a full-scope API key for `tofu` in
     /// an env file. Keeps the file's key while it works. Safe to run again
     DemoKey {
-        /// The env file to read and write (BIZKIT_ENDPOINT,
-        /// BIZKIT_WORKSPACE_ID, BIZKIT_API_KEY)
+        /// The env file to read and write: `BIZKIT_ENDPOINT`,
+        /// `BIZKIT_WORKSPACE_ID` and `BIZKIT_API_KEY`
         #[arg(long)]
         out: PathBuf,
-        /// Where OpenTofu reaches the API
+        /// Where `tofu` reaches the API
         #[arg(long)]
         endpoint: Url,
     },
@@ -250,18 +250,18 @@ mod tests {
             (String::from_utf8(out).unwrap(), read_env_file(&env).unwrap())
         };
 
-        let (said, first) = run().await;
-        assert_eq!(said, format!("minted a new demo API key in {}\n", env.display()));
+        let (minted, first) = run().await;
+        assert_eq!(minted, format!("minted a new demo API key in {}\n", env.display()));
         assert_eq!(first["BIZKIT_ENDPOINT"], "http://127.0.0.1:8514");
         assert!(first["BIZKIT_API_KEY"].starts_with("bk_"));
 
-        let (said, second) = run().await;
-        assert!(said.starts_with("kept the demo API key"), "{said}");
+        let (kept, second) = run().await;
+        assert!(kept.starts_with("kept the demo API key"), "{kept}");
         assert_eq!(second, first, "a working key stays");
 
         std::fs::write(&env, "BIZKIT_API_KEY=bk_gone\n").unwrap();
-        let (said, third) = run().await;
-        assert!(said.starts_with("minted"), "{said}");
+        let (reminted, third) = run().await;
+        assert!(reminted.starts_with("minted"), "{reminted}");
         assert_ne!(third["BIZKIT_API_KEY"], first["BIZKIT_API_KEY"]);
 
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();

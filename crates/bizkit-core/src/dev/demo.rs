@@ -2,7 +2,7 @@
 //! projects, then each module's sample rows. Every step finds its row by
 //! its natural key first, so seeding again changes nothing.
 //!
-//! The dev stack makes the demo's configuration with OpenTofu first
+//! The dev stack makes the demo's configuration with `tofu` first
 //! (`dev/tofu`), through the API key [`api_key`] keeps; [`seed`] then finds
 //! those rows by name and adds the sample data around them.
 
@@ -86,10 +86,10 @@ async fn demo_account(
     Ok((user, workspace))
 }
 
-/// The name of the demo workspace's key for OpenTofu.
+/// The name of the demo workspace's key for `tofu`.
 pub const DEMO_KEY_NAME: &str = "dev seed (tofu)";
 
-/// The demo workspace's API key for OpenTofu.
+/// The demo workspace's API key for `tofu`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DemoKey {
     /// The demo workspace.
@@ -100,9 +100,10 @@ pub struct DemoKey {
     pub minted: bool,
 }
 
-/// Makes the demo user and workspace when missing, then returns a live key
-/// named [`DEMO_KEY_NAME`] that holds `<area>:admin` for every area.
-/// `known` is the token an earlier call returned; it is kept while it still
+/// Makes the demo account when missing and returns its live `tofu` key.
+///
+/// The key is named [`DEMO_KEY_NAME`] and holds `<area>:admin` for every
+/// area. `known` is the token an earlier call returned; it is kept while it still
 /// works in the demo workspace. Otherwise keys with that name are revoked
 /// and a new one is minted, because only the hash of a token is stored.
 ///
