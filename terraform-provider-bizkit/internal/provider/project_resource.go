@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hay-kot/bizkit/terraform-provider-bizkit/internal/client"
@@ -55,7 +56,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "The URL-safe name, unique in the workspace. Changing it replaces the project.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"name": schema.StringAttribute{Required: true, MarkdownDescription: "The display name."},
+			"name": schema.StringAttribute{Required: true, MarkdownDescription: "The display name.", Validators: []validator.String{trimmed()}},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "When it was created (RFC 3339).",

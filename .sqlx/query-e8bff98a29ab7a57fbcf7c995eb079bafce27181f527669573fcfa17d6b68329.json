@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS (SELECT 1 FROM form_submissions WHERE workspace_id = ? AND form_id = ?) AS \"found!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "found!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e8bff98a29ab7a57fbcf7c995eb079bafce27181f527669573fcfa17d6b68329"
+}

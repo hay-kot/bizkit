@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hay-kot/bizkit/terraform-provider-bizkit/internal/client"
@@ -59,14 +60,15 @@ func (r *webhookEndpointResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required: true, MarkdownDescription: "The project it belongs to. Changing it replaces the endpoint.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"name": schema.StringAttribute{Required: true, MarkdownDescription: "The display name."},
+			"name": schema.StringAttribute{Required: true, MarkdownDescription: "The display name.", Validators: []validator.String{trimmed()}},
 			"enabled": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(true),
 				MarkdownDescription: "Disabled endpoints answer 404 and store nothing. Defaults to `true`.",
 			},
 			"forward_url": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Where each captured request is sent on. Public addresses only. Write it as bizkit normalizes URLs (a bare origin ends in `/`).",
+				MarkdownDescription: "Where each captured request is sent on. Public addresses only, written as bizkit stores URLs (a bare origin ends in `/`).",
+				Validators:          []validator.String{canonicalURL()},
 			},
 			"url": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "The public URL that captures requests.",
@@ -99,12 +101,18 @@ func (r *webhookEndpointResource) Create(ctx context.Context, req resource.Creat
 		apiError(&resp.Diagnostics, "create the webhook endpoint", err)
 		return
 	}
-	if !plan.Enabled.ValueBool() {
-		e, err = r.client.UpdateEndpoint(ctx, e.ID, client.UpdateEndpoint{Enabled: client.Ptr(false)})
-		if err != nil {
-			apiError(&resp.Diagnostics, "disable the new webhook endpoint", err)
-			return
-		}
+	// State first, so a failed disable below leaves the endpoint tracked
+	// (a later apply disables it) rather than orphaned.
+	wantEnabled := plan.Enabled.ValueBool()
+	plan.fill(e)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if wantEnabled || resp.Diagnostics.HasError() {
+		return
+	}
+	e, err = r.client.UpdateEndpoint(ctx, e.ID, client.UpdateEndpoint{Enabled: client.Ptr(false)})
+	if err != nil {
+		apiError(&resp.Diagnostics, "disable the new webhook endpoint", err)
+		return
 	}
 	plan.fill(e)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

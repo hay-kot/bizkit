@@ -143,7 +143,7 @@ func (r *formResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Required: true, MarkdownDescription: "The project the form belongs to. Changing it replaces the form.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"name": schema.StringAttribute{Required: true, MarkdownDescription: "The display name."},
+			"name": schema.StringAttribute{Required: true, MarkdownDescription: "The display name.", Validators: []validator.String{trimmed()}},
 			"enabled": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(true),
 				MarkdownDescription: "Disabled forms answer 404 to submissions. Defaults to `true`.",
@@ -157,7 +157,7 @@ func (r *formResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 						Required: true, MarkdownDescription: "One of `text`, `email`, `url`, `number`, `choice`.",
 						Validators: []validator.String{stringvalidator.OneOf("text", "email", "url", "number", "choice")},
 					},
-					"label": schema.StringAttribute{Optional: true, MarkdownDescription: "A label for the UI and mail; the name when unset."},
+					"label": schema.StringAttribute{Optional: true, MarkdownDescription: "A label for the UI and mail; the name when unset.", Validators: []validator.String{trimmed()}},
 					"required": schema.BoolAttribute{
 						Optional: true, Computed: true, Default: booldefault.StaticBool(false),
 						MarkdownDescription: "A non-blank value is needed. Defaults to `false`.",
@@ -188,7 +188,9 @@ func (r *formResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Validators:          []validator.Set{lowercaseElements()},
 			},
 			"redirect_url": schema.StringAttribute{
-				Optional: true, MarkdownDescription: "Where browsers go after a plain HTML post.",
+				Optional:            true,
+				MarkdownDescription: "Where browsers go after a plain HTML post, written as bizkit stores URLs (a bare origin ends in `/`).",
+				Validators:          []validator.String{canonicalURL()},
 			},
 			"endpoint": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "The URL sites post to.",
@@ -233,13 +235,19 @@ func (r *formResource) Create(ctx context.Context, req resource.CreateRequest, r
 		apiError(&resp.Diagnostics, "create the form", err)
 		return
 	}
-	// A new form starts enabled; create has no field for it.
-	if !plan.Enabled.ValueBool() {
-		f, err = r.client.UpdateForm(ctx, f.ID, client.UpdateForm{Enabled: client.Ptr(false)})
-		if err != nil {
-			apiError(&resp.Diagnostics, "disable the new form", err)
-			return
-		}
+	// A new form starts enabled; create has no field for it. State goes in
+	// first, so a failed disable leaves the form tracked (a later apply
+	// disables it) rather than orphaned.
+	wantEnabled := plan.Enabled.ValueBool()
+	plan.fill(ctx, f, &resp.Diagnostics)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if wantEnabled || resp.Diagnostics.HasError() {
+		return
+	}
+	f, err = r.client.UpdateForm(ctx, f.ID, client.UpdateForm{Enabled: client.Ptr(false)})
+	if err != nil {
+		apiError(&resp.Diagnostics, "disable the new form", err)
+		return
 	}
 	plan.fill(ctx, f, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

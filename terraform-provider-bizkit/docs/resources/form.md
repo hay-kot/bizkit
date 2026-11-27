@@ -41,7 +41,7 @@ resource "bizkit_form" "contact" {
 - `fields` (Attributes List) The accepted fields. Empty keeps every field a site sends. (see [below for nested schema](#nestedatt--fields))
 - `min_fill_ms` (Number) Submissions faster than this after the page loads count as spam. Defaults to 2000.
 - `notify_emails` (Set of String) Addresses mailed on each new submission, in lower case.
-- `redirect_url` (String) Where browsers go after a plain HTML post.
+- `redirect_url` (String) Where browsers go after a plain HTML post, written as bizkit stores URLs (a bare origin ends in `/`).
 
 ### Read-Only
 

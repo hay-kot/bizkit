@@ -178,6 +178,11 @@ fn write_env_file(path: &Path, vars: &[(&str, &str)]) -> anyhow::Result<()> {
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
     let mut file = options.open(path).with_context(|| format!("opening {}", path.display()))?;
+    // `mode` applies only when the file is new; an older, wider file
+    // tightens here before it gets the token.
+    #[cfg(unix)]
+    std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+        .with_context(|| format!("restricting {}", path.display()))?;
     for (key, value) in vars {
         writeln!(file, "{key}={value}").with_context(|| format!("writing {}", path.display()))?;
     }
@@ -264,6 +269,28 @@ mod tests {
         assert!(reminted.starts_with("minted"), "{reminted}");
         assert_ne!(third["BIZKIT_API_KEY"], first["BIZKIT_API_KEY"]);
 
+        // A key missing an area's scope (a module added since) is replaced.
+        {
+            let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+            let mut tx = db.write().await.unwrap();
+            sqlx::query(
+                "UPDATE api_keys SET scopes = '[\"forms:admin\"]' WHERE revoked_at IS NULL",
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+            db.close().await;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&env, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        let (rescoped, fourth) = run().await;
+        assert!(rescoped.starts_with("minted"), "{rescoped}");
+        assert_ne!(fourth["BIZKIT_API_KEY"], third["BIZKIT_API_KEY"]);
+
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
         let live: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM api_keys WHERE name = 'dev seed (tofu)' AND revoked_at IS NULL",
@@ -277,7 +304,7 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt as _;
             let mode = std::fs::metadata(&env).unwrap().permissions().mode() & 0o777;
-            assert_eq!(mode, 0o600, "only the owner reads the token");
+            assert_eq!(mode, 0o600, "only the owner reads the token, even after 0644");
         }
     }
 

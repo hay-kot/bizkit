@@ -23,7 +23,9 @@ func main() {
 	flag.Parse()
 
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		Address: "registry.terraform.io/hay-kot/bizkit",
+		// OpenTofu is what the repo tests and seeds with; the address only
+		// matters for -debug reattach.
+		Address: "registry.opentofu.org/hay-kot/bizkit",
 		Debug:   debug,
 	})
 	if err != nil {

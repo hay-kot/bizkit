@@ -31,7 +31,7 @@ resource "bizkit_webhook_endpoint" "stripe" {
 ### Optional
 
 - `enabled` (Boolean) Disabled endpoints answer 404 and store nothing. Defaults to `true`.
-- `forward_url` (String) Where each captured request is sent on. Public addresses only. Write it as bizkit normalizes URLs (a bare origin ends in `/`).
+- `forward_url` (String) Where each captured request is sent on. Public addresses only, written as bizkit stores URLs (a bare origin ends in `/`).
 
 ### Read-Only
 

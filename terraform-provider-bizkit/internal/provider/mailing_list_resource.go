@@ -59,7 +59,7 @@ func (r *mailingListResource) Metadata(_ context.Context, req resource.MetadataR
 
 func (r *mailingListResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	emptySet, _ := types.SetValue(types.StringType, nil)
-	notBlank := []validator.String{stringvalidator.RegexMatches(nonBlank, "must not be blank; leave it unset instead")}
+	notBlank := []validator.String{stringvalidator.RegexMatches(nonBlank, "must not be blank; leave it unset instead"), trimmed()}
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A mailing list. Contacts and their consent belong to one list. Needs an API key with `mailing:admin`. " +
 			"Destroying a list deletes its contacts, broadcasts and sequences.",
@@ -72,7 +72,7 @@ func (r *mailingListResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Required: true, MarkdownDescription: "The project it belongs to. Changing it replaces the list.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"name":        schema.StringAttribute{Required: true, MarkdownDescription: "The display name."},
+			"name":        schema.StringAttribute{Required: true, MarkdownDescription: "The display name.", Validators: []validator.String{trimmed()}},
 			"description": schema.StringAttribute{Optional: true, Validators: notBlank, MarkdownDescription: "What subscribers get, for the team."},
 			"footer":      schema.StringAttribute{Optional: true, Validators: notBlank, MarkdownDescription: "Text at the end of every mail, such as a postal address."},
 			"double_opt_in": schema.BoolAttribute{

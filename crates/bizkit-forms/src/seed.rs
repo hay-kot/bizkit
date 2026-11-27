@@ -68,15 +68,22 @@ fn demo_forms() -> [DemoForm; 2] {
 
 /// Seeds "Contact" and "Newsletter" in the `website` project and records
 /// them in `seed.entities`. A form that already exists by name keeps its
-/// settings; it gets the sample submissions only while its inbox is empty,
+/// settings; it gets the sample submissions only while it has none at all,
 /// which is how forms the dev stack's `tofu` config made get them.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let existing = store::list_forms(db.read(), seed.workspace_id, Some(project_id)).await?;
     let mut tx = db.write().await?;
     for (name, fields, bot_check, samples) in demo_forms() {
-        let form_id = match existing.iter().find(|f| f.form.name == name) {
-            Some(found) if found.inbox_count > 0 => {
+        let found = existing.iter().find(|f| f.form.name == name);
+        let has_samples = match found {
+            Some(found) => {
+                store::has_submissions(&mut *tx, seed.workspace_id, found.form.id).await?
+            }
+            None => false,
+        };
+        let form_id = match found {
+            Some(found) if has_samples => {
                 seed.entities
                     .insert((FORM.id.to_owned(), name.to_owned()), found.form.id.to_string());
                 continue;

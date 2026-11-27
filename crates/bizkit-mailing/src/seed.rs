@@ -113,11 +113,13 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let existing = store::list_lists(db.read(), seed.workspace_id, Some(project_id)).await?;
     if let Some(list) = existing.into_iter().find(|list| list.name == LIST) {
         // Stacks seeded before sequences existed get the sequence alone. A
-        // list without contacts was made by the dev stack's OpenTofu config,
-        // which also links its forms, and gets the sample contacts and
-        // broadcasts here.
+        // list without contacts or broadcasts was made by the dev stack's
+        // `tofu` config, which also links its forms, and gets the sample
+        // contacts and broadcasts here.
         let mut tx = db.write().await?;
-        if is_empty(&mut tx, &list).await? {
+        let broadcasts =
+            store::list_broadcasts(&mut *tx, list.workspace_id, None, Some(list.id)).await?;
+        if broadcasts.is_empty() && is_empty(&mut tx, &list).await? {
             let form = seed.entities.get(&(FORM_KIND.to_owned(), "Contact".to_owned()));
             let subscribed = seed_contacts(&mut tx, &list, form, seed.now).await?;
             seed_broadcasts(&mut tx, &list, &subscribed, seed.now).await?;

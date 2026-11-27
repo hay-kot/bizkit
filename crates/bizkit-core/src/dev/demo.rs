@@ -104,7 +104,7 @@ pub struct DemoKey {
 ///
 /// The key is named [`DEMO_KEY_NAME`] and holds `<area>:admin` for every
 /// area. `known` is the token an earlier call returned; it is kept while it still
-/// works in the demo workspace. Otherwise keys with that name are revoked
+/// works in the demo workspace with every area's scope. Otherwise keys with that name are revoked
 /// and a new one is minted, because only the hash of a token is stored.
 ///
 /// # Errors
@@ -118,9 +118,15 @@ pub async fn api_key(
 ) -> anyhow::Result<DemoKey> {
     let mut tx = db.write().await?;
     let (user, workspace) = demo_account(&mut tx, now).await?;
+    let scopes: Vec<String> = areas.iter().map(|(area, _)| format!("{area}:admin")).collect();
+    let scopes = serde_json::to_string(&scopes).context("serializing the key's scopes")?;
     if let Some(token) = known {
         let found = api_keys::find_active(&mut *tx, &hash_token(token), now).await?;
-        if found.is_some_and(|key| key.workspace_id == workspace.id && key.name == DEMO_KEY_NAME) {
+        // A key from before a module added a scope area can't reach it, so
+        // it only stays while it holds exactly what a new one would.
+        if found.is_some_and(|key| {
+            key.workspace_id == workspace.id && key.name == DEMO_KEY_NAME && key.scopes == scopes
+        }) {
             tx.commit().await?;
             return Ok(DemoKey {
                 workspace_id: workspace.id,
@@ -136,8 +142,6 @@ pub async fn api_key(
     }
     let token = format!("{API_KEY_PREFIX}{}", random_token());
     let prefix: String = token.chars().take(10).collect();
-    let scopes: Vec<String> = areas.iter().map(|(area, _)| format!("{area}:admin")).collect();
-    let scopes = serde_json::to_string(&scopes).context("serializing the key's scopes")?;
     api_keys::insert(
         &mut *tx,
         &api_keys::NewApiKey {
