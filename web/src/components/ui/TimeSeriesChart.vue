@@ -172,8 +172,12 @@ const bars = computed(() => {
   })
 })
 
+// A date label needs about 90px, so narrow plots (a phone, a third-width
+// tile) get fewer than five.
+const X_LABEL_ROOM = 90
 const xLabels = computed(() => {
-  const indexes = spreadIndexes(props.points.length)
+  const fit = Math.max(2, Math.min(5, Math.floor(plotWidth.value / X_LABEL_ROOM)))
+  const indexes = spreadIndexes(props.points.length, fit)
   return indexes.map((i, n) => ({
     i,
     label: props.points[i]?.label ?? '',
