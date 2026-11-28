@@ -15,7 +15,7 @@ use serde_json::json;
 use super::{DAYS, Rng, arrival, mark_events, site_row};
 use crate::api::Day;
 use crate::files::{ProjectDb, project_db_path};
-use crate::insights::{InsightQuery, seed_dashboard};
+use crate::insights::{InsightDisplay, InsightQuery, seed_dashboard};
 use crate::report::Scope;
 use crate::store::{self, EventRow};
 
@@ -75,24 +75,31 @@ async fn fill_once(
     Ok(())
 }
 
-fn insights() -> anyhow::Result<Vec<(&'static str, InsightQuery, u8)>> {
+fn insights() -> anyhow::Result<Vec<(&'static str, InsightQuery, u8, InsightDisplay)>> {
     [
         (
             "API key holders",
             json!({"kind": "people", "filters": [{"key": "api_keys", "op": "gt", "value": 0}],
                    "breakdown": {"source": "trait", "key": "api_keys"}}),
             4,
+            InsightDisplay::Auto,
         ),
         (
             "Share creating API keys",
             json!({"kind": "events", "event": "api_key_created", "measure": "share"}),
             8,
+            InsightDisplay::Bar,
         ),
-        ("Sign-ins", json!({"kind": "events", "event": "signed_in", "measure": "users"}), 12),
+        (
+            "Sign-ins",
+            json!({"kind": "events", "event": "signed_in", "measure": "users"}),
+            12,
+            InsightDisplay::Auto,
+        ),
     ]
     .into_iter()
-    .map(|(name, query, width)| {
-        Ok((name, serde_json::from_value(query).context("a usage insight")?, width))
+    .map(|(name, query, width, display)| {
+        Ok((name, serde_json::from_value(query).context("a usage insight")?, width, display))
     })
     .collect()
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id: InsightId\", project_id AS \"project_id: ProjectId\", name, query, range,\n                      created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n               FROM analytics_insights WHERE workspace_id = ? AND project_id = ? ORDER BY name, id",
+  "query": "SELECT id AS \"id: InsightId\", project_id AS \"project_id: ProjectId\", name, query, range, display,\n                      created_at AS \"created_at: UnixMillis\", updated_at AS \"updated_at: UnixMillis\"\n               FROM analytics_insights WHERE workspace_id = ? AND project_id = ? ORDER BY name, id",
   "describe": {
     "columns": [
       {
@@ -59,8 +59,19 @@
         }
       },
       {
-        "name": "created_at: UnixMillis",
+        "name": "display",
         "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "analytics_insights",
+            "name": "display"
+          }
+        }
+      },
+      {
+        "name": "created_at: UnixMillis",
+        "ordinal": 6,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -71,7 +82,7 @@
       },
       {
         "name": "updated_at: UnixMillis",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -91,8 +102,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "795ebbdf6138aaf00aeb78f0f9d1195279429633a48d25eccf12ff630fea9127"
+  "hash": "6ccf3b13b6fc323772b9313081591283eaabd5a9c92f3be2c0bfea735b449e45"
 }

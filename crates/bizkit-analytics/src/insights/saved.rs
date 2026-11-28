@@ -89,6 +89,43 @@ impl InsightRange {
     }
 }
 
+/// How a saved insight draws its result. The web draws a choice the
+/// result can't show (a line for a breakdown) as `auto`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum InsightDisplay {
+    /// By the result's view: a line for a series, ranked bars for a
+    /// breakdown or distribution, the number for a count.
+    #[default]
+    Auto,
+    /// A line over time. Series only.
+    Line,
+    /// Bars: over time for a series, ranked for a breakdown or distribution.
+    Bar,
+    /// The headline number with its change from the previous period.
+    Number,
+}
+
+impl InsightDisplay {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Line => "line",
+            Self::Bar => "bar",
+            Self::Number => "number",
+        }
+    }
+
+    fn from_stored(text: &str) -> Self {
+        match text {
+            "line" => Self::Line,
+            "bar" => Self::Bar,
+            "number" => Self::Number,
+            _ => Self::Auto,
+        }
+    }
+}
+
 /// A dashboard an insight is on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub(crate) struct DashboardRef {
@@ -111,6 +148,8 @@ pub(crate) struct Insight {
     pub(crate) query: InsightQuery,
     /// The range it opens with.
     pub(crate) range: InsightRange,
+    /// How it draws.
+    pub(crate) display: InsightDisplay,
     /// The dashboards it is on, by name.
     pub(crate) dashboards: Vec<DashboardRef>,
     /// When it was made.
@@ -189,6 +228,9 @@ pub(crate) struct CreateInsight {
     /// The range it opens with; default `30d`.
     #[serde(default)]
     range: Option<InsightRange>,
+    /// How it draws; default `auto`.
+    #[serde(default)]
+    display: Option<InsightDisplay>,
 }
 
 impl Validate for CreateInsight {
@@ -228,6 +270,9 @@ pub(crate) struct UpdateInsight {
     /// The range it opens with.
     #[serde(default)]
     range: Option<InsightRange>,
+    /// How it draws.
+    #[serde(default)]
+    display: Option<InsightDisplay>,
 }
 
 impl Validate for UpdateInsight {
@@ -331,6 +376,7 @@ struct InsightRow {
     name: String,
     query: String,
     range: String,
+    display: String,
     created_at: UnixMillis,
     updated_at: UnixMillis,
 }
@@ -351,6 +397,7 @@ fn insight_to_api(row: InsightRow, dashboards: Vec<DashboardRef>) -> Result<Insi
         name: row.name,
         query,
         range: InsightRange::from_stored(&row.range),
+        display: InsightDisplay::from_stored(&row.display),
         dashboards,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -368,7 +415,7 @@ async fn find_insight(
 ) -> Result<InsightRow, ApiError> {
     sqlx::query_as!(
         InsightRow,
-        r#"SELECT id AS "id: InsightId", project_id AS "project_id: ProjectId", name, query, range,
+        r#"SELECT id AS "id: InsightId", project_id AS "project_id: ProjectId", name, query, range, display,
                   created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
            FROM analytics_insights WHERE workspace_id = ? AND id = ?"#,
         workspace_id,
@@ -410,16 +457,18 @@ async fn save_insight(
     row: &InsightRow,
 ) -> sqlx::Result<()> {
     sqlx::query!(
-        "INSERT INTO analytics_insights (id, workspace_id, project_id, name, query, range, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        "INSERT INTO analytics_insights
+           (id, workspace_id, project_id, name, query, range, display, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, query = excluded.query,
-           range = excluded.range, updated_at = excluded.updated_at",
+           range = excluded.range, display = excluded.display, updated_at = excluded.updated_at",
         row.id,
         workspace_id,
         row.project_id,
         row.name,
         row.query,
         row.range,
+        row.display,
         row.created_at,
         row.updated_at,
     )
@@ -567,7 +616,7 @@ impl Operation for InsightsList {
         let db = cx.platform().db();
         let rows = sqlx::query_as!(
             InsightRow,
-            r#"SELECT id AS "id: InsightId", project_id AS "project_id: ProjectId", name, query, range,
+            r#"SELECT id AS "id: InsightId", project_id AS "project_id: ProjectId", name, query, range, display,
                       created_at AS "created_at: UnixMillis", updated_at AS "updated_at: UnixMillis"
                FROM analytics_insights WHERE workspace_id = ? AND project_id = ? ORDER BY name, id"#,
             input.workspace_id,
@@ -609,6 +658,7 @@ impl Operation for InsightsCreate {
             name: input.name.trim().to_owned(),
             query: encode_query(&input.query)?,
             range: input.range.unwrap_or_default().as_str().to_owned(),
+            display: input.display.unwrap_or_default().as_str().to_owned(),
             created_at: now,
             updated_at: now,
         };
@@ -661,6 +711,9 @@ impl Operation for InsightsUpdate {
         }
         if let Some(range) = input.range {
             range.as_str().clone_into(&mut row.range);
+        }
+        if let Some(display) = input.display {
+            display.as_str().clone_into(&mut row.display);
         }
         row.updated_at = cx.now();
         save_insight(&mut *tx, input.workspace_id, &row).await?;
@@ -836,7 +889,7 @@ impl Operation for DashboardsDelete {
 }
 
 /// Saves `insights` and a dashboard named `name` that shows them at the
-/// given widths, unless the project has insights already. Returns whether
+/// given widths and displays, unless the project has insights already. Returns whether
 /// it saved.
 #[cfg(feature = "test-hooks")]
 pub(crate) async fn seed_dashboard(
@@ -844,7 +897,7 @@ pub(crate) async fn seed_dashboard(
     scope: crate::report::Scope,
     now: UnixMillis,
     name: &str,
-    insights: &[(&str, InsightQuery, u8)],
+    insights: &[(&str, InsightQuery, u8, InsightDisplay)],
 ) -> anyhow::Result<bool> {
     let has_insights = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM analytics_insights
@@ -858,13 +911,14 @@ pub(crate) async fn seed_dashboard(
         return Ok(false);
     }
     let mut tiles = Vec::new();
-    for (insight_name, query, width) in insights {
+    for (insight_name, query, width, display) in insights {
         let row = InsightRow {
             id: InsightId::new(),
             project_id: scope.project_id,
             name: (*insight_name).to_owned(),
             query: serde_json::to_string(query)?,
             range: InsightRange::default().as_str().to_owned(),
+            display: display.as_str().to_owned(),
             created_at: now,
             updated_at: now,
         };

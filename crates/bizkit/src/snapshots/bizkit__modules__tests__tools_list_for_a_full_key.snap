@@ -948,6 +948,16 @@ expression: tools
               }
             ]
           },
+          "InsightDisplay": {
+            "description": "How a saved insight draws its result. The web draws a choice the\nresult can't show (a line for a breakdown) as `auto`.",
+            "enum": [
+              "auto",
+              "line",
+              "bar",
+              "number"
+            ],
+            "type": "string"
+          },
           "InsightFilter": {
             "additionalProperties": false,
             "description": "One condition on an event property, or on a trait for the people kind.",
@@ -1066,6 +1076,17 @@ expression: tools
         "additionalProperties": false,
         "description": "A new insight.",
         "properties": {
+          "display": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/InsightDisplay",
+                "description": "How it draws; default `auto`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "description": "The display name.",
             "type": "string"
@@ -1448,6 +1469,16 @@ expression: tools
               }
             ]
           },
+          "InsightDisplay": {
+            "description": "How a saved insight draws its result. The web draws a choice the\nresult can't show (a line for a breakdown) as `auto`.",
+            "enum": [
+              "auto",
+              "line",
+              "bar",
+              "number"
+            ],
+            "type": "string"
+          },
           "InsightFilter": {
             "additionalProperties": false,
             "description": "One condition on an event property, or on a trait for the people kind.",
@@ -1566,6 +1597,17 @@ expression: tools
         "additionalProperties": false,
         "description": "Changes to an insight. Absent fields stay as they are.",
         "properties": {
+          "display": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/InsightDisplay",
+                "description": "How it draws."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "insight_id": {
             "$ref": "#/$defs/InsightId",
             "description": "The insight."

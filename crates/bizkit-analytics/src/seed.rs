@@ -17,7 +17,7 @@ use crate::api::{Day, FunnelId, GoalId, PersonId};
 use crate::files::{ProjectDb, project_db_path};
 use crate::funnels::{self, FunnelRow};
 use crate::hooks::GOAL;
-use crate::insights::{InsightQuery, seed_dashboard};
+use crate::insights::{InsightDisplay, InsightQuery, seed_dashboard};
 use crate::report::Scope;
 use crate::rollup::{self, Rollup};
 use crate::store::{self, EventRow, GoalRow, SiteRow};
@@ -512,36 +512,40 @@ async fn ensure_demo_site(db: &Db, seed: &DemoSeed, project_id: ProjectId) -> an
 
 /// The demo insights: the design's three feature-usage questions, asked
 /// of Tallyho's events and traits, plus a breakdown, each with its tile
-/// width so the dashboard shows every width but the full row.
-fn demo_insights() -> anyhow::Result<Vec<(&'static str, InsightQuery, u8)>> {
+/// width (every width but the full row) and display.
+fn demo_insights() -> anyhow::Result<Vec<(&'static str, InsightQuery, u8, InsightDisplay)>> {
     let queries = [
         (
             "Token holders",
             json!({"kind": "people", "filters": [{"key": "api_tokens", "op": "gt", "value": 0}],
                    "breakdown": {"source": "trait", "key": "plan"}}),
             4,
+            InsightDisplay::Auto,
         ),
         (
             "Share opening projects",
             json!({"kind": "events", "event": "project_opened", "measure": "share"}),
             8,
+            InsightDisplay::Number,
         ),
         (
             "Projects opened per user",
             json!({"kind": "events", "event": "project_opened", "measure": "per_user"}),
             6,
+            InsightDisplay::Auto,
         ),
         (
             "Signups by plan",
             json!({"kind": "events", "event": "signup_completed",
                    "breakdown": {"source": "property", "key": "plan"}}),
             6,
+            InsightDisplay::Auto,
         ),
     ];
     queries
         .into_iter()
-        .map(|(name, query, width)| {
-            Ok((name, serde_json::from_value(query).context("a demo insight")?, width))
+        .map(|(name, query, width, display)| {
+            Ok((name, serde_json::from_value(query).context("a demo insight")?, width, display))
         })
         .collect()
 }
@@ -811,7 +815,7 @@ mod tests {
     fn the_demo_insights_are_valid() {
         let insights = demo_insights().unwrap();
         assert_eq!(insights.len(), 4);
-        for (name, query, _) in insights {
+        for (name, query, _, _) in insights {
             let mut errors = bizkit_core::validate::FieldErrors::default();
             query.check(&mut errors, "query");
             assert!(errors.is_empty(), "{name}: {errors:?}");
