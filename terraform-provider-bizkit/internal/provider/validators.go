@@ -19,7 +19,9 @@ func (lowercaseValidator) Description(context.Context) string {
 	return "every value is lower case, with no surrounding space"
 }
 
-func (v lowercaseValidator) MarkdownDescription(ctx context.Context) string { return v.Description(ctx) }
+func (v lowercaseValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
 
 func (lowercaseValidator) ValidateSet(ctx context.Context, req validator.SetRequest, resp *validator.SetResponse) {
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
