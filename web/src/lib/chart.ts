@@ -122,3 +122,18 @@ export function barPath(
     'Z',
   ].join(' ')
 }
+
+/**
+ * The index of the first bucket that hasn't ended at `now`: its start plus
+ * `intervalMs` is after `now`. Undefined when every bucket has ended.
+ * `starts` are ISO times in order; dropping buckets that haven't begun is
+ * the caller's job.
+ */
+export function openFrom(
+  starts: readonly string[],
+  intervalMs: number,
+  now: number,
+): number | undefined {
+  const index = starts.findIndex((start) => Date.parse(start) + intervalMs > now)
+  return index === -1 ? undefined : index
+}
