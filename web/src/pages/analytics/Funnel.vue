@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AnalyticsShell from '@/components/analytics/AnalyticsShell.vue'
 import FunnelDropoffs from '@/components/analytics/FunnelDropoffs.vue'
 import FunnelForm from '@/components/analytics/FunnelForm.vue'
-import FunnelSteps from '@/components/analytics/FunnelSteps.vue'
+import FunnelChart from '@/components/analytics/FunnelChart.vue'
 import {
   describeStep,
   draftOf,
@@ -151,7 +151,7 @@ function onDelete() {
       </p>
       <ErrorAlert v-if="results.error.value" :error="results.error.value" />
       <SkeletonRows v-else-if="results.isPending.value" :rows="4" />
-      <FunnelSteps
+      <FunnelChart
         v-else-if="results.data.value"
         :steps="results.data.value.steps"
         :dropped-link="droppedLink"

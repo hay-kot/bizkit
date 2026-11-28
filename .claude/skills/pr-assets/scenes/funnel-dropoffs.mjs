@@ -64,8 +64,7 @@ export default async function ({ page, d, baseUrl }) {
   await d.settled();
   await d.sleep(1500);
 
-  const steps = page.getByRole("list", { name: "Funnel steps" });
-  await d.click(steps.getByRole("link", { name: /dropped off/ }).nth(1));
+  await d.click(page.getByRole("link", { name: /dropped off/ }).nth(1));
   await page.getByText(/Dropped before step 3/).waitFor();
   await d.settled();
   await d.sleep(2500);
