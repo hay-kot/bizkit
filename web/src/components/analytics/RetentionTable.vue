@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import DataTable from '@/components/ui/DataTable.vue'
-import { formatDayRange, formatNumber, formatPercent } from '@/lib/format'
+import { formatNumber, formatPercent, formatShortUtcDay } from '@/lib/format'
 import { addDays } from '@/lib/range'
 import type { Cohort } from '@/queries/analytics'
 
@@ -57,7 +57,8 @@ const rows = computed(() => {
     mean,
     ...cohorts.map((cohort) => ({
       key: cohort.week,
-      week: formatDayRange(cohort.week, addDays(cohort.week, 6)),
+      // No year: it would push week 8 out of view at laptop widths.
+      week: `${formatShortUtcDay(cohort.week)} to ${formatShortUtcDay(addDays(cohort.week, 6))}`,
       people: formatNumber(cohort.people),
       total: false,
       cells: weekKeys.map((_, i) => {
