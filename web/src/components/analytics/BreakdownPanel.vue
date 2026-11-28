@@ -91,7 +91,7 @@ const showingAll = ref(false)
         :label="`${title} by`"
         size="toolbar"
       />
-      <RouterLink v-if="explore" :to="explore" class="btn h-9 btn-ghost btn-sm">Explore</RouterLink>
+      <RouterLink v-if="explore" :to="explore" class="btn h-9 btn-ghost">Explore</RouterLink>
     </template>
     <ErrorAlert v-if="error" :error="error" />
     <BarList

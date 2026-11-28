@@ -79,7 +79,9 @@ const reportProps = computed(() => ({
       <PageSection :title="METRICS[metric].label" :description="METRICS[metric].description">
         <template #actions>
           <SegmentedControl v-model="metric" :options="metricOptions" label="Chart metric" />
-          <RouterLink :to="explore('pageview')" class="btn h-9 btn-ghost btn-sm"
+          <RouterLink
+            :to="explore(metric === 'pageviews' ? 'pageview' : undefined)"
+            class="btn h-9 btn-ghost"
             >Explore</RouterLink
           >
         </template>
