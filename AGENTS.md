@@ -150,6 +150,7 @@ Modules let workspace scripts run at **hook points** they declare. Core owns the
   | KPIs with a change | `StatTiles` | |
   | Numbers over time | `TimeSeriesChart` (SVG, no chart library): monotone lines, or `kind="bar"`; `partialFrom` dots the open bucket | Inline styles and arbitrary values are errors |
   | A ranked list with share bars | `BarList` (bars are `progress` elements) | Inline styles and arbitrary values are errors |
+  | A funnel's results | `FunnelChart` (bars, hatched lost share, conversion chips whose drop-off links keep the name `N dropped off`) | Inline styles and arbitrary values are errors |
   | Report panels side by side | `ReportGrid` | `grid-cols-*` is an error in `src/pages` |
   | Tiles a user arranges (dashboards) | `DashboardGrid` with `DashboardTile`s: widths 4/6/8/12, pointer and arrow-key reorder in edit mode, a header with an info `Popover` and a `menu` slot | `grid-cols-*` and `col-span-*` are errors in `src/pages` and `src/components/analytics` |
   | Two to five short choices side by side (Builder or Code) | `SegmentedControl` (a radio group) | `input[type=radio]` is an error |
