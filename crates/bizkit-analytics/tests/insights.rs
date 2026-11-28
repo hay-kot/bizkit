@@ -307,13 +307,17 @@ mod insights {
         let query = json!({"kind": "events", "event": "signup"});
         let plain: Value = s
             .member
-            .post(&s.path("insights"), &json!({"project_id": s.project(), "name": "Plain", "query": query}))
+            .post(
+                &s.path("insights"),
+                &json!({"project_id": s.project(), "name": "Plain", "query": query}),
+            )
             .await
             .expect(StatusCode::CREATED)
             .json();
         assert_eq!(plain["display"], "auto");
 
-        let body = json!({"project_id": s.project(), "name": "Big", "query": query, "display": "number"});
+        let body =
+            json!({"project_id": s.project(), "name": "Big", "query": query, "display": "number"});
         let big: Value =
             s.member.post(&s.path("insights"), &body).await.expect(StatusCode::CREATED).json();
         assert_eq!(big["display"], "number");

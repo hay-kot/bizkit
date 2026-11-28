@@ -57,6 +57,7 @@ test('build a per-user insight, save it and pin it to a new dashboard', async ({
   await pin.getByLabel('New dashboard name').fill('Adoption')
   await pin.getByRole('button', { name: 'Add to dashboard' }).click()
   await expect(page.getByRole('heading', { name: 'Adoption' })).toBeVisible()
+  const dashboard = page.url()
   const tile = page.getByRole('region', { name: 'Workspaces per user' })
   await expect(tile).toContainText('2')
   await expect(tile.getByRole('listitem')).toHaveCount(5)
@@ -75,4 +76,26 @@ test('build a per-user insight, save it and pin it to a new dashboard', async ({
   await expect(page.getByRole('link', { name: 'Workspaces per user' })).toBeVisible()
   await boards.getByRole('link', { name: 'Adoption' }).click()
   await expect(page.getByRole('heading', { name: 'Adoption' })).toBeVisible()
+
+  // Show it as a number. Every event landed today, so the previous period
+  // had none and the change reads as new.
+  await page.getByRole('link', { name: 'Workspaces per user' }).click()
+  const showAs = page.getByRole('radiogroup', { name: 'Show as' })
+  await showAs.getByRole('radio', { name: 'Number' }).click()
+  await expect(page.getByText('New this period')).toBeVisible()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+  await page.reload()
+  await expect(showAs.getByRole('radio', { name: 'Number' })).toHaveAttribute('aria-checked', 'true')
+
+  // The tile draws by the saved display, and its menu takes it off the dashboard.
+  await page.goto(dashboard)
+  await expect(tile).toContainText('New this period')
+  await tile.getByRole('button', { name: 'Actions for Workspaces per user' }).click()
+  await page.getByRole('menuitem', { name: 'Remove from dashboard' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click()
+  await expect(tile).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Adoption' })).toBeVisible()
+  await expect(tile).toHaveCount(0)
 })
