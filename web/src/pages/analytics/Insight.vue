@@ -23,6 +23,7 @@ import { useReportRange } from '@/composables/useReportRange'
 import { runAction } from '@/lib/action'
 import { type DateRange, presetRange, savedPreset } from '@/lib/range'
 import {
+  type InsightDisplay,
   type InsightRange,
   useCreateDashboard,
   useDashboards,
@@ -67,12 +68,15 @@ const range = computed<DateRange>({
 })
 
 const editor = ref<InsightEditorState>(editorOfDraft())
+const display = ref<InsightDisplay>('auto')
 // Seed the editor once per insight: refetches after a rename or a pin must
 // not throw away edits that aren't saved yet.
 watch(
   () => insight.value?.id,
   (id) => {
-    if (id && insight.value) editor.value = editorOfQuery(insight.value.query)
+    if (!id || !insight.value) return
+    editor.value = editorOfQuery(insight.value.query)
+    display.value = insight.value.display
   },
   { immediate: true },
 )
@@ -86,7 +90,8 @@ const dirty = computed(() => {
   return (
     !query.ok ||
     canonicalQuery(query.value) !== canonicalQuery(saved.query) ||
-    savedRange.value !== saved.range
+    savedRange.value !== saved.range ||
+    display.value !== saved.display
   )
 })
 
@@ -98,7 +103,7 @@ function onSave() {
     run: () =>
       update.mutateAsync({
         path: { workspace_id: props.workspaceId, insight_id: props.insightId },
-        body: { query: query.value, range: savedRange.value },
+        body: { query: query.value, range: savedRange.value, display: display.value },
       }),
     success: 'Insight saved',
   })
@@ -242,6 +247,7 @@ function onDelete() {
       v-if="insight"
       v-model:range="range"
       v-model:editor="editor"
+      v-model:display="display"
       :workspace-id="workspaceId"
       :project-id="projectId"
       :today="today"

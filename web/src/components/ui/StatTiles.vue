@@ -2,6 +2,7 @@
 import { ArrowDown, ArrowUp, Minus } from 'lucide-vue-next'
 import { computed } from 'vue'
 
+import { changeOf } from '@/lib/change'
 import { formatNumber, formatPercent } from '@/lib/format'
 
 export interface StatTile {
@@ -18,24 +19,6 @@ const props = withDefaults(defineProps<{ tiles: StatTile[]; loading?: boolean }>
   loading: false,
 })
 
-interface Change {
-  kind: 'up' | 'down' | 'flat' | 'new'
-  text: string
-}
-
-function change(tile: StatTile): Change | undefined {
-  if (tile.previous === undefined) return undefined
-  // A rise from zero has no finite percent.
-  if (tile.previous === 0) {
-    return tile.value === 0
-      ? { kind: 'flat', text: formatPercent(0) }
-      : { kind: 'new', text: 'new' }
-  }
-  const ratio = (tile.value - tile.previous) / Math.abs(tile.previous)
-  const kind = ratio > 0 ? 'up' : ratio < 0 ? 'down' : 'flat'
-  return { kind, text: formatPercent(Math.abs(ratio)) }
-}
-
 const tones = {
   up: 'text-success',
   new: 'text-success',
@@ -44,21 +27,12 @@ const tones = {
 }
 const icons = { up: ArrowUp, new: ArrowUp, down: ArrowDown, flat: Minus }
 
-function spoken({ kind, text }: Change): string {
-  if (kind === 'new') return 'new since the previous period'
-  if (kind === 'flat') return 'no change from the previous period'
-  return `${kind} ${text} from the previous period`
-}
-
 const rows = computed(() =>
-  props.tiles.map((tile) => {
-    const delta = change(tile)
-    return {
-      label: tile.label,
-      value: tile.format === 'percent' ? formatPercent(tile.value) : formatNumber(tile.value),
-      change: delta && { ...delta, spoken: spoken(delta) },
-    }
-  }),
+  props.tiles.map((tile) => ({
+    label: tile.label,
+    value: tile.format === 'percent' ? formatPercent(tile.value) : formatNumber(tile.value),
+    change: tile.previous === undefined ? undefined : changeOf(tile.value, tile.previous),
+  })),
 )
 </script>
 
@@ -79,9 +53,9 @@ const rows = computed(() =>
         <dd
           v-if="row.change"
           class="flex items-center gap-1 text-sm tabular-nums"
-          :class="tones[row.change.kind]"
+          :class="tones[row.change.direction]"
         >
-          <component :is="icons[row.change.kind]" class="size-3.5" aria-hidden="true" />
+          <component :is="icons[row.change.direction]" class="size-3.5" aria-hidden="true" />
           <span aria-hidden="true">{{ row.change.text }}</span>
           <span class="sr-only">{{ row.change.spoken }}</span>
         </dd>

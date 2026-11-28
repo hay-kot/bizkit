@@ -302,6 +302,43 @@ mod insights {
     }
 
     #[tokio::test]
+    async fn an_insight_keeps_its_display() {
+        let s = setup().await;
+        let query = json!({"kind": "events", "event": "signup"});
+        let plain: Value = s
+            .member
+            .post(
+                &s.path("insights"),
+                &json!({"project_id": s.project(), "name": "Plain", "query": query}),
+            )
+            .await
+            .expect(StatusCode::CREATED)
+            .json();
+        assert_eq!(plain["display"], "auto");
+
+        let body =
+            json!({"project_id": s.project(), "name": "Big", "query": query, "display": "number"});
+        let big: Value =
+            s.member.post(&s.path("insights"), &body).await.expect(StatusCode::CREATED).json();
+        assert_eq!(big["display"], "number");
+        let path = s.path(&format!("insights/{}", big["id"].as_str().unwrap()));
+
+        let bars: Value =
+            s.member.patch(&path, &json!({"display": "bar"})).await.expect(StatusCode::OK).json();
+        assert_eq!(bars["display"], "bar");
+        let renamed: Value =
+            s.member.patch(&path, &json!({"name": "Bars"})).await.expect(StatusCode::OK).json();
+        assert_eq!(renamed["display"], "bar", "a change without display keeps it");
+        let got: Value = s.member.get(&path).await.expect(StatusCode::OK).json();
+        assert_eq!(got["display"], "bar");
+
+        s.member
+            .patch(&path, &json!({"display": "pie"}))
+            .await
+            .expect(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
     async fn insights_and_dashboards_are_saved() {
         let s = setup().await;
         let save = |name: &str| {

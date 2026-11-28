@@ -78,6 +78,86 @@ describe('TimeSeriesChart', () => {
     expect(wrapper.find('foreignObject').exists()).toBe(false)
   })
 
+  it('draws smooth lines', () => {
+    const wrapper = mount(TimeSeriesChart, { props: { points, series } })
+    const d = wrapper.get('path.stroke-chart-1').attributes('d') ?? ''
+    expect(d).toMatch(/^M[\d.]+,[\d.]+ C/)
+    expect(d).not.toContain('L')
+  })
+
+  it('dots the line from the point before the unfinished bucket', () => {
+    const wrapper = mount(TimeSeriesChart, { props: { points, series, partialFrom: 2 } })
+    const parts = wrapper
+      .findAll('path.stroke-chart-1')
+      .map((p) => [p.attributes('data-part'), p.attributes('stroke-dasharray')])
+    expect(parts).toEqual([
+      ['solid', undefined],
+      ['partial', '1 4'],
+    ])
+    const muted = wrapper
+      .findAll('path.stroke-base-content\\/40')
+      .map((p) => p.attributes('stroke-dasharray'))
+    expect(muted).toEqual(['4 4', '1 4'])
+  })
+
+  it('dots the whole line when the first bucket is unfinished', () => {
+    const wrapper = mount(TimeSeriesChart, { props: { points, series, partialFrom: 0 } })
+    expect(wrapper.findAll('path.stroke-chart-1').map((p) => p.attributes('data-part'))).toEqual([
+      'partial',
+    ])
+  })
+
+  it('draws a lone point as a dot', () => {
+    const wrapper = mount(TimeSeriesChart, {
+      props: { points: points.slice(0, 1), series: series.slice(0, 1) },
+    })
+    expect(wrapper.find('path.stroke-chart-1').exists()).toBe(false)
+    expect(wrapper.find('circle.fill-chart-1').exists()).toBe(true)
+  })
+
+  it('draws bars with value badges and a hatched unfinished bar', () => {
+    const wrapper = mount(TimeSeriesChart, {
+      props: {
+        points,
+        series: [{ name: 'Share', tone: 'primary' as const, unit: '%' }],
+        kind: 'bar',
+        partialFrom: 2,
+      },
+    })
+    const bars = wrapper.findAll('svg path[d^="M"]')
+    expect(bars).toHaveLength(3)
+    expect(bars.slice(0, 2).every((b) => b.classes('fill-chart-1'))).toBe(true)
+    const patternId = wrapper.get('pattern').attributes('id')
+    expect(bars[2]?.attributes('fill')).toBe(`url(#${patternId})`)
+    expect(wrapper.findAll('foreignObject span').map((b) => b.text())).toEqual([
+      '10%',
+      '40%',
+      '25%',
+    ])
+    expect(wrapper.find('path[fill="none"]').exists()).toBe(false)
+  })
+
+  it('leaves badges off bars too narrow for them', () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({
+      t: String(i),
+      label: String(i),
+      values: [i + 1],
+    }))
+    const wrapper = mount(TimeSeriesChart, {
+      props: { points: many, series: series.slice(0, 1), kind: 'bar' },
+    })
+    expect(wrapper.findAll('svg path[d^="M"]')).toHaveLength(40)
+    expect(wrapper.find('foreignObject').exists()).toBe(false)
+  })
+
+  it('writes the unit after values', async () => {
+    const wrapper = mount(TimeSeriesChart, {
+      props: { points, series: [{ name: 'Share', tone: 'primary' as const, unit: '%' }] },
+    })
+    await wrapper.get('svg').trigger('focus')
+    expect(wrapper.get('[aria-live="polite"]').text()).toBe('Mar 15: Share 25%')
+  })
+
   it('shows a flat baseline and a message without data', () => {
     const wrapper = mount(TimeSeriesChart, { props: { points: [], series } })
     expect(wrapper.text()).toContain('No data for this range')

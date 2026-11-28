@@ -1347,6 +1347,10 @@ export type Insight = {
      */
     dashboards: Array<DashboardRef>;
     /**
+     * How it draws.
+     */
+    display: InsightDisplay;
+    /**
      * The insight ID.
      */
     id: InsightId;
@@ -1371,6 +1375,12 @@ export type Insight = {
      */
     updated_at: Timestamp;
 };
+
+/**
+ * How a saved insight draws its result. The web draws a choice the
+ * result can't show (a line for a breakdown) as `auto`.
+ */
+export type InsightDisplay = 'auto' | 'line' | 'bar' | 'number';
 
 /**
  * One condition on an event property, or on a trait for the people kind.
@@ -4766,6 +4776,7 @@ export type AnalyticsInsightsListResponse = AnalyticsInsightsListResponses[keyof
 
 export type AnalyticsInsightsCreateData = {
     body: {
+        display?: InsightDisplay | null;
         /**
          * The display name.
          */
@@ -4989,6 +5000,7 @@ export type AnalyticsInsightsGetResponse = AnalyticsInsightsGetResponses[keyof A
 
 export type AnalyticsInsightsUpdateData = {
     body: {
+        display?: InsightDisplay | null;
         /**
          * The display name.
          */

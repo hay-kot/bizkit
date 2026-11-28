@@ -55,8 +55,16 @@ function toggle() {
 // Runs in the capture phase, before the item's own handler, so a confirm
 // dialog the item opens records the trigger, not the item that is about to
 // unmount, as the element to give focus back to.
-function onPick() {
+function focusTrigger() {
   trigger()?.focus()
+}
+
+// Runs as the click bubbles, after the item's handler. Closing in the
+// capture phase broke every button item for real clicks: the browser runs
+// microtasks between listeners of a trusted event, so Vue unmounted the
+// items before their own handler ran, and `emit` on an unmounted component
+// does nothing. A script's `element.click()` hid it.
+function close() {
   open.value = false
 }
 </script>
@@ -84,7 +92,8 @@ function onPick() {
           placement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1',
         ]"
         @keydown="onMenuKey"
-        @click.capture="onPick"
+        @click.capture="focusTrigger"
+        @click="close"
       >
         <slot />
       </div>

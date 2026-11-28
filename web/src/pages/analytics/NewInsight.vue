@@ -14,13 +14,19 @@ import { useReportRange } from '@/composables/useReportRange'
 import { runAction } from '@/lib/action'
 import { rangeToQuery, savedPreset } from '@/lib/range'
 import { toast } from '@/lib/toast'
-import { useCreateInsight, useDashboard, useUpdateDashboard } from '@/queries/analytics'
+import {
+  type InsightDisplay,
+  useCreateInsight,
+  useDashboard,
+  useUpdateDashboard,
+} from '@/queries/analytics'
 
 const props = defineProps<{ workspaceId: string; projectId: string; projectName: string }>()
 const route = useRoute()
 const router = useRouter()
 const { today, range } = useReportRange()
 const editor = ref(editorOfDraft(draftFromLink(route.query)))
+const display = ref<InsightDisplay>('auto')
 const create = useCreateInsight()
 // Opened from a dashboard's Add insight panel: the saved insight joins that
 // dashboard and the user goes back to it.
@@ -50,6 +56,7 @@ async function onSave() {
       // A range the API can't keep (custom dates would go stale), so the
       // insight opens on 30 days.
       range: savedPreset(range.value.preset) ?? '30d',
+      display: display.value,
     },
   })
   // Waits for the dashboard when it hasn't loaded yet. The insight is saved
@@ -116,6 +123,7 @@ async function onSave() {
     <InsightEditor
       v-model:range="range"
       v-model:editor="editor"
+      v-model:display="display"
       :workspace-id="workspaceId"
       :project-id="projectId"
       :today="today"

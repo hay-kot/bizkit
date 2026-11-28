@@ -148,6 +148,54 @@ describe('DashboardTile', () => {
   })
 })
 
+describe('DashboardTile header', () => {
+  const handle = { 'aria-label': 'Move Signups' } as unknown as HandleBindings
+  const menu = { menu: '<button role="menuitem">Open insight</button>' }
+
+  it('opens the description from the info button', async () => {
+    const wrapper = mount(DashboardTile, {
+      props: {
+        title: 'Signups',
+        description: 'Events · signup',
+        to: '/x',
+        editing: false,
+        width: 6,
+        handle,
+      },
+      global: { stubs: { RouterLink: true } },
+      attachTo: document.body,
+    })
+    const info = wrapper.get('button[aria-label="About Signups"]')
+    expect(document.body.textContent).not.toContain('Events · signup')
+    await info.trigger('click')
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('Events · signup')
+    wrapper.unmount()
+  })
+
+  it('shows the menu outside edit mode only', async () => {
+    const wrapper = mount(DashboardTile, {
+      props: { title: 'Signups', to: '/x', editing: false, width: 6, handle },
+      slots: menu,
+      global: { stubs: { RouterLink: true } },
+      attachTo: document.body,
+    })
+    const trigger = wrapper.get('button[aria-label="Actions for Signups"]')
+    await trigger.trigger('click')
+    expect(wrapper.find('[role="menuitem"]').text()).toBe('Open insight')
+    await wrapper.setProps({ editing: true })
+    expect(wrapper.find('button[aria-label="Actions for Signups"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('has no info button without a description and no menu without items', () => {
+    const wrapper = mount(DashboardTile, {
+      props: { title: 'Signups', to: '/x', editing: false, width: 6, handle },
+      global: { stubs: { RouterLink: true } },
+    })
+    expect(wrapper.find('button').exists()).toBe(false)
+  })
+})
+
 describe('SegmentedControl', () => {
   it('is a radio group that arrow keys move through', async () => {
     const options = [
