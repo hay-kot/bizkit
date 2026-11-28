@@ -116,6 +116,35 @@ function removeTile(index: number) {
   draft.value = draft.value.filter((_, at) => at !== index)
 }
 
+/**
+ * Remove from a tile's menu outside edit mode: confirm, then save the
+ * server's tile list without it, so tiles whose insight isn't loaded yet
+ * stay.
+ */
+function removeSavedTile(insight: Insight) {
+  if (saving.value) return
+  const keep = (dashboard.value?.tiles ?? []).filter((tile) => tile.insight_id !== insight.id)
+  void runAction({
+    confirm: {
+      title: `Remove ${insight.name} from this dashboard?`,
+      message: 'The insight stays saved and can be added again.',
+      confirmLabel: 'Remove',
+    },
+    run: () =>
+      update.mutateAsync({
+        path: { workspace_id: props.workspaceId, dashboard_id: props.dashboardId },
+        body: { tiles: keep },
+      }),
+    success: `Removed ${insight.name}`,
+  })
+}
+
+function onRemove(index: number) {
+  const tile = tiles.value[index]
+  if (editing.value) removeTile(index)
+  else if (tile) removeSavedTile(tile.insight)
+}
+
 // Tiles whose insight the list doesn't have yet keep their place at the end
 // of a save, so a stale insights list never drops them.
 const hidden = computed(() =>
@@ -313,7 +342,7 @@ function onDelete() {
             :locked="saving"
             :handle="handle"
             @update:width="setWidth(index, $event)"
-            @remove="removeTile(index)"
+            @remove="onRemove(index)"
           />
         </template>
       </DashboardGrid>
