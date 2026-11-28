@@ -6,7 +6,7 @@ import { computed, ref, shallowRef } from 'vue'
 import JsonEditor from '@/components/ui/JsonEditor.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import type { DateRange } from '@/lib/range'
-import { type InsightQuery, useInsightResult } from '@/queries/analytics'
+import { type InsightDisplay, type InsightQuery, useInsightResult } from '@/queries/analytics'
 
 import {
   builderOfCode,
@@ -18,17 +18,21 @@ import {
 import InsightControls from './InsightControls.vue'
 import { isRunnable, queryOf } from './insightDraft'
 import InsightResultView from './InsightResultView.vue'
+import { useInsightTrend } from './insightTrend'
+import { type Display, displayOptions, resolveDisplay, storedDisplay } from './insightView'
 import RangeToolbar from './RangeToolbar.vue'
 
 /**
  * The insight editor shared by the new and saved insight pages: the range
  * and the Builder or Code switch, the builder or the query JSON, then the
- * result. The builder runs once typing pauses; Code runs on Run or
- * Cmd/Ctrl+Enter, since half-typed JSON would only fail.
+ * result with a picker for how it draws (`display`). The builder runs once
+ * typing pauses; Code runs on Run or Cmd/Ctrl+Enter, since half-typed
+ * JSON would only fail.
  */
 const props = defineProps<{ workspaceId: string; projectId: string; today: string }>()
 const range = defineModel<DateRange>('range', { required: true })
 const editor = defineModel<InsightEditorState>('editor', { required: true })
+const display = defineModel<InsightDisplay>('display', { default: 'auto' })
 
 const MODES: { value: EditorMode; label: string }[] = [
   { value: 'builder', label: 'Builder' },
@@ -65,6 +69,31 @@ const result = useInsightResult(
   range,
   () => shown.value ?? { kind: 'people' },
   runnable,
+)
+
+const DISPLAY_LABELS: Record<Display, string> = {
+  line: 'Line',
+  bar: 'Bars',
+  number: 'Number',
+  list: 'List',
+}
+const view = computed(() => result.data.value?.view)
+const displays = computed(() =>
+  view.value
+    ? displayOptions(view.value).map((value) => ({ value, label: DISPLAY_LABELS[value] }))
+    : [],
+)
+const drawn = computed({
+  get: (): Display => (view.value ? resolveDisplay(display.value, view.value) : 'line'),
+  set: (picked: Display) => (display.value = storedDisplay(picked)),
+})
+// The change shown under a number compares the query on screen, not the saved one.
+const { previous } = useInsightTrend(
+  () => props.workspaceId,
+  () => props.projectId,
+  range,
+  () => shown.value ?? { kind: 'people' },
+  () => runnable.value && drawn.value === 'number' && shown.value?.kind === 'events',
 )
 
 function toCode() {
@@ -146,6 +175,17 @@ const stale = computed(() => editor.value.mode === 'code' && ran.value?.code !==
     class="flex flex-col gap-4 rounded-box border border-base-300 bg-base-100 p-4"
     aria-label="Result"
   >
+    <div class="flex flex-wrap items-center gap-2">
+      <p class="text-sm font-medium">Result</p>
+      <SegmentedControl
+        v-if="displays.length > 1"
+        v-model="drawn"
+        :options="displays"
+        label="Show as"
+        size="sm"
+        class="ml-auto"
+      />
+    </div>
     <p
       v-if="editor.mode === 'builder' && !isRunnable(draft)"
       class="py-6 text-center text-sm text-base-content/70"
@@ -164,6 +204,8 @@ const stale = computed(() => editor.value.mode === 'code' && ran.value?.code !==
       :result="result.data.value"
       :loading="result.isLoading.value || !runnable"
       :error="result.error.value"
+      :display="display"
+      :previous="previous"
     />
   </section>
 </template>
