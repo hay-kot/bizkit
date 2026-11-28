@@ -259,6 +259,22 @@ pub(crate) struct Page<'a> {
     pub(crate) limit: i64,
 }
 
+/// Whether a form has any submission, in any status.
+#[cfg(feature = "test-hooks")]
+pub(crate) async fn has_submissions(
+    exec: impl SqliteExecutor<'_>,
+    workspace_id: WorkspaceId,
+    form_id: FormId,
+) -> sqlx::Result<bool> {
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM form_submissions WHERE workspace_id = ? AND form_id = ?) AS "found!: bool""#,
+        workspace_id,
+        form_id
+    )
+    .fetch_one(exec)
+    .await
+}
+
 /// Submissions newest first.
 pub(crate) async fn list_submissions(
     exec: impl SqliteExecutor<'_>,

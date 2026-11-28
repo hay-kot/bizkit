@@ -112,8 +112,18 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
     let existing = store::list_lists(db.read(), seed.workspace_id, Some(project_id)).await?;
     if let Some(list) = existing.into_iter().find(|list| list.name == LIST) {
-        // Stacks seeded before sequences existed get the sequence alone.
+        // Stacks seeded before sequences existed get the sequence alone. A
+        // list without contacts or broadcasts was made by the dev stack's
+        // `tofu` config, which also links its forms, and gets the sample
+        // contacts and broadcasts here.
         let mut tx = db.write().await?;
+        let broadcasts =
+            store::list_broadcasts(&mut *tx, list.workspace_id, None, Some(list.id)).await?;
+        if broadcasts.is_empty() && is_empty(&mut tx, &list).await? {
+            let form = seed.entities.get(&(FORM_KIND.to_owned(), "Contact".to_owned()));
+            let subscribed = seed_contacts(&mut tx, &list, form, seed.now).await?;
+            seed_broadcasts(&mut tx, &list, &subscribed, seed.now).await?;
+        }
         seed_sequence(&mut tx, &list, seed.now).await?;
         seed_suppressions(&mut tx, &list, seed.now).await?;
         seed_privacy(&mut tx, &list, seed.now).await?;
@@ -165,7 +175,10 @@ async fn seed_privacy(
         store::list_lists(&mut **tx, newsletter.workspace_id, Some(newsletter.project_id))
             .await
             .context("loading the project's lists")?;
-    if !existing.iter().any(|list| list.name == UPDATES) {
+    let found = existing.into_iter().find(|list| list.name == UPDATES);
+    let list = if let Some(list) = found {
+        list
+    } else {
         let list = ListRow {
             id: ListId::new(),
             name: UPDATES.to_owned(),
@@ -178,6 +191,9 @@ async fn seed_privacy(
             ..newsletter.clone()
         };
         store::insert_list(&mut **tx, &list).await.context("inserting the updates list")?;
+        list
+    };
+    if is_empty(tx, &list).await? {
         for (email, name) in UPDATES_CONTACTS {
             let arrived = days_ago(now, 20);
             let contact = ContactRow {
@@ -205,6 +221,14 @@ async fn seed_privacy(
     }
     privacy::erase(tx, newsletter.workspace_id, ERASED, days_ago(now, 1)).await?;
     Ok(())
+}
+
+/// Whether a list has no contacts yet.
+async fn is_empty(tx: &mut WriteTx, list: &ListRow) -> anyhow::Result<bool> {
+    let counts = store::contact_counts(&mut **tx, list.workspace_id, list.id)
+        .await
+        .context("counting the list's contacts")?;
+    Ok(counts.pending + counts.subscribed + counts.unsubscribed == 0)
 }
 
 /// Inserts the sample contacts and returns the subscribed ones.

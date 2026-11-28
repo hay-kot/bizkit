@@ -102,7 +102,9 @@ fn demo_endpoints() -> [(&'static str, Vec<DemoRequest>); 2] {
 
 /// Seeds "Stripe" and "GitHub" in the `website` project, with sample
 /// requests, and records them in `seed.entities`. An endpoint that already
-/// exists by name is left alone, with its requests. No endpoint forwards,
+/// exists by name keeps its settings; it gets the sample requests only
+/// while it has none, which is how the dev stack's `tofu` endpoints get
+/// them. No endpoint forwards,
 /// so the dev stack sends nothing out.
 pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let Some(&project_id) = seed.project_ids.get("website") else { return Ok(()) };
@@ -110,22 +112,29 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
     let mut tx = db.write().await?;
     for (name, requests) in demo_endpoints() {
         let key = (ENDPOINT.id.to_owned(), name.to_owned());
-        if let Some(found) = existing.iter().find(|e| e.endpoint.name == name) {
-            seed.entities.insert(key, found.endpoint.id.to_string());
-            continue;
-        }
-        let endpoint = EndpointRow {
-            id: EndpointId::new(),
-            workspace_id: seed.workspace_id,
-            project_id,
-            name: name.to_owned(),
-            enabled: true,
-            forward_url: None,
-            created_at: seed.now,
-            updated_at: seed.now,
+        let endpoint_id = match existing.iter().find(|e| e.endpoint.name == name) {
+            Some(found) if found.request_count > 0 => {
+                seed.entities.insert(key, found.endpoint.id.to_string());
+                continue;
+            }
+            // Made by the dev stack's OpenTofu config, still without requests.
+            Some(found) => found.endpoint.id,
+            None => {
+                let endpoint = EndpointRow {
+                    id: EndpointId::new(),
+                    workspace_id: seed.workspace_id,
+                    project_id,
+                    name: name.to_owned(),
+                    enabled: true,
+                    forward_url: None,
+                    created_at: seed.now,
+                    updated_at: seed.now,
+                };
+                store::insert_endpoint(&mut *tx, &endpoint).await?;
+                endpoint.id
+            }
         };
-        store::insert_endpoint(&mut *tx, &endpoint).await?;
-        seed.entities.insert(key, endpoint.id.to_string());
+        seed.entities.insert(key, endpoint_id.to_string());
         let count = u64::try_from(requests.len()).unwrap_or(0);
         for (i, (method, query, extra, body, delivered)) in requests.into_iter().enumerate() {
             let age = Duration::from_mins(20 * count.saturating_sub(u64::try_from(i).unwrap_or(0)));
@@ -144,7 +153,7 @@ pub(crate) async fn seed(db: &Db, seed: &mut DemoSeed) -> anyhow::Result<()> {
                 &RequestRow {
                     id: RequestId::new(),
                     workspace_id: seed.workspace_id,
-                    endpoint_id: endpoint.id,
+                    endpoint_id,
                     method: method.to_owned(),
                     query: query.map(str::to_owned),
                     headers: serde_json::to_string(&headers)?,

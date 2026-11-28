@@ -1,8 +1,9 @@
 //! The `dev` command: seeding and sign-in shortcuts for development and
 //! end-to-end tests. Built only with the `test-hooks` feature.
 
+use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 use bizkit_core::deps::{Clock as _, SystemClock};
@@ -38,6 +39,17 @@ enum DevCommand {
     },
     /// Seed the demo workspace and each module's sample data. Safe to run again
     SeedDemo,
+    /// Make the demo account and keep a full-scope API key for `tofu` in
+    /// an env file. Keeps the file's key while it works. Safe to run again
+    DemoKey {
+        /// The env file to read and write: `BIZKIT_ENDPOINT`,
+        /// `BIZKIT_WORKSPACE_ID` and `BIZKIT_API_KEY`
+        #[arg(long)]
+        out: PathBuf,
+        /// Where `tofu` reaches the API
+        #[arg(long)]
+        endpoint: Url,
+    },
     /// Print a sign-in link for an email without sending mail
     Login {
         /// The email to sign in as
@@ -88,6 +100,23 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
                 bizkit_core::dev::demo::DEMO_EMAIL
             )?;
         }
+        DevCommand::DemoKey { out: path, endpoint } => {
+            let areas = bizkit_core::scope_areas(&modules)?;
+            let known = read_env_file(path)?.remove("BIZKIT_API_KEY");
+            let key =
+                bizkit_core::dev::demo::api_key(&db, &areas, known.as_deref(), SystemClock.now())
+                    .await?;
+            write_env_file(
+                path,
+                &[
+                    ("BIZKIT_ENDPOINT", endpoint.as_str().trim_end_matches('/')),
+                    ("BIZKIT_WORKSPACE_ID", &key.workspace_id.to_string()),
+                    ("BIZKIT_API_KEY", &key.token),
+                ],
+            )?;
+            let action = if key.minted { "minted a new" } else { "kept the" };
+            writeln!(out, "{action} demo API key in {}", path.display())?;
+        }
         DevCommand::Login { email } => {
             let base_url = match &config.base_url {
                 Some(url) => url.clone(),
@@ -122,6 +151,44 @@ async fn dev(args: &Args, ctx: &Context, out: &mut impl Write) -> anyhow::Result
     Ok(())
 }
 
+/// Reads `KEY=value` lines; a missing file is empty.
+fn read_env_file(path: &Path) -> anyhow::Result<BTreeMap<String, String>> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(err) => return Err(err).with_context(|| format!("reading {}", path.display())),
+    };
+    Ok(text
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .map(|(key, value)| (key.trim().to_owned(), value.trim().to_owned()))
+        .collect())
+}
+
+/// Writes `KEY=value` lines, readable by the owner only, as the file holds
+/// a bearer token.
+fn write_env_file(path: &Path, vars: &[(&str, &str)]) -> anyhow::Result<()> {
+    use std::io::Write as _;
+
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(path).with_context(|| format!("opening {}", path.display()))?;
+    // `mode` applies only when the file is new; an older, wider file
+    // tightens here before it gets the token.
+    #[cfg(unix)]
+    std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+        .with_context(|| format!("restricting {}", path.display()))?;
+    for (key, value) in vars {
+        writeln!(file, "{key}={value}").with_context(|| format!("writing {}", path.display()))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,7 +220,7 @@ mod tests {
     }
 
     #[cfg(feature = "forms")]
-    async fn counts(data_dir: &std::path::Path) -> Vec<i64> {
+    async fn counts(data_dir: &Path) -> Vec<i64> {
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
         let mut counts = Vec::new();
         for sql in [
@@ -168,6 +235,77 @@ mod tests {
         }
         db.close().await;
         counts
+    }
+
+    #[tokio::test]
+    async fn demo_key_keeps_a_working_key_and_remints_a_dead_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let env = dir.path().join("tofu/demo.env");
+        let args = Args {
+            command: DevCommand::DemoKey {
+                out: env.clone(),
+                endpoint: Url::parse("http://127.0.0.1:8514/").unwrap(),
+            },
+            data_dir: Some(data_dir.clone()),
+        };
+        let run = async || {
+            let mut out = Vec::new();
+            dev(&args, &Context::default(), &mut out).await.unwrap();
+            (String::from_utf8(out).unwrap(), read_env_file(&env).unwrap())
+        };
+
+        let (minted, first) = run().await;
+        assert_eq!(minted, format!("minted a new demo API key in {}\n", env.display()));
+        assert_eq!(first["BIZKIT_ENDPOINT"], "http://127.0.0.1:8514");
+        assert!(first["BIZKIT_API_KEY"].starts_with("bk_"));
+
+        let (kept, second) = run().await;
+        assert!(kept.starts_with("kept the demo API key"), "{kept}");
+        assert_eq!(second, first, "a working key stays");
+
+        std::fs::write(&env, "BIZKIT_API_KEY=bk_gone\n").unwrap();
+        let (reminted, third) = run().await;
+        assert!(reminted.starts_with("minted"), "{reminted}");
+        assert_ne!(third["BIZKIT_API_KEY"], first["BIZKIT_API_KEY"]);
+
+        // A key missing an area's scope (a module added since) is replaced.
+        {
+            let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+            let mut tx = db.write().await.unwrap();
+            sqlx::query(
+                "UPDATE api_keys SET scopes = '[\"forms:admin\"]' WHERE revoked_at IS NULL",
+            )
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+            db.close().await;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&env, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        let (rescoped, fourth) = run().await;
+        assert!(rescoped.starts_with("minted"), "{rescoped}");
+        assert_ne!(fourth["BIZKIT_API_KEY"], third["BIZKIT_API_KEY"]);
+
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let live: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM api_keys WHERE name = 'dev seed (tofu)' AND revoked_at IS NULL",
+        )
+        .fetch_one(db.read())
+        .await
+        .unwrap();
+        db.close().await;
+        assert_eq!(live, 1, "the old key is revoked");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = std::fs::metadata(&env).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "only the owner reads the token, even after 0644");
+        }
     }
 
     #[cfg(feature = "forms")]
@@ -191,6 +329,43 @@ mod tests {
             "seeded the demo workspace; sign in as demo@bizkit.test\n",
             "output"
         );
+    }
+
+    #[cfg(all(feature = "forms", feature = "webhooks"))]
+    #[tokio::test]
+    async fn seed_demo_fills_rows_made_elsewhere() {
+        // The dev stack's OpenTofu config makes forms and endpoints before
+        // seed-demo runs; it adds the samples to them by name.
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let args = Args { command: DevCommand::SeedDemo, data_dir: Some(data_dir.clone()) };
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        let samples = async || {
+            let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+            let mut counts = Vec::new();
+            for sql in [
+                "SELECT COUNT(*) FROM forms",
+                "SELECT COUNT(*) FROM form_submissions",
+                "SELECT COUNT(*) FROM webhook_endpoints",
+                "SELECT COUNT(*) FROM webhook_requests",
+            ] {
+                counts.push(sqlx::query_scalar::<_, i64>(sql).fetch_one(db.read()).await.unwrap());
+            }
+            db.close().await;
+            counts
+        };
+        let seeded = samples().await;
+
+        let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
+        let mut tx = db.write().await.unwrap();
+        for sql in ["DELETE FROM form_submissions", "DELETE FROM webhook_requests"] {
+            sqlx::query(sql).execute(&mut *tx).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        db.close().await;
+
+        dev(&args, &Context::default(), &mut Vec::new()).await.unwrap();
+        assert_eq!(samples().await, seeded, "same rows, samples back");
     }
 
     #[cfg(feature = "analytics")]
@@ -278,7 +453,7 @@ mod tests {
     /// The website site takes the demo site's host and key, and its file
     /// has onboarding events, none in the future.
     #[cfg(feature = "analytics")]
-    async fn demo_site_is_ready(data_dir: &std::path::Path) {
+    async fn demo_site_is_ready(data_dir: &Path) {
         let db = bizkit_core::db::Db::open(&data_dir.join("bizkit.db")).await.unwrap();
         let (project, hostnames, rolled_through): (
             bizkit_core::ids::ProjectId,

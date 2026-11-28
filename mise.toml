@@ -8,8 +8,10 @@ cargo-insta = "1.49.0"
 "github:Boshen/cargo-shear" = "1.14.1"
 "github:rust-cross/cargo-zigbuild" = "0.24.1"
 "github:taiki-e/cargo-llvm-cov" = "0.9.1"
+go = "1.27.4"
 goreleaser = "2.20.2"
 node = "26.13.1"
+opentofu = "1.13.9"
 pnpm = "12.20.0"
 typos = "1.52.2"
 zig = "0.17.1"
@@ -35,6 +37,26 @@ run = "cargo test --locked --workspace --all-features"
 [tasks."test:e2e"]
 description = "Run the Playwright end-to-end tests against a fresh server and Mailpit"
 run = "scripts/test-e2e.sh"
+
+[tasks."test:tfacc"]
+description = "Run the Terraform provider's acceptance tests with OpenTofu (under `svx exec --` they use the dev stack)"
+run = "scripts/test-tfacc.sh"
+
+[tasks."tf:docs"]
+description = "Regenerate the Terraform provider's docs with tfplugindocs"
+run = "scripts/tf-docs.sh"
+
+[tasks."tf:check"]
+description = "Check the Terraform provider: gofmt, go vet, unit and spec tests, tofu fmt and current docs"
+dir = "terraform-provider-bizkit"
+run = [
+    "test -z \"$(gofmt -l .)\" || { gofmt -l .; echo 'run gofmt -w terraform-provider-bizkit' >&2; exit 1; }",
+    "go vet ./...",
+    "go test ./...",
+    "tofu fmt -check -recursive examples ../dev/tofu",
+    { task = "tf:docs" },
+    "test -z \"$(git status --porcelain docs)\" || { git status --porcelain docs; echo 'provider docs are stale: run mise run tf:docs' >&2; exit 1; }",
+]
 
 [tasks."demo:traffic"]
 description = "Drive headless visitors through the dev stack's demo site (--site <demo url> --api <api url> [--visitors 200])"
@@ -155,7 +177,7 @@ depends = ["web:install"]
 run = "pnpm -C web dev --port 5173 --strictPort"
 
 [tasks.check]
-description = "Run all checks for PRs (fmt, lint, test, docs, deny, tidy, typos, db, gen, web)"
+description = "Run all checks for PRs (fmt, lint, test, docs, deny, tidy, typos, db, gen, web, tf)"
 run = [
     { task = "fmt:check" },
     { task = "lint" },
@@ -167,4 +189,5 @@ run = [
     { task = "db:check" },
     { task = "gen:check" },
     { task = "web:check" },
+    { task = "tf:check" },
 ]

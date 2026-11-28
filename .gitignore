@@ -12,3 +12,6 @@ node_modules
 *.tsbuildinfo
 /.claude/scheduled_tasks.lock
 /.claude/worktrees/
+/terraform-provider-bizkit/terraform-provider-bizkit
+/dev/tofu/adopt_generated.tf
+/dev/tofu/.terraform*
