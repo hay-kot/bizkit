@@ -11,7 +11,7 @@ import {
   opsForChoice,
   queryOf,
 } from './insightDraft'
-import { insightView } from './insightView'
+import { displayOptions, insightView, resolveDisplay, storedDisplay } from './insightView'
 
 describe('insight drafts', () => {
   it('need an event for the events kind', () => {
@@ -114,32 +114,40 @@ describe('insight drafts', () => {
   })
 })
 
+const NOW = Date.parse('2026-01-10T12:00:00Z')
+
 describe('insight views', () => {
   it('show a share as a percent over time', () => {
-    const view = insightView({
-      view: 'series',
-      measure: 'share',
-      interval: 'day',
-      value: 0.25,
-      active: 40,
-      points: [{ start: '2026-01-01T00:00:00Z', value: 0.5 }],
-    })
+    const view = insightView(
+      {
+        view: 'series',
+        measure: 'share',
+        interval: 'day',
+        value: 0.25,
+        active: 40,
+        points: [{ start: '2026-01-01T00:00:00Z', value: 0.5 }],
+      },
+      NOW,
+    )
     expect(view.headline).toEqual({ label: 'Share of active users', value: '25%' })
     expect(view.caption).toBe('of 40 active users')
     expect(view.chart?.points[0]?.values).toEqual([50])
   })
 
   it('list breakdown rows, with not set and the rest last', () => {
-    const view = insightView({
-      view: 'breakdown',
-      measure: 'total',
-      value: 12,
-      rows: [
-        { value: 'pro', result: 6 },
-        { value: null, result: 2 },
-      ],
-      other: { value: null, result: 4 },
-    })
+    const view = insightView(
+      {
+        view: 'breakdown',
+        measure: 'total',
+        value: 12,
+        rows: [
+          { value: 'pro', result: 6 },
+          { value: null, result: 2 },
+        ],
+        other: { value: null, result: 4 },
+      },
+      NOW,
+    )
     expect(view.bars?.items.map((item) => [item.label, item.value])).toEqual([
       ['pro', 6],
       ['(not set)', 2],
@@ -148,21 +156,112 @@ describe('insight views', () => {
   })
 
   it('label the last per-user bucket as and more', () => {
-    const view = insightView({
-      view: 'distribution',
-      users: 3,
-      buckets: [
-        { times: 1, or_more: false, users: 2 },
-        { times: 5, or_more: true, users: 1 },
-      ],
-    })
+    const view = insightView(
+      {
+        view: 'distribution',
+        users: 3,
+        buckets: [
+          { times: 1, or_more: false, users: 2 },
+          { times: 5, or_more: true, users: 1 },
+        ],
+      },
+      NOW,
+    )
     expect(view.bars?.items.map((item) => item.label)).toEqual(['1 time', '5+ times'])
   })
 
+  it('stop at now and mark the open bucket', () => {
+    const points = [
+      { start: '2026-01-09T00:00:00Z', value: 3 },
+      { start: '2026-01-10T00:00:00Z', value: 1 },
+      { start: '2026-01-11T00:00:00Z', value: 0 },
+    ]
+    const series = {
+      view: 'series' as const,
+      measure: 'total' as const,
+      interval: 'day' as const,
+      value: 4,
+      points,
+    }
+    const view = insightView(series, NOW)
+    expect(view.chart?.points.map((p) => p.values[0])).toEqual([3, 1])
+    expect(view.chart?.partialFrom).toBe(1)
+    expect(view.trendValue).toBe(4)
+    expect(view.trendMode).toBe('relative')
+    // Just after midnight the new day is the open one.
+    const next = insightView(series, Date.parse('2026-01-11T00:00:01Z'))
+    expect(next.chart?.points).toHaveLength(3)
+    expect(next.chart?.partialFrom).toBe(2)
+  })
+
+  it('mark the first hour open just after midnight', () => {
+    const view = insightView(
+      {
+        view: 'series',
+        measure: 'users',
+        interval: 'hour',
+        value: 1,
+        points: [
+          { start: '2026-01-10T00:00:00Z', value: 1 },
+          { start: '2026-01-10T01:00:00Z', value: 0 },
+        ],
+      },
+      Date.parse('2026-01-10T00:20:00Z'),
+    )
+    expect(view.chart?.points).toHaveLength(1)
+    expect(view.chart?.partialFrom).toBe(0)
+  })
+
+  it('leave a past range with nothing open', () => {
+    const view = insightView(
+      {
+        view: 'series',
+        measure: 'total',
+        interval: 'day',
+        value: 1,
+        points: [{ start: '2026-01-01T00:00:00Z', value: 1 }],
+      },
+      NOW,
+    )
+    expect(view.chart?.partialFrom).toBeUndefined()
+  })
+
+  it('compare shares in points', () => {
+    const view = insightView(
+      { view: 'series', measure: 'share', interval: 'day', value: 0.3, active: 10, points: [] },
+      NOW,
+    )
+    expect(view.trendMode).toBe('points')
+    expect(view.chart?.series[0]?.unit).toBe('%')
+  })
+
   it('count people against everyone known', () => {
-    const view = insightView({ view: 'count', people: 137, known: 1204 })
+    const view = insightView({ view: 'count', people: 137, known: 1204 }, NOW)
     expect(view.headline.value).toBe('137')
     expect(view.caption).toBe('of 1,204 known')
+    expect(view.trendValue).toBeUndefined()
+  })
+})
+
+describe('insight displays', () => {
+  it('offer what each view can draw, default first', () => {
+    expect(displayOptions('series')).toEqual(['line', 'bar', 'number'])
+    expect(displayOptions('breakdown')).toEqual(['list', 'number'])
+    expect(displayOptions('count')).toEqual(['number'])
+  })
+
+  it('draw the saved choice when the view can, else the default', () => {
+    expect(resolveDisplay('auto', 'series')).toBe('line')
+    expect(resolveDisplay('bar', 'series')).toBe('bar')
+    expect(resolveDisplay('number', 'breakdown')).toBe('number')
+    expect(resolveDisplay('bar', 'breakdown')).toBe('list')
+    expect(resolveDisplay('line', 'distribution')).toBe('list')
+    expect(resolveDisplay('line', 'count')).toBe('number')
+  })
+
+  it('store a ranked list as bar', () => {
+    expect(storedDisplay('list')).toBe('bar')
+    expect(storedDisplay('number')).toBe('number')
   })
 })
 
