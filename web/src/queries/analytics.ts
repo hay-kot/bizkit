@@ -73,6 +73,7 @@ import type {
   Site,
   Step,
   StepResult,
+  Summary,
 } from '@/api/gen/types.gen'
 import { errorCode } from '@/lib/errors'
 import type { DayRange } from '@/lib/range'
@@ -111,6 +112,7 @@ export type {
   Site,
   Step,
   StepResult,
+  Summary,
 }
 
 /** The site; the query fails with `not_found` while analytics is off. */

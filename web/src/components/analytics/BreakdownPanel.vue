@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import BarList, { type BarListItem } from '@/components/ui/BarList.vue'
@@ -25,8 +26,12 @@ const props = withDefaults(
     blank?: string
     /** Shown under the list when every row is blank, such as how to fill it. */
     blankHint?: string
+    /** A line under the title. */
+    description?: string
+    /** Where "Explore" in the heading goes, such as the events explorer. */
+    explore?: RouteLocationRaw
   }>(),
-  { blank: '(none)', blankHint: undefined },
+  { blank: '(none)', blankHint: undefined, description: undefined, explore: undefined },
 )
 
 const first = props.dimensions[0]
@@ -77,9 +82,16 @@ const showingAll = ref(false)
 </script>
 
 <template>
-  <PageSection :title="title">
-    <template v-if="dimensions.length > 1" #actions>
-      <Select v-model="dimension" :options="dimensions" :label="`${title} by`" size="toolbar" />
+  <PageSection :title="title" :description="description">
+    <template v-if="dimensions.length > 1 || explore" #actions>
+      <Select
+        v-if="dimensions.length > 1"
+        v-model="dimension"
+        :options="dimensions"
+        :label="`${title} by`"
+        size="toolbar"
+      />
+      <RouterLink v-if="explore" :to="explore" class="btn h-9 btn-ghost">Explore</RouterLink>
     </template>
     <ErrorAlert v-if="error" :error="error" />
     <BarList

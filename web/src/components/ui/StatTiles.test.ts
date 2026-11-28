@@ -20,11 +20,13 @@ describe('StatTiles', () => {
     })
     const tiles = wrapper.findAll('dl > div').map((tile) => ({
       label: tile.get('dt').text(),
-      shown: [tile.get('dd'), ...tile.findAll('span[aria-hidden="true"]')].map((d) => d.text()),
+      shown: [tile.get('.text-2xl'), ...tile.findAll('span[aria-hidden="true"]')].map((d) =>
+        d.text(),
+      ),
       spoken: tile.find('.sr-only').exists() ? tile.get('.sr-only').text() : undefined,
-      tone: tile.find('.text-success').exists()
+      tone: tile.find('.badge-success').exists()
         ? 'success'
-        : tile.find('.text-error').exists()
+        : tile.find('.badge-error').exists()
           ? 'error'
           : undefined,
     }))
@@ -55,6 +57,24 @@ describe('StatTiles', () => {
         tone: undefined,
       },
     ])
+  })
+
+  it('says the previous value and draws a sparkline when given a series', () => {
+    const wrapper = mount(StatTiles, {
+      props: {
+        tiles: [
+          { label: 'Visitors', value: 76, previous: 51, series: [3, 5, 4], partialFrom: 2 },
+          { label: 'Rate', value: 0.2, previous: 0.25, format: 'percent' },
+          { label: 'Events', value: 9 },
+        ],
+      },
+    })
+    const tiles = wrapper.findAll('dl > div')
+    expect(text(tiles[0]!.text())).toContain('vs. 51 prior')
+    expect(text(tiles[1]!.text())).toContain('vs. 25% prior')
+    expect(tiles[2]!.text()).not.toContain('prior')
+    expect(tiles[0]!.find('[data-part="partial"]').exists()).toBe(true)
+    expect(tiles[1]!.find('[data-part="area"]').exists()).toBe(false)
   })
 
   it('shows skeletons while loading', () => {

@@ -97,7 +97,8 @@ describe('TimeSeriesChart', () => {
     const muted = wrapper
       .findAll('path.stroke-base-content\\/40')
       .map((p) => p.attributes('stroke-dasharray'))
-    expect(muted).toEqual(['4 4', '1 4'])
+    // The previous period has ended, so it stays dashed to the end.
+    expect(muted).toEqual(['4 4'])
   })
 
   it('dots the whole line when the first bucket is unfinished', () => {

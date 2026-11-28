@@ -5,6 +5,7 @@ import {
   type Coord,
   monotoneSegments,
   niceTicks,
+  openFrom,
   pathBetween,
   spreadIndexes,
 } from './chart'
@@ -112,5 +113,25 @@ describe('barPath', () => {
 
   it('draws nothing for an empty bar', () => {
     expect(barPath(0, 10, 20, 0, 3)).toBe('')
+  })
+})
+
+describe('openFrom', () => {
+  const DAY = 86_400_000
+  const days = ['2026-11-26T00:00:00Z', '2026-11-27T00:00:00Z', '2026-11-28T00:00:00Z']
+
+  it('finds the bucket that runs at now', () => {
+    expect(openFrom(days, DAY, Date.parse('2026-11-28T09:00:00Z'))).toBe(2)
+  })
+
+  it('treats a bucket as ended at its last millisecond', () => {
+    expect(openFrom(days, DAY, Date.parse('2026-11-29T00:00:00Z'))).toBeUndefined()
+    expect(openFrom(days, DAY, Date.parse('2026-11-28T23:59:59.999Z'))).toBe(2)
+  })
+
+  it('works per hour and for no buckets', () => {
+    const hours = ['2026-11-28T08:00:00Z', '2026-11-28T09:00:00Z']
+    expect(openFrom(hours, 3_600_000, Date.parse('2026-11-28T09:30:00Z'))).toBe(1)
+    expect(openFrom([], DAY, 0)).toBeUndefined()
   })
 })

@@ -41,7 +41,8 @@ export interface ChartSeries {
  *
  * `partialFrom` marks the first point whose bucket hasn't ended (today, or
  * this hour): lines draw dotted from the point before it, and its bar is
- * hatched, so a count still filling up doesn't read as a drop.
+ * hatched, so a count still filling up doesn't read as a drop. A muted
+ * series (the previous period) stays whole: its buckets have all ended.
  */
 const props = withDefaults(
   defineProps<{
@@ -139,10 +140,12 @@ const lines = computed(() =>
       seriesIndex === 0 && s.tone === 'primary' && first && end && last > 0
         ? `${whole} L${end[0]},${baseline.value} L${first[0]},${baseline.value} Z`
         : undefined
+    // A muted series is an earlier period: its last bucket has ended.
+    const solidTo = s.tone === 'muted' ? last : split.value
     return {
       ...s,
-      solid: split.value > 0 ? pathBetween(coords, segments, 0, split.value) : '',
-      partial: split.value < last ? pathBetween(coords, segments, split.value, last) : '',
+      solid: solidTo > 0 ? pathBetween(coords, segments, 0, solidTo) : '',
+      partial: solidTo < last ? pathBetween(coords, segments, solidTo, last) : '',
       area,
       dot: last === 0 ? first : undefined,
     }
