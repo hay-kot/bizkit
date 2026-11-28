@@ -66,6 +66,7 @@ const options = computed(() => [
       <RetentionTable
         v-else
         :cohorts="retention.data.value?.cohorts"
+        :today="today"
         :loading="retention.isPending.value"
         :error="retention.error.value"
       />
