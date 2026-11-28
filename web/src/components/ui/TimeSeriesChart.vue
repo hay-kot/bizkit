@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { useElementSize } from '@vueuse/core'
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 
-import { niceTicks, spreadIndexes } from '@/lib/chart'
+import {
+  barPath,
+  type Coord,
+  monotoneSegments,
+  niceTicks,
+  pathBetween,
+  spreadIndexes,
+} from '@/lib/chart'
 import { formatCompactNumber, formatNumber } from '@/lib/format'
 
 export interface ChartPoint {
@@ -21,17 +28,31 @@ export interface ChartSeries {
    * `chart-4`), the first one with an area; `muted` a faint dashed line.
    */
   tone: 'primary' | 'muted'
+  /** Written after each value in the tooltip, badges and table, such as `%`. */
+  unit?: string
 }
 
 /**
- * A line chart over time, drawn as SVG. Hover, or focus and use the arrow
- * keys, to read a point. Screen readers get a summary and a hidden table.
- * With `fill` the plot grows to the space its flex parent gives it, at
- * least 12rem, and `height` only applies before the first layout.
+ * A chart over time, drawn as SVG: smooth lines, or bars for the first
+ * series with value badges when they fit. Hover, or focus and use the
+ * arrow keys, to read a point. Screen readers get a summary and a hidden
+ * table. With `fill` the plot grows to the space its flex parent gives it,
+ * at least 12rem, and `height` only applies before the first layout.
+ *
+ * `partialFrom` marks the first point whose bucket hasn't ended (today, or
+ * this hour): lines draw dotted from the point before it, and its bar is
+ * hatched, so a count still filling up doesn't read as a drop.
  */
 const props = withDefaults(
-  defineProps<{ points: ChartPoint[]; series: ChartSeries[]; height?: number; fill?: boolean }>(),
-  { height: 240, fill: false },
+  defineProps<{
+    points: ChartPoint[]
+    series: ChartSeries[]
+    height?: number
+    fill?: boolean
+    kind?: 'line' | 'bar'
+    partialFrom?: number
+  }>(),
+  { height: 240, fill: false, kind: 'line', partialFrom: undefined },
 )
 
 // Static class strings, so Tailwind sees every one. Past four series the
@@ -56,7 +77,14 @@ const tones = computed(() => {
   )
 })
 
-const PAD = { top: 12, right: 12, bottom: 28, left: 44 }
+const PAD = { right: 12, bottom: 28, left: 44 }
+// Bars leave room above the tallest one for its badge.
+const padTop = computed(() => (props.kind === 'bar' ? 24 : 12))
+// Muted is the previous period, dashed; dots mark the unfinished bucket.
+const MUTED_DASH = '4 4'
+const PARTIAL_DASH = '1 4'
+const BADGE_WIDTH = 64
+const hatchId = useId()
 const TOOLTIP_WIDTH = 200
 const TOOLTIP_HEIGHT = 96
 
@@ -70,8 +98,9 @@ const plotBox = ref<HTMLElement>()
 const { height: measuredHeight } = useElementSize(plotBox)
 const drawHeight = computed(() => (props.fill && measuredHeight.value) || props.height)
 const plotWidth = computed(() => Math.max(1, width.value - PAD.left - PAD.right))
-const plotHeight = computed(() => Math.max(1, drawHeight.value - PAD.top - PAD.bottom))
-const baseline = computed(() => PAD.top + plotHeight.value)
+const plotHeight = computed(() => Math.max(1, drawHeight.value - padTop.value - PAD.bottom))
+const baseline = computed(() => padTop.value + plotHeight.value)
+const band = computed(() => plotWidth.value / Math.max(1, props.points.length))
 
 const ticks = computed(() => {
   const max = Math.max(0, ...props.points.flatMap((p) => p.values))
@@ -79,8 +108,10 @@ const ticks = computed(() => {
 })
 const top = computed(() => ticks.value[ticks.value.length - 1] || 1)
 
+/** A point's x: spread edge to edge for lines, the band's middle for bars. */
 function x(index: number): number {
   const count = props.points.length
+  if (props.kind === 'bar') return PAD.left + band.value * (index + 0.5)
   if (count <= 1) return PAD.left + plotWidth.value / 2
   return PAD.left + (index / (count - 1)) * plotWidth.value
 }
@@ -89,19 +120,57 @@ function y(value: number): number {
   return baseline.value - (value / top.value) * plotHeight.value
 }
 
+/** The index the dotted part starts from, or the last index when nothing is unfinished. */
+const split = computed(() => {
+  const last = props.points.length - 1
+  const from = props.partialFrom
+  return from === undefined || from > last ? last : Math.max(0, from - 1)
+})
+
 const lines = computed(() =>
   props.series.map((s, seriesIndex) => {
-    const coords = props.points.map((p, i) => [x(i), y(p.values[seriesIndex] ?? 0)] as const)
-    const line = coords.map(([px, py], i) => `${i ? 'L' : 'M'}${px},${py}`).join(' ')
+    const coords: Coord[] = props.points.map((p, i) => [x(i), y(p.values[seriesIndex] ?? 0)])
+    const segments = monotoneSegments(coords)
+    const last = coords.length - 1
+    const whole = pathBetween(coords, segments, 0, last)
     const first = coords[0]
-    const last = coords[coords.length - 1]
+    const end = coords[last]
     const area =
-      seriesIndex === 0 && s.tone === 'primary' && first && last
-        ? `${line} L${last[0]},${baseline.value} L${first[0]},${baseline.value} Z`
+      seriesIndex === 0 && s.tone === 'primary' && first && end && last > 0
+        ? `${whole} L${end[0]},${baseline.value} L${first[0]},${baseline.value} Z`
         : undefined
-    return { ...s, line, area }
+    return {
+      ...s,
+      solid: split.value > 0 ? pathBetween(coords, segments, 0, split.value) : '',
+      partial: split.value < last ? pathBetween(coords, segments, split.value, last) : '',
+      area,
+      dot: last === 0 ? first : undefined,
+    }
   }),
 )
+
+function display(value: number, s: ChartSeries | undefined): string {
+  return `${formatNumber(value)}${s?.unit ?? ''}`
+}
+
+const bars = computed(() => {
+  if (props.kind !== 'bar') return []
+  const width = band.value * 0.7
+  const showBadges = band.value >= 28 && props.points.length <= 31
+  const unfinished = props.partialFrom ?? props.points.length
+  return props.points.map((p, i) => {
+    const value = p.values[0] ?? 0
+    const top = y(value)
+    return {
+      key: p.t,
+      d: barPath(x(i) - width / 2, top, width, baseline.value - top, 3),
+      partial: i >= unfinished,
+      badge: showBadges && value > 0 ? display(value, props.series[0]) : undefined,
+      badgeX: x(i) - BADGE_WIDTH / 2,
+      badgeY: top - 22,
+    }
+  })
+})
 
 const xLabels = computed(() => {
   const indexes = spreadIndexes(props.points.length)
@@ -126,7 +195,7 @@ const activePoint = computed(() =>
 const activeText = computed(() => {
   const point = activePoint.value
   if (!point) return ''
-  const values = props.series.map((s, i) => `${s.name} ${formatNumber(point.values[i] ?? 0)}`)
+  const values = props.series.map((s, i) => `${s.name} ${display(point.values[i] ?? 0, s)}`)
   return `${point.label}: ${values.join(', ')}`
 })
 const tooltipX = computed(() => {
@@ -141,7 +210,12 @@ function onPointer(event: PointerEvent) {
   if (!count) return
   const bounds = (event.currentTarget as SVGElement).getBoundingClientRect()
   const offset = event.clientX - bounds.left - PAD.left
-  const index = count === 1 ? 0 : Math.round((offset / plotWidth.value) * (count - 1))
+  const index =
+    props.kind === 'bar'
+      ? Math.floor(offset / band.value)
+      : count === 1
+        ? 0
+        : Math.round((offset / plotWidth.value) * (count - 1))
   active.value = Math.min(count - 1, Math.max(0, index))
 }
 
@@ -235,33 +309,85 @@ const summary = computed(() => {
             {{ tick.label }}
           </text>
 
-          <template v-if="points.length">
+          <template v-if="points.length && kind === 'bar'">
+            <defs>
+              <pattern
+                :id="hatchId"
+                width="6"
+                height="6"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+              >
+                <rect width="6" height="6" class="fill-chart-1/20" />
+                <line x1="0" y1="0" x2="0" y2="6" stroke-width="2" class="stroke-chart-1" />
+              </pattern>
+            </defs>
+            <path
+              v-for="bar in bars"
+              :key="bar.key"
+              :d="bar.d"
+              :fill="bar.partial ? `url(#${hatchId})` : undefined"
+              :class="bar.partial ? undefined : tones[0]?.dot"
+            />
+            <template v-for="bar in bars" :key="`badge-${bar.key}`">
+              <foreignObject
+                v-if="bar.badge"
+                :x="bar.badgeX"
+                :y="bar.badgeY"
+                :width="BADGE_WIDTH"
+                height="20"
+                class="pointer-events-none overflow-visible"
+              >
+                <div class="flex justify-center">
+                  <span
+                    class="rounded-field border bg-base-100 px-1 text-xs leading-4 font-medium tabular-nums"
+                    :class="tones[0]?.key"
+                    >{{ bar.badge }}</span
+                  >
+                </div>
+              </foreignObject>
+            </template>
+          </template>
+          <template v-else-if="points.length">
             <template v-for="s in lines" :key="`area-${s.name}`">
               <path v-if="s.area" :d="s.area" class="fill-chart-1/10" />
             </template>
-            <path
-              v-for="(s, i) in lines"
-              :key="`line-${s.name}`"
-              :d="s.line"
-              fill="none"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-              :stroke-dasharray="s.tone === 'muted' ? '4 4' : undefined"
-              class="stroke-2"
-              :class="tones[i]?.line"
-            />
+            <template v-for="(s, i) in lines" :key="`line-${s.name}`">
+              <path
+                v-if="s.solid"
+                :d="s.solid"
+                fill="none"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+                :stroke-dasharray="s.tone === 'muted' ? MUTED_DASH : undefined"
+                class="stroke-2"
+                :class="tones[i]?.line"
+                data-part="solid"
+              />
+              <path
+                v-if="s.partial"
+                :d="s.partial"
+                fill="none"
+                stroke-linecap="round"
+                :stroke-dasharray="PARTIAL_DASH"
+                class="stroke-2"
+                :class="tones[i]?.line"
+                data-part="partial"
+              />
+              <circle v-if="s.dot" :cx="s.dot[0]" :cy="s.dot[1]" r="3" :class="tones[i]?.dot" />
+            </template>
           </template>
 
           <g v-if="active !== undefined && activePoint">
             <line
               :x1="x(active)"
               :x2="x(active)"
-              :y1="PAD.top"
+              :y1="padTop"
               :y2="baseline"
               class="stroke-base-content/30"
             />
             <circle
-              v-for="(s, i) in series"
+              v-for="(s, i) in kind === 'bar' ? [] : series"
               :key="s.name"
               :cx="x(active)"
               :cy="y(activePoint.values[i] ?? 0)"
@@ -272,7 +398,7 @@ const summary = computed(() => {
             <!-- HTML inside the SVG, so the tooltip is placed with attributes rather than an inline style. -->
             <foreignObject
               :x="tooltipX"
-              :y="PAD.top"
+              :y="padTop"
               :width="TOOLTIP_WIDTH"
               :height="TOOLTIP_HEIGHT"
               class="pointer-events-none overflow-visible"
@@ -290,7 +416,7 @@ const summary = computed(() => {
                     <span class="size-2 rounded-full" :class="tones[i]?.swatch"></span>
                     <span class="text-base-content/70">{{ s.name }}</span>
                     <span class="ml-auto font-medium tabular-nums">{{
-                      formatNumber(activePoint.values[i] ?? 0)
+                      display(activePoint.values[i] ?? 0, s)
                     }}</span>
                   </span>
                 </div>
@@ -326,7 +452,7 @@ const summary = computed(() => {
         <tbody>
           <tr v-for="point in points" :key="point.t">
             <th scope="row">{{ point.label }}</th>
-            <td v-for="(s, i) in series" :key="s.name">{{ formatNumber(point.values[i] ?? 0) }}</td>
+            <td v-for="(s, i) in series" :key="s.name">{{ display(point.values[i] ?? 0, s) }}</td>
           </tr>
         </tbody>
       </table>
