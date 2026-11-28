@@ -21,8 +21,8 @@ export interface StatTile {
 }
 
 /**
- * A row of KPI tiles: the number, a pill with its change against the
- * previous period and the previous value, and an optional sparkline.
+ * A row of KPI tiles: the number, then a pill with its change against
+ * the previous period beside the previous value, and an optional sparkline.
  * Tiles share the row and wrap, two to a row on a phone.
  */
 const props = withDefaults(defineProps<{ tiles: StatTile[]; loading?: boolean }>(), {
@@ -66,10 +66,9 @@ const rows = computed(() =>
         <span class="h-4 w-12 animate-pulse rounded-field bg-base-300"></span>
       </dd>
       <template v-else>
-        <dd class="flex flex-wrap items-center justify-between gap-2">
-          <span class="text-2xl font-semibold tabular-nums">{{ row.value }}</span>
+        <dd class="text-2xl font-semibold tabular-nums">{{ row.value }}</dd>
+        <dd v-if="row.change" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <span
-            v-if="row.change"
             class="badge gap-0.5 badge-soft badge-sm tabular-nums"
             :class="pills[row.change.direction]"
             data-part="change"
@@ -78,9 +77,7 @@ const rows = computed(() =>
             <span aria-hidden="true">{{ row.change.text }}</span>
             <span class="sr-only">{{ row.change.spoken }}</span>
           </span>
-        </dd>
-        <dd v-if="row.prior" class="text-sm text-base-content/70 tabular-nums">
-          {{ row.prior }}
+          <span class="text-base-content/70 tabular-nums">{{ row.prior }}</span>
         </dd>
         <dd v-if="row.series" class="mt-auto pt-2">
           <Sparkline :values="row.series" :partial-from="row.partialFrom" />
